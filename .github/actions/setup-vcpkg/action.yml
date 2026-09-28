@@ -1,0 +1,31 @@
+name: Set up vcpkg
+description: >
+  Clone vcpkg at the builtin-baseline of vcpkg.json, bootstrap it, export
+  VCPKG_ROOT for the CMake presets, and cache built packages between runs.
+
+runs:
+  using: composite
+  steps:
+    - name: Clone vcpkg
+      shell: bash
+      run: |
+        git clone --quiet https://github.com/microsoft/vcpkg "$RUNNER_TEMP/vcpkg"
+        echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+        echo "VCPKG_BINARY_SOURCES=clear;files,$RUNNER_TEMP/vcpkg-cache,readwrite" >> "$GITHUB_ENV"
+        mkdir -p "$RUNNER_TEMP/vcpkg-cache"
+
+    - name: Bootstrap vcpkg (Windows)
+      if: runner.os == 'Windows'
+      shell: cmd
+      run: '"%RUNNER_TEMP%\vcpkg\bootstrap-vcpkg.bat" -disableMetrics'
+
+    - name: Bootstrap vcpkg (Linux / macOS)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: '"$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics'
+
+    - uses: actions/cache@v6
+      with:
+        path: ${{ runner.temp }}/vcpkg-cache
+        key: vcpkg-${{ runner.os }}-${{ github.job }}-${{ hashFiles('vcpkg.json') }}
+        restore-keys: vcpkg-${{ runner.os }}-${{ github.job }}-

@@ -41,7 +41,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Compiler cache: third-party code (GoogleTest...) is not rebuilt on every run.
+      - uses: ./.github/actions/setup-vcpkg
+
       - name: Install ccache
         if: matrix.ccache
         run: ${{ runner.os == 'macOS' && 'brew install ccache' || 'sudo apt-get update && sudo apt-get install -y ccache' }}
@@ -71,6 +72,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: ./.github/actions/setup-vcpkg
+
       # TSan cannot map its shadow memory with the runner's default ASLR entropy.
       - name: Lower ASLR entropy
         if: matrix.preset == 'tsan'
@@ -87,6 +90,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-vcpkg
 
       - name: Install clang-tidy
         run: sudo apt-get update && sudo apt-get install -y clang-tidy
@@ -110,7 +115,7 @@ jobs:
       # Same files as the `format-check` target.
       - name: clang-format
         run: >
-          git ls-files -- {src,include,tests,bench}/'*'.{cpp,cc,hpp,h}
+          git ls-files -- {engine,plugins,game,tests}/'*'.{cpp,hpp}
           | xargs -r clang-format --dry-run --Werror
 
   # Every job above passed on a push to main: the tested commit goes to the mirror.
