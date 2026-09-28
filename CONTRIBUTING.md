@@ -1,5 +1,7 @@
 # Contributing to RType
 
+Rules for code, tests and architecture are in [AGENTS.md](AGENTS.md).
+
 ## Workflow
 
 1. Open (or pick) an issue, then work on a branch named after it.
@@ -7,6 +9,8 @@
 3. Pull requests target `dev`; `dev` is merged into `main` for releases.
 
 ## Build and test
+
+Set `VCPKG_ROOT` first (see the README).
 
 ```sh
 cmake --preset debug
