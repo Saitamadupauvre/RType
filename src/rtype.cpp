@@ -2,8 +2,6 @@
 
 namespace rtype {
 
-std::string greet(const std::string& name) {
-    return "Hello, " + name + "!";
-}
+std::string greet(const std::string& name) { return "Hello, " + name + "!"; }
 
-}  // namespace rtype
+} // namespace rtype
