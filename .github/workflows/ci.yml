@@ -1,4 +1,4 @@
-# Managed by project-bootstrap [779c4ee463cbf6af]: edits here are reported by `status`.
+# Managed by project-bootstrap [40536492ea8dbdb6]: edits here are reported by `status`.
 name: CI
 
 on:
@@ -112,3 +112,51 @@ jobs:
         run: >
           git ls-files -- {src,include,tests,bench}/'*'.{cpp,cc,hpp,h}
           | xargs -r clang-format --dry-run --Werror
+
+  # Every job above passed on a push to main: the tested commit goes to the mirror.
+  # `pb github mirror <ssh-url>` sets MIRROR_URL, MIRROR_KNOWN_HOSTS and MIRROR_SSH_KEY.
+  mirror:
+    name: Mirror
+    needs: [build, sanitizers, tidy, format]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MIRROR_URL: ${{ vars.MIRROR_URL }}
+      HAS_KEY: ${{ secrets.MIRROR_SSH_KEY != '' }}
+    steps:
+      - if: env.MIRROR_URL == '' || env.HAS_KEY != 'true'
+        run: echo "::warning::MIRROR_URL variable or MIRROR_SSH_KEY secret missing, nothing mirrored (run pb github mirror)"
+
+      # Full history: a shallow clone cannot be pushed to an empty mirror.
+      - if: env.MIRROR_URL != '' && env.HAS_KEY == 'true'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Push to the mirror
+        if: env.MIRROR_URL != '' && env.HAS_KEY == 'true'
+        env:
+          SSH_KEY: ${{ secrets.MIRROR_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.MIRROR_KNOWN_HOSTS }}
+        run: |
+          key="$RUNNER_TEMP/mirror_key"
+          hosts="$RUNNER_TEMP/mirror_known_hosts"
+          (umask 077 && printf '%s\n' "$SSH_KEY" | tr -d '\r' > "$key")
+          printf '%s\n' "$KNOWN_HOSTS" > "$hosts"
+          check=yes
+          if [ -z "$KNOWN_HOSTS" ]; then
+            echo "::warning::MIRROR_KNOWN_HOSTS variable missing: the mirror's host key is not checked"
+            check=accept-new
+          fi
+          export GIT_SSH_COMMAND="ssh -i '$key' -o IdentitiesOnly=yes -o UserKnownHostsFile='$hosts' -o StrictHostKeyChecking=$check"
+
+          # Already there (a re-run, or a newer commit mirrored since): nothing to do.
+          if git fetch --quiet "$MIRROR_URL" main 2>/dev/null &&
+            git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "The mirror's main already contains $GITHUB_SHA"
+            exit 0
+          fi
+          # Not forced: a mirror that diverged fails here instead of losing its commits.
+          git push "$MIRROR_URL" "$GITHUB_SHA:refs/heads/main"
