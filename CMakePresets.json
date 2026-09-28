@@ -13,7 +13,8 @@
       "name": "base",
       "hidden": true,
       "binaryDir": "${sourceDir}/build/${presetName}",
-      "installDir": "${sourceDir}/install/${presetName}"
+      "installDir": "${sourceDir}/install/${presetName}",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
     },
     {
       "name": "debug",
@@ -55,7 +56,8 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "RTYPE_WARNINGS_AS_ERRORS": "ON"
+        "RTYPE_WARNINGS_AS_ERRORS": "ON",
+        "ENGINE_WARNINGS_AS_ERRORS": "ON"
       }
     },
     {
