@@ -1,0 +1,52 @@
+# Managed by project-bootstrap [336dc847f11dbb7c]: edits here are reported by `status`.
+# Builds the Doxygen HTML on every pull request; publishes it to GitHub Pages from main.
+# Pages must use "GitHub Actions" as its source (`pb github settings` sets it).
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Doxygen
+        run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
+
+      - name: Generate
+        run: |
+          cmake --preset release
+          cmake --build --preset release --target docs
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/release/docs/html
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

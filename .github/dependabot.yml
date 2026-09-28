@@ -1,0 +1,10 @@
+# Managed by project-bootstrap [33b3367e661c8f54]: edits here are reported by `status`.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

@@ -1,0 +1,16 @@
+# Managed by project-bootstrap [41fa2d5a8bfc2847].
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape,
+  clang-analyzer-*,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  performance-*,
+  readability-const-return-type,
+  readability-container-size-empty,
+  readability-redundant-*
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*/(include|src)/.*'
+FormatStyle: file

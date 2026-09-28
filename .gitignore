@@ -1,0 +1,12 @@
+build/
+install/
+out/
+dist/
+Testing/
+cmake-build-*/
+.vs/
+.idea/
+.cache/
+.ccache/
+CMakeUserPresets.json
+compile_commands.json

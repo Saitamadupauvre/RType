@@ -1,0 +1,114 @@
+# Managed by project-bootstrap [779c4ee463cbf6af]: edits here are reported by `status`.
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its previous run; pushes to branches all finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux GCC
+            os: ubuntu-latest
+            cxx: g++
+            ccache: true
+          - name: Linux Clang
+            os: ubuntu-latest
+            cxx: clang++
+            ccache: true
+          - name: Windows MSVC
+            os: windows-latest
+            ccache: false
+          - name: macOS Clang
+            os: macos-latest
+            ccache: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Compiler cache: third-party code (GoogleTest...) is not rebuilt on every run.
+      - name: Install ccache
+        if: matrix.ccache
+        run: ${{ runner.os == 'macOS' && 'brew install ccache' || 'sudo apt-get update && sudo apt-get install -y ccache' }}
+
+      - uses: actions/cache@v6
+        if: matrix.ccache
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.name }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.name }}-
+
+      - name: Configure, build, test
+        run: cmake --workflow --preset ci
+        env:
+          CXX: ${{ matrix.cxx }}
+          CMAKE_CXX_COMPILER_LAUNCHER: ${{ matrix.ccache && 'ccache' || '' }}
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+
+  sanitizers:
+    name: Sanitizers (${{ matrix.preset }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [asan, tsan]
+    steps:
+      - uses: actions/checkout@v7
+
+      # TSan cannot map its shadow memory with the runner's default ASLR entropy.
+      - name: Lower ASLR entropy
+        if: matrix.preset == 'tsan'
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      - name: Configure, build, test
+        run: cmake --workflow --preset ${{ matrix.preset }}
+        env:
+          CXX: clang++
+
+  tidy:
+    name: clang-tidy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install clang-tidy
+        run: sudo apt-get update && sudo apt-get install -y clang-tidy
+
+      - name: Configure and build with clang-tidy
+        run: cmake --workflow --preset tidy
+        env:
+          CXX: clang++
+
+  format:
+    name: Format check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pinned: another clang-format version may format differently.
+      - name: Install clang-format
+        run: pipx install clang-format==23.1.1
+
+      # Same files as the `format-check` target.
+      - name: clang-format
+        run: >
+          git ls-files -- {src,include,tests,bench}/'*'.{cpp,cc,hpp,h}
+          | xargs -r clang-format --dry-run --Werror
