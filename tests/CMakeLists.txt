@@ -11,6 +11,6 @@ function(engine_add_test module)
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "${module}.")
 endfunction()
 
-engine_add_test(core SOURCES engine/core/EntityTest.cpp engine/core/EntityPoolTest.cpp)
+engine_add_test(core SOURCES engine/core/EntityTest.cpp engine/core/EntityPoolTest.cpp engine/core/ComponentPoolTest.cpp)
 engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
 engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
