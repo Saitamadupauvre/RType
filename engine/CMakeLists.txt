@@ -1,7 +1,7 @@
 include(cmake/EngineModule.cmake)
 
 engine_add_module(core
-    SOURCES src/core/Module.cpp
+    SOURCES src/core/EntityPool.cpp
 )
 
 engine_add_module(script
