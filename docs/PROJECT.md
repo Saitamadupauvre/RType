@@ -123,7 +123,7 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
 ### 4.3 ECS
 
 - Entities are IDs with a generation counter, so a recycled ID is never confused with a destroyed entity.
-- Native components are stored in sparse arrays in C++ (position, velocity, sprite, hitbox, tags...).
+- Native components are stored in component pools (sparse sets) in C++ (position, velocity, sprite, hitbox, tags...).
 - Fields defined by scripts live in Lua tables attached to the entity.
 - Systems are either native (C++: movement, collisions, replication, rendering) or scripted (Lua).
 
@@ -437,7 +437,7 @@ Both forms produce the same internal representation.
 
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `tags` | C++ sparse arrays | Movement, collisions, rendering, replication |
+| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
 | Free fields | `health`, `speed`, `points` | Lua table of the entity | Scripts only |
 | Callbacks | `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
