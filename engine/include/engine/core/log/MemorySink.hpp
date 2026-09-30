@@ -18,6 +18,11 @@ struct MemoryRecord {
     std::string message;
 };
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4251)
+#endif
+
 /**
  * @brief Sink that keeps every record in memory, meant for tests.
  *
@@ -51,5 +56,9 @@ private:
     mutable std::mutex mutex_;
     std::vector<MemoryRecord> records_;
 };
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 } // namespace engine::core::log
