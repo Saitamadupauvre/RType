@@ -18,7 +18,7 @@ architecture, the Lua API and the roadmap.
 4. **Dependencies only through vcpkg.** Add a port to `vcpkg.json` in the same
    pull request as the module that uses it. Never copy library sources, never
    use `FetchContent` or git submodules for third-party code.
-5. **CI must be green** (Linux, Windows, macOS, sanitizers, clang-tidy, format)
+5. **CI must be green** (Linux, macOS, sanitizers, clang-tidy, format)
    before merging.
 
 ## Repository layout
