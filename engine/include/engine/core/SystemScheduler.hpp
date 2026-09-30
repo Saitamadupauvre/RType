@@ -45,8 +45,21 @@ public:
      * @param function Called on every run.
      * @return A handle identifying the system.
      * @throws SystemAlreadyRegistered If a system with this name already exists.
+     * @throws std::logic_error If called while run is executing.
      */
     SystemHandle add(std::string name, int order, SystemFunction function);
+
+    /**
+     * @brief Removes a system and frees its name.
+     *
+     * Safe to call from inside a running system, including on itself: the removed system is not
+     * called again, and if it had not run yet in the current tick it is skipped.
+     *
+     * @param handle Handle returned by add.
+     * @return true if the system existed and is now removed, false for an unknown or already
+     * removed handle.
+     */
+    bool remove(SystemHandle handle);
 
     /**
      * @brief Calls every enabled system once, in order.
@@ -66,13 +79,16 @@ private:
         int order;
         SystemFunction function;
         bool enabled{true};
+        bool removed{false};
     };
 
     static void run_system(System& system, EntityManager& manager, float dt);
     static void disable(System& system, std::string_view reason) noexcept;
+    std::vector<System>::iterator find(SystemHandle handle);
 
     std::vector<System> _systems;
     std::uint64_t _next_id{1};
+    bool _running{false};
 };
 
 } // namespace engine::core
