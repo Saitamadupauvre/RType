@@ -16,6 +16,11 @@
 
 namespace engine::core {
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4275)
+#endif
+
 /** @brief Thrown when a component type is used before being registered. */
 class ENGINE_CORE_EXPORT ComponentNotRegistered : public std::logic_error {
 public:
@@ -29,6 +34,10 @@ public:
     /** @param type_name Name of the offending component type. */
     explicit ComponentAlreadyRegistered(std::string_view type_name);
 };
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 /**
  * @brief Owns the entities and every component pool, and queries them.
