@@ -13,6 +13,7 @@
 namespace logger = engine::core::log;
 using engine::core::EntityManager;
 using engine::core::SystemAlreadyRegistered;
+using engine::core::SystemHandle;
 using engine::core::SystemScheduler;
 
 TEST(SystemScheduler, RunsSystemsByAscendingOrder) {
@@ -187,4 +188,172 @@ TEST(SystemScheduler, DisabledSystemKeepsItsNameReserved) {
     scheduler.run(manager, 0.016F);
 
     EXPECT_THROW(scheduler.add("faulty", 0, [](EntityManager&, float) {}), SystemAlreadyRegistered);
+}
+
+TEST(SystemScheduler, RemovedSystemIsNoLongerCalled) {
+    SystemScheduler scheduler;
+    EntityManager manager;
+    int calls = 0;
+    const SystemHandle handle =
+        scheduler.add("movement", 0, [&](EntityManager&, float) { ++calls; });
+
+    EXPECT_TRUE(scheduler.remove(handle));
+    scheduler.run(manager, 0.016F);
+
+    EXPECT_EQ(calls, 0);
+}
+
+TEST(SystemScheduler, RemoveKeepsTheOrderOfOtherSystems) {
+    SystemScheduler scheduler;
+    EntityManager manager;
+    std::vector<std::string> calls;
+    scheduler.add("first", 1, [&](EntityManager&, float) { calls.emplace_back("first"); });
+    const SystemHandle middle = scheduler.add("middle", 2, [](EntityManager&, float) {});
+    scheduler.add("last", 3, [&](EntityManager&, float) { calls.emplace_back("last"); });
+
+    scheduler.remove(middle);
+    scheduler.run(manager, 0.016F);
+
+    EXPECT_EQ(calls, (std::vector<std::string>{"first", "last"}));
+}
+
+TEST(SystemScheduler, RemoveReturnsFalseForUnknownHandle) {
+    SystemScheduler scheduler;
+
+    EXPECT_FALSE(scheduler.remove(SystemHandle{}));
+    EXPECT_FALSE(scheduler.remove(SystemHandle{42}));
+}
+
+TEST(SystemScheduler, RemoveReturnsFalseWhenAlreadyRemoved) {
+    SystemScheduler scheduler;
+    const SystemHandle handle = scheduler.add("movement", 0, [](EntityManager&, float) {});
+    scheduler.remove(handle);
+
+    EXPECT_FALSE(scheduler.remove(handle));
+}
+
+TEST(SystemScheduler, RemoveFreesTheName) {
+    SystemScheduler scheduler;
+    EntityManager manager;
+    int calls = 0;
+    const SystemHandle handle = scheduler.add("movement", 0, [](EntityManager&, float) {});
+    scheduler.remove(handle);
+
+    EXPECT_NO_THROW(scheduler.add("movement", 0, [&](EntityManager&, float) { ++calls; }));
+    scheduler.run(manager, 0.016F);
+
+    EXPECT_EQ(calls, 1);
+}
+
+TEST(SystemScheduler, RemoveDoesNotAffectTheHandleOfANewSystem) {
+    SystemScheduler scheduler;
+    const SystemHandle removed = scheduler.add("old", 0, [](EntityManager&, float) {});
+    scheduler.remove(removed);
+
+    const SystemHandle fresh = scheduler.add("new", 0, [](EntityManager&, float) {});
+
+    EXPECT_NE(fresh.id, removed.id);
+    EXPECT_FALSE(scheduler.remove(removed));
+    EXPECT_TRUE(scheduler.remove(fresh));
+}
+
+TEST(SystemScheduler, RemovesADisabledSystem) {
+    auto sink = std::make_shared<logger::MemorySink>();
+    logger::ScopedSink scoped(sink, logger::Level::Trace);
+    SystemScheduler scheduler;
+    EntityManager manager;
+    const SystemHandle handle =
+        scheduler.add("faulty", 0, [](EntityManager&, float) { throw std::runtime_error("boom"); });
+    scheduler.run(manager, 0.016F);
+
+    EXPECT_TRUE(scheduler.remove(handle));
+    EXPECT_NO_THROW(scheduler.add("faulty", 0, [](EntityManager&, float) {}));
+}
+
+TEST(SystemScheduler, SystemCanRemoveItselfDuringRun) {
+    SystemScheduler scheduler;
+    EntityManager manager;
+    SystemHandle handle;
+    int calls = 0;
+    handle = scheduler.add("once", 0, [&](EntityManager&, float) {
+        ++calls;
+        scheduler.remove(handle);
+    });
+
+    scheduler.run(manager, 0.016F);
+    scheduler.run(manager, 0.016F);
+
+    EXPECT_EQ(calls, 1);
+}
+
+TEST(SystemScheduler, SystemRemovedDuringRunBeforeItsTurnIsSkipped) {
+    SystemScheduler scheduler;
+    EntityManager manager;
+    SystemHandle victim;
+    std::vector<std::string> calls;
+    scheduler.add("killer", 1, [&](EntityManager&, float) {
+        calls.emplace_back("killer");
+        scheduler.remove(victim);
+    });
+    victim =
+        scheduler.add("victim", 2, [&](EntityManager&, float) { calls.emplace_back("victim"); });
+    scheduler.add("bystander", 3, [&](EntityManager&, float) { calls.emplace_back("bystander"); });
+
+    scheduler.run(manager, 0.016F);
+
+    EXPECT_EQ(calls, (std::vector<std::string>{"killer", "bystander"}));
+}
+
+TEST(SystemScheduler, SystemRemovedDuringRunAfterItsTurnIsGoneNextRun) {
+    SystemScheduler scheduler;
+    EntityManager manager;
+    SystemHandle victim;
+    int victim_calls = 0;
+    victim = scheduler.add("victim", 1, [&](EntityManager&, float) { ++victim_calls; });
+    scheduler.add("killer", 2, [&](EntityManager&, float) { scheduler.remove(victim); });
+
+    scheduler.run(manager, 0.016F);
+    scheduler.run(manager, 0.016F);
+
+    EXPECT_EQ(victim_calls, 1);
+}
+
+TEST(SystemScheduler, RemovingTheSameSystemTwiceDuringRunReportsFalseTheSecondTime) {
+    SystemScheduler scheduler;
+    EntityManager manager;
+    SystemHandle victim;
+    bool first = false;
+    bool second = true;
+    victim = scheduler.add("victim", 2, [](EntityManager&, float) {});
+    scheduler.add("killer", 1, [&](EntityManager&, float) {
+        first = scheduler.remove(victim);
+        second = scheduler.remove(victim);
+    });
+
+    scheduler.run(manager, 0.016F);
+
+    EXPECT_TRUE(first);
+    EXPECT_FALSE(second);
+}
+
+TEST(SystemScheduler, AddDuringRunIsRejectedAndSchedulerKeepsWorking) {
+    SystemScheduler scheduler;
+    EntityManager manager;
+    int rejected = 0;
+    int calls = 0;
+    scheduler.add("adder", 0, [&](EntityManager&, float) {
+        ++calls;
+        try {
+            scheduler.add("late", 1, [](EntityManager&, float) {});
+        } catch (const std::logic_error&) {
+            ++rejected;
+        }
+    });
+
+    scheduler.run(manager, 0.016F);
+    scheduler.run(manager, 0.016F);
+
+    EXPECT_EQ(rejected, 2);
+    EXPECT_EQ(calls, 2);
+    EXPECT_NO_THROW(scheduler.add("late", 1, [](EntityManager&, float) {}));
 }
