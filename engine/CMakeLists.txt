@@ -4,7 +4,7 @@ engine_add_module(core
     SOURCES
         src/core/EntityPool.cpp
         src/core/ComponentTypeId.cpp
-        src/core/Registry.cpp
+        src/core/EntityManager.cpp
         src/core/event/EventBus.cpp
         src/core/log/Log.cpp
         src/core/log/MemorySink.cpp
