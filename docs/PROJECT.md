@@ -61,7 +61,7 @@ See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as
 
 ### Common requirements (evaluated at both defenses)
 
-- Cross-platform: Linux (required) and Windows (strongly recommended), tested in CI from day one.
+- Cross-platform: Linux (required) and macOS, tested in CI from day one. Windows support is postponed: new code is not required to compile on Windows for now, and the CI has no Windows job.
 - Dependencies handled only by a package manager; no library sources copied into the repository.
 - Git workflow: branches, pull requests, reviews, issues, tags.
 - Documentation in English, published online.
@@ -82,7 +82,7 @@ See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as
 | Tests | GoogleTest | Decided. |
 | Logging | spdlog | Levels, timestamps, per-module loggers. |
 | Documentation | MkDocs (or equivalent) | Markdown in the repository, published online. |
-| Formatting / CI | Already set up by the team | clang-format, Linux + Windows builds. |
+| Formatting / CI | Already set up by the team | clang-format, Linux + macOS builds. |
 
 Linux system packages required by Raylib (X11, OpenGL, ALSA development headers) are low-level system dependencies and are listed in the README.
 
@@ -676,7 +676,7 @@ Each measure is documented as it is implemented.
   2. ECS behaviour;
   3. Lua loading: duplicate names, scripts with errors, reserved names;
   4. plugin loading: missing library, missing symbol, wrong API version.
-- **CI:** Linux and Windows builds with cached dependencies (already set up).
+- **CI:** Linux and macOS builds with cached dependencies (already set up).
 - **Packaging:** CPack produces archives/installers containing executables, engine libraries, the `plugins/` folder, scripts and assets.
 
 ---
@@ -700,7 +700,7 @@ All documentation is in English and published online.
 
 | Week | Goals |
 |---|---|
-| 1 | ECS core and fixed-timestep loop; graphics plugin (window, starfield, sprites, input); network foundations; Lua runtime loading declarations; CI green on Linux and Windows. |
+| 1 | ECS core and fixed-timestep loop; graphics plugin (window, starfield, sprites, input); network foundations; Lua runtime loading declarations; CI green on Linux and macOS. |
 | 2 | Lua API: entities, callbacks, globals, systems; player movement and shooting; Bydo spawning; collisions; replication of native fields; sounds. |
 | 3 | 4-player stability, disconnection handling, malformed-packet tests, accessibility measures, documentation, packaging, tag `v1.0`. |
 

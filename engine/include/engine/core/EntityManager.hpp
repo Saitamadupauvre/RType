@@ -8,11 +8,11 @@
 #include <vector>
 
 #include "engine/core/ComponentPool.hpp"
+#include "engine/core/ComponentQuery.hpp"
 #include "engine/core/ComponentTypeId.hpp"
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityPool.hpp"
 #include "engine/core/Export.hpp"
-#include "engine/core/View.hpp"
 
 namespace engine::core {
 
@@ -28,7 +28,7 @@ public:
     explicit ComponentNotRegistered(std::string_view type_name);
 };
 
-/** @brief Thrown when a component type is registered twice in the same registry. */
+/** @brief Thrown when a component type is registered twice in the same manager. */
 class ENGINE_CORE_EXPORT ComponentAlreadyRegistered : public std::logic_error {
 public:
     /** @param type_name Name of the offending component type. */
@@ -45,9 +45,9 @@ public:
  * Component types must be registered before use. Killing an entity removes all
  * its components.
  *
- * @note Not thread safe: use one registry per thread or synchronize externally.
+ * @note Not thread safe: use one manager per thread or synchronize externally.
  */
-class Registry {
+class EntityManager {
 public:
     /**
      * @brief Creates a new entity.
@@ -69,7 +69,7 @@ public:
     [[nodiscard]] ENGINE_CORE_EXPORT bool alive(Entity entity) const noexcept;
 
     /**
-     * @brief Makes a component type usable in this registry.
+     * @brief Makes a component type usable in this manager.
      * @tparam T Component type.
      * @throws ComponentAlreadyRegistered If T is already registered.
      */
@@ -115,15 +115,15 @@ public:
     template <typename T> [[nodiscard]] T& get(Entity entity) { return pool_of<T>().get(entity); }
 
     /**
-     * @brief Builds a view over the entities owning all the listed components.
+     * @brief Builds a query over the entities owning all the listed components.
      * @tparam First First component type.
      * @tparam Rest Other component types. All types must be distinct.
      * @throws ComponentNotRegistered If one of the types is not registered.
      */
     template <typename First, typename... Rest>
         requires DistinctTypes<First, Rest...>
-    [[nodiscard]] View<First, Rest...> view() {
-        return View<First, Rest...>(pool_of<First>(), pool_of<Rest>()...);
+    [[nodiscard]] ComponentQuery<First, Rest...> query() {
+        return ComponentQuery<First, Rest...>(pool_of<First>(), pool_of<Rest>()...);
     }
 
 private:
