@@ -1,7 +1,13 @@
 include(cmake/EngineModule.cmake)
 
 engine_add_module(core
-    SOURCES src/core/EntityPool.cpp src/core/ComponentTypeId.cpp src/core/Registry.cpp
+    SOURCES
+        src/core/EntityPool.cpp
+        src/core/ComponentTypeId.cpp
+        src/core/Registry.cpp
+        src/core/log/Log.cpp
+        src/core/log/MemorySink.cpp
+        src/core/log/StderrSink.cpp
 )
 
 engine_add_module(script
