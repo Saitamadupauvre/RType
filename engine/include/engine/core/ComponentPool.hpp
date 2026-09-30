@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -28,8 +29,8 @@ namespace engine::core {
  */
 template <typename T> class ComponentPool {
 public:
-    using iterator = typename std::vector<T>::iterator;
-    using const_iterator = typename std::vector<T>::const_iterator;
+    using iterator = std::vector<T>::iterator;
+    using const_iterator = std::vector<T>::const_iterator;
 
     /**
      * @brief Stores a component for an entity, replacing any previous one.
@@ -58,8 +59,11 @@ public:
             _sparse.resize(static_cast<std::size_t>(entity.index()) + 1, no_slot);
         }
 
-        _entities.reserve(_entities.size() + 1);
-        _values.reserve(_values.size() + 1);
+        if (_values.size() == _values.capacity()) {
+            const std::size_t grown = std::max(min_capacity, _values.capacity() * 2);
+            _entities.reserve(grown);
+            _values.reserve(grown);
+        }
         _sparse[entity.index()] = static_cast<std::uint32_t>(_values.size());
         _entities.push_back(entity);
         _values.push_back(std::move(value));
@@ -145,6 +149,7 @@ public:
 
 private:
     static constexpr std::uint32_t no_slot = std::numeric_limits<std::uint32_t>::max();
+    static constexpr std::size_t min_capacity = 8;
 
     [[nodiscard]] std::uint32_t slot_of_index(std::uint32_t index) const noexcept {
         return index < _sparse.size() ? _sparse[index] : no_slot;

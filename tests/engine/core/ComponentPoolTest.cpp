@@ -33,7 +33,7 @@ TEST(ComponentPool, InsertStoresComponent) {
     ComponentPool<Position> pool;
     const Entity entity{4, 0};
 
-    pool.insert(entity, Position{1, 2});
+    pool.insert(entity, Position{.x = 1, .y = 2});
 
     EXPECT_TRUE(pool.contains(entity));
     EXPECT_EQ(pool.get(entity), (Position{1, 2}));
@@ -44,7 +44,7 @@ TEST(ComponentPool, EmplaceConstructsInPlace) {
     ComponentPool<Position> pool;
     const Entity entity{2, 0};
 
-    Position& position = pool.emplace(entity, Position{5, 6});
+    Position& position = pool.emplace(entity, Position{.x = 5, .y = 6});
 
     EXPECT_EQ(position, (Position{5, 6}));
     EXPECT_EQ(&position, &pool.get(entity));
@@ -273,4 +273,35 @@ TEST(ComponentPool, KeepsLookupsCorrectAfterManyRemovals) {
             EXPECT_EQ(pool.get(entity), static_cast<int>(i));
         }
     }
+}
+
+namespace {
+
+struct RelocationCounter {
+    static inline std::size_t relocations = 0;
+
+    int value = 0;
+
+    explicit RelocationCounter(int initial) : value(initial) {}
+    RelocationCounter(const RelocationCounter& other) : value(other.value) { ++relocations; }
+    RelocationCounter(RelocationCounter&& other) noexcept : value(other.value) { ++relocations; }
+    RelocationCounter& operator=(const RelocationCounter&) = default;
+    RelocationCounter& operator=(RelocationCounter&&) noexcept = default;
+    ~RelocationCounter() = default;
+};
+
+} // namespace
+
+TEST(ComponentPool, GrowsGeometricallyWhenInsertingManyComponents) {
+    constexpr std::uint32_t count = 2000;
+    ComponentPool<RelocationCounter> pool;
+    RelocationCounter::relocations = 0;
+
+    for (std::uint32_t index = 0; index < count; ++index) {
+        pool.emplace(Entity(index, 0), static_cast<int>(index));
+    }
+
+    EXPECT_LT(RelocationCounter::relocations, std::size_t{count} * 8);
+    EXPECT_EQ(pool.size(), count);
+    EXPECT_EQ(pool.get(Entity(count - 1, 0)).value, static_cast<int>(count - 1));
 }
