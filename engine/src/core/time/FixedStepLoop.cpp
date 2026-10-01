@@ -6,41 +6,41 @@
 namespace engine::core::time {
 
 FixedStepLoop::FixedStepLoop(const IClock& clock, FixedStepConfig config)
-    : clock_(&clock), config_(config), last_(clock.now()) {
-    if (config_.step <= Duration::zero()) {
+    : _clock(&clock), _config(config), _last(clock.now()) {
+    if (_config.step <= Duration::zero()) {
         throw std::invalid_argument("FixedStepLoop step must be positive");
     }
-    if (config_.max_steps_per_frame == 0) {
+    if (_config.max_steps_per_frame == 0) {
         throw std::invalid_argument("FixedStepLoop max_steps_per_frame must be positive");
     }
 }
 
 std::size_t FixedStepLoop::run_frame(const Update& update) {
-    const Duration now = clock_->now();
-    accumulator_ += std::max(now - last_, Duration::zero());
-    last_ = now;
+    const Duration now = _clock->now();
+    _accumulator += std::max(now - _last, Duration::zero());
+    _last = now;
 
     std::size_t steps = 0;
-    while (accumulator_ >= config_.step && steps < config_.max_steps_per_frame) {
-        accumulator_ -= config_.step;
+    while (_accumulator >= _config.step && steps < _config.max_steps_per_frame) {
+        _accumulator -= _config.step;
         ++steps;
         try {
-            update(config_.step);
+            update(_config.step);
         } catch (...) {
-            accumulator_ = Duration::zero();
+            _accumulator = Duration::zero();
             throw;
         }
     }
-    if (accumulator_ >= config_.step) {
-        accumulator_ = Duration::zero();
+    if (_accumulator >= _config.step) {
+        _accumulator = Duration::zero();
     }
     return steps;
 }
 
 double FixedStepLoop::alpha() const {
-    return static_cast<double>(accumulator_.count()) / static_cast<double>(config_.step.count());
+    return static_cast<double>(_accumulator.count()) / static_cast<double>(_config.step.count());
 }
 
-Duration FixedStepLoop::step() const { return config_.step; }
+Duration FixedStepLoop::step() const { return _config.step; }
 
 } // namespace engine::core::time

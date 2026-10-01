@@ -24,7 +24,7 @@ public:
     void advance(Duration delta);
 
 private:
-    Duration current_{};
+    Duration _current{};
 };
 
 } // namespace engine::core::time
