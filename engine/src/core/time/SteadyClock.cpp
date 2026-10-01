@@ -13,10 +13,10 @@ Duration steady_now() {
 
 } // namespace
 
-SteadyClock::SteadyClock() : origin_(steady_now()) {}
+SteadyClock::SteadyClock() : _origin(steady_now()) {}
 
 SteadyClock::~SteadyClock() = default;
 
-Duration SteadyClock::now() const { return steady_now() - origin_; }
+Duration SteadyClock::now() const { return steady_now() - _origin; }
 
 } // namespace engine::core::time

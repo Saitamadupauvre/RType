@@ -18,7 +18,7 @@ public:
     [[nodiscard]] Duration now() const override;
 
 private:
-    Duration origin_;
+    Duration _origin;
 };
 
 } // namespace engine::core::time

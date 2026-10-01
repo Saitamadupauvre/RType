@@ -59,10 +59,10 @@ public:
     [[nodiscard]] Duration step() const;
 
 private:
-    const IClock* clock_;
-    FixedStepConfig config_;
-    Duration last_;
-    Duration accumulator_{};
+    const IClock* _clock;
+    FixedStepConfig _config;
+    Duration _last;
+    Duration _accumulator{};
 };
 
 } // namespace engine::core::time
