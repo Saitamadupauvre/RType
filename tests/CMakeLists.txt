@@ -20,6 +20,8 @@ engine_add_test(core SOURCES
     engine/core/event/EventBusTest.cpp
     engine/core/log/LogTest.cpp
     engine/core/log/MemorySinkTest.cpp
+    engine/core/time/ManualClockTest.cpp
+    engine/core/time/FixedStepLoopTest.cpp
 )
 engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
 engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
