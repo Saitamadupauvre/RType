@@ -6,6 +6,7 @@
 #include "Cli.hpp"
 
 using rtype::server::parse_cli;
+using rtype::server::ServerConfig;
 
 namespace {
 
@@ -30,15 +31,14 @@ void expect_rejected(const std::vector<std::string>& arguments) {
 TEST(ServerCli, AcceptsValidPort) {
     const auto result = parse_cli(args({"4242"}));
 
-    ASSERT_TRUE(result.config.has_value());
-    EXPECT_EQ(result.config->port, 4242);
+    EXPECT_EQ(result.config, ServerConfig{.port = 4242});
     EXPECT_EQ(result.exit_code, 0);
     EXPECT_TRUE(result.message.empty());
 }
 
 TEST(ServerCli, AcceptsPortBounds) {
-    EXPECT_EQ(parse_cli(args({"1"})).config->port, 1);
-    EXPECT_EQ(parse_cli(args({"65535"})).config->port, 65535);
+    EXPECT_EQ(parse_cli(args({"1"})).config, ServerConfig{.port = 1});
+    EXPECT_EQ(parse_cli(args({"65535"})).config, ServerConfig{.port = 65535});
 }
 
 TEST(ServerCli, PrintsHelpWithShortAndLongFlag) {

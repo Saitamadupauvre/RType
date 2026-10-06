@@ -9,6 +9,8 @@ namespace rtype::server {
 
 struct ServerConfig {
     std::uint16_t port;
+
+    bool operator==(const ServerConfig&) const = default;
 };
 
 struct CliResult {
