@@ -59,7 +59,7 @@ public:
     [[nodiscard]] Duration step() const;
 
 private:
-    const IClock* _clock;
+    std::reference_wrapper<const IClock> _clock;
     FixedStepConfig _config;
     Duration _last;
     Duration _accumulator{};

@@ -6,7 +6,7 @@
 namespace engine::core::time {
 
 FixedStepLoop::FixedStepLoop(const IClock& clock, FixedStepConfig config)
-    : _clock(&clock), _config(config), _last(clock.now()) {
+    : _clock(clock), _config(config), _last(clock.now()) {
     if (_config.step <= Duration::zero()) {
         throw std::invalid_argument("FixedStepLoop step must be positive");
     }
@@ -16,7 +16,7 @@ FixedStepLoop::FixedStepLoop(const IClock& clock, FixedStepConfig config)
 }
 
 std::size_t FixedStepLoop::run_frame(const Update& update) {
-    const Duration now = _clock->now();
+    const Duration now = _clock.get().now();
     _accumulator += std::max(now - _last, Duration::zero());
     _last = now;
 
