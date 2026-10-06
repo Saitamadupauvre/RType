@@ -23,3 +23,15 @@ engine_add_test(core SOURCES
 )
 engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
 engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
+
+function(game_add_test name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
+    set(target game_${name}_tests)
+
+    add_executable(${target} ${arg_SOURCES})
+    target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
+    rtype_set_warnings(${target})
+    gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "game.${name}.")
+endfunction()
+
+game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
