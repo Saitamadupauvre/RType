@@ -35,3 +35,4 @@ function(game_add_test name)
 endfunction()
 
 game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
+game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
