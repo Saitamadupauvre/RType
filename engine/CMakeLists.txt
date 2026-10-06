@@ -20,3 +20,7 @@ engine_add_module(network
     SOURCES src/network/Module.cpp
     DEPENDS engine::core
 )
+
+engine_add_module(graphics
+    SOURCES src/graphics/Interfaces.cpp
+)
