@@ -10,6 +10,8 @@ namespace rtype::client {
 struct ClientConfig {
     std::string host;
     std::uint16_t port;
+
+    bool operator==(const ClientConfig&) const = default;
 };
 
 struct CliResult {

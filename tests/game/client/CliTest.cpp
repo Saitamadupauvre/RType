@@ -5,6 +5,7 @@
 
 #include "Cli.hpp"
 
+using rtype::client::ClientConfig;
 using rtype::client::parse_cli;
 
 namespace {
@@ -30,9 +31,7 @@ void expect_rejected(const std::vector<std::string>& arguments) {
 TEST(ClientCli, AcceptsHostAndPort) {
     const auto result = parse_cli(args({"127.0.0.1", "4242"}));
 
-    ASSERT_TRUE(result.config.has_value());
-    EXPECT_EQ(result.config->host, "127.0.0.1");
-    EXPECT_EQ(result.config->port, 4242);
+    EXPECT_EQ(result.config, (ClientConfig{.host = "127.0.0.1", .port = 4242}));
     EXPECT_EQ(result.exit_code, 0);
     EXPECT_TRUE(result.message.empty());
 }
@@ -40,13 +39,14 @@ TEST(ClientCli, AcceptsHostAndPort) {
 TEST(ClientCli, KeepsHostNameUnresolved) {
     const auto result = parse_cli(args({"localhost", "4242"}));
 
-    ASSERT_TRUE(result.config.has_value());
-    EXPECT_EQ(result.config->host, "localhost");
+    EXPECT_EQ(result.config, (ClientConfig{.host = "localhost", .port = 4242}));
 }
 
 TEST(ClientCli, AcceptsPortBounds) {
-    EXPECT_EQ(parse_cli(args({"127.0.0.1", "1"})).config->port, 1);
-    EXPECT_EQ(parse_cli(args({"127.0.0.1", "65535"})).config->port, 65535);
+    EXPECT_EQ(parse_cli(args({"127.0.0.1", "1"})).config,
+              (ClientConfig{.host = "127.0.0.1", .port = 1}));
+    EXPECT_EQ(parse_cli(args({"127.0.0.1", "65535"})).config,
+              (ClientConfig{.host = "127.0.0.1", .port = 65535}));
 }
 
 TEST(ClientCli, PrintsHelpWithShortAndLongFlag) {
