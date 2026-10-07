@@ -10,6 +10,8 @@ engine_add_module(script
 )
 
 engine_add_module(network
-    SOURCES src/network/Module.cpp
+    SOURCES
+        src/network/Module.cpp
+        src/network/ProtocolHandler.cpp
     DEPENDS engine::core
 )

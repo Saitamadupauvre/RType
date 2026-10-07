@@ -13,4 +13,8 @@ endfunction()
 
 engine_add_test(core SOURCES engine/core/ModuleTest.cpp)
 engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
-engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
+engine_add_test(network SOURCES
+    engine/network/ModuleTest.cpp
+    engine/network/ProtocolHandlerTest.cpp
+)
+target_include_directories(engine_network_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/network")
