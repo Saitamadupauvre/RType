@@ -89,3 +89,19 @@ TEST(Vec2, ChainedOperations) {
     EXPECT_FLOAT_EQ(result.x, 3.0f);
     EXPECT_FLOAT_EQ(result.y, 6.0f);
 }
+
+TEST(Vec2, Equality) {
+    Vec2 a(1.0f, 2.0f);
+    Vec2 b(1.0f, 2.0f);
+    Vec2 c(1.0f, 3.0f);
+    EXPECT_TRUE(a == b);
+    EXPECT_FALSE(a == c);
+}
+
+TEST(Vec2, Inequality) {
+    Vec2 a(1.0f, 2.0f);
+    Vec2 b(1.0f, 3.0f);
+    Vec2 c(1.0f, 2.0f);
+    EXPECT_TRUE(a != b);
+    EXPECT_FALSE(a != c);
+}

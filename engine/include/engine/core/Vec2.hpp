@@ -5,12 +5,15 @@
 
 namespace engine::core {
 
+/**
+ * @brief A 2D vector with x and y components.
+ */
 struct Vec2 {
     float x = 0.0f;
     float y = 0.0f;
 
     constexpr Vec2() noexcept = default;
-    constexpr Vec2(float x, float y) noexcept : x(x), y(y) {}
+    constexpr Vec2(float x_, float y_) noexcept : x(x_), y(y_) {}
 
     [[nodiscard]] constexpr Vec2 operator+(const Vec2& other) const noexcept {
         return Vec2{x + other.x, y + other.y};
@@ -22,6 +25,14 @@ struct Vec2 {
 
     [[nodiscard]] constexpr Vec2 operator*(float scalar) const noexcept {
         return Vec2{x * scalar, y * scalar};
+    }
+
+    [[nodiscard]] constexpr bool operator==(const Vec2& other) const noexcept {
+        return x == other.x && y == other.y;
+    }
+
+    [[nodiscard]] constexpr bool operator!=(const Vec2& other) const noexcept {
+        return x != other.x || y != other.y;
     }
 
     [[nodiscard]] float length() const noexcept { return std::sqrt(x * x + y * y); }
