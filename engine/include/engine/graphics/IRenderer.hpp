@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/core/NonCopyableNonMovable.hpp"
 #include "engine/graphics/Export.hpp"
 #include "engine/graphics/Types.hpp"
 
@@ -12,15 +13,9 @@ namespace engine::graphics {
  *
  * @note Every member function must be called from the main thread, the one that called open().
  */
-class ENGINE_GRAPHICS_EXPORT IRenderer {
+class ENGINE_GRAPHICS_EXPORT IRenderer : core::NonCopyableNonMovable {
 public:
-    IRenderer() = default;
     virtual ~IRenderer();
-
-    IRenderer(const IRenderer&) = delete;
-    IRenderer& operator=(const IRenderer&) = delete;
-    IRenderer(IRenderer&&) = delete;
-    IRenderer& operator=(IRenderer&&) = delete;
 
     /**
      * @brief Opens the window.

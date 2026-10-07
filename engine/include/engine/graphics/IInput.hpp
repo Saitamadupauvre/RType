@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/core/NonCopyableNonMovable.hpp"
 #include "engine/graphics/Export.hpp"
 #include "engine/graphics/Types.hpp"
 
@@ -12,15 +13,9 @@ namespace engine::graphics {
  *
  * @note Main thread only. Key::Unknown is never down.
  */
-class ENGINE_GRAPHICS_EXPORT IInput {
+class ENGINE_GRAPHICS_EXPORT IInput : core::NonCopyableNonMovable {
 public:
-    IInput() = default;
     virtual ~IInput();
-
-    IInput(const IInput&) = delete;
-    IInput& operator=(const IInput&) = delete;
-    IInput(IInput&&) = delete;
-    IInput& operator=(IInput&&) = delete;
 
     /** @return true while the key is held. */
     [[nodiscard]] virtual bool is_key_down(Key key) const = 0;

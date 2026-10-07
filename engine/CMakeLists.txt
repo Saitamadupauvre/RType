@@ -23,4 +23,5 @@ engine_add_module(network
 
 engine_add_module(graphics
     SOURCES src/graphics/Interfaces.cpp
+    DEPENDS engine::core
 )
