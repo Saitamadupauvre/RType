@@ -26,8 +26,10 @@ engine_add_test(core SOURCES
 )
 engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
 
-=======
-engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
+engine_add_test(network SOURCES
+    engine/network/ModuleTest.cpp
+    engine/network/ProtocolHandlerTest.cpp
+)
 
 function(game_add_test name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
