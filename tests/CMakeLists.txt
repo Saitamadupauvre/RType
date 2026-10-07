@@ -24,6 +24,7 @@ engine_add_test(core SOURCES
     engine/core/NonCopyableNonMovableTest.cpp
     engine/core/time/ManualClockTest.cpp
     engine/core/time/FixedStepLoopTest.cpp
+    engine/core/Vec2Test.cpp
 )
 engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
 engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
