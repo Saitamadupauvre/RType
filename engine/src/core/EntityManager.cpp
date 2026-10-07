@@ -1,4 +1,4 @@
-#include "engine/core/Registry.hpp"
+#include "engine/core/EntityManager.hpp"
 
 #include <string>
 
@@ -10,9 +10,9 @@ ComponentNotRegistered::ComponentNotRegistered(std::string_view type_name)
 ComponentAlreadyRegistered::ComponentAlreadyRegistered(std::string_view type_name)
     : std::logic_error("component type already registered: " + std::string(type_name)) {}
 
-Entity Registry::spawn() { return _entities.create(); }
+Entity EntityManager::spawn() { return _entities.create(); }
 
-bool Registry::kill(Entity entity) {
+bool EntityManager::kill(Entity entity) {
     if (!_entities.destroy(entity)) {
         return false;
     }
@@ -24,6 +24,6 @@ bool Registry::kill(Entity entity) {
     return true;
 }
 
-bool Registry::alive(Entity entity) const noexcept { return _entities.alive(entity); }
+bool EntityManager::alive(Entity entity) const noexcept { return _entities.alive(entity); }
 
 } // namespace engine::core
