@@ -24,7 +24,11 @@ engine_add_module(core
 )
 
 engine_add_module(script
-    SOURCES src/script/ScriptRuntime.cpp
+    SOURCES
+        src/script/Declarations.cpp
+        src/script/ModuleLoader.cpp
+        src/script/ScriptFiles.cpp
+        src/script/ScriptRuntime.cpp
     DEPENDS engine::core
     PRIVATE_DEPENDS sol2::sol2 engine_lua
 )
