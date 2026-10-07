@@ -71,8 +71,8 @@ TEST(ComponentPhysics, RegisterInEntityManager) {
     manager.add(entity, Position{100.0f, 200.0f});
     manager.add(entity, Velocity{10.0f, 20.0f});
 
-    Position& pos = manager.get<Position>(entity);
-    Velocity& vel = manager.get<Velocity>(entity);
+    auto& pos = manager.get<Position>(entity);
+    auto& vel = manager.get<Velocity>(entity);
 
     EXPECT_FLOAT_EQ(pos.pos.x, 100.0f);
     EXPECT_FLOAT_EQ(pos.pos.y, 200.0f);
@@ -105,9 +105,9 @@ TEST(ComponentPhysics, ViewPositionAndVelocity) {
 
     EXPECT_EQ(count, 2);
 
-    Position& pos1 = manager.get<Position>(entity1);
-    Position& pos2 = manager.get<Position>(entity2);
-    Position& pos3 = manager.get<Position>(entity3);
+    auto& pos1 = manager.get<Position>(entity1);
+    auto& pos2 = manager.get<Position>(entity2);
+    auto& pos3 = manager.get<Position>(entity3);
 
     EXPECT_FLOAT_EQ(pos1.pos.x, 10.0f);
     EXPECT_FLOAT_EQ(pos1.pos.y, 10.0f);
