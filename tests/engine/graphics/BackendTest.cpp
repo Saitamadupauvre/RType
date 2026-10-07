@@ -45,11 +45,6 @@ public:
     explicit FakeBackend(bool& destroyed) : _destroyed(destroyed) {}
     ~FakeBackend() override { _destroyed = true; }
 
-    FakeBackend(const FakeBackend&) = delete;
-    FakeBackend& operator=(const FakeBackend&) = delete;
-    FakeBackend(FakeBackend&&) = delete;
-    FakeBackend& operator=(FakeBackend&&) = delete;
-
     IRenderer& renderer() override { return _renderer; }
     IInput& input() override { return _input; }
 
