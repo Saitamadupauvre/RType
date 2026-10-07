@@ -27,24 +27,25 @@ concept DistinctTypes = detail::all_distinct<Ts...>;
 /**
  * @brief Iteration over the entities owning every listed component type.
  *
- * The view walks the smallest of the pools and skips entities missing one of
+ * The query walks the smallest of the pools and skips entities missing one of
  * the other components.
  *
  * @tparam First First component type.
  * @tparam Rest Other component types. All types must be distinct.
  * @note Adding or removing components of the listed types while iterating is
- * undefined. Views must not outlive the Registry that created them.
+ * undefined. Queries must not outlive the EntityManager that created them.
  */
 template <typename First, typename... Rest>
     requires DistinctTypes<First, Rest...>
-class View {
+class ComponentQuery {
 public:
     /**
-     * @brief Builds a view over existing pools.
+     * @brief Builds a query over existing pools.
      * @param first Pool of the first component type.
      * @param rest Pools of the other component types.
      */
-    View(ComponentPool<First>& first, ComponentPool<Rest>&... rest) : _pools(first, rest...) {}
+    ComponentQuery(ComponentPool<First>& first, ComponentPool<Rest>&... rest)
+        : _pools(first, rest...) {}
 
     /**
      * @brief Calls a function for every entity owning all the component types.
