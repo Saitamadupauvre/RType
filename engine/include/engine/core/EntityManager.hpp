@@ -115,6 +115,17 @@ public:
     template <typename T> [[nodiscard]] T& get(Entity entity) { return pool_of<T>().get(entity); }
 
     /**
+     * @brief Checks if an entity has a component.
+     * @tparam T Component type.
+     * @param entity Entity to check.
+     * @return true if the entity has component T, false otherwise.
+     * @throws ComponentNotRegistered If T is not registered.
+     */
+    template <typename T> [[nodiscard]] bool has(Entity entity) const {
+        return pool_of<T>().contains(entity);
+    }
+
+    /**
      * @brief Builds a query over the entities owning all the listed components.
      * @tparam First First component type.
      * @tparam Rest Other component types. All types must be distinct.
@@ -146,6 +157,14 @@ private:
             throw ComponentNotRegistered(typeid(T).name());
         }
         return static_cast<Pool<T>&>(*_pools[id]).pool;
+    }
+
+    template <typename T> const ComponentPool<T>& pool_of() const {
+        const ComponentTypeId id = component_type_id<T>();
+        if (id >= _pools.size() || !_pools[id]) {
+            throw ComponentNotRegistered(typeid(T).name());
+        }
+        return static_cast<const Pool<T>&>(*_pools[id]).pool;
     }
 
     EntityPool _entities;
