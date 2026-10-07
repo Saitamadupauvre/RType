@@ -1,0 +1,2 @@
+entity "lost" {}
+error("boom")

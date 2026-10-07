@@ -24,7 +24,11 @@ engine_add_test(core SOURCES
     engine/core/time/ManualClockTest.cpp
     engine/core/time/FixedStepLoopTest.cpp
 )
-engine_add_test(script SOURCES engine/script/ScriptRuntimeTest.cpp)
+engine_add_test(script SOURCES
+    engine/script/ScriptRuntimeTest.cpp
+    engine/script/ScriptDeclarationsTest.cpp
+    engine/script/ScriptRequireTest.cpp
+)
 engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
 
 function(game_add_test name)

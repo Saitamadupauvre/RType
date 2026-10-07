@@ -79,7 +79,7 @@ TEST_F(ScriptRuntimeTest, DofileAndLoadfileAreUnavailable) {
 }
 
 TEST_F(ScriptRuntimeTest, PackageLibraryIsUnavailable) {
-    EXPECT_TRUE(_runtime.run_string("assert(package == nil and require == nil)", "sandbox"));
+    EXPECT_TRUE(_runtime.run_string("assert(package == nil)", "sandbox"));
 }
 
 TEST_F(ScriptRuntimeTest, CallingIoFailsWithoutCrashing) {

@@ -346,9 +346,12 @@ The loader refuses a plugin built for another API version, and the backend is al
 - The whole game is written in Lua. The developer never touches C++.
 - **Files are free to live anywhere** in the game folder. The engine loads every `.lua` file recursively.
 - **Each file declares what it contains**: `entity "name"` or `system "name"`. A file usually declares one thing; small or related things can share a file using the table form.
+- A file uses **either** one short form (`entity "name"` alone, the whole file is the prefab) **or** any number of table forms (`entity "name" { ... }`). Two short forms in one file, or a short form mixed with table forms, is a load-time error and none of the file's declarations are registered.
+- A file outside `lib/` that declares nothing (other than `main.lua`) is loaded but logs a warning.
 - Names are **unique**. Two declarations with the same name are a load-time error that shows both file paths.
 - `main.lua` at the root is the entry point.
 - Utility code used with `require` lives in `lib/` and is **not** loaded automatically.
+- `require("name")` loads `lib/name.lua`; dots are folders (`require("enemies.wave")` loads `lib/enemies/wave.lua`). Each module runs once, in its own environment, and its return value is cached (`true` if it returns nothing). Names only contain letters, digits, `_` and `.`, so a script cannot leave `lib/`. Modules cannot declare entities or systems, circular requires are an error, and precompiled bytecode is rejected. The standard `package` library is not available.
 
 ### 10.2 Loading order
 
@@ -432,6 +435,8 @@ system "respawn" {
 ```
 
 Both forms produce the same internal representation.
+
+`entity "x" { ... }` is plain Lua sugar for `entity("x")({ ... })`: `entity "x"` returns a declarator, and calling it with a table gives the declaration its body. A declarator that is never called is a short form, and the file's environment becomes the prefab. This is why a file holds **at most one** short form and never mixes it with table forms: every name the file defines would otherwise belong to two declarations at once.
 
 ### 10.4 What a file contains
 
@@ -628,7 +633,7 @@ Developers must not use these names for their own fields or methods; the engine 
 
 ### 10.14 How it maps to C++ (for engine developers)
 
-- **Declarations** — `entity "name"` switches the current file's environment into a prefab table registered under that name (sol2 `sol::environment`).
+- **Declarations** — every declaration file runs in its own `sol::environment` whose `__index` is the globals table. `entity "name"` / `system "name"` record a pending declaration and return a declarator; calling the declarator with a table (`entity("name")({ ... })`, written `entity "name" { ... }`) stores that table as the prefab. Once the file has run, an uncalled declarator (short form) takes the file environment as its prefab. A file with one short form, or only table forms, is registered as a whole; two short forms, or a short form mixed with table forms, rejects the file. The registry maps each name to its prefab table, kind and source path.
 - **Global functions** are C++ lambdas exposed with sol2:
 
   ```cpp
