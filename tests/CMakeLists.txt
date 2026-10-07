@@ -27,7 +27,11 @@ engine_add_test(core SOURCES
     engine/core/Vec2Test.cpp
     engine/core/ComponentPhysicsTest.cpp
 )
-engine_add_test(script SOURCES engine/script/ScriptRuntimeTest.cpp)
+engine_add_test(script SOURCES
+    engine/script/ScriptRuntimeTest.cpp
+    engine/script/ScriptDeclarationsTest.cpp
+    engine/script/ScriptRequireTest.cpp
+)
 engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
 engine_add_test(physics SOURCES
     engine/physics/PhysicsSystemTest.cpp
