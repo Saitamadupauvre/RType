@@ -18,7 +18,7 @@ architecture, the Lua API and the roadmap.
 4. **Dependencies only through vcpkg.** Add a port to `vcpkg.json` in the same
    pull request as the module that uses it. Never copy library sources, never
    use `FetchContent` or git submodules for third-party code.
-5. **CI must be green** (Linux, Windows, macOS, sanitizers, clang-tidy, format)
+5. **CI must be green** (Linux, macOS, sanitizers, clang-tidy, format)
    before merging.
 
 ## Repository layout
@@ -33,6 +33,7 @@ game/server, game/client    r-type_server / r-type_client entry points
 game/scripts/               Lua game code (main.lua is the entry point)
 assets/                     sprites, sounds, music
 tests/engine/<module>/      tests of one engine module
+tests/game/<target>/        tests of one game target (server, client)
 tests/fixtures/             test data: packets, Lua scripts...
 docs/                       documentation (English): engine.md, plugins.md, game.md
 ```
@@ -45,6 +46,9 @@ docs/                       documentation (English): engine.md, plugins.md, game
 - One test executable per module (`engine_<module>_tests`), linked **only**
   against that module. Needing another module in a test means the modules are
   coupled: fix the design, not the test.
+- Game code under test lives in a static library linked by its executable
+  (e.g. `r-type_server_cli`), tested in `tests/game/<target>/` and registered
+  with `game_add_test(<target> SOURCES ... LINKS <library>)`.
 - Test names: `TEST(Feature, ExpectedBehaviour)`, e.g.
   `TEST(PacketParser, RejectsTruncatedHeader)`.
 - Test the failure paths, not only the happy path: truncated or random packets,

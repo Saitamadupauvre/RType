@@ -82,7 +82,7 @@ void internal_helper();
 
 `load_game` and `LuaRuntime` are visible outside the library; `internal_helper`
 is not. Because symbols are hidden on every platform, forgetting the macro
-fails on Linux too, not only on the Windows CI.
+fails on Linux as well.
 
 ## Rules
 

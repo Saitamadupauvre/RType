@@ -1,0 +1,11 @@
+{
+  "name": "clap",
+  "version": "1.0.0",
+  "description": "Header-only C++20 command line argument parser",
+  "homepage": "https://github.com/lucaspujol/clap",
+  "license": "MIT",
+  "dependencies": [
+    { "name": "vcpkg-cmake", "host": true },
+    { "name": "vcpkg-cmake-config", "host": true }
+  ]
+}

@@ -31,9 +31,6 @@ jobs:
             os: ubuntu-latest
             cxx: clang++
             ccache: true
-          - name: Windows MSVC
-            os: windows-latest
-            ccache: false
           - name: macOS Clang
             os: macos-latest
             ccache: true

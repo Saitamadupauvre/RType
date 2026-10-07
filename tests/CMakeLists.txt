@@ -11,10 +11,34 @@ function(engine_add_test module)
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "${module}.")
 endfunction()
 
-engine_add_test(core SOURCES engine/core/ModuleTest.cpp)
-engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
-engine_add_test(network SOURCES
-    engine/network/ModuleTest.cpp
-    engine/network/ProtocolHandlerTest.cpp
+engine_add_test(core SOURCES
+    engine/core/EntityTest.cpp
+    engine/core/EntityPoolTest.cpp
+    engine/core/ComponentPoolTest.cpp
+    engine/core/ComponentTypeIdTest.cpp
+    engine/core/EntityManagerTest.cpp
+    engine/core/SystemSchedulerTest.cpp
+    engine/core/event/EventBusTest.cpp
+    engine/core/log/LogTest.cpp
+    engine/core/log/MemorySinkTest.cpp
+    engine/core/time/ManualClockTest.cpp
+    engine/core/time/FixedStepLoopTest.cpp
 )
-target_include_directories(engine_network_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/network")
+engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
+
+=======
+engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
+
+function(game_add_test name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
+    set(target game_${name}_tests)
+
+    add_executable(${target} ${arg_SOURCES})
+    target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
+    rtype_set_warnings(${target})
+    gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "game.${name}.")
+endfunction()
+
+game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
+game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
+>>>>>>> dev

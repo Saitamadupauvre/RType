@@ -61,7 +61,7 @@ See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as
 
 ### Common requirements (evaluated at both defenses)
 
-- Cross-platform: Linux (required) and Windows (strongly recommended), tested in CI from day one.
+- Cross-platform: Linux (required) and macOS, tested in CI from day one. Windows support is postponed: new code is not required to compile on Windows for now, and the CI has no Windows job.
 - Dependencies handled only by a package manager; no library sources copied into the repository.
 - Git workflow: branches, pull requests, reviews, issues, tags.
 - Documentation in English, published online.
@@ -82,7 +82,7 @@ See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as
 | Tests | GoogleTest | Decided. |
 | Logging | spdlog | Levels, timestamps, per-module loggers. |
 | Documentation | MkDocs (or equivalent) | Markdown in the repository, published online. |
-| Formatting / CI | Already set up by the team | clang-format, Linux + Windows builds. |
+| Formatting / CI | Already set up by the team | clang-format, Linux + macOS builds. |
 
 Linux system packages required by Raylib (X11, OpenGL, ALSA development headers) are low-level system dependencies and are listed in the README.
 
@@ -123,7 +123,7 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
 ### 4.3 ECS
 
 - Entities are IDs with a generation counter, so a recycled ID is never confused with a destroyed entity.
-- Native components are stored in sparse arrays in C++ (position, velocity, sprite, hitbox, tags...).
+- Native components are stored in component pools (sparse sets) in C++ (position, velocity, sprite, hitbox, tags...).
 - Fields defined by scripts live in Lua tables attached to the entity.
 - Systems are either native (C++: movement, collisions, replication, rendering) or scripted (Lua).
 
@@ -437,7 +437,7 @@ Both forms produce the same internal representation.
 
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `tags` | C++ sparse arrays | Movement, collisions, rendering, replication |
+| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
 | Free fields | `health`, `speed`, `points` | Lua table of the entity | Scripts only |
 | Callbacks | `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
@@ -676,7 +676,7 @@ Each measure is documented as it is implemented.
   2. ECS behaviour;
   3. Lua loading: duplicate names, scripts with errors, reserved names;
   4. plugin loading: missing library, missing symbol, wrong API version.
-- **CI:** Linux and Windows builds with cached dependencies (already set up).
+- **CI:** Linux and macOS builds with cached dependencies (already set up).
 - **Packaging:** CPack produces archives/installers containing executables, engine libraries, the `plugins/` folder, scripts and assets.
 
 ---
@@ -700,7 +700,7 @@ All documentation is in English and published online.
 
 | Week | Goals |
 |---|---|
-| 1 | ECS core and fixed-timestep loop; graphics plugin (window, starfield, sprites, input); network foundations; Lua runtime loading declarations; CI green on Linux and Windows. |
+| 1 | ECS core and fixed-timestep loop; graphics plugin (window, starfield, sprites, input); network foundations; Lua runtime loading declarations; CI green on Linux and macOS. |
 | 2 | Lua API: entities, callbacks, globals, systems; player movement and shooting; Bydo spawning; collisions; replication of native fields; sounds. |
 | 3 | 4-player stability, disconnection handling, malformed-packet tests, accessibility measures, documentation, packaging, tag `v1.0`. |
 
