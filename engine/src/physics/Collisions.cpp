@@ -6,8 +6,8 @@
 namespace engine::physics {
 
 bool check_aabb_collision(const core::Vec2& pos_a, const core::Vec2& size_a,
-                          const core::Vec2& pos_b, const core::Vec2& size_b,
-                          core::Vec2& out_normal, float& out_p_depth) {
+                          const core::Vec2& pos_b, const core::Vec2& size_b, core::Vec2& out_normal,
+                          float& out_p_depth) {
     engine::core::Vec2 a_min = pos_a - size_a / 2.0f;
     engine::core::Vec2 a_max = pos_a + size_a / 2.0f;
     engine::core::Vec2 b_min = pos_b - size_b / 2.0f;
@@ -20,8 +20,10 @@ bool check_aabb_collision(const core::Vec2& pos_a, const core::Vec2& size_a,
     engine::core::Vec2 a_center = pos_a;
     engine::core::Vec2 b_center = pos_b;
     engine::core::Vec2 delta = b_center - a_center;
-    float dx = (a_max.x - b_min.x) < (b_max.x - a_min.x) ? (a_max.x - b_min.x) : (b_max.x - a_min.x);
-    float dy = (a_max.y - b_min.y) < (b_max.y - a_min.y) ? (a_max.y - b_min.y) : (b_max.y - a_min.y);
+    float dx =
+        (a_max.x - b_min.x) < (b_max.x - a_min.x) ? (a_max.x - b_min.x) : (b_max.x - a_min.x);
+    float dy =
+        (a_max.y - b_min.y) < (b_max.y - a_min.y) ? (a_max.y - b_min.y) : (b_max.y - a_min.y);
     if (dx < dy) {
         out_normal = engine::core::Vec2{(delta.x > 0) ? 1.0f : -1.0f, 0.0f};
         out_p_depth = dx;
@@ -32,13 +34,13 @@ bool check_aabb_collision(const core::Vec2& pos_a, const core::Vec2& size_a,
     return true;
 }
 
-bool check_circle_collision(const core::Vec2& pos_a, float radius_a,
-                            const core::Vec2& pos_b, float radius_b,
-                            core::Vec2& out_normal, float& out_p_depth) {
+bool check_circle_collision(const core::Vec2& pos_a, float radius_a, const core::Vec2& pos_b,
+                            float radius_b, core::Vec2& out_normal, float& out_p_depth) {
     engine::core::Vec2 delta = pos_b - pos_a;
     float dist_sq = delta.x * delta.x + delta.y * delta.y;
     float radius_sum = radius_a + radius_b;
-    if (dist_sq > radius_sum * radius_sum) return false;
+    if (dist_sq > radius_sum * radius_sum)
+        return false;
 
     float dist = std::sqrt(dist_sq);
     if (dist < 0.0001f) {
@@ -55,12 +57,15 @@ bool check_aabb_circle_collision(const core::Vec2& aabb_pos, const core::Vec2& a
                                  const core::Vec2& circle_pos, float circle_radius,
                                  core::Vec2& out_normal, float& out_p_depth) {
     engine::core::Vec2 closest;
-    closest.x = std::clamp(circle_pos.x, aabb_pos.x - aabb_size.x / 2.0f, aabb_pos.x + aabb_size.x / 2.0f);
-    closest.y = std::clamp(circle_pos.y, aabb_pos.y - aabb_size.y / 2.0f, aabb_pos.y + aabb_size.y / 2.0f);
+    closest.x =
+        std::clamp(circle_pos.x, aabb_pos.x - aabb_size.x / 2.0f, aabb_pos.x + aabb_size.x / 2.0f);
+    closest.y =
+        std::clamp(circle_pos.y, aabb_pos.y - aabb_size.y / 2.0f, aabb_pos.y + aabb_size.y / 2.0f);
 
     engine::core::Vec2 delta = circle_pos - closest;
     float dist_sq = delta.x * delta.x + delta.y * delta.y;
-    if (dist_sq > circle_radius * circle_radius) return false;
+    if (dist_sq > circle_radius * circle_radius)
+        return false;
 
     float dist = std::sqrt(dist_sq);
     if (dist < 0.0001f) {

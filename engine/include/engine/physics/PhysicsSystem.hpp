@@ -11,6 +11,7 @@ public:
     PhysicsSystem(core::EntityManager& entity_manager, core::event::EventBus& event_bus);
 
     void update(float dt);
+
 private:
     core::EntityManager& _entity_manager;
     core::event::EventBus& _event_bus;

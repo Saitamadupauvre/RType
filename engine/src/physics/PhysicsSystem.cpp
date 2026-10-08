@@ -18,12 +18,12 @@ void PhysicsSystem::update(float dt) {
 
 void PhysicsSystem::integrate_velocity(float dt) {
     _entity_manager.query<core::Position, core::Velocity, physics::PhysicsBody>().each(
-        [dt](core::Entity, core::Position& position, core::Velocity& velocity, physics::PhysicsBody& body) {
+        [dt](core::Entity, core::Position& position, core::Velocity& velocity,
+             physics::PhysicsBody& body) {
             if (body.type == physics::PhysicsBody::Type::Dynamic) {
                 position.pos = position.pos + velocity.vel * dt;
             }
-        }
-    );
+        });
 }
 
 void PhysicsSystem::detect_and_handle_collisions() {
@@ -31,14 +31,12 @@ void PhysicsSystem::detect_and_handle_collisions() {
     _entity_manager.query<core::Position, physics::PhysicsBody, physics::AABBCollider>().each(
         [&](core::Entity e, core::Position&, physics::PhysicsBody&, physics::AABBCollider&) {
             entities.push_back(e);
-        }
-    );
+        });
     _entity_manager.query<core::Position, physics::PhysicsBody, physics::CircleCollider>().each(
         [&](core::Entity e, core::Position&, physics::PhysicsBody&, physics::CircleCollider&) {
             entities.push_back(e);
-        }
-    );
-    
+        });
+
     // TODO: optimize with broad and narrow phases
     // TODO: handle collision resolution when needed
     for (size_t i = 0; i < entities.size(); ++i) {
@@ -49,42 +47,63 @@ void PhysicsSystem::detect_and_handle_collisions() {
 
             auto& body_a = _entity_manager.get<physics::PhysicsBody>(a);
             auto& body_b = _entity_manager.get<physics::PhysicsBody>(b);
-            if ((body_a.collision_mask & body_b.collision_layer) == 0) continue;
+            if ((body_a.collision_mask & body_b.collision_layer) == 0)
+                continue;
 
             bool collided = false;
             core::Vec2 normal;
             float penetration_depth;
-            if (_entity_manager.has<physics::AABBCollider>(a) && _entity_manager.has<physics::AABBCollider>(b)) {
-                core::Vec2 pos_a  = _entity_manager.get<core::Position>(a).pos + _entity_manager.get<physics::AABBCollider>(a).offset;
+            if (_entity_manager.has<physics::AABBCollider>(a) &&
+                _entity_manager.has<physics::AABBCollider>(b)) {
+                core::Vec2 pos_a = _entity_manager.get<core::Position>(a).pos +
+                                   _entity_manager.get<physics::AABBCollider>(a).offset;
                 core::Vec2 size_a = _entity_manager.get<physics::AABBCollider>(a).size;
-                core::Vec2 pos_b  = _entity_manager.get<core::Position>(b).pos + _entity_manager.get<physics::AABBCollider>(b).offset;
+                core::Vec2 pos_b = _entity_manager.get<core::Position>(b).pos +
+                                   _entity_manager.get<physics::AABBCollider>(b).offset;
                 core::Vec2 size_b = _entity_manager.get<physics::AABBCollider>(b).size;
-                if (check_aabb_collision(pos_a, size_a, pos_b, size_b, normal, penetration_depth)) collided = true;
-            }
-            else if (_entity_manager.has<physics::CircleCollider>(a) && _entity_manager.has<physics::CircleCollider>(b)) {
-                core::Vec2 pos_a = _entity_manager.get<core::Position>(a).pos + _entity_manager.get<physics::CircleCollider>(a).offset;
-                float radius_a   = _entity_manager.get<physics::CircleCollider>(a).radius;
-                core::Vec2 pos_b = _entity_manager.get<core::Position>(b).pos + _entity_manager.get<physics::CircleCollider>(b).offset;
-                float radius_b   = _entity_manager.get<physics::CircleCollider>(b).radius;
-                if (check_circle_collision(pos_a, radius_a, pos_b, radius_b, normal, penetration_depth)) collided = true;
-            }
-            else if (_entity_manager.has<physics::AABBCollider>(a) && _entity_manager.has<physics::CircleCollider>(b)) {
-                core::Vec2 aabb_pos   = _entity_manager.get<core::Position>(a).pos + _entity_manager.get<physics::AABBCollider>(a).offset;
-                core::Vec2 aabb_size  = _entity_manager.get<physics::AABBCollider>(a).size;
-                core::Vec2 circle_pos = _entity_manager.get<core::Position>(b).pos + _entity_manager.get<physics::CircleCollider>(b).offset;
-                float circle_radius   = _entity_manager.get<physics::CircleCollider>(b).radius;
-                if (check_aabb_circle_collision(aabb_pos, aabb_size, circle_pos, circle_radius, normal, penetration_depth)) collided = true;
-            }
-            else if (_entity_manager.has<physics::CircleCollider>(a) && _entity_manager.has<physics::AABBCollider>(b)) {
-                core::Vec2 circle_pos = _entity_manager.get<core::Position>(a).pos + _entity_manager.get<physics::CircleCollider>(a).offset;
-                float circle_radius   = _entity_manager.get<physics::CircleCollider>(a).radius;
-                core::Vec2 aabb_pos   = _entity_manager.get<core::Position>(b).pos + _entity_manager.get<physics::AABBCollider>(b).offset;
-                core::Vec2 aabb_size  = _entity_manager.get<physics::AABBCollider>(b).size;
-                if (check_aabb_circle_collision(aabb_pos, aabb_size, circle_pos, circle_radius, normal, penetration_depth)) collided = true;
+                if (check_aabb_collision(pos_a, size_a, pos_b, size_b, normal, penetration_depth))
+                    collided = true;
+            } else if (_entity_manager.has<physics::CircleCollider>(a) &&
+                       _entity_manager.has<physics::CircleCollider>(b)) {
+                core::Vec2 pos_a = _entity_manager.get<core::Position>(a).pos +
+                                   _entity_manager.get<physics::CircleCollider>(a).offset;
+                float radius_a = _entity_manager.get<physics::CircleCollider>(a).radius;
+                core::Vec2 pos_b = _entity_manager.get<core::Position>(b).pos +
+                                   _entity_manager.get<physics::CircleCollider>(b).offset;
+                float radius_b = _entity_manager.get<physics::CircleCollider>(b).radius;
+                if (check_circle_collision(pos_a, radius_a, pos_b, radius_b, normal,
+                                           penetration_depth))
+                    collided = true;
+            } else if (_entity_manager.has<physics::AABBCollider>(a) &&
+                       _entity_manager.has<physics::CircleCollider>(b)) {
+                core::Vec2 aabb_pos = _entity_manager.get<core::Position>(a).pos +
+                                      _entity_manager.get<physics::AABBCollider>(a).offset;
+                core::Vec2 aabb_size = _entity_manager.get<physics::AABBCollider>(a).size;
+                core::Vec2 circle_pos = _entity_manager.get<core::Position>(b).pos +
+                                        _entity_manager.get<physics::CircleCollider>(b).offset;
+                float circle_radius = _entity_manager.get<physics::CircleCollider>(b).radius;
+                if (check_aabb_circle_collision(aabb_pos, aabb_size, circle_pos, circle_radius,
+                                                normal, penetration_depth))
+                    collided = true;
+            } else if (_entity_manager.has<physics::CircleCollider>(a) &&
+                       _entity_manager.has<physics::AABBCollider>(b)) {
+                core::Vec2 circle_pos = _entity_manager.get<core::Position>(a).pos +
+                                        _entity_manager.get<physics::CircleCollider>(a).offset;
+                float circle_radius = _entity_manager.get<physics::CircleCollider>(a).radius;
+                core::Vec2 aabb_pos = _entity_manager.get<core::Position>(b).pos +
+                                      _entity_manager.get<physics::AABBCollider>(b).offset;
+                core::Vec2 aabb_size = _entity_manager.get<physics::AABBCollider>(b).size;
+                if (check_aabb_circle_collision(aabb_pos, aabb_size, circle_pos, circle_radius,
+                                                normal, penetration_depth))
+                    collided = true;
             }
 
-            if (collided && (_entity_manager.has<physics::Scriptable>(a) || _entity_manager.has<physics::Scriptable>(b))) {
-                CollisionEvent event{.entity_a=a, .entity_b=b, .normal=normal, .penetration_depth=penetration_depth};
+            if (collided && (_entity_manager.has<physics::Scriptable>(a) ||
+                             _entity_manager.has<physics::Scriptable>(b))) {
+                CollisionEvent event{.entity_a = a,
+                                     .entity_b = b,
+                                     .normal = normal,
+                                     .penetration_depth = penetration_depth};
                 _event_bus.publish(event);
             }
         }
