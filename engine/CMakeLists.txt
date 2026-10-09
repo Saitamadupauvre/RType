@@ -25,3 +25,10 @@ engine_add_module(network
     SOURCES src/network/Module.cpp
     DEPENDS engine::core
 )
+
+engine_add_module(physics
+    SOURCES
+        src/physics/PhysicsSystem.cpp
+        src/physics/Collisions.cpp
+    DEPENDS engine::core
+)

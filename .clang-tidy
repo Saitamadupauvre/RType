@@ -7,6 +7,7 @@ Checks: >
   clang-analyzer-*,
   modernize-*,
   -modernize-use-trailing-return-type,
+  -modernize-use-std-numbers,
   performance-*,
   readability-const-return-type,
   readability-container-size-empty,

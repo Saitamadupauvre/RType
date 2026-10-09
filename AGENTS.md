@@ -113,6 +113,9 @@ cmake --workflow --preset tidy          # clang-tidy
 cmake --build --preset ninja-debug --target format
 ```
 
+**Formatting:** CI uses `clang-format 23.1.1` (pinned in `.github/workflows/ci.yml`).
+Install locally: `pipx install clang-format==23.1.1`
+
 ## Git workflow
 
 - One issue → one branch → one pull request targeting `dev` (`Closes #<n>`).

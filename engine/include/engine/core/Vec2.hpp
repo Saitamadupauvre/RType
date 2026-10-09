@@ -27,6 +27,10 @@ struct Vec2 {
         return Vec2{x * scalar, y * scalar};
     }
 
+    [[nodiscard]] constexpr Vec2 operator/(float scalar) const noexcept {
+        return Vec2{x / scalar, y / scalar};
+    }
+
     [[nodiscard]] constexpr bool operator==(const Vec2& other) const noexcept {
         return x == other.x && y == other.y;
     }
