@@ -51,7 +51,9 @@ void PhysicsSystem::detect_and_handle_collisions() {
 
             auto& body_a = _entity_manager.get<physics::PhysicsBody>(a);
             auto& body_b = _entity_manager.get<physics::PhysicsBody>(b);
-            if ((body_a.collision_mask & body_b.collision_layer) == 0)
+            bool mask_check = (body_a.collision_mask & body_b.collision_layer) != 0;
+            std::cerr << "  Pair [" << i << "," << j << "]: mask=" << mask_check << "\n";
+            if (!mask_check)
                 continue;
 
             bool collided = false;
@@ -102,8 +104,11 @@ void PhysicsSystem::detect_and_handle_collisions() {
                     collided = true;
             }
 
-            if (collided && (_entity_manager.has<physics::Scriptable>(a) ||
-                             _entity_manager.has<physics::Scriptable>(b))) {
+            bool has_scriptable = _entity_manager.has<physics::Scriptable>(a) ||
+                                  _entity_manager.has<physics::Scriptable>(b);
+            std::cerr << "    collided=" << collided << " scriptable=" << has_scriptable << "\n";
+            if (collided && has_scriptable) {
+                std::cerr << "    Publishing event\n";
                 CollisionEvent event{.entity_a = a,
                                      .entity_b = b,
                                      .normal = normal,
