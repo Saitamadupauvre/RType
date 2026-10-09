@@ -29,6 +29,7 @@ TEST(PhysicsSystem, DetectsEntitiesWithColliders) {
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
+    manager.register_component<Scriptable>();
 
     auto aabb_entity = manager.spawn();
     manager.add(aabb_entity, Position{100.0f, 100.0f});
@@ -53,6 +54,7 @@ TEST(PhysicsSystem, IntegratesVelocity) {
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
+    manager.register_component<Scriptable>();
 
     auto entity = manager.spawn();
     manager.add(entity, Position{0.0f, 0.0f});
@@ -76,6 +78,7 @@ TEST(PhysicsSystem, DoesNotMoveStaticBodies) {
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
+    manager.register_component<Scriptable>();
 
     auto entity = manager.spawn();
     manager.add(entity, Position{100.0f, 100.0f});
