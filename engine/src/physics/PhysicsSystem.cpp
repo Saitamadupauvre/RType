@@ -1,5 +1,7 @@
 #include "engine/physics/PhysicsSystem.hpp"
 
+#include <iostream>
+
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/physics/Collisions.hpp"
@@ -36,6 +38,8 @@ void PhysicsSystem::detect_and_handle_collisions() {
         [&](core::Entity e, core::Position&, physics::PhysicsBody&, physics::CircleCollider&) {
             entities.push_back(e);
         });
+
+    std::cerr << "[PhysicsSystem] Checking " << entities.size() << " entities with colliders\n";
 
     // TODO: optimize with broad and narrow phases
     // TODO: handle collision resolution when needed

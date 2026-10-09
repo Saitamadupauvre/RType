@@ -261,3 +261,10 @@ TEST(PhysicsSystem, NoEventWhenLayerMaskFilters) {
 
     EXPECT_EQ(events.size(), 0u);
 }
+
+TEST(PhysicsBody, DefaultMaskAllowsCollision) {
+    PhysicsBody a{};
+    PhysicsBody b{};
+    EXPECT_NE(0u, a.collision_mask & b.collision_layer);
+    EXPECT_NE(0u, b.collision_mask & a.collision_layer);
+}
