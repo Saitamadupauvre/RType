@@ -271,3 +271,19 @@ TEST(PhysicsBody, DefaultMaskAllowsCollision) {
     EXPECT_NE(0u, a.collision_mask & b.collision_layer);
     EXPECT_NE(0u, b.collision_mask & a.collision_layer);
 }
+
+TEST(CollisionEvent, EventBusDeliversCollisionEvents) {
+    EventBus bus;
+    std::vector<CollisionEvent> events;
+    bus.subscribe<CollisionEvent>([&events](const CollisionEvent& evt) { events.push_back(evt); });
+
+    EntityManager manager;
+    auto e1 = manager.spawn();
+    auto e2 = manager.spawn();
+
+    bus.publish(CollisionEvent{e1, e2, {1.0f, 0.0f}, 5.0f});
+
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_EQ(events[0].entity_a, e1);
+    EXPECT_EQ(events[0].entity_b, e2);
+}
