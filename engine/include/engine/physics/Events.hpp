@@ -2,6 +2,7 @@
 
 #include "engine/core/Entity.hpp"
 #include "engine/core/Vec2.hpp"
+#include "engine/physics/Export.hpp"
 
 namespace engine::physics {
 
@@ -14,7 +15,7 @@ namespace engine::physics {
  * The normal vector points from entity_a toward entity_b.
  * Penetration depth indicates how much the shapes overlap.
  */
-struct CollisionEvent {
+struct ENGINE_PHYSICS_EXPORT CollisionEvent {
     engine::core::Entity entity_a;
     engine::core::Entity entity_b;
     engine::core::Vec2 normal;
