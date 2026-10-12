@@ -48,6 +48,8 @@ engine_add_module(physics
 )
 
 engine_add_module(graphics
-    SOURCES src/graphics/Interfaces.cpp
+    SOURCES
+        src/graphics/Interfaces.cpp
+        src/graphics/PluginLoader.cpp
     DEPENDS engine::core
 )
