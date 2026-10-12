@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "Declarations.hpp"
+#include "Entities.hpp"
 #include "ModuleLoader.hpp"
 #include "ScriptFiles.hpp"
 #include "Sol.hpp"
@@ -25,12 +26,15 @@ namespace log = engine::core::log;
 
 struct ScriptRuntime::Impl {
     sol::state lua;
+    Entities entities{lua};
     std::map<std::string, Declaration, std::less<>> declarations;
     std::shared_ptr<PendingFile> current_file;
     std::optional<ModuleLoader> modules;
 
     sol::object declare(sol::this_state state, DeclarationKind kind, const std::string& name);
     sol::object require(sol::this_state state, const std::string& name);
+    sol::object spawn(sol::this_state state, const std::string& type,
+                      const sol::optional<sol::table>& overrides);
     bool load_scripts(const fs::path& root);
     bool load_declaration_file(const fs::path& root, const fs::path& relative,
                                const sol::environment& environment);
@@ -65,6 +69,16 @@ sol::object ScriptRuntime::Impl::require(sol::this_state state, const std::strin
     } catch (const std::runtime_error& error) {
         throw std::runtime_error(caller_location(state) + error.what());
     }
+}
+
+sol::object ScriptRuntime::Impl::spawn(sol::this_state state, const std::string& type,
+                                       const sol::optional<sol::table>& overrides) {
+    const auto found = declarations.find(type);
+    if (found == declarations.end()) {
+        log::error("lua: {}cannot spawn unknown entity '{}'", caller_location(state), type);
+        return sol::make_object(state, sol::lua_nil);
+    }
+    return entities.spawn_from_lua(state, found->second, overrides);
 }
 
 bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
@@ -181,6 +195,10 @@ ScriptRuntime::ScriptRuntime() : _impl(std::make_unique<Impl>()) {
     _impl->lua.set_function("system", [impl](sol::this_state state, const std::string& name) {
         return impl->declare(state, DeclarationKind::System, name);
     });
+    _impl->lua.set_function("spawn", [impl](sol::this_state state, const std::string& type,
+                                            const sol::optional<sol::table>& overrides) {
+        return impl->spawn(state, type, overrides);
+    });
     _impl->lua.set_function("require", [impl](sol::this_state state, const std::string& name) {
         return impl->require(state, name);
     });
@@ -229,6 +247,38 @@ std::optional<DeclarationInfo> ScriptRuntime::find_declaration(std::string_view 
         return std::nullopt;
     }
     return DeclarationInfo{.kind = found->second.kind, .source = found->second.source};
+}
+
+void ScriptRuntime::attach_world(core::EntityManager& world) { _impl->entities.attach(world); }
+
+std::optional<core::Entity> ScriptRuntime::spawn(std::string_view type,
+                                                 std::optional<core::Vec2> position) noexcept {
+    try {
+        const auto found = _impl->declarations.find(type);
+        if (found == _impl->declarations.end()) {
+            log::error("lua: cannot spawn unknown entity '{}'", type);
+            return std::nullopt;
+        }
+        return _impl->entities.spawn(found->second, position);
+    } catch (const std::exception& exception) {
+        log::error("lua: cannot spawn '{}': {}", type, exception.what());
+    } catch (...) {
+        log::error("lua: cannot spawn '{}': unknown error", type);
+    }
+    return std::nullopt;
+}
+
+void ScriptRuntime::release(core::Entity entity) noexcept { _impl->entities.release(entity); }
+
+bool ScriptRuntime::call(core::Entity entity, std::string_view method) noexcept {
+    try {
+        return _impl->entities.call(entity, method);
+    } catch (const std::exception& exception) {
+        log::error("lua: {}: {}", method, exception.what());
+    } catch (...) {
+        log::error("lua: {}: unknown error", method);
+    }
+    return false;
 }
 
 } // namespace engine::script
