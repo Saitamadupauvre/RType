@@ -7,10 +7,12 @@ Checks: >
   clang-analyzer-*,
   modernize-*,
   -modernize-use-trailing-return-type,
+  -modernize-use-std-numbers,
   performance-*,
   readability-const-return-type,
   readability-container-size-empty,
   readability-redundant-*
 WarningsAsErrors: ''
-HeaderFilterRegex: '.*/(include|src)/.*'
+HeaderFilterRegex: '.*/rtype/(engine|game|tests|plugins)/.*'
+SystemHeaders: false
 FormatStyle: file

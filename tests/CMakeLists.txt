@@ -8,6 +8,7 @@ function(engine_add_test module)
         RTYPE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
     rtype_set_warnings(${target})
+    set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "${module}.")
 endfunction()
 
@@ -40,6 +41,7 @@ function(game_add_test name)
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
     rtype_set_warnings(${target})
+    set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "game.${name}.")
 endfunction()
 
