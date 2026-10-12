@@ -30,8 +30,8 @@ struct ThrowingFormat {};
 
 template <> struct std::formatter<ThrowingFormat> {
     constexpr auto parse(std::format_parse_context& context) { return context.begin(); }
-    auto format(const ThrowingFormat&, std::format_context&) const
-        -> std::format_context::iterator {
+    auto format(const ThrowingFormat&,
+                std::format_context&) const -> std::format_context::iterator {
         throw std::runtime_error("format failure");
     }
 };
