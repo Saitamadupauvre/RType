@@ -26,6 +26,7 @@ engine_add_test(core SOURCES
     engine/core/time/FixedStepLoopTest.cpp
     engine/core/Vec2Test.cpp
     engine/core/ComponentPhysicsTest.cpp
+    engine/core/DynamicLibraryTest.cpp
 )
 engine_add_test(script SOURCES
     engine/script/ScriptRuntimeTest.cpp
@@ -41,6 +42,22 @@ engine_add_test(graphics SOURCES
     engine/graphics/BackendTest.cpp
     engine/graphics/TypesTest.cpp
 )
+
+function(engine_add_test_library name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
+    add_library(${name} MODULE ${arg_SOURCES})
+    target_link_libraries(${name} PRIVATE ${arg_LINKS})
+    set_target_properties(${name} PROPERTIES PREFIX "")
+    rtype_set_warnings(${name})
+endfunction()
+
+function(engine_test_use_library test_target macro library)
+    target_compile_definitions(${test_target} PRIVATE ${macro}="$<TARGET_FILE:${library}>")
+    add_dependencies(${test_target} ${library})
+endfunction()
+
+engine_add_test_library(test-sample-library SOURCES engine/core/fixtures/SampleLibrary.cpp)
+engine_test_use_library(engine_core_tests SAMPLE_LIBRARY_PATH test-sample-library)
 
 function(game_add_test name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
