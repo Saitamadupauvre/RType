@@ -1,4 +1,5 @@
 find_package(raylib CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
 
 add_library(graphics-raylib-letterbox STATIC src/Letterbox.cpp)
 target_include_directories(graphics-raylib-letterbox PUBLIC src)
@@ -15,5 +16,5 @@ engine_add_plugin(graphics-raylib
         src/Plugin.cpp
         src/RaylibInput.cpp
         src/RaylibRenderer.cpp
-    PRIVATE_DEPENDS engine::graphics graphics-raylib-letterbox raylib
+    PRIVATE_DEPENDS engine::graphics graphics-raylib-letterbox raylib glfw
 )

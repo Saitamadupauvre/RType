@@ -9,5 +9,12 @@
     "lua",
     "sol2",
     "raylib"
+  ],
+  "overrides": [
+    {
+      "name": "raylib",
+      "version": "5.5",
+      "port-version": 1
+    }
   ]
 }
