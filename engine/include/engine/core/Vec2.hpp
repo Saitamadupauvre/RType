@@ -31,6 +31,18 @@ struct Vec2 {
         return Vec2{x / scalar, y / scalar};
     }
 
+    constexpr Vec2& operator+=(const Vec2& other) noexcept {
+        x += other.x;
+        y += other.y;
+        return *this;
+    }
+
+    constexpr Vec2& operator-=(const Vec2& other) noexcept {
+        x -= other.x;
+        y -= other.y;
+        return *this;
+    }
+
     [[nodiscard]] constexpr bool operator==(const Vec2& other) const noexcept {
         return x == other.x && y == other.y;
     }
@@ -49,6 +61,14 @@ struct Vec2 {
         return Vec2{x / len, y / len};
     }
 };
+
+inline Vec2 operator*(float scalar, const Vec2& vec) {
+    return Vec2{vec.x * scalar, vec.y * scalar};
+}
+
+inline float dot(const Vec2& a, const Vec2& b) {
+    return a.x * b.x + a.y * b.y;
+}
 
 inline std::ostream& operator<<(std::ostream& os, const Vec2& vec) {
     os << "Vec2(" << vec.x << ", " << vec.y << ")";
