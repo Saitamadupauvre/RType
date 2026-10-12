@@ -7,6 +7,7 @@
     "clap",
     "gtest",
     "lua",
-    "sol2"
+    "sol2",
+    "raylib"
   ]
 }
