@@ -28,7 +28,7 @@ std::optional<Endpoint> Endpoint::fromString(std::string_view ip, std::uint16_t 
     sockaddr_in v4{};
     if (inet_pton(AF_INET, s.c_str(), &v4.sin_addr) == 1) {
         v4.sin_family = AF_INET;
-        v4.sin_port   = htons(port);
+        v4.sin_port = htons(port);
         std::memcpy(&e._ss, &v4, sizeof(v4));
         e._len = sizeof(v4);
         return e;
@@ -37,7 +37,7 @@ std::optional<Endpoint> Endpoint::fromString(std::string_view ip, std::uint16_t 
     sockaddr_in6 v6{};
     if (inet_pton(AF_INET6, s.c_str(), &v6.sin6_addr) == 1) {
         v6.sin6_family = AF_INET6;
-        v6.sin6_port   = htons(port);
+        v6.sin6_port = htons(port);
         std::memcpy(&e._ss, &v6, sizeof(v6));
         e._len = sizeof(v6);
         return e;
@@ -107,9 +107,7 @@ UdpSocket UdpSocket::create(int domain, std::error_code& ec, int type) noexcept 
     return s;
 }
 
-UdpSocket::~UdpSocket() {
-    close();
-}
+UdpSocket::~UdpSocket() { close(); }
 
 UdpSocket::UdpSocket(UdpSocket&& other) noexcept
     : _fd(other._fd.exchange(EMPTY_SOCKET, std::memory_order_acq_rel)) {}
@@ -182,7 +180,8 @@ std::size_t UdpSocket::sendTo(std::span<const std::byte> data, const Endpoint& t
     }
 
     for (;;) {
-        const ssize_t n = ::sendto(g.fd, data.data(), data.size(), MSG_NOSIGNAL, to.addr(), to.size());
+        const ssize_t n =
+            ::sendto(g.fd, data.data(), data.size(), MSG_NOSIGNAL, to.addr(), to.size());
         if (n >= 0) {
             return static_cast<std::size_t>(n);
         }
@@ -197,7 +196,8 @@ std::size_t UdpSocket::sendTo(std::span<const std::byte> data, const Endpoint& t
 }
 
 std::size_t UdpSocket::receiveFrom(std::span<std::byte> buf, Endpoint& from,
-                                   std::chrono::milliseconds timeout, std::error_code& ec) noexcept {
+                                   std::chrono::milliseconds timeout,
+                                   std::error_code& ec) noexcept {
     using clock = std::chrono::steady_clock;
     constexpr auto kSlice = std::chrono::milliseconds(100); // upper bound to notice close()
 
@@ -219,7 +219,8 @@ std::size_t UdpSocket::receiveFrom(std::span<std::byte> buf, Endpoint& from,
 
         auto wait = kSlice;
         if (!infinite) {
-            const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - clock::now());
+            const auto left =
+                std::chrono::duration_cast<std::chrono::milliseconds>(deadline - clock::now());
             if (left.count() <= 0 && timeout.count() != 0) {
                 ec = std::make_error_code(std::errc::timed_out);
                 return 0;
@@ -230,7 +231,8 @@ std::size_t UdpSocket::receiveFrom(std::span<std::byte> buf, Endpoint& from,
         pollfd p{g.fd, POLLIN, 0};
         const int pr = ::poll(&p, 1, static_cast<int>(wait.count()));
         if (pr < 0) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR)
+                continue;
             ec = lastError();
             return 0;
         }

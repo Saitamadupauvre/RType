@@ -21,14 +21,29 @@ engine_add_test(core SOURCES
     engine/core/event/EventBusTest.cpp
     engine/core/log/LogTest.cpp
     engine/core/log/MemorySinkTest.cpp
+    engine/core/NonCopyableNonMovableTest.cpp
     engine/core/time/ManualClockTest.cpp
     engine/core/time/FixedStepLoopTest.cpp
+    engine/core/Vec2Test.cpp
+    engine/core/ComponentPhysicsTest.cpp
 )
-engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
-
+engine_add_test(script SOURCES
+    engine/script/ScriptRuntimeTest.cpp
+    engine/script/ScriptDeclarationsTest.cpp
+    engine/script/ScriptRequireTest.cpp
+)
 engine_add_test(network SOURCES
     engine/network/ModuleTest.cpp
     engine/network/ProtocolHandlerTest.cpp
+)
+target_include_directories(engine_network_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/network")
+engine_add_test(physics SOURCES
+    engine/physics/PhysicsSystemTest.cpp
+    engine/physics/CollisionsTest.cpp
+)
+engine_add_test(graphics SOURCES
+    engine/graphics/BackendTest.cpp
+    engine/graphics/TypesTest.cpp
 )
 
 function(game_add_test name)
@@ -43,4 +58,4 @@ endfunction()
 
 game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
 game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
->>>>>>> dev
+

@@ -62,7 +62,7 @@ TEST(ProtocolHandler, RejectsTruncatedPacket) {
 TEST(ProtocolHandler, RejectsMismatchedPayloadSize) {
     const engine::network::ProtocolHandler handler;
     const std::array<std::uint8_t, 14> packet{0x52, 0x54, 0x59, 0x50, 0x00, 0x01, 0x03,
-                                               0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x01};
+                                              0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x01};
 
     EXPECT_FALSE(handler.deserialize(packet).has_value());
 }

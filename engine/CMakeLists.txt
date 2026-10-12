@@ -1,5 +1,12 @@
 include(cmake/EngineModule.cmake)
 
+find_package(Lua REQUIRED)
+find_package(sol2 CONFIG REQUIRED)
+
+add_library(engine_lua INTERFACE)
+target_include_directories(engine_lua INTERFACE ${LUA_INCLUDE_DIR})
+target_link_libraries(engine_lua INTERFACE ${LUA_LIBRARIES})
+
 engine_add_module(core
     SOURCES
         src/core/EntityPool.cpp
@@ -17,8 +24,13 @@ engine_add_module(core
 )
 
 engine_add_module(script
-    SOURCES src/script/Module.cpp
+    SOURCES
+        src/script/Declarations.cpp
+        src/script/ModuleLoader.cpp
+        src/script/ScriptFiles.cpp
+        src/script/ScriptRuntime.cpp
     DEPENDS engine::core
+    PRIVATE_DEPENDS sol2::sol2 engine_lua
 )
 
 engine_add_module(network
@@ -26,5 +38,17 @@ engine_add_module(network
         src/network/Module.cpp
         src/network/ProtocolHandler.cpp
         src/network/UdpSocket.cpp
+    DEPENDS engine::core
+)
+
+engine_add_module(physics
+    SOURCES
+        src/physics/PhysicsSystem.cpp
+        src/physics/Collisions.cpp
+    DEPENDS engine::core
+)
+
+engine_add_module(graphics
+    SOURCES src/graphics/Interfaces.cpp
     DEPENDS engine::core
 )
