@@ -29,6 +29,10 @@ engine_add_test(core SOURCES
 )
 engine_add_test(script SOURCES engine/script/ModuleTest.cpp)
 engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
+engine_add_test(physics SOURCES
+    engine/physics/PhysicsSystemTest.cpp
+    engine/physics/CollisionsTest.cpp
+)
 engine_add_test(graphics SOURCES
     engine/graphics/BackendTest.cpp
     engine/graphics/TypesTest.cpp
