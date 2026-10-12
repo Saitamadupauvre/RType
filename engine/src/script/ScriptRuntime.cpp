@@ -21,15 +21,6 @@ namespace {
 namespace fs = std::filesystem;
 namespace log = engine::core::log;
 
-bool report(const sol::protected_function_result& result) {
-    if (result.valid()) {
-        return true;
-    }
-    const sol::error error = result;
-    log::error("lua: {}", error.what());
-    return false;
-}
-
 } // namespace
 
 struct ScriptRuntime::Impl {
