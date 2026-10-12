@@ -2,8 +2,10 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string_view>
 
+#include "engine/script/Declaration.hpp"
 #include "engine/script/Export.hpp"
 
 namespace engine::script {
@@ -57,6 +59,37 @@ public:
      * @note Never throws.
      */
     bool run_string(std::string_view code, std::string_view chunk_name) noexcept;
+
+    /**
+     * @brief Loads every declaration file of a script folder, then calls `on_start()` from its
+     * `main.lua`.
+     *
+     * Every `.lua` file under @p root is run recursively, in path order, each in its own
+     * environment whose missing names fall back to the globals. Files under `root/lib/` are
+     * skipped: they are modules reached with `require("name")`, which loads `lib/name.lua` once
+     * and caches its result. `main.lua` at the root runs last.
+     *
+     * A file declares either one short form (`entity "name"` alone, the whole file becomes the
+     * prefab) or any number of table forms (`entity "name" { ... }`), never both. A file breaking
+     * that rule, failing to run, or reusing a name already declared is rejected as a whole: none
+     * of its declarations are registered and the error is logged with both file paths for a
+     * duplicate. Other files keep loading. Files declaring nothing and reserved names are logged at
+     * Level::Warn.
+     *
+     * @param root Script folder. Paths in messages and in DeclarationInfo are relative to it.
+     * @return true if every file loaded, `main.lua` exists and `on_start()` did not fail; false
+     * otherwise. Every failure is logged.
+     * @note Can be called once per runtime; later calls fail. Never throws.
+     */
+    bool load_scripts(const std::filesystem::path& root) noexcept;
+
+    /**
+     * @brief Looks up a name registered by load_scripts().
+     *
+     * @param name Declared entity or system name.
+     * @return Its kind and source file, or std::nullopt if no loaded file declares it.
+     */
+    [[nodiscard]] std::optional<DeclarationInfo> find_declaration(std::string_view name) const;
 
 private:
     struct Impl;
