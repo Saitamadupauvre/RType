@@ -5,6 +5,6 @@ engine_add_module(network
         Protocol.cpp
         ProtocolHandler.cpp
         Server.cpp
-        UdpTransport.cpp
+        UdpSocket.cpp
     DEPENDS engine::core
 )
