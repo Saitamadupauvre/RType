@@ -25,5 +25,6 @@ engine_add_module(network
     SOURCES
         src/network/Module.cpp
         src/network/ProtocolHandler.cpp
+        src/network/UdpSocket.cpp
     DEPENDS engine::core
 )
