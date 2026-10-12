@@ -96,3 +96,12 @@ TEST(PluginLoader, RejectsMissingEntryPoint) {
 TEST(PluginLoader, RejectsNullBackend) {
     expect_rejected(NULL_BACKEND_PLUGIN_PATH, "returned null");
 }
+
+TEST(PluginLoader, LoadsRaylibPluginWithoutOpeningAWindow) {
+    auto result = load_graphics_plugin(RAYLIB_PLUGIN_PATH);
+
+    if (!result.plugin.has_value()) {
+        FAIL() << result.error;
+    }
+    EXPECT_TRUE(result.plugin->backend().renderer().should_close());
+}
