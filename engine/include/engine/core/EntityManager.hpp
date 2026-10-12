@@ -85,6 +85,16 @@ public:
     }
 
     /**
+     * @brief Checks if a component type can be used in this manager.
+     * @tparam T Component type.
+     * @return true if register_component<T>() was called on this manager.
+     */
+    template <typename T> [[nodiscard]] bool is_registered() const {
+        const ComponentTypeId id = component_type_id<T>();
+        return id < _pools.size() && _pools[id] != nullptr;
+    }
+
+    /**
      * @brief Attaches a component to an entity, replacing any previous one.
      * @param entity Living owner of the component.
      * @param component Value to store.
