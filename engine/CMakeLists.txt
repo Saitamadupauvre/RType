@@ -32,3 +32,8 @@ engine_add_module(physics
         src/physics/Collisions.cpp
     DEPENDS engine::core
 )
+
+engine_add_module(graphics
+    SOURCES src/graphics/Interfaces.cpp
+    DEPENDS engine::core
+)

@@ -21,6 +21,7 @@ engine_add_test(core SOURCES
     engine/core/event/EventBusTest.cpp
     engine/core/log/LogTest.cpp
     engine/core/log/MemorySinkTest.cpp
+    engine/core/NonCopyableNonMovableTest.cpp
     engine/core/time/ManualClockTest.cpp
     engine/core/time/FixedStepLoopTest.cpp
     engine/core/Vec2Test.cpp
@@ -31,6 +32,10 @@ engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
 engine_add_test(physics SOURCES
     engine/physics/PhysicsSystemTest.cpp
     engine/physics/CollisionsTest.cpp
+)
+engine_add_test(graphics SOURCES
+    engine/graphics/BackendTest.cpp
+    engine/graphics/TypesTest.cpp
 )
 
 function(game_add_test name)
