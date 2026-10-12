@@ -105,14 +105,14 @@ TEST(PhysicsSystem, PublishesCollisionEventForAABBCollision) {
 
     auto entity_a = manager.spawn();
     manager.add(entity_a, Position{0.0f, 0.0f});
-    manager.add(entity_a, PhysicsBody{.type=PhysicsBody::Type::Dynamic});
-    manager.add(entity_a, AABBCollider{.offset={0.0f, 0.0f}, .size={10.0f, 10.0f}});
+    manager.add(entity_a, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
+    manager.add(entity_a, AABBCollider{.offset = {0.0f, 0.0f}, .size = {10.0f, 10.0f}});
     manager.add(entity_a, Scriptable{});
 
     auto entity_b = manager.spawn();
     manager.add(entity_b, Position{5.0f, 0.0f});
-    manager.add(entity_b, PhysicsBody{.type=PhysicsBody::Type::Dynamic});
-    manager.add(entity_b, AABBCollider{.offset={0.0f, 0.0f}, .size={10.0f, 10.0f}});
+    manager.add(entity_b, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
+    manager.add(entity_b, AABBCollider{.offset = {0.0f, 0.0f}, .size = {10.0f, 10.0f}});
     manager.add(entity_b, Scriptable{});
 
     std::vector<CollisionEvent> events;
@@ -140,13 +140,13 @@ TEST(PhysicsSystem, PublishesCollisionEventForCircleCollision) {
 
     auto entity_a = manager.spawn();
     manager.add(entity_a, Position{0.0f, 0.0f});
-    manager.add(entity_a, PhysicsBody{.type=PhysicsBody::Type::Dynamic});
+    manager.add(entity_a, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(entity_a, CircleCollider{{0.0f, 0.0f}, 5.0f});
     manager.add(entity_a, Scriptable{});
 
     auto entity_b = manager.spawn();
     manager.add(entity_b, Position{8.0f, 0.0f});
-    manager.add(entity_b, PhysicsBody{.type=PhysicsBody::Type::Dynamic});
+    manager.add(entity_b, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(entity_b, CircleCollider{{0.0f, 0.0f}, 5.0f});
     manager.add(entity_b, Scriptable{});
 
@@ -175,13 +175,13 @@ TEST(PhysicsSystem, PublishesCollisionEventForAABBCircleCollision) {
 
     auto aabb_entity = manager.spawn();
     manager.add(aabb_entity, Position{0.0f, 0.0f});
-    manager.add(aabb_entity, PhysicsBody{.type=PhysicsBody::Type::Dynamic});
+    manager.add(aabb_entity, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(aabb_entity, AABBCollider{{0.0f, 0.0f}, {10.0f, 10.0f}});
     manager.add(aabb_entity, Scriptable{});
 
     auto circle_entity = manager.spawn();
     manager.add(circle_entity, Position{7.0f, 0.0f});
-    manager.add(circle_entity, PhysicsBody{.type=PhysicsBody::Type::Dynamic});
+    manager.add(circle_entity, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(circle_entity, CircleCollider{{0.0f, 0.0f}, 5.0f});
     manager.add(circle_entity, Scriptable{});
 
@@ -210,12 +210,12 @@ TEST(PhysicsSystem, NoEventWhenNoScriptableComponent) {
 
     auto entity_a = manager.spawn();
     manager.add(entity_a, Position{0.0f, 0.0f});
-    manager.add(entity_a, PhysicsBody{.type=PhysicsBody::Type::Dynamic});
+    manager.add(entity_a, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(entity_a, AABBCollider{{0.0f, 0.0f}, {10.0f, 10.0f}});
 
     auto entity_b = manager.spawn();
     manager.add(entity_b, Position{5.0f, 0.0f});
-    manager.add(entity_b, PhysicsBody{.type=PhysicsBody::Type::Dynamic});
+    manager.add(entity_b, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(entity_b, AABBCollider{{0.0f, 0.0f}, {10.0f, 10.0f}});
 
     std::vector<CollisionEvent> events;

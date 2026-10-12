@@ -66,9 +66,7 @@ inline Vec2 operator*(float scalar, const Vec2& vec) {
     return Vec2{vec.x * scalar, vec.y * scalar};
 }
 
-inline float dot(const Vec2& a, const Vec2& b) {
-    return a.x * b.x + a.y * b.y;
-}
+inline float dot(const Vec2& a, const Vec2& b) { return a.x * b.x + a.y * b.y; }
 
 inline std::ostream& operator<<(std::ostream& os, const Vec2& vec) {
     os << "Vec2(" << vec.x << ", " << vec.y << ")";

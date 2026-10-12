@@ -1,8 +1,8 @@
 #pragma once
 
 #include "engine/core/EntityManager.hpp"
-#include "engine/core/event/EventBus.hpp"
 #include "engine/core/Vec2.hpp"
+#include "engine/core/event/EventBus.hpp"
 #include "engine/physics/Export.hpp"
 
 namespace engine::physics {
@@ -13,7 +13,8 @@ public:
 
     void update(float dt);
 
-    /* Really just sets a universal force upon a vector for dynamic bodies, called gravity because... sugar */
+    /* Really just sets a universal force upon a vector for dynamic bodies, called gravity
+     * because... sugar */
     void set_gravity(core::Vec2 gravity);
     [[nodiscard]] core::Vec2 get_gravity() const;
 
@@ -46,7 +47,8 @@ private:
      * @note Uses coefficient of restitution e = 0.5 (semi-elastic)
      * @note See: https://www.chrishecker.com/Rigid_Body_Dynamics
      */
-    void resolve_collision(core::Entity a, core::Entity b, core::Vec2 normal, float penetration_depth);
+    void resolve_collision(core::Entity a, core::Entity b, core::Vec2 normal,
+                           float penetration_depth);
 };
 
 } // namespace engine::physics

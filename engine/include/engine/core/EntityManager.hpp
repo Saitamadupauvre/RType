@@ -159,7 +159,7 @@ private:
         return static_cast<Pool<T>&>(*_pools[id]).pool;
     }
 
-    template <typename T> const ComponentPool<T>& pool_of() const {
+    template <typename T> [[nodiscard]] const ComponentPool<T>& pool_of() const {
         const ComponentTypeId id = component_type_id<T>();
         if (id >= _pools.size() || !_pools[id]) {
             throw ComponentNotRegistered(typeid(T).name());
