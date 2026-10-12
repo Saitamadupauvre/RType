@@ -212,7 +212,10 @@ std::size_t UdpSocket::receiveFrom(std::span<std::byte> buf, Endpoint& from,
     const auto deadline = clock::now() + (infinite ? std::chrono::milliseconds(0) : timeout);
 
     for (;;) {
-        if (g.closing()) { ec = std::make_error_code(std::errc::operation_canceled); return 0; }
+        if (g.closing()) {
+            ec = std::make_error_code(std::errc::operation_canceled);
+            return 0;
+        }
 
         auto wait = kSlice;
         if (!infinite) {
@@ -261,6 +264,7 @@ std::size_t UdpSocket::receiveFrom(std::span<std::byte> buf, Endpoint& from,
         if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
             continue;
         }
+
         ec = lastError();
         return 0;
     }
