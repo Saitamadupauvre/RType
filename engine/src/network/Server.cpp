@@ -1,7 +1,5 @@
 #include "engine/network/Server.hpp"
 
-#include <sys/socket.h>
-
 namespace engine::network {
 
 NetworkServer::NetworkServer(std::uint16_t port) noexcept : port_(port) {}

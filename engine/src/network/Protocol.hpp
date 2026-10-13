@@ -38,5 +38,3 @@ struct PacketHeader {
 };
 
 } // namespace engine::network
-
-// PLEASE REFER TO DOCS/PROTOCOL.MD FOR MORE INFO :D

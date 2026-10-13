@@ -1,7 +1,5 @@
 #include "engine/network/Client.hpp"
 
-#include <utility>
-
 namespace engine::network {
 
 NetworkClient::NetworkClient(std::string_view server_address, std::uint16_t port)
