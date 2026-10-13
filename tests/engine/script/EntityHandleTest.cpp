@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,15 @@ protected:
         return result;
     }
 
+    [[nodiscard]] Entity spawn_or_throw(const std::string& type,
+                                        std::optional<Vec2> position = std::nullopt) {
+        const std::optional<Entity> entity = _runtime.spawn(type, position);
+        if (!entity.has_value()) {
+            throw std::runtime_error("spawn failed: " + type);
+        }
+        return *entity;
+    }
+
     [[nodiscard]] Entity only_entity() {
         const std::vector<Entity> entities = living_entities();
         EXPECT_EQ(entities.size(), 1U);
@@ -63,18 +73,16 @@ protected:
 } // namespace
 
 TEST_F(EntityHandleTest, SpawnInitialisesComponentsFromPrefab) {
-    const auto bydo = _runtime.spawn("bydo");
+    const Entity bydo = spawn_or_throw("bydo");
 
-    ASSERT_TRUE(bydo);
-    EXPECT_EQ(_world.get<Position>(*bydo).pos, (Vec2{800.0F, 0.0F}));
-    EXPECT_EQ(_world.get<Velocity>(*bydo).vel, (Vec2{-150.0F, 0.0F}));
+    EXPECT_EQ(_world.get<Position>(bydo).pos, (Vec2{800.0F, 0.0F}));
+    EXPECT_EQ(_world.get<Velocity>(bydo).vel, (Vec2{-150.0F, 0.0F}));
 }
 
 TEST_F(EntityHandleTest, SpawnPositionOverridesPrefab) {
-    const auto bydo = _runtime.spawn("bydo", Vec2{10.0F, 20.0F});
+    const Entity bydo = spawn_or_throw("bydo", Vec2{10.0F, 20.0F});
 
-    ASSERT_TRUE(bydo);
-    EXPECT_EQ(_world.get<Position>(*bydo).pos, (Vec2{10.0F, 20.0F}));
+    EXPECT_EQ(_world.get<Position>(bydo).pos, (Vec2{10.0F, 20.0F}));
 }
 
 TEST_F(EntityHandleTest, ReadingNativeFieldReturnsComponent) {
@@ -157,18 +165,16 @@ TEST_F(EntityHandleTest, CallRunsPrefabMethodWithHandle) {
 }
 
 TEST_F(EntityHandleTest, CallReportsMissingMethodWithoutLogging) {
-    const auto bydo = _runtime.spawn("bydo");
-    ASSERT_TRUE(bydo);
+    const Entity bydo = spawn_or_throw("bydo");
 
-    EXPECT_FALSE(_runtime.call(*bydo, "on_spawn"));
+    EXPECT_FALSE(_runtime.call(bydo, "on_spawn"));
     EXPECT_FALSE(logged_error("on_spawn"));
 }
 
 TEST_F(EntityHandleTest, CallLogsErrorRaisedByMethod) {
-    const auto bydo = _runtime.spawn("bydo");
-    ASSERT_TRUE(bydo);
+    const Entity bydo = spawn_or_throw("bydo");
 
-    EXPECT_FALSE(_runtime.call(*bydo, "explode"));
+    EXPECT_FALSE(_runtime.call(bydo, "explode"));
     EXPECT_TRUE(logged_error("bydo.lua:12: bydo exploded"));
 }
 
