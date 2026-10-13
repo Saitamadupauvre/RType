@@ -13,10 +13,10 @@
 ## UDP Transport
 
 - [ ] Define the `UdpTransport` public API using engine-owned endpoint and datagram types.
-- [ ] Implement RAII socket ownership and explicit close behavior.
-- [ ] Implement socket creation, bind, send, and receive.
-- [ ] Keep POSIX socket headers confined to private transport implementation files.
-- [ ] Add the Windows socket implementation behind the same transport interface.
+- [x] Implement RAII socket ownership and explicit close behavior.
+- [x] Implement socket creation, bind, send, and receive.
+- [x] Keep POSIX socket headers confined to private transport implementation files.
+- [ ] Add the Windows socket implementation behind the same transport interface (postponed, see PROJECT.md §2).
 - [ ] Translate platform socket failures into engine errors without exposing platform types.
 
 ## Server
@@ -56,7 +56,7 @@
 
 ## Documentation
 
-- [ ] Replace the Asio reference in `docs/PROJECT.md` with the socket-wrapper design.
+- [x] Replace the Asio reference in `docs/PROJECT.md` with the socket-wrapper design.
 - [ ] Document the server thread, game thread, queues, and ownership boundaries.
 - [ ] Document how malformed packets and client crashes are handled.
 - [ ] Add build and run examples for `r-type_server` and `r-type_client`.

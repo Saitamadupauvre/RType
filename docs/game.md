@@ -19,7 +19,7 @@ The game is a **user** of the engine, exactly like a second game would be.
 - It includes only public engine headers: `#include "engine/<module>/..."`.
   Nothing from `engine/src/`.
 - It never links a plugin: the client loads `graphics-raylib` at runtime.
-- It never uses a third-party library directly: Lua, Asio and Raylib are
+- It never uses a third-party library directly: Lua, Raylib and the OS socket API are
   reached only through the engine.
 
 In the other direction, the engine never knows the game: nothing under

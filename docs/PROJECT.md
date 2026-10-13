@@ -77,7 +77,7 @@ See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as
 | Build system | CMake | Standard, cross-platform, integrates with package managers. |
 | Package manager | vcpkg (manifest mode) — *to confirm* | All our dependencies are ports; binary caching for CI; copies DLLs automatically on Windows. |
 | Windowing / 2D rendering / input / audio | Raylib | One small library for all four; simple API. Isolated in a plugin. |
-| Networking | Asio (standalone) | Portable async UDP on Linux and Windows. |
+| Networking | POSIX sockets, wrapped in `engine-network` | No extra dependency; a small thread-safe UDP socket wrapper is all the protocol needs. |
 | Scripting | Lua 5.4 + sol2 | Lightweight, designed to be embedded, industry standard for game scripting; sol2 gives a modern C++ binding. |
 | Tests | GoogleTest | Decided. |
 | Logging | spdlog | Levels, timestamps, per-module loggers. |
@@ -98,7 +98,7 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
             │  engine-core     ECS, game loop, time, events, resources,      │
             │                  logging, input actions, plugin loader         │
             │  engine-script   Lua runtime (sol2), entity/system loading     │
-            │  engine-network  Asio, protocol, replication                   │
+            │  engine-network  UDP sockets, protocol, replication            │
             │                                                                │
             │  plugins/graphics-raylib   window, 2D rendering, input, audio  │
             │                            (loaded at runtime, client only)    │
@@ -117,7 +117,7 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
 - **The engine never depends on the game.** Nothing under `engine/` includes or references game code. The build enforces it: engine targets do not link against game targets.
 - **Shared libraries everywhere.** Every engine module is a shared library (`.so` / `.dll`).
 - **Runtime plugins for backends.** The graphics backend is a plugin loaded with `dlopen` / `LoadLibrary` through a small `DynamicLibrary` wrapper. The server never loads it, so it runs on machines without a display.
-- **Third-party headers stay private.** `raylib.h` is included only inside the graphics plugin; Asio only inside `.cpp` files of the network module. This also avoids the well-known `windows.h` / Raylib name clashes on Windows.
+- **Third-party headers stay private.** `raylib.h` is included only inside the graphics plugin; POSIX socket headers only inside the private sources of the network module. This also avoids the well-known `windows.h` / Raylib name clashes on Windows.
 - **Data flows through the ECS.** Subsystems communicate through components and an event bus, never by calling each other directly.
 
 ### 4.3 ECS
@@ -230,7 +230,7 @@ Usage:
 
 - **Authoritative:** clients send **inputs** (actions), never positions. The server simulates and replicates the result. This prevents trivial cheating.
 - **Multithreaded:**
-  - a **network thread** (Asio) receives packets, validates them and pushes messages into a thread-safe queue;
+  - a **network thread** receives packets, validates them and pushes messages into a thread-safe queue;
   - the **game thread** drains the queue at each tick, runs the simulation and sends snapshots.
   The game loop never blocks waiting for a client.
 - **Resilient:**
@@ -694,7 +694,7 @@ All documentation is in English and published online.
 - **Developer documentation:** architecture diagrams, modules, engine rules, how-to guides (create an entity, a system, a level).
 - **Lua API reference:** derived from §10.
 - **Protocol specification:** RFC-style, maintained by the protocol owner.
-- **Comparative study:** justification of each technology (C++20, CMake + vcpkg, Raylib, Asio, Lua 5.4 + sol2 vs alternatives such as LuaJIT or Python), including algorithms, data storage and security aspects.
+- **Comparative study:** justification of each technology (C++20, CMake + vcpkg, Raylib, POSIX sockets, Lua 5.4 + sol2 vs alternatives such as LuaJIT or Python), including algorithms, data storage and security aspects.
 - **Accessibility report.**
 
 ---
