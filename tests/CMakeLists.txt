@@ -37,6 +37,7 @@ engine_add_test(network SOURCES
     engine/network/ByteWriterTest.cpp
     engine/network/ClientTest.cpp
     engine/network/ModuleTest.cpp
+    engine/network/PayloadsTest.cpp
     engine/network/ProtocolHandlerTest.cpp
     engine/network/ServerTest.cpp
     engine/network/UdpSocketTest.cpp

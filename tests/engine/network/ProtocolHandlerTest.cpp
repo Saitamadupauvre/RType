@@ -66,22 +66,3 @@ TEST(ProtocolHandler, RejectsMismatchedPayloadSize) {
 
     EXPECT_FALSE(handler.deserialize(packet).has_value());
 }
-
-TEST(ProtocolHandler, RejectsInvalidInputPayload) {
-    const engine::network::ProtocolHandler handler;
-    const engine::network::InputPayload payload{.action_flags = 0x02, .move_x = 2, .move_y = 0};
-
-    EXPECT_FALSE(handler.serialize_input_payload(payload).has_value());
-}
-
-TEST(ProtocolHandler, DeserializesValidInputPayload) {
-    const engine::network::ProtocolHandler handler;
-    const std::array<std::uint8_t, 3> payload{0x01, 0xFF, 0x01};
-
-    const auto input = handler.deserialize_input_payload(payload);
-
-    ASSERT_TRUE(input.has_value());
-    EXPECT_EQ(input->action_flags, 0x01);
-    EXPECT_EQ(input->move_x, -1);
-    EXPECT_EQ(input->move_y, 1);
-}
