@@ -33,8 +33,11 @@ engine_add_test(script SOURCES
     engine/script/ScriptRequireTest.cpp
 )
 engine_add_test(network SOURCES
+    engine/network/ClientTest.cpp
     engine/network/ModuleTest.cpp
     engine/network/ProtocolHandlerTest.cpp
+    engine/network/ServerTest.cpp
+    engine/network/UdpSocketTest.cpp
 )
 target_include_directories(engine_network_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/network")
 engine_add_test(physics SOURCES
