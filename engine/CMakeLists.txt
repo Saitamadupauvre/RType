@@ -35,8 +35,10 @@ engine_add_module(script
 
 engine_add_module(network
     SOURCES
+        src/network/Client.cpp
         src/network/Module.cpp
         src/network/ProtocolHandler.cpp
+        src/network/Server.cpp
         src/network/UdpSocket.cpp
     DEPENDS engine::core
 )
