@@ -9,10 +9,18 @@
 - [x] Reject truncated packets, invalid magic values, unsupported versions, unknown message types, and mismatched payload lengths.
 - [x] Define messages for connection, input, snapshots, entity events, heartbeat, and disconnection.
 - [x] Document the protocol header and every message in `docs/protocol.md`.
+- [x] Encode and decode the `input` payload.
+- [ ] Encode and decode the `connect_request` payload (4-byte client nonce).
+- [ ] Encode and decode the `connect_accept` payload, rejecting duplicate type IDs or names, names above 63 bytes, and truncated entries.
+- [ ] Encode and decode the `snapshot` payload, rejecting sizes other than `6 + entity_count * 14`.
+- [ ] Validate snapshot and spawn `type_id` values against the connection type table.
+- [ ] Encode and decode the `event` payloads (`spawn`, `destroy`, `fire`, `sound`), rejecting unknown types and wrong fixed sizes.
+- [ ] Encode and decode the `disconnect` payload, rejecting undefined reasons.
+- [ ] Reject non-empty `heartbeat` payloads.
 
 ## UDP Transport
 
-- [ ] Define the `UdpTransport` public API using engine-owned endpoint and datagram types.
+- [X] Define the `UdpTransport` public API using engine-owned endpoint and datagram types.
 - [x] Implement RAII socket ownership and explicit close behavior.
 - [x] Implement socket creation, bind, send, and receive.
 - [x] Keep POSIX socket headers confined to private transport implementation files.
@@ -53,6 +61,7 @@
 - [ ] Add deterministic transport tests with a fake transport instead of real network timing.
 - [ ] Add server tests for queued input processing and heartbeat timeouts.
 - [ ] Add client tests for stale, duplicated, and out-of-order snapshots.
+- [ ] Add payload tests for every message: valid, truncated, oversized, out-of-range values, and random bytes.
 
 ## Documentation
 

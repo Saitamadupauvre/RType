@@ -33,6 +33,8 @@ engine_add_test(script SOURCES
     engine/script/ScriptRequireTest.cpp
 )
 engine_add_test(network SOURCES
+    engine/network/ByteReaderTest.cpp
+    engine/network/ByteWriterTest.cpp
     engine/network/ClientTest.cpp
     engine/network/ModuleTest.cpp
     engine/network/ProtocolHandlerTest.cpp

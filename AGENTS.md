@@ -65,8 +65,8 @@ docs/                       documentation (English): engine.md, plugins.md, game
   Symbols are hidden by default: mark public API with the generated
   `ENGINE_<MODULE>_EXPORT` macro from `<engine/<module>/Export.hpp>`.
 - Third-party headers never appear in public headers (`engine/include/`).
-  `raylib.h` is included only in `plugins/graphics-raylib/`; Asio only in
-  `.cpp` files of `engine/src/network/`. Link third-party libraries with
+  `raylib.h` is included only in `plugins/graphics-raylib/`; POSIX socket
+  headers only in `engine/src/network/`. Link third-party libraries with
   `PRIVATE_DEPENDS`.
 - No global state in headers (no `static` variables in templates): registries
   live in a `.cpp` of `engine-core` behind exported functions.
