@@ -21,13 +21,13 @@ Every payload follows the pattern already used by `InputPayload` in
 
 ### 1. Fixed-size messages
 
-- [ ] `ConnectRequestPayload { std::uint32_t client_nonce; }`
+- [x] `ConnectRequestPayload { std::uint32_t client_nonce; }`
   - `encode_payload(const ConnectRequestPayload&)`: `write_u32(client_nonce)`.
   - `decode_connect_request(payload)`: `read_u32()`, then `at_end()`. Exactly 4 bytes.
-- [ ] `HeartbeatPayload {}`
+- [x] `HeartbeatPayload {}`
   - `encode_payload(const HeartbeatPayload&)`: returns an empty `Bytes`.
   - `decode_heartbeat(payload)`: accepts only `payload.empty()`.
-- [ ] `enum class DisconnectReason : std::uint8_t { normal = 0, timeout = 1, server_shutdown = 2, protocol_error = 3 };`
+- [x] `enum class DisconnectReason : std::uint8_t { normal = 0, timeout = 1, server_shutdown = 2, protocol_error = 3 };`
   and `DisconnectPayload { DisconnectReason reason; }`
   - `is_valid`: `reason <= DisconnectReason::protocol_error`.
   - `encode_payload(const DisconnectPayload&)`: `write_u8(static_cast<std::uint8_t>(reason))`.
@@ -106,13 +106,13 @@ Every payload follows the pattern already used by `InputPayload` in
 - [x] Define messages for connection, input, snapshots, entity events, heartbeat, and disconnection.
 - [x] Document the protocol header and every message in `docs/protocol.md`.
 - [x] Encode and decode the `input` payload.
-- [ ] Encode and decode the `connect_request` payload (4-byte client nonce).
+- [x] Encode and decode the `connect_request` payload (4-byte client nonce).
 - [ ] Encode and decode the `connect_accept` payload, rejecting duplicate type IDs or names, empty names, names above 63 bytes, and truncated entries.
 - [ ] Encode and decode the `snapshot` payload, rejecting sizes other than `6 + entity_count * 14` and more than 84 entities.
 - [ ] Validate snapshot and spawn `type_id` values against the connection type table.
 - [ ] Encode and decode the `event` payloads (`spawn`, `destroy`, `fire`, `sound`), rejecting unknown types and wrong fixed sizes.
-- [ ] Encode and decode the `disconnect` payload, rejecting undefined reasons.
-- [ ] Reject non-empty `heartbeat` payloads.
+- [x] Encode and decode the `disconnect` payload, rejecting undefined reasons.
+- [x] Reject non-empty `heartbeat` payloads.
 
 ## UDP Transport
 
