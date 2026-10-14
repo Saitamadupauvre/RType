@@ -33,16 +33,20 @@ engine_add_test(script SOURCES
     engine/script/ScriptRequireTest.cpp
 )
 engine_add_test(network SOURCES
-    engine/network/ByteReaderTest.cpp
-    engine/network/ByteWriterTest.cpp
     engine/network/ClientTest.cpp
     engine/network/ModuleTest.cpp
-    engine/network/PayloadsTest.cpp
-    engine/network/ProtocolHandlerTest.cpp
     engine/network/ServerTest.cpp
-    engine/network/UdpSocketTest.cpp
+    engine/network/bytes/ByteReaderTest.cpp
+    engine/network/bytes/ByteWriterTest.cpp
+    engine/network/decoder/PayloadDecoderTest.cpp
+    engine/network/encoder/PayloadEncoderTest.cpp
+    engine/network/protocol/ProtocolHandlerTest.cpp
+    engine/network/socket/UdpSocketTest.cpp
 )
-target_include_directories(engine_network_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/network")
+target_include_directories(engine_network_tests PRIVATE
+    "${PROJECT_SOURCE_DIR}/engine/src/network"
+    "${CMAKE_CURRENT_SOURCE_DIR}/engine/network"
+)
 engine_add_test(physics SOURCES
     engine/physics/PhysicsSystemTest.cpp
     engine/physics/CollisionsTest.cpp

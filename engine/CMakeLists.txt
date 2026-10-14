@@ -37,12 +37,16 @@ engine_add_module(network
     SOURCES
         src/network/Client.cpp
         src/network/Module.cpp
-        src/network/Payloads.cpp
-        src/network/ProtocolHandler.cpp
         src/network/Server.cpp
-        src/network/UdpSocket.cpp
+        src/network/decoder/EventReader.cpp
+        src/network/decoder/PayloadDecoder.cpp
+        src/network/encoder/PayloadEncoder.cpp
+        src/network/protocol/ProtocolHandler.cpp
+        src/network/protocol/Validation.cpp
+        src/network/socket/UdpSocket.cpp
     DEPENDS engine::core
 )
+target_include_directories(engine-network PRIVATE src/network)
 
 engine_add_module(physics
     SOURCES
