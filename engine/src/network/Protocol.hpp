@@ -96,6 +96,29 @@ struct SoundEvent {
 
 using EventPayload = std::variant<SpawnEvent, DestroyEvent, FireEvent, SoundEvent>;
 
+struct EntityState {
+    std::uint32_t entity_id{};
+    std::uint16_t type_id{};
+    std::int16_t x{};
+    std::int16_t y{};
+    std::int16_t vx{};
+    std::int16_t vy{};
+
+    bool operator==(const EntityState&) const = default;
+};
+
+struct SnapshotPayload {
+    std::uint32_t server_tick{};
+    std::vector<EntityState> entities;
+
+    bool operator==(const SnapshotPayload&) const = default;
+};
+
+inline constexpr std::size_t snapshot_prefix_size = 6;
+inline constexpr std::size_t entity_record_size = 14;
+inline constexpr std::size_t max_snapshot_entities =
+    (max_payload_size - snapshot_prefix_size) / entity_record_size;
+
 struct PacketHeader {
     std::uint32_t magic{};
     std::uint16_t version{};
