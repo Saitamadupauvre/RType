@@ -1,6 +1,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -26,6 +27,11 @@ using engine::network::SnapshotPayload;
 using engine::network::SpawnEvent;
 
 constexpr std::size_t header_type_offset = 6;
+
+template <typename T> T value_of(std::optional<T> value) {
+    EXPECT_TRUE(value.has_value());
+    return std::move(value).value_or(T{});
+}
 
 std::vector<std::pair<Message, MessageType>> sample_messages() {
     return {
@@ -75,22 +81,21 @@ TEST(ProtocolHandler, SerializesPacketInBigEndianOrder) {
 
     const auto packet = handler.serialize(input_header(0x0102'0304, payload.size()), payload);
 
-    ASSERT_TRUE(packet.has_value());
-    EXPECT_EQ(*packet, (std::vector<std::uint8_t>{0x52, 0x54, 0x59, 0x50, 0x00, 0x01, 0x03, 0x01,
-                                                  0x02, 0x03, 0x04, 0x00, 0x03, 0x01, 0x00, 0x01}));
+    const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x01, 0x03, 0x01,
+                                             0x02, 0x03, 0x04, 0x00, 0x03, 0x01, 0x00, 0x01};
+
+    EXPECT_EQ(packet, expected);
 }
 
 TEST(ProtocolHandler, DeserializesValidPacket) {
     const engine::network::ProtocolHandler handler;
     const std::array<std::uint8_t, 3> payload{1, 0, 1};
-    const auto encoded = handler.serialize(input_header(42, payload.size()), payload);
+    const auto encoded = value_of(handler.serialize(input_header(42, payload.size()), payload));
 
-    ASSERT_TRUE(encoded.has_value());
-    const auto packet = handler.deserialize(*encoded);
+    const auto packet = value_of(handler.deserialize(encoded));
 
-    ASSERT_TRUE(packet.has_value());
-    EXPECT_EQ(packet->header.sequence, 42);
-    EXPECT_EQ(packet->payload, std::vector<std::uint8_t>(payload.begin(), payload.end()));
+    EXPECT_EQ(packet.header.sequence, 42);
+    EXPECT_EQ(packet.payload, std::vector<std::uint8_t>(payload.begin(), payload.end()));
 }
 
 TEST(ProtocolHandler, RejectsMalformedPacket) {
@@ -120,15 +125,13 @@ TEST(ProtocolHandler, RoundTripsEveryMessageType) {
     const ProtocolHandler handler;
 
     for (const auto& [message, type] : sample_messages()) {
-        const auto datagram = handler.encode(message, 42);
-        ASSERT_TRUE(datagram.has_value()) << "index " << message.index();
+        const auto datagram = value_of(handler.encode(message, 42));
 
-        const auto received = handler.decode(*datagram);
+        const auto received = value_of(handler.decode(datagram));
 
-        ASSERT_TRUE(received.has_value()) << "index " << message.index();
-        EXPECT_EQ(received->message, message);
-        EXPECT_EQ(received->header.type, type);
-        EXPECT_EQ(received->header.sequence, 42U);
+        EXPECT_EQ(received.message, message) << "index " << message.index();
+        EXPECT_EQ(received.header.type, type);
+        EXPECT_EQ(received.header.sequence, 42U);
     }
 }
 
@@ -136,10 +139,10 @@ TEST(ProtocolHandler, EncodedHeaderTypeMatchesPayload) {
     const ProtocolHandler handler;
 
     for (const auto& [message, type] : sample_messages()) {
-        const auto datagram = handler.encode(message, 0);
+        const auto datagram = value_of(handler.encode(message, 0));
 
-        ASSERT_TRUE(datagram.has_value()) << "index " << message.index();
-        EXPECT_EQ(datagram->at(header_type_offset), static_cast<std::uint8_t>(type));
+        ASSERT_GT(datagram.size(), header_type_offset) << "index " << message.index();
+        EXPECT_EQ(datagram[header_type_offset], static_cast<std::uint8_t>(type));
     }
 }
 
@@ -153,24 +156,25 @@ TEST(ProtocolHandler, EncodeRejectsInvalidPayload) {
 
 TEST(ProtocolHandler, DecodeRejectsPayloadOfAnotherMessageType) {
     const ProtocolHandler handler;
-    const auto input = engine::network::encode_payload(InputPayload{.action_flags = 0x01});
-    const auto request = engine::network::encode_payload(ConnectRequestPayload{.client_nonce = 7});
-    const auto disconnect =
-        engine::network::encode_payload(DisconnectPayload{.reason = DisconnectReason::normal});
-    ASSERT_TRUE(input && request && disconnect);
+    const InputPayload input{.action_flags = 0x01};
+    const ConnectRequestPayload request{.client_nonce = 7};
+    const DisconnectPayload disconnect{.reason = DisconnectReason::normal};
+    const auto input_bytes = value_of(engine::network::encode_payload(input));
+    const auto request_bytes = value_of(engine::network::encode_payload(request));
+    const auto disconnect_bytes = value_of(engine::network::encode_payload(disconnect));
 
-    EXPECT_FALSE(handler.decode(packet_of(MessageType::disconnect, *input)).has_value());
-    EXPECT_FALSE(handler.decode(packet_of(MessageType::heartbeat, *request)).has_value());
-    EXPECT_FALSE(handler.decode(packet_of(MessageType::input, *disconnect)).has_value());
-    EXPECT_FALSE(handler.decode(packet_of(MessageType::snapshot, *input)).has_value());
-    EXPECT_FALSE(handler.decode(packet_of(MessageType::event, *request)).has_value());
+    EXPECT_FALSE(handler.decode(packet_of(MessageType::disconnect, input_bytes)).has_value());
+    EXPECT_FALSE(handler.decode(packet_of(MessageType::heartbeat, request_bytes)).has_value());
+    EXPECT_FALSE(handler.decode(packet_of(MessageType::input, disconnect_bytes)).has_value());
+    EXPECT_FALSE(handler.decode(packet_of(MessageType::snapshot, input_bytes)).has_value());
+    EXPECT_FALSE(handler.decode(packet_of(MessageType::event, request_bytes)).has_value());
 }
 
 TEST(ProtocolHandler, DecodeRejectsInvalidHeader) {
     const ProtocolHandler handler;
-    auto datagram = handler.encode(HeartbeatPayload{}, 0);
-    ASSERT_TRUE(datagram.has_value());
-    datagram->front() = 0x00;
+    auto datagram = value_of(handler.encode(HeartbeatPayload{}, 0));
+    ASSERT_FALSE(datagram.empty());
+    datagram.front() = 0x00;
 
-    EXPECT_FALSE(handler.decode(*datagram).has_value());
+    EXPECT_FALSE(handler.decode(datagram).has_value());
 }

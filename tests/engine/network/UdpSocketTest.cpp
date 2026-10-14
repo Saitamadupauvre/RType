@@ -8,6 +8,8 @@
 #include <tuple>
 #include <utility>
 
+#include <fcntl.h>
+
 #include <gtest/gtest.h>
 
 #include "UdpSocket.hpp"
@@ -18,10 +20,18 @@ using namespace std::chrono_literals;
 
 namespace {
 
+Endpoint endpoint_of(std::string_view ip, std::uint16_t port) {
+    const auto endpoint = Endpoint::from_string(ip, port);
+    EXPECT_TRUE(endpoint.has_value()) << ip;
+    return endpoint.value_or(Endpoint{});
+}
+
+bool is_open_descriptor(int fd) { return ::fcntl(fd, F_GETFD) != -1; }
+
 UdpSocket bound_loopback_socket() {
     UdpSocket socket(AF_INET);
     std::error_code ec;
-    socket.bind(*Endpoint::from_string("127.0.0.1", 0), ec);
+    socket.bind(endpoint_of("127.0.0.1", 0), ec);
     EXPECT_FALSE(ec) << ec.message();
     return socket;
 }
@@ -36,21 +46,19 @@ Endpoint local_endpoint_of(const UdpSocket& socket) {
 } // namespace
 
 TEST(Endpoint, ParsesIpv4Address) {
-    const auto endpoint = Endpoint::from_string("127.0.0.1", 4242);
+    const auto endpoint = endpoint_of("127.0.0.1", 4242);
 
-    ASSERT_TRUE(endpoint.has_value());
-    EXPECT_EQ(endpoint->port(), 4242);
-    EXPECT_EQ(endpoint->to_string(), "127.0.0.1:4242");
-    EXPECT_EQ(endpoint->size(), sizeof(sockaddr_in));
+    EXPECT_EQ(endpoint.port(), 4242);
+    EXPECT_EQ(endpoint.to_string(), "127.0.0.1:4242");
+    EXPECT_EQ(endpoint.size(), sizeof(sockaddr_in));
 }
 
 TEST(Endpoint, ParsesIpv6Address) {
-    const auto endpoint = Endpoint::from_string("::1", 4242);
+    const auto endpoint = endpoint_of("::1", 4242);
 
-    ASSERT_TRUE(endpoint.has_value());
-    EXPECT_EQ(endpoint->port(), 4242);
-    EXPECT_EQ(endpoint->to_string(), "[::1]:4242");
-    EXPECT_EQ(endpoint->size(), sizeof(sockaddr_in6));
+    EXPECT_EQ(endpoint.port(), 4242);
+    EXPECT_EQ(endpoint.to_string(), "[::1]:4242");
+    EXPECT_EQ(endpoint.size(), sizeof(sockaddr_in6));
 }
 
 TEST(Endpoint, RejectsMalformedAddresses) {
@@ -107,7 +115,7 @@ TEST(UdpSocket, CloseIsIdempotent) {
 
 TEST(UdpSocket, OperationsOnClosedSocketReportBadDescriptor) {
     UdpSocket socket;
-    const auto local = *Endpoint::from_string("127.0.0.1", 0);
+    const auto local = endpoint_of("127.0.0.1", 0);
     std::array<std::uint8_t, 4> buffer{};
     Endpoint from;
     std::error_code ec;
@@ -126,24 +134,32 @@ TEST(UdpSocket, OperationsOnClosedSocketReportBadDescriptor) {
 }
 
 TEST(UdpSocket, MoveConstructionTransfersOwnership) {
-    UdpSocket source(AF_INET);
-    const int fd = source.native_handle();
+    int fd = -1;
 
-    const UdpSocket target(std::move(source));
+    const UdpSocket target = [&fd] {
+        UdpSocket source(AF_INET);
+        fd = source.native_handle();
+        return UdpSocket(std::move(source));
+    }();
 
-    EXPECT_FALSE(source.is_open());
     EXPECT_EQ(target.native_handle(), fd);
+    EXPECT_TRUE(is_open_descriptor(fd));
 }
 
 TEST(UdpSocket, MoveAssignmentTransfersOwnership) {
-    UdpSocket source(AF_INET);
     UdpSocket target(AF_INET);
-    const int fd = source.native_handle();
+    const int replaced_fd = target.native_handle();
+    int fd = -1;
 
-    target = std::move(source);
+    {
+        UdpSocket source(AF_INET);
+        fd = source.native_handle();
+        target = std::move(source);
+    }
 
-    EXPECT_FALSE(source.is_open());
     EXPECT_EQ(target.native_handle(), fd);
+    EXPECT_TRUE(is_open_descriptor(fd));
+    EXPECT_FALSE(is_open_descriptor(replaced_fd));
 }
 
 TEST(UdpSocket, BindRejectsAddressAlreadyInUse) {

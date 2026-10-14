@@ -5,6 +5,7 @@ Checks: >
   -bugprone-easily-swappable-parameters,
   -bugprone-exception-escape,
   clang-analyzer-*,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
   modernize-*,
   -modernize-use-trailing-return-type,
   -modernize-use-std-numbers,

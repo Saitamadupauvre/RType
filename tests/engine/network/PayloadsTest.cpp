@@ -34,24 +34,28 @@ using engine::network::SoundEvent;
 using engine::network::SpawnEvent;
 using engine::network::TypeEntry;
 
+namespace {
+
+template <typename Payload> std::vector<std::uint8_t> encoded(const Payload& payload) {
+    auto bytes = encode_payload(payload);
+    EXPECT_TRUE(bytes.has_value());
+    return bytes.value_or(std::vector<std::uint8_t>{});
+}
+
+} // namespace
+
 TEST(InputPayload, EncodesFieldsInOrder) {
     const InputPayload input{.action_flags = 0x01, .move_x = -1, .move_y = 1};
 
-    const auto bytes = encode_payload(input);
-
-    ASSERT_TRUE(bytes.has_value());
-    EXPECT_EQ(*bytes, (std::vector<std::uint8_t>{0x01, 0xFF, 0x01}));
+    EXPECT_EQ(encode_payload(input), (std::vector<std::uint8_t>{0x01, 0xFF, 0x01}));
 }
 
 TEST(InputPayload, DecodesValidPayload) {
     const std::array<std::uint8_t, 3> payload{0x01, 0xFF, 0x01};
 
-    const auto input = decode_input(payload);
+    const InputPayload expected{.action_flags = 0x01, .move_x = -1, .move_y = 1};
 
-    ASSERT_TRUE(input.has_value());
-    EXPECT_EQ(input->action_flags, 0x01);
-    EXPECT_EQ(input->move_x, -1);
-    EXPECT_EQ(input->move_y, 1);
+    EXPECT_EQ(decode_input(payload), expected);
 }
 
 TEST(InputPayload, RoundTripsEveryValidCombination) {
@@ -63,10 +67,7 @@ TEST(InputPayload, RoundTripsEveryValidCombination) {
             for (const auto move_y : axis_values) {
                 const InputPayload input{.action_flags = flags, .move_x = move_x, .move_y = move_y};
 
-                const auto bytes = encode_payload(input);
-
-                ASSERT_TRUE(bytes.has_value());
-                EXPECT_EQ(decode_input(*bytes), input);
+                EXPECT_EQ(decode_input(encoded(input)), input);
             }
         }
     }
@@ -113,10 +114,9 @@ TEST(InputPayload, DecoderRejectsTrailingBytes) {
 }
 
 TEST(ConnectRequestPayload, EncodesNonceInBigEndianOrder) {
-    const auto bytes = encode_payload(ConnectRequestPayload{.client_nonce = 0x0102'0304});
+    const ConnectRequestPayload request{.client_nonce = 0x0102'0304};
 
-    ASSERT_TRUE(bytes.has_value());
-    EXPECT_EQ(*bytes, (std::vector<std::uint8_t>{0x01, 0x02, 0x03, 0x04}));
+    EXPECT_EQ(encode_payload(request), (std::vector<std::uint8_t>{0x01, 0x02, 0x03, 0x04}));
 }
 
 TEST(ConnectRequestPayload, RoundTripsBoundaryNonces) {
@@ -125,10 +125,7 @@ TEST(ConnectRequestPayload, RoundTripsBoundaryNonces) {
     for (const auto nonce : nonces) {
         const ConnectRequestPayload request{.client_nonce = nonce};
 
-        const auto bytes = encode_payload(request);
-
-        ASSERT_TRUE(bytes.has_value());
-        EXPECT_EQ(decode_connect_request(*bytes), request);
+        EXPECT_EQ(decode_connect_request(encoded(request)), request);
     }
 }
 
@@ -150,17 +147,11 @@ TEST(ConnectRequestPayload, DecoderRejectsTrailingBytes) {
 }
 
 TEST(HeartbeatPayload, EncodesEmptyPayload) {
-    const auto bytes = encode_payload(HeartbeatPayload{});
-
-    ASSERT_TRUE(bytes.has_value());
-    EXPECT_TRUE(bytes->empty());
+    EXPECT_EQ(encode_payload(HeartbeatPayload{}), std::vector<std::uint8_t>{});
 }
 
 TEST(HeartbeatPayload, RoundTrips) {
-    const auto bytes = encode_payload(HeartbeatPayload{});
-
-    ASSERT_TRUE(bytes.has_value());
-    EXPECT_EQ(decode_heartbeat(*bytes), HeartbeatPayload{});
+    EXPECT_EQ(decode_heartbeat(encoded(HeartbeatPayload{})), HeartbeatPayload{});
 }
 
 TEST(HeartbeatPayload, DecoderRejectsNonEmptyPayload) {
@@ -171,10 +162,7 @@ TEST(HeartbeatPayload, DecoderRejectsNonEmptyPayload) {
 TEST(DisconnectPayload, EncodesReasonAsOneByte) {
     const DisconnectPayload disconnect{.reason = DisconnectReason::server_shutdown};
 
-    const auto bytes = encode_payload(disconnect);
-
-    ASSERT_TRUE(bytes.has_value());
-    EXPECT_EQ(*bytes, (std::vector<std::uint8_t>{0x02}));
+    EXPECT_EQ(encode_payload(disconnect), (std::vector<std::uint8_t>{0x02}));
 }
 
 TEST(DisconnectPayload, RoundTripsEveryDefinedReason) {
@@ -188,10 +176,7 @@ TEST(DisconnectPayload, RoundTripsEveryDefinedReason) {
     for (const auto reason : reasons) {
         const DisconnectPayload disconnect{.reason = reason};
 
-        const auto bytes = encode_payload(disconnect);
-
-        ASSERT_TRUE(bytes.has_value());
-        EXPECT_EQ(decode_disconnect(*bytes), disconnect);
+        EXPECT_EQ(decode_disconnect(encoded(disconnect)), disconnect);
     }
 }
 
@@ -227,46 +212,42 @@ std::array<EventPayload, 4> sample_events() {
     };
 }
 
-std::vector<std::uint8_t> encode_event(const EventPayload& event) {
-    auto bytes = encode_payload(event);
-    EXPECT_TRUE(bytes.has_value());
-    return bytes.value_or(std::vector<std::uint8_t>{});
-}
-
 } // namespace
 
 TEST(EventPayload, EncodesSpawnFieldsInOrder) {
     const EventPayload event =
         SpawnEvent{.entity_id = 0x0102'0304, .type_id = 0x0506, .x = -2, .y = 0x0708};
 
-    EXPECT_EQ(encode_event(event), (std::vector<std::uint8_t>{0x01, 0x01, 0x02, 0x03, 0x04, 0x05,
-                                                              0x06, 0xFF, 0xFE, 0x07, 0x08}));
+    const std::vector<std::uint8_t> expected{0x01, 0x01, 0x02, 0x03, 0x04, 0x05,
+                                             0x06, 0xFF, 0xFE, 0x07, 0x08};
+
+    EXPECT_EQ(encoded(event), expected);
 }
 
 TEST(EventPayload, EncodesDestroyFieldsInOrder) {
     const EventPayload event = DestroyEvent{.entity_id = 0x0102'0304};
 
-    EXPECT_EQ(encode_event(event), (std::vector<std::uint8_t>{0x02, 0x01, 0x02, 0x03, 0x04}));
+    EXPECT_EQ(encoded(event), (std::vector<std::uint8_t>{0x02, 0x01, 0x02, 0x03, 0x04}));
 }
 
 TEST(EventPayload, EncodesFireFieldsInOrder) {
     const EventPayload event =
         FireEvent{.source_entity_id = 0x0102'0304, .projectile_entity_id = 0x0506'0708};
 
-    EXPECT_EQ(encode_event(event),
+    EXPECT_EQ(encoded(event),
               (std::vector<std::uint8_t>{0x03, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}));
 }
 
 TEST(EventPayload, EncodesSoundFieldsInOrder) {
     const EventPayload event = SoundEvent{.source_entity_id = 0x0102'0304, .sound_id = 0x0506};
 
-    EXPECT_EQ(encode_event(event),
+    EXPECT_EQ(encoded(event),
               (std::vector<std::uint8_t>{0x04, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06}));
 }
 
 TEST(EventPayload, RoundTripsEveryEvent) {
     for (const auto& event : sample_events()) {
-        EXPECT_EQ(decode_event(encode_event(event)), event) << "index " << event.index();
+        EXPECT_EQ(decode_event(encoded(event)), event) << "index " << event.index();
     }
 }
 
@@ -288,7 +269,7 @@ TEST(EventPayload, DecoderRejectsUnknownEventTypes) {
 
 TEST(EventPayload, DecoderRejectsTruncatedEvents) {
     for (const auto& event : sample_events()) {
-        const auto bytes = encode_event(event);
+        const auto bytes = encoded(event);
 
         for (std::size_t size = 1; size < bytes.size(); ++size) {
             const std::span<const std::uint8_t> truncated(bytes.data(), size);
@@ -301,7 +282,7 @@ TEST(EventPayload, DecoderRejectsTruncatedEvents) {
 
 TEST(EventPayload, DecoderRejectsTrailingBytes) {
     for (const auto& event : sample_events()) {
-        auto bytes = encode_event(event);
+        auto bytes = encoded(event);
         bytes.push_back(0x00);
 
         EXPECT_FALSE(decode_event(bytes).has_value()) << "index " << event.index();
@@ -326,12 +307,6 @@ SnapshotPayload snapshot_with(std::size_t entity_count) {
     return snapshot;
 }
 
-std::vector<std::uint8_t> encode_snapshot(const SnapshotPayload& snapshot) {
-    auto bytes = encode_payload(snapshot);
-    EXPECT_TRUE(bytes.has_value());
-    return bytes.value_or(std::vector<std::uint8_t>{});
-}
-
 } // namespace
 
 TEST(SnapshotPayload, EncodesFieldsInOrder) {
@@ -353,11 +328,11 @@ TEST(SnapshotPayload, EncodesFieldsInOrder) {
     std::vector<std::uint8_t> expected = prefix;
     expected.insert(expected.end(), record.begin(), record.end());
 
-    EXPECT_EQ(encode_snapshot(snapshot), expected);
+    EXPECT_EQ(encoded(snapshot), expected);
 }
 
 TEST(SnapshotPayload, EncodesEmptySnapshot) {
-    EXPECT_EQ(encode_snapshot(snapshot_with(0)),
+    EXPECT_EQ(encoded(snapshot_with(0)),
               (std::vector<std::uint8_t>{0x01, 0x02, 0x03, 0x04, 0x00, 0x00}));
 }
 
@@ -365,13 +340,13 @@ TEST(SnapshotPayload, RoundTripsZeroOneAndMaximumEntities) {
     for (const std::size_t count : {std::size_t{0}, std::size_t{1}, max_snapshot_entities}) {
         const auto snapshot = snapshot_with(count);
 
-        EXPECT_EQ(decode_snapshot(encode_snapshot(snapshot)), snapshot) << "count " << count;
+        EXPECT_EQ(decode_snapshot(encoded(snapshot)), snapshot) << "count " << count;
     }
 }
 
 TEST(SnapshotPayload, MaximumSnapshotFitsInOnePayload) {
     EXPECT_EQ(max_snapshot_entities, 84U);
-    EXPECT_LE(encode_snapshot(snapshot_with(max_snapshot_entities)).size(), max_payload_size);
+    EXPECT_LE(encoded(snapshot_with(max_snapshot_entities)).size(), max_payload_size);
 }
 
 TEST(SnapshotPayload, EncoderRejectsTooManyEntities) {
@@ -379,7 +354,7 @@ TEST(SnapshotPayload, EncoderRejectsTooManyEntities) {
 }
 
 TEST(SnapshotPayload, DecoderRejectsTruncatedPrefix) {
-    const auto bytes = encode_snapshot(snapshot_with(0));
+    const auto bytes = encoded(snapshot_with(0));
 
     for (std::size_t size = 0; size < bytes.size(); ++size) {
         const std::span<const std::uint8_t> truncated(bytes.data(), size);
@@ -389,28 +364,28 @@ TEST(SnapshotPayload, DecoderRejectsTruncatedPrefix) {
 }
 
 TEST(SnapshotPayload, DecoderRejectsTruncatedRecord) {
-    const auto bytes = encode_snapshot(snapshot_with(2));
+    const auto bytes = encoded(snapshot_with(2));
     const std::span<const std::uint8_t> truncated(bytes.data(), bytes.size() - 1);
 
     EXPECT_FALSE(decode_snapshot(truncated).has_value());
 }
 
 TEST(SnapshotPayload, DecoderRejectsTrailingBytes) {
-    auto bytes = encode_snapshot(snapshot_with(2));
+    auto bytes = encoded(snapshot_with(2));
     bytes.push_back(0x00);
 
     EXPECT_FALSE(decode_snapshot(bytes).has_value());
 }
 
 TEST(SnapshotPayload, DecoderRejectsCountLargerThanRecords) {
-    auto bytes = encode_snapshot(snapshot_with(1));
+    auto bytes = encoded(snapshot_with(1));
     bytes[5] = 0x02;
 
     EXPECT_FALSE(decode_snapshot(bytes).has_value());
 }
 
 TEST(SnapshotPayload, DecoderRejectsCountSmallerThanRecords) {
-    auto bytes = encode_snapshot(snapshot_with(2));
+    auto bytes = encoded(snapshot_with(2));
     bytes[5] = 0x01;
 
     EXPECT_FALSE(decode_snapshot(bytes).has_value());
@@ -475,39 +450,33 @@ const std::vector<TypeEntry> sample_types{{.type_id = 1, .name = "player"},
 } // namespace
 
 TEST(ConnectAcceptPayload, EncodesFieldsInOrder) {
-    const auto bytes = encode_payload(accept_with({{.type_id = 0x0009, .name = "ab"}}));
+    const auto accept = accept_with({{.type_id = 0x0009, .name = "ab"}});
 
-    ASSERT_TRUE(bytes.has_value());
-    EXPECT_EQ(*bytes, (std::vector<std::uint8_t>{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                                                 0x00, 0x01, 0x00, 0x09, 0x02, 'a', 'b'}));
+    const std::vector<std::uint8_t> expected{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                                             0x00, 0x01, 0x00, 0x09, 0x02, 'a',  'b'};
+
+    EXPECT_EQ(encode_payload(accept), expected);
 }
 
 TEST(ConnectAcceptPayload, RoundTripsTypeTable) {
     const auto accept = accept_with(sample_types);
 
-    const auto bytes = encode_payload(accept);
-
-    ASSERT_TRUE(bytes.has_value());
-    EXPECT_EQ(decode_connect_accept(*bytes), accept);
+    EXPECT_EQ(decode_connect_accept(encoded(accept)), accept);
 }
 
 TEST(ConnectAcceptPayload, RoundTripsEmptyTypeTable) {
     const auto accept = accept_with({});
 
-    const auto bytes = encode_payload(accept);
+    const auto bytes = encoded(accept);
 
-    ASSERT_TRUE(bytes.has_value());
-    EXPECT_EQ(bytes->size(), engine::network::connect_accept_prefix_size);
-    EXPECT_EQ(decode_connect_accept(*bytes), accept);
+    EXPECT_EQ(bytes.size(), engine::network::connect_accept_prefix_size);
+    EXPECT_EQ(decode_connect_accept(bytes), accept);
 }
 
 TEST(ConnectAcceptPayload, AcceptsMaximumNameLength) {
     const auto accept = accept_with(long_name_types(1));
 
-    const auto bytes = encode_payload(accept);
-
-    ASSERT_TRUE(bytes.has_value());
-    EXPECT_EQ(decode_connect_accept(*bytes), accept);
+    EXPECT_EQ(decode_connect_accept(encoded(accept)), accept);
 }
 
 TEST(ConnectAcceptPayload, RejectsEmptyName) {

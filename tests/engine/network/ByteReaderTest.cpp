@@ -73,8 +73,9 @@ TEST(ByteReader, ReadsByteRangeWithoutCopying) {
     const auto bytes = reader.read_bytes(2);
 
     ASSERT_TRUE(bytes.has_value());
-    EXPECT_EQ(bytes->data(), data.data() + 1);
-    EXPECT_EQ(bytes->size(), 2U);
+    const auto range = bytes.value_or(std::span<const std::uint8_t>{});
+    EXPECT_EQ(range.data(), data.data() + 1);
+    EXPECT_EQ(range.size(), 2U);
     EXPECT_EQ(reader.remaining(), 1U);
 }
 
@@ -85,7 +86,7 @@ TEST(ByteReader, ReadsEmptyByteRange) {
     const auto bytes = reader.read_bytes(0);
 
     ASSERT_TRUE(bytes.has_value());
-    EXPECT_TRUE(bytes->empty());
+    EXPECT_TRUE(bytes.value_or(std::span<const std::uint8_t>{}).empty());
     EXPECT_EQ(reader.remaining(), 1U);
 }
 
