@@ -22,6 +22,17 @@ public:
     [[nodiscard]] bool is_key_down(engine::graphics::Key) const override { return false; }
     [[nodiscard]] bool is_key_pressed(engine::graphics::Key) const override { return false; }
     [[nodiscard]] bool is_key_released(engine::graphics::Key) const override { return false; }
+    [[nodiscard]] engine::graphics::Key last_key_pressed() override {
+        return engine::graphics::Key::Unknown;
+    }
+    [[nodiscard]] engine::graphics::Vec2 mouse_position() const override { return {}; }
+    [[nodiscard]] bool is_mouse_down(engine::graphics::MouseButton) const override { return false; }
+    [[nodiscard]] bool is_mouse_pressed(engine::graphics::MouseButton) const override {
+        return false;
+    }
+    [[nodiscard]] bool is_mouse_released(engine::graphics::MouseButton) const override {
+        return false;
+    }
 };
 
 class Backend final : public engine::graphics::IGraphicsBackend {
