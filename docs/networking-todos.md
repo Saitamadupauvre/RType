@@ -50,18 +50,18 @@ Every payload follows the pattern already used by `InputPayload` in
 
 ### 3. Snapshot message
 
-- [ ] Structs in `Protocol.hpp`:
+- [x] Structs in `Protocol.hpp`:
   - `EntityState { std::uint32_t entity_id; std::uint16_t type_id; std::int16_t x, y, vx, vy; }`
   - `SnapshotPayload { std::uint32_t server_tick; std::vector<EntityState> entities; }`
   - constants `snapshot_prefix_size = 6`, `entity_record_size = 14`,
     `max_snapshot_entities = (max_payload_size - snapshot_prefix_size) / entity_record_size` (84).
-- [ ] `is_valid`: `entities.size() <= max_snapshot_entities`.
-- [ ] `encode_payload(const SnapshotPayload&)`: `write_u32(server_tick)`,
+- [x] `is_valid`: `entities.size() <= max_snapshot_entities`.
+- [x] `encode_payload(const SnapshotPayload&)`: `write_u32(server_tick)`,
   `write_u16(entity count)`, then each record.
-- [ ] `decode_snapshot(payload)`: `read_u32()`, `read_u16()` count, then require
+- [x] `decode_snapshot(payload)`: `read_u32()`, `read_u16()` count, then require
   `reader.remaining() == count * entity_record_size` **before**
   `entities.reserve(count)`; reject `count > max_snapshot_entities`.
-- [ ] Test that a 13-byte packet claiming 65535 entities is rejected without allocating.
+- [x] Test that a 13-byte packet claiming 65535 entities is rejected without allocating.
 
 ### 4. Connect accept message
 
@@ -108,7 +108,7 @@ Every payload follows the pattern already used by `InputPayload` in
 - [x] Encode and decode the `input` payload.
 - [x] Encode and decode the `connect_request` payload (4-byte client nonce).
 - [ ] Encode and decode the `connect_accept` payload, rejecting duplicate type IDs or names, empty names, names above 63 bytes, and truncated entries.
-- [ ] Encode and decode the `snapshot` payload, rejecting sizes other than `6 + entity_count * 14` and more than 84 entities.
+- [x] Encode and decode the `snapshot` payload, rejecting sizes other than `6 + entity_count * 14` and more than 84 entities.
 - [ ] Validate snapshot and spawn `type_id` values against the connection type table.
 - [x] Encode and decode the `event` payloads (`spawn`, `destroy`, `fire`, `sound`), rejecting unknown types and wrong fixed sizes.
 - [x] Encode and decode the `disconnect` payload, rejecting undefined reasons.
