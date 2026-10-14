@@ -11,6 +11,7 @@ engine_add_module(core
     SOURCES
         src/core/EntityPool.cpp
         src/core/ComponentTypeId.cpp
+        src/core/DynamicLibrary.cpp
         src/core/EntityManager.cpp
         src/core/SystemScheduler.cpp
         src/core/event/EventBus.cpp
@@ -21,6 +22,7 @@ engine_add_module(core
         src/core/time/SteadyClock.cpp
         src/core/time/ManualClock.cpp
         src/core/time/FixedStepLoop.cpp
+    PRIVATE_DEPENDS ${CMAKE_DL_LIBS}
 )
 
 engine_add_module(script
@@ -46,6 +48,8 @@ engine_add_module(physics
 )
 
 engine_add_module(graphics
-    SOURCES src/graphics/Interfaces.cpp
+    SOURCES
+        src/graphics/Interfaces.cpp
+        src/graphics/PluginLoader.cpp
     DEPENDS engine::core
 )

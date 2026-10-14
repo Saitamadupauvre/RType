@@ -31,3 +31,14 @@ inline constexpr std::string_view create_symbol = "engine_graphics_create";
 inline constexpr std::string_view destroy_symbol = "engine_graphics_destroy";
 
 } // namespace engine::graphics
+
+/**
+ * @brief Marks a plugin entry point: C linkage, exported from the plugin library.
+ *
+ * Usage: `ENGINE_GRAPHICS_PLUGIN_EXPORT std::uint32_t engine_graphics_api_version() { ... }`.
+ */
+#if defined(_WIN32)
+#define ENGINE_GRAPHICS_PLUGIN_EXPORT extern "C" __declspec(dllexport)
+#else
+#define ENGINE_GRAPHICS_PLUGIN_EXPORT extern "C" __attribute__((visibility("default")))
+#endif
