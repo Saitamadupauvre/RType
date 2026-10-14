@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "ByteReader.hpp"
+#include "bytes/ByteReader.hpp"
 
 using engine::network::ByteReader;
 

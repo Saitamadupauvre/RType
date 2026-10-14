@@ -7,8 +7,8 @@
 
 #include <gtest/gtest.h>
 
-#include "Payloads.hpp"
-#include "ProtocolHandler.hpp"
+#include "encoder/PayloadEncoder.hpp"
+#include "protocol/ProtocolHandler.hpp"
 
 namespace {
 
