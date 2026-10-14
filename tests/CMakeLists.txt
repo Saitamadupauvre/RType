@@ -73,6 +73,7 @@ engine_test_use_library(engine_graphics_tests VALID_PLUGIN_PATH test-plugin-vali
 engine_test_use_library(engine_graphics_tests WRONG_VERSION_PLUGIN_PATH test-plugin-wrongversion)
 engine_test_use_library(engine_graphics_tests MISSING_CREATE_PLUGIN_PATH test-plugin-missingcreate)
 engine_test_use_library(engine_graphics_tests NULL_BACKEND_PLUGIN_PATH test-plugin-nullbackend)
+engine_test_use_library(engine_graphics_tests RAYLIB_PLUGIN_PATH graphics-raylib)
 
 function(game_add_test name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
@@ -84,6 +85,21 @@ function(game_add_test name)
     set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "game.${name}.")
 endfunction()
+
+function(plugin_add_test name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
+    set(target plugin_${name}_tests)
+
+    add_executable(${target} ${arg_SOURCES})
+    target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
+    rtype_set_warnings(${target})
+    gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "plugin.${name}.")
+endfunction()
+
+plugin_add_test(graphics-raylib
+    SOURCES plugins/graphics-raylib/LetterboxTest.cpp
+    LINKS graphics-raylib-letterbox
+)
 
 game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
 game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)

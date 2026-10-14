@@ -12,6 +12,16 @@ git clone https://github.com/microsoft/vcpkg ~/vcpkg
 export VCPKG_ROOT=~/vcpkg               # add it to your shell profile
 ```
 
+On Linux, raylib's vcpkg dependencies need build tools and X11 headers from
+the system:
+
+```sh
+sudo apt install autoconf autoconf-archive automake libtool pkg-config \
+    libxinerama-dev libxcursor-dev libxrandr-dev libxi-dev xorg-dev libglu1-mesa-dev
+sudo pacman -S --needed autoconf autoconf-archive automake libtool pkgconf \
+    libxinerama libxcursor libxrandr libxi mesa
+```
+
 ## Build
 
 ```sh
