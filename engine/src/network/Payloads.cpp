@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -153,6 +157,60 @@ bool has_exact_entity_records(const ByteReader& reader, std::size_t count) noexc
     return count <= max_snapshot_entities && reader.remaining() == count * entity_record_size;
 }
 
+bool has_valid_name_length(const TypeEntry& entry) noexcept {
+    return !entry.name.empty() && entry.name.size() <= max_type_name_length;
+}
+
+std::size_t encoded_size(const ConnectAcceptPayload& payload) noexcept {
+    std::size_t size = connect_accept_prefix_size;
+    for (const auto& entry : payload.types) {
+        size += min_type_entry_size + entry.name.size();
+    }
+    return size;
+}
+
+bool has_unique_types(const ConnectAcceptPayload& payload) {
+    std::unordered_set<std::uint16_t> type_ids;
+    std::unordered_set<std::string_view> names;
+    for (const auto& entry : payload.types) {
+        if (!type_ids.insert(entry.type_id).second || !names.insert(entry.name).second) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool is_valid(const ConnectAcceptPayload& payload) {
+    return std::ranges::all_of(payload.types, has_valid_name_length) &&
+           encoded_size(payload) <= max_payload_size && has_unique_types(payload);
+}
+
+void write_type_entry(ByteWriter& writer, const TypeEntry& entry) {
+    writer.write_u16(entry.type_id);
+    writer.write_u8(static_cast<std::uint8_t>(entry.name.size()));
+    for (const char character : entry.name) {
+        writer.write_u8(static_cast<std::uint8_t>(character));
+    }
+}
+
+std::optional<TypeEntry> read_type_entry(ByteReader& reader) {
+    const auto type_id = reader.read_u16();
+    const auto name_length = reader.read_u8();
+    if (!type_id || !name_length) {
+        return std::nullopt;
+    }
+
+    const auto name = reader.read_bytes(*name_length);
+    if (!name) {
+        return std::nullopt;
+    }
+    return TypeEntry{.type_id = *type_id, .name = std::string(name->begin(), name->end())};
+}
+
+bool can_hold_type_entries(const ByteReader& reader, std::size_t count) noexcept {
+    return count * min_type_entry_size <= reader.remaining();
+}
+
 } // namespace
 
 EncodedPayload encode_payload(const InputPayload& payload) {
@@ -283,6 +341,50 @@ std::optional<SnapshotPayload> decode_snapshot(std::span<const std::uint8_t> pay
         snapshot.entities.push_back(*entity);
     }
     return snapshot;
+}
+
+EncodedPayload encode_payload(const ConnectAcceptPayload& payload) {
+    if (!is_valid(payload)) {
+        return std::nullopt;
+    }
+
+    ByteWriter writer;
+    writer.write_u32(payload.client_nonce);
+    writer.write_u32(payload.player_entity_id);
+    writer.write_u16(static_cast<std::uint16_t>(payload.types.size()));
+    for (const auto& entry : payload.types) {
+        write_type_entry(writer, entry);
+    }
+    return std::move(writer).take();
+}
+
+std::optional<ConnectAcceptPayload> decode_connect_accept(std::span<const std::uint8_t> payload) {
+    ByteReader reader(payload);
+    const auto client_nonce = reader.read_u32();
+    const auto player_entity_id = reader.read_u32();
+    const auto count = reader.read_u16();
+    if (!client_nonce || !player_entity_id || !count || !can_hold_type_entries(reader, *count)) {
+        return std::nullopt;
+    }
+
+    ConnectAcceptPayload accept{
+        .client_nonce = *client_nonce,
+        .player_entity_id = *player_entity_id,
+        .types = {},
+    };
+    accept.types.reserve(*count);
+    for (std::size_t index = 0; index < *count; ++index) {
+        auto entry = read_type_entry(reader);
+        if (!entry) {
+            return std::nullopt;
+        }
+        accept.types.push_back(std::move(*entry));
+    }
+
+    if (!reader.at_end() || !is_valid(accept)) {
+        return std::nullopt;
+    }
+    return accept;
 }
 
 } // namespace engine::network

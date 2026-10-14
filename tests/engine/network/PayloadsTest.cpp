@@ -8,7 +8,9 @@
 
 #include "Payloads.hpp"
 
+using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
+using engine::network::decode_connect_accept;
 using engine::network::decode_connect_request;
 using engine::network::decode_disconnect;
 using engine::network::decode_event;
@@ -26,9 +28,11 @@ using engine::network::HeartbeatPayload;
 using engine::network::InputPayload;
 using engine::network::max_payload_size;
 using engine::network::max_snapshot_entities;
+using engine::network::max_type_name_length;
 using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
 using engine::network::SpawnEvent;
+using engine::network::TypeEntry;
 
 TEST(InputPayload, EncodesFieldsInOrder) {
     const InputPayload input{.action_flags = 0x01, .move_x = -1, .move_y = 1};
@@ -425,4 +429,153 @@ TEST(SnapshotPayload, DecoderRejectsMoreThanMaximumEntities) {
     bytes.resize(bytes.size() + (count * engine::network::entity_record_size), 0x00);
 
     EXPECT_FALSE(decode_snapshot(bytes).has_value());
+}
+
+namespace {
+
+ConnectAcceptPayload accept_with(std::vector<TypeEntry> types) {
+    return {
+        .client_nonce = 0x0102'0304,
+        .player_entity_id = 0x0506'0708,
+        .types = std::move(types),
+    };
+}
+
+std::vector<std::uint8_t> raw_accept(std::uint16_t count, const std::vector<TypeEntry>& types) {
+    std::vector<std::uint8_t> bytes{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+    bytes.push_back(static_cast<std::uint8_t>(count >> 8U));
+    bytes.push_back(static_cast<std::uint8_t>(count));
+    for (const auto& entry : types) {
+        bytes.push_back(static_cast<std::uint8_t>(entry.type_id >> 8U));
+        bytes.push_back(static_cast<std::uint8_t>(entry.type_id));
+        bytes.push_back(static_cast<std::uint8_t>(entry.name.size()));
+        bytes.insert(bytes.end(), entry.name.begin(), entry.name.end());
+    }
+    return bytes;
+}
+
+std::vector<std::uint8_t> raw_accept(const std::vector<TypeEntry>& types) {
+    return raw_accept(static_cast<std::uint16_t>(types.size()), types);
+}
+
+std::vector<TypeEntry> long_name_types(std::size_t count) {
+    std::vector<TypeEntry> types;
+    for (std::size_t index = 0; index < count; ++index) {
+        std::string name(max_type_name_length, 'a');
+        name.back() = static_cast<char>('A' + index);
+        types.push_back({.type_id = static_cast<std::uint16_t>(index), .name = std::move(name)});
+    }
+    return types;
+}
+
+const std::vector<TypeEntry> sample_types{{.type_id = 1, .name = "player"},
+                                          {.type_id = 2, .name = "bydo"},
+                                          {.type_id = 7, .name = "player_missile"}};
+
+} // namespace
+
+TEST(ConnectAcceptPayload, EncodesFieldsInOrder) {
+    const auto bytes = encode_payload(accept_with({{.type_id = 0x0009, .name = "ab"}}));
+
+    ASSERT_TRUE(bytes.has_value());
+    EXPECT_EQ(*bytes, (std::vector<std::uint8_t>{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                                                 0x00, 0x01, 0x00, 0x09, 0x02, 'a', 'b'}));
+}
+
+TEST(ConnectAcceptPayload, RoundTripsTypeTable) {
+    const auto accept = accept_with(sample_types);
+
+    const auto bytes = encode_payload(accept);
+
+    ASSERT_TRUE(bytes.has_value());
+    EXPECT_EQ(decode_connect_accept(*bytes), accept);
+}
+
+TEST(ConnectAcceptPayload, RoundTripsEmptyTypeTable) {
+    const auto accept = accept_with({});
+
+    const auto bytes = encode_payload(accept);
+
+    ASSERT_TRUE(bytes.has_value());
+    EXPECT_EQ(bytes->size(), engine::network::connect_accept_prefix_size);
+    EXPECT_EQ(decode_connect_accept(*bytes), accept);
+}
+
+TEST(ConnectAcceptPayload, AcceptsMaximumNameLength) {
+    const auto accept = accept_with(long_name_types(1));
+
+    const auto bytes = encode_payload(accept);
+
+    ASSERT_TRUE(bytes.has_value());
+    EXPECT_EQ(decode_connect_accept(*bytes), accept);
+}
+
+TEST(ConnectAcceptPayload, RejectsEmptyName) {
+    const std::vector<TypeEntry> types{{.type_id = 1, .name = ""}};
+
+    EXPECT_FALSE(encode_payload(accept_with(types)).has_value());
+    EXPECT_FALSE(decode_connect_accept(raw_accept(types)).has_value());
+}
+
+TEST(ConnectAcceptPayload, RejectsNameAboveMaximumLength) {
+    const std::vector<TypeEntry> types{
+        {.type_id = 1, .name = std::string(max_type_name_length + 1, 'a')}};
+
+    EXPECT_FALSE(encode_payload(accept_with(types)).has_value());
+    EXPECT_FALSE(decode_connect_accept(raw_accept(types)).has_value());
+}
+
+TEST(ConnectAcceptPayload, RejectsDuplicateTypeId) {
+    const std::vector<TypeEntry> types{{.type_id = 1, .name = "player"},
+                                       {.type_id = 1, .name = "bydo"}};
+
+    EXPECT_FALSE(encode_payload(accept_with(types)).has_value());
+    EXPECT_FALSE(decode_connect_accept(raw_accept(types)).has_value());
+}
+
+TEST(ConnectAcceptPayload, RejectsDuplicateName) {
+    const std::vector<TypeEntry> types{{.type_id = 1, .name = "bydo"},
+                                       {.type_id = 2, .name = "bydo"}};
+
+    EXPECT_FALSE(encode_payload(accept_with(types)).has_value());
+    EXPECT_FALSE(decode_connect_accept(raw_accept(types)).has_value());
+}
+
+TEST(ConnectAcceptPayload, EncoderRejectsTableAboveMaximumPayloadSize) {
+    EXPECT_TRUE(encode_payload(accept_with(long_name_types(17))).has_value());
+    EXPECT_FALSE(encode_payload(accept_with(long_name_types(18))).has_value());
+}
+
+TEST(ConnectAcceptPayload, DecoderRejectsTruncatedPrefix) {
+    const auto bytes = raw_accept({});
+
+    for (std::size_t size = 0; size < bytes.size(); ++size) {
+        const std::span<const std::uint8_t> truncated(bytes.data(), size);
+
+        EXPECT_FALSE(decode_connect_accept(truncated).has_value()) << "size " << size;
+    }
+}
+
+TEST(ConnectAcceptPayload, DecoderRejectsNameRunningPastTheEnd) {
+    auto bytes = raw_accept({{.type_id = 1, .name = "bydo"}});
+    bytes.pop_back();
+
+    EXPECT_FALSE(decode_connect_accept(bytes).has_value());
+}
+
+TEST(ConnectAcceptPayload, DecoderRejectsCountLargerThanEntries) {
+    const auto bytes = raw_accept(2, {{.type_id = 1, .name = "bydo"}});
+
+    EXPECT_FALSE(decode_connect_accept(bytes).has_value());
+}
+
+TEST(ConnectAcceptPayload, DecoderRejectsHugeCountInShortPayload) {
+    EXPECT_FALSE(decode_connect_accept(raw_accept(0xFFFF, sample_types)).has_value());
+}
+
+TEST(ConnectAcceptPayload, DecoderRejectsTrailingBytes) {
+    auto bytes = raw_accept(sample_types);
+    bytes.push_back(0x00);
+
+    EXPECT_FALSE(decode_connect_accept(bytes).has_value());
 }

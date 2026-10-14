@@ -65,20 +65,20 @@ Every payload follows the pattern already used by `InputPayload` in
 
 ### 4. Connect accept message
 
-- [ ] Structs in `Protocol.hpp`:
+- [x] Structs in `Protocol.hpp`:
   - `TypeEntry { std::uint16_t type_id; std::string name; }`
   - `ConnectAcceptPayload { std::uint32_t client_nonce; std::uint32_t player_entity_id; std::vector<TypeEntry> types; }`
   - constants `max_type_name_length = 63`, `min_type_entry_size = 3`.
-- [ ] `is_valid`: every name 1 to 63 bytes, no duplicate `type_id`, no duplicate
+- [x] `is_valid`: every name 1 to 63 bytes, no duplicate `type_id`, no duplicate
   name (two `std::unordered_set`), encoded size `<= max_payload_size`.
-- [ ] `encode_payload(const ConnectAcceptPayload&)`: `write_u32` nonce,
+- [x] `encode_payload(const ConnectAcceptPayload&)`: `write_u32` nonce,
   `write_u32` player id, `write_u16` count, then per entry `write_u16(type_id)`,
   `write_u8(name.size())`, `write_bytes(name)`.
-- [ ] `decode_connect_accept(payload)`: read the three prefix fields, require
+- [x] `decode_connect_accept(payload)`: read the three prefix fields, require
   `count * min_type_entry_size <= reader.remaining()` before `types.reserve(count)`,
   then per entry `read_u16()`, `read_u8()` length, `read_bytes(length)`;
   finish with `at_end()` and `is_valid`.
-- [ ] Tests: empty name, 64-byte name, duplicate id, duplicate name, name running
+- [x] Tests: empty name, 64-byte name, duplicate id, duplicate name, name running
   past the end, count larger than the entries present, trailing bytes.
 
 ### 5. Typed message dispatch in `ProtocolHandler`
@@ -107,7 +107,7 @@ Every payload follows the pattern already used by `InputPayload` in
 - [x] Document the protocol header and every message in `docs/protocol.md`.
 - [x] Encode and decode the `input` payload.
 - [x] Encode and decode the `connect_request` payload (4-byte client nonce).
-- [ ] Encode and decode the `connect_accept` payload, rejecting duplicate type IDs or names, empty names, names above 63 bytes, and truncated entries.
+- [x] Encode and decode the `connect_accept` payload, rejecting duplicate type IDs or names, empty names, names above 63 bytes, and truncated entries.
 - [x] Encode and decode the `snapshot` payload, rejecting sizes other than `6 + entity_count * 14` and more than 84 entities.
 - [ ] Validate snapshot and spawn `type_id` values against the connection type table.
 - [x] Encode and decode the `event` payloads (`spawn`, `destroy`, `fire`, `sound`), rejecting unknown types and wrong fixed sizes.
