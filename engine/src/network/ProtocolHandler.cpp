@@ -1,9 +1,12 @@
 #include "ProtocolHandler.hpp"
 
+#include <algorithm>
+#include <array>
 #include <utility>
 
 #include "ByteReader.hpp"
 #include "ByteWriter.hpp"
+#include "Payloads.hpp"
 
 namespace engine::network {
 
@@ -43,6 +46,59 @@ std::optional<PacketHeader> read_header(ByteReader& reader) noexcept {
     return header;
 }
 
+MessageType message_type_of(const ConnectRequestPayload&) noexcept {
+    return MessageType::connect_request;
+}
+
+MessageType message_type_of(const ConnectAcceptPayload&) noexcept {
+    return MessageType::connect_accept;
+}
+
+MessageType message_type_of(const InputPayload&) noexcept { return MessageType::input; }
+
+MessageType message_type_of(const SnapshotPayload&) noexcept { return MessageType::snapshot; }
+
+MessageType message_type_of(const EventPayload&) noexcept { return MessageType::event; }
+
+MessageType message_type_of(const HeartbeatPayload&) noexcept { return MessageType::heartbeat; }
+
+MessageType message_type_of(const DisconnectPayload&) noexcept { return MessageType::disconnect; }
+
+template <auto Decode> std::optional<Message> decode_as(std::span<const std::uint8_t> payload) {
+    auto decoded = Decode(payload);
+    if (!decoded) {
+        return std::nullopt;
+    }
+    return Message{std::move(*decoded)};
+}
+
+using MessageDecoder = std::optional<Message> (*)(std::span<const std::uint8_t>);
+
+struct MessageDecoderEntry {
+    MessageType type;
+    MessageDecoder decode;
+};
+
+constexpr std::array message_decoders{
+    MessageDecoderEntry{.type = MessageType::connect_request,
+                        .decode = decode_as<decode_connect_request>},
+    MessageDecoderEntry{.type = MessageType::connect_accept,
+                        .decode = decode_as<decode_connect_accept>},
+    MessageDecoderEntry{.type = MessageType::input, .decode = decode_as<decode_input>},
+    MessageDecoderEntry{.type = MessageType::snapshot, .decode = decode_as<decode_snapshot>},
+    MessageDecoderEntry{.type = MessageType::event, .decode = decode_as<decode_event>},
+    MessageDecoderEntry{.type = MessageType::heartbeat, .decode = decode_as<decode_heartbeat>},
+    MessageDecoderEntry{.type = MessageType::disconnect, .decode = decode_as<decode_disconnect>},
+};
+
+std::optional<Message> decode_message(MessageType type, std::span<const std::uint8_t> payload) {
+    const auto entry = std::ranges::find(message_decoders, type, &MessageDecoderEntry::type);
+    if (entry == message_decoders.end()) {
+        return std::nullopt;
+    }
+    return entry->decode(payload);
+}
+
 } // namespace
 
 ProtocolHandler::SerializedData
@@ -75,6 +131,41 @@ ProtocolHandler::deserialize(std::span<const std::uint8_t> datagram) const {
         .header = *header,
         .payload = Bytes(payload->begin(), payload->end()),
     };
+}
+
+ProtocolHandler::SerializedData ProtocolHandler::encode(const Message& message,
+                                                        std::uint32_t sequence) const {
+    return std::visit(
+        [this, sequence](const auto& payload) -> SerializedData {
+            const auto bytes = encode_payload(payload);
+            if (!bytes) {
+                return std::nullopt;
+            }
+
+            const PacketHeader header{
+                .magic = protocol_magic,
+                .version = protocol_version,
+                .type = message_type_of(payload),
+                .sequence = sequence,
+                .payload_size = static_cast<std::uint16_t>(bytes->size()),
+            };
+            return serialize(header, *bytes);
+        },
+        message);
+}
+
+std::optional<ReceivedMessage>
+ProtocolHandler::decode(std::span<const std::uint8_t> datagram) const {
+    const auto packet = deserialize(datagram);
+    if (!packet) {
+        return std::nullopt;
+    }
+
+    auto message = decode_message(packet->header.type, packet->payload);
+    if (!message) {
+        return std::nullopt;
+    }
+    return ReceivedMessage{.header = packet->header, .message = std::move(*message)};
 }
 
 } // namespace engine::network
