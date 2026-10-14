@@ -11,7 +11,6 @@
 
 using engine::core::EntityManager;
 using engine::core::Position;
-using engine::core::Velocity;
 using engine::core::event::EventBus;
 using engine::physics::AABBCollider;
 using engine::physics::CircleCollider;
@@ -25,7 +24,6 @@ TEST(PhysicsSystem, DetectsEntitiesWithColliders) {
     EventBus bus;
 
     manager.register_component<Position>();
-    manager.register_component<Velocity>();
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
@@ -50,7 +48,6 @@ TEST(PhysicsSystem, IntegratesVelocity) {
     EventBus bus;
 
     manager.register_component<Position>();
-    manager.register_component<Velocity>();
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
@@ -58,12 +55,10 @@ TEST(PhysicsSystem, IntegratesVelocity) {
 
     auto entity = manager.spawn();
     manager.add(entity, Position{0.0f, 0.0f});
-    manager.add(entity, Velocity{10.0f, 20.0f});
-    manager.add(entity, PhysicsBody{.type = PhysicsBody::Type::Dynamic,
-                                    .resolve_collisions = true,
-                                    .mass = 1.0f,
-                                    .collision_layer = 1,
-                                    .collision_mask = 0xFFFFFFFF});
+    PhysicsBody body;
+    body.type = PhysicsBody::Type::Dynamic;
+    body.velocity = {10.0f, 20.0f};
+    manager.add(entity, body);
 
     PhysicsSystem system(manager, bus);
     system.update(1.0f);
@@ -78,7 +73,6 @@ TEST(PhysicsSystem, DoesNotMoveStaticBodies) {
     EventBus bus;
 
     manager.register_component<Position>();
-    manager.register_component<Velocity>();
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
@@ -86,12 +80,10 @@ TEST(PhysicsSystem, DoesNotMoveStaticBodies) {
 
     auto entity = manager.spawn();
     manager.add(entity, Position{100.0f, 100.0f});
-    manager.add(entity, Velocity{10.0f, 20.0f});
-    manager.add(entity, PhysicsBody{.type = PhysicsBody::Type::Static,
-                                    .resolve_collisions = true,
-                                    .mass = 1.0f,
-                                    .collision_layer = 1,
-                                    .collision_mask = 0xFFFFFFFF});
+    PhysicsBody body;
+    body.type = PhysicsBody::Type::Static;
+    body.velocity = {10.0f, 20.0f};
+    manager.add(entity, body);
 
     PhysicsSystem system(manager, bus);
     system.update(1.0f);
@@ -106,7 +98,6 @@ TEST(PhysicsSystem, PublishesCollisionEventForAABBCollision) {
     EventBus bus;
 
     manager.register_component<Position>();
-    manager.register_component<Velocity>();
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
@@ -114,13 +105,13 @@ TEST(PhysicsSystem, PublishesCollisionEventForAABBCollision) {
 
     auto entity_a = manager.spawn();
     manager.add(entity_a, Position{0.0f, 0.0f});
-    manager.add(entity_a, PhysicsBody{});
+    manager.add(entity_a, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(entity_a, AABBCollider{.offset = {0.0f, 0.0f}, .size = {10.0f, 10.0f}});
     manager.add(entity_a, Scriptable{});
 
     auto entity_b = manager.spawn();
     manager.add(entity_b, Position{5.0f, 0.0f});
-    manager.add(entity_b, PhysicsBody{});
+    manager.add(entity_b, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(entity_b, AABBCollider{.offset = {0.0f, 0.0f}, .size = {10.0f, 10.0f}});
     manager.add(entity_b, Scriptable{});
 
@@ -142,7 +133,6 @@ TEST(PhysicsSystem, PublishesCollisionEventForCircleCollision) {
     EventBus bus;
 
     manager.register_component<Position>();
-    manager.register_component<Velocity>();
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
@@ -150,13 +140,13 @@ TEST(PhysicsSystem, PublishesCollisionEventForCircleCollision) {
 
     auto entity_a = manager.spawn();
     manager.add(entity_a, Position{0.0f, 0.0f});
-    manager.add(entity_a, PhysicsBody{});
+    manager.add(entity_a, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(entity_a, CircleCollider{.offset = {0.0f, 0.0f}, .radius = 5.0f});
     manager.add(entity_a, Scriptable{});
 
     auto entity_b = manager.spawn();
     manager.add(entity_b, Position{8.0f, 0.0f});
-    manager.add(entity_b, PhysicsBody{});
+    manager.add(entity_b, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(entity_b, CircleCollider{.offset = {0.0f, 0.0f}, .radius = 5.0f});
     manager.add(entity_b, Scriptable{});
 
@@ -178,7 +168,6 @@ TEST(PhysicsSystem, PublishesCollisionEventForAABBCircleCollision) {
     EventBus bus;
 
     manager.register_component<Position>();
-    manager.register_component<Velocity>();
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
@@ -186,13 +175,13 @@ TEST(PhysicsSystem, PublishesCollisionEventForAABBCircleCollision) {
 
     auto aabb_entity = manager.spawn();
     manager.add(aabb_entity, Position{0.0f, 0.0f});
-    manager.add(aabb_entity, PhysicsBody{});
+    manager.add(aabb_entity, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(aabb_entity, AABBCollider{.offset = {0.0f, 0.0f}, .size = {10.0f, 10.0f}});
     manager.add(aabb_entity, Scriptable{});
 
     auto circle_entity = manager.spawn();
     manager.add(circle_entity, Position{7.0f, 0.0f});
-    manager.add(circle_entity, PhysicsBody{});
+    manager.add(circle_entity, PhysicsBody{.type = PhysicsBody::Type::Dynamic});
     manager.add(circle_entity, CircleCollider{.offset = {0.0f, 0.0f}, .radius = 5.0f});
     manager.add(circle_entity, Scriptable{});
 
@@ -214,7 +203,6 @@ TEST(PhysicsSystem, NoEventWhenNoScriptableComponent) {
     EventBus bus;
 
     manager.register_component<Position>();
-    manager.register_component<Velocity>();
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
@@ -245,7 +233,6 @@ TEST(PhysicsSystem, NoEventWhenLayerMaskFilters) {
     EventBus bus;
 
     manager.register_component<Position>();
-    manager.register_component<Velocity>();
     manager.register_component<PhysicsBody>();
     manager.register_component<AABBCollider>();
     manager.register_component<CircleCollider>();
@@ -254,8 +241,8 @@ TEST(PhysicsSystem, NoEventWhenLayerMaskFilters) {
     auto entity_a = manager.spawn();
     manager.add(entity_a, Position{0.0f, 0.0f});
     manager.add(entity_a, PhysicsBody{.type = PhysicsBody::Type::Dynamic,
-                                      .resolve_collisions = true,
                                       .mass = 1.0f,
+                                      .resolve_collisions = true,
                                       .collision_layer = 0b01,
                                       .collision_mask = 0b01});
     manager.add(entity_a, AABBCollider{.offset = {0.0f, 0.0f}, .size = {10.0f, 10.0f}});
@@ -264,8 +251,8 @@ TEST(PhysicsSystem, NoEventWhenLayerMaskFilters) {
     auto entity_b = manager.spawn();
     manager.add(entity_b, Position{5.0f, 0.0f});
     manager.add(entity_b, PhysicsBody{.type = PhysicsBody::Type::Dynamic,
-                                      .resolve_collisions = true,
                                       .mass = 1.0f,
+                                      .resolve_collisions = true,
                                       .collision_layer = 0b10,
                                       .collision_mask = 0b10});
     manager.add(entity_b, AABBCollider{.offset = {0.0f, 0.0f}, .size = {10.0f, 10.0f}});
