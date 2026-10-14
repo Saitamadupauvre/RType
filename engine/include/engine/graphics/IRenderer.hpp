@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/core/NonCopyableNonMovable.hpp"
+#include "engine/core/Vec2.hpp"
 #include "engine/graphics/Export.hpp"
 #include "engine/graphics/Types.hpp"
 
@@ -35,7 +36,7 @@ public:
     virtual void set_fullscreen(bool enabled) = 0;
 
     /** @return The size of the drawing space in virtual units, whatever the window size. */
-    [[nodiscard]] virtual Vec2 virtual_size() const = 0;
+    [[nodiscard]] virtual core::Vec2 virtual_size() const = 0;
 
     /**
      * @brief Starts a frame and clears it.

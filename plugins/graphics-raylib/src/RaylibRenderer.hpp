@@ -14,7 +14,7 @@ public:
     void close() override;
     [[nodiscard]] bool should_close() const override;
     void set_fullscreen(bool enabled) override;
-    [[nodiscard]] engine::graphics::Vec2 virtual_size() const override;
+    [[nodiscard]] engine::core::Vec2 virtual_size() const override;
     void begin_frame(engine::graphics::Color clear) override;
     void end_frame() override;
 
