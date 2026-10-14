@@ -127,6 +127,9 @@ ProtocolHandler::deserialize(std::span<const std::uint8_t> datagram) const {
     }
 
     const auto payload = reader.read_bytes(header->payload_size);
+    if (!payload) {
+        return std::nullopt;
+    }
     return DecodedPacket{
         .header = *header,
         .payload = Bytes(payload->begin(), payload->end()),
