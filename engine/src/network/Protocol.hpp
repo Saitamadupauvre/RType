@@ -34,6 +34,29 @@ struct InputPayload {
     bool operator==(const InputPayload&) const = default;
 };
 
+struct ConnectRequestPayload {
+    std::uint32_t client_nonce{};
+
+    bool operator==(const ConnectRequestPayload&) const = default;
+};
+
+struct HeartbeatPayload {
+    bool operator==(const HeartbeatPayload&) const = default;
+};
+
+enum class DisconnectReason : std::uint8_t {
+    normal = 0,
+    timeout = 1,
+    server_shutdown = 2,
+    protocol_error = 3,
+};
+
+struct DisconnectPayload {
+    DisconnectReason reason{};
+
+    bool operator==(const DisconnectPayload&) const = default;
+};
+
 struct PacketHeader {
     std::uint32_t magic{};
     std::uint16_t version{};
