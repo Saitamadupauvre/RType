@@ -5,6 +5,9 @@
 #include <optional>
 #include <string_view>
 
+#include "engine/core/Entity.hpp"
+#include "engine/core/EntityManager.hpp"
+#include "engine/core/Vec2.hpp"
 #include "engine/script/Declaration.hpp"
 #include "engine/script/Export.hpp"
 
@@ -90,6 +93,56 @@ public:
      * @return Its kind and source file, or std::nullopt if no loaded file declares it.
      */
     [[nodiscard]] std::optional<DeclarationInfo> find_declaration(std::string_view name) const;
+
+    /**
+     * @brief Connects the runtime to the world whose entities scripts read and write.
+     *
+     * Registers core::Position and core::Velocity in @p world if they are not registered yet.
+     *
+     * @param world Entity storage. It must outlive this runtime, or be replaced by another call.
+     */
+    void attach_world(core::EntityManager& world);
+
+    /**
+     * @brief Creates an entity from a declaration registered by load_scripts().
+     *
+     * The entity gets a core::Position and a core::Velocity, initialised from the native fields
+     * of its prefab (`x`, `y`, `vx`, `vy`, 0 when absent), and its own table for custom fields.
+     * Scripts reach it through a handle whose fields resolve, in order, to native components,
+     * the entity's own fields, then its prefab.
+     *
+     * @param type Declared entity name.
+     * @param position Starting position. Overrides the prefab's `x` and `y` when given.
+     * @return The new entity, or std::nullopt if no world is attached, @p type is unknown or
+     * declared as a system, or a prefab native field has the wrong type. The error is logged.
+     * @note Never throws.
+     */
+    std::optional<core::Entity> spawn(std::string_view type,
+                                      std::optional<core::Vec2> position = std::nullopt) noexcept;
+
+    /**
+     * @brief Forgets the script data of an entity.
+     *
+     * Every handle to @p entity becomes stale: using it from Lua raises an error, which is logged
+     * by the protected call that runs the script. Does not destroy the entity in the world.
+     *
+     * @param entity Entity returned by spawn(). Unknown entities are ignored.
+     */
+    void release(core::Entity entity) noexcept;
+
+    /**
+     * @brief Calls a method of an entity's prefab, as `self:method()` would from Lua.
+     *
+     * The call is protected: an error raised by the method is logged with its file and line.
+     *
+     * @param entity Entity returned by spawn().
+     * @param method Name of a function stored in the entity's prefab.
+     * @return true if the method ran to completion; false if the entity is destroyed or released,
+     * has no such method, or the method raised an error. Errors are logged; a missing method is
+     * not, since callbacks are optional.
+     * @note Never throws.
+     */
+    bool call(core::Entity entity, std::string_view method) noexcept;
 
 private:
     struct Impl;

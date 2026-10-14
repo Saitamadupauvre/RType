@@ -48,6 +48,26 @@ function(engine_add_module name)
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON
     )
+    target_precompile_headers(${target} PRIVATE
+        <cstdint>
+        <string_view>
+        <vector>
+        <utility>
+        <string>
+        <stdexcept>
+        <cstddef>
+        <algorithm>
+        <mutex>
+        <functional>
+        <memory>
+        <chrono>
+        <unordered_map>
+        <typeinfo>
+        <span>
+        <format>
+        <exception>
+        <cmath>
+    )
     engine_set_warnings(${target})
 
     install(TARGETS ${target}

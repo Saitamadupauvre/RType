@@ -58,4 +58,6 @@ void warn_reserved_names(const Declaration& declaration);
 
 std::string caller_location(lua_State* state);
 
+bool report(const sol::protected_function_result& result);
+
 } // namespace engine::script

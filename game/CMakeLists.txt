@@ -15,7 +15,10 @@ target_include_directories(r-type_client_cli PUBLIC client)
 rtype_set_warnings(r-type_client_cli)
 
 add_executable(r-type_client client/main.cpp)
-target_link_libraries(r-type_client PRIVATE r-type_client_cli engine::core engine::script engine::network)
+target_link_libraries(r-type_client PRIVATE r-type_client_cli engine::core engine::script engine::network engine::graphics)
+target_compile_definitions(r-type_client PRIVATE
+    GRAPHICS_PLUGIN_FILE="$<TARGET_FILE_NAME:graphics-raylib>"
+)
 add_dependencies(r-type_client graphics-raylib)
 rtype_set_warnings(r-type_client)
 

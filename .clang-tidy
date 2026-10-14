@@ -14,5 +14,6 @@ Checks: >
   readability-container-size-empty,
   readability-redundant-*
 WarningsAsErrors: ''
-HeaderFilterRegex: '.*/(include|src)/.*'
+HeaderFilterRegex: '.*/rtype/(engine|game|tests|plugins)/.*'
+SystemHeaders: false
 FormatStyle: file

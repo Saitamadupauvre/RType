@@ -244,3 +244,11 @@ TEST(EntityManager, EntityManagersAreIndependent) {
     EXPECT_EQ(count, 0);
     EXPECT_FALSE(second.alive(in_first));
 }
+
+TEST(EntityManager, ReportsWhetherComponentIsRegistered) {
+    EntityManager manager;
+    manager.register_component<Position>();
+
+    EXPECT_TRUE(manager.is_registered<Position>());
+    EXPECT_FALSE(manager.is_registered<Velocity>());
+}

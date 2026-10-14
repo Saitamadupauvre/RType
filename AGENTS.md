@@ -34,6 +34,7 @@ game/scripts/               Lua game code (main.lua is the entry point)
 assets/                     sprites, sounds, music
 tests/engine/<module>/      tests of one engine module
 tests/game/<target>/        tests of one game target (server, client)
+tests/plugins/<name>/       tests of one plugin's backend-free code
 tests/fixtures/             test data: packets, Lua scripts...
 docs/                       documentation (English): engine.md, plugins.md, game.md
 ```
@@ -49,6 +50,10 @@ docs/                       documentation (English): engine.md, plugins.md, game
 - Game code under test lives in a static library linked by its executable
   (e.g. `r-type_server_cli`), tested in `tests/game/<target>/` and registered
   with `game_add_test(<target> SOURCES ... LINKS <library>)`.
+- Plugin code under test must not need the backend library: it lives in a
+  static library linked by the plugin (e.g. `graphics-raylib-letterbox`),
+  tested in `tests/plugins/<name>/` and registered with
+  `plugin_add_test(<name> SOURCES ... LINKS <library>)`.
 - Test names: `TEST(Feature, ExpectedBehaviour)`, e.g.
   `TEST(PacketParser, RejectsTruncatedHeader)`.
 - Test the failure paths, not only the happy path: truncated or random packets,

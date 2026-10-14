@@ -9,22 +9,34 @@ namespace engine::physics {
 /**
  * @brief Physics properties of an entity.
  *
- * Determines how the entity behaves in collisions and physics simulation.
+ * Registers an entity in the physics simulation. Entities with PhysicsBody
+ * are affected by forces and participate in collision detection/resolution.
  */
 struct PhysicsBody {
-    enum class Type : std::uint8_t { Static, Dynamic };
+    enum class Type : std::uint8_t {
+        Static,  // Infinite mass, never moves (walls, terrain)
+        Dynamic, // Finite mass, affected by forces (players, projectiles)
+        // TODO: add Kinematic type, moved only via velocity, unaffected by forces
+    };
 
     Type type = Type::Static;
-    bool resolve_collisions = true;
+
+    core::Vec2 velocity{0.0f, 0.0f};
+    core::Vec2 acceleration{0.0f, 0.0f};
+
     float mass = 1.0f;
+    bool resolve_collisions = true;
+    bool affected_by_gravity = true;
+
     std::uint32_t collision_layer = 1;
     std::uint32_t collision_mask = 0xFFFFFFFF;
 };
 
 /**
- * @brief Axis-aligned bounding box collider.
+ * @brief Axis-Aligned Bounding Box collider.
  *
- * Defines a rectangular collision shape relative to the entity's position.
+ * Defines a rectangular area for collision detection. The offset is relative to
+ * the entity's position.
  */
 struct AABBCollider {
     engine::core::Vec2 offset;
@@ -32,9 +44,10 @@ struct AABBCollider {
 };
 
 /**
- * @brief Circle collider.
+ * @brief Circular collider.
  *
- * Defines a circular collision shape relative to the entity's position.
+ * Defines a circular area for collision detection. The offset is relative to
+ * the entity's position.
  */
 struct CircleCollider {
     engine::core::Vec2 offset;

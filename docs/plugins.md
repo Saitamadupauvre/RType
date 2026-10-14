@@ -30,15 +30,27 @@ extern "C" void engine_graphics_destroy(engine::graphics::IGraphicsBackend*);
 | `engine_graphics_create` | Allocates the backend. Called once, after the version check. |
 | `engine_graphics_destroy` | Frees the backend. Memory is always freed by the plugin that allocated it. |
 
-When loading a plugin, the engine:
+`engine::graphics::load_graphics_plugin(path)`
+(`<engine/graphics/PluginLoader.hpp>`) loads a plugin. It:
 
 1. opens the library, and fails cleanly if it is missing;
 2. looks up the three symbols, and fails cleanly if one is missing;
 3. compares `engine_graphics_api_version()` with its own
    `plugin_api_version` (`<engine/graphics/PluginApi.hpp>`), and refuses the
    plugin if they differ;
-4. calls `engine_graphics_create()` and uses the backend only through the
-   interfaces.
+4. calls `engine_graphics_create()`, and refuses the plugin if it returns
+   null;
+5. returns a `GraphicsPlugin` that owns the library and the backend, used only
+   through the interfaces.
+
+On failure it returns no plugin and an error naming the file; it never throws.
+The path is used as is: resolving it relative to the executable is the
+caller's job. When the `GraphicsPlugin` is destroyed, the backend is passed to
+`engine_graphics_destroy()` before the library is closed.
+
+Opening the library and looking up symbols is done by
+`engine::core::DynamicLibrary` (`<engine/core/DynamicLibrary.hpp>`), which any
+future plugin kind can reuse.
 
 Any change to the interfaces increments `plugin_api_version`, so an old plugin
 is refused instead of crashing.
@@ -70,13 +82,14 @@ engine_add_plugin(graphics-raylib
 - The client draws in virtual units (1920 x 1080); the plugin handles scaling
   and letterboxing.
 - Plugin loading is tested: missing library, missing symbol, wrong API
-  version.
+  version, null backend.
 
 ## Adding a plugin
 
 1. Create `plugins/<name>/` with its `CMakeLists.txt` calling
    `engine_add_plugin`, and add it to `plugins/CMakeLists.txt`.
-2. Export the three C functions and implement the engine interfaces.
+2. Export the three C functions with `ENGINE_GRAPHICS_PLUGIN_EXPORT`
+   (`<engine/graphics/PluginApi.hpp>`) and implement the engine interfaces.
 3. Add the backend library to `vcpkg.json` and link it with
    `PRIVATE_DEPENDS`.
 4. Add `add_dependencies(<executable> <name>)` in the executable that loads

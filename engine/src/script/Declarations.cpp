@@ -74,6 +74,15 @@ std::string caller_location(lua_State* state) {
     return location;
 }
 
+bool report(const sol::protected_function_result& result) {
+    if (result.valid()) {
+        return true;
+    }
+    const sol::error error = result;
+    log::error("lua: {}", error.what());
+    return false;
+}
+
 sol::object make_declarator(sol::this_state state, const std::shared_ptr<PendingFile>& file,
                             std::size_t index) {
     const std::string name = file->declarations[index].name;
