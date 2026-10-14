@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -10,6 +11,7 @@
 #include "engine/core/Vec2.hpp"
 #include "engine/script/Declaration.hpp"
 #include "engine/script/Export.hpp"
+#include "engine/script/InputState.hpp"
 
 namespace engine::script {
 
@@ -112,6 +114,9 @@ public:
      * the entity's own fields, then its prefab.
      *
      * @param type Declared entity name.
+     * Calls the entity's `on_spawn(self)` callback once it is ready; an error raised by it is
+     * logged and the entity is kept.
+     *
      * @param position Starting position. Overrides the prefab's `x` and `y` when given.
      * @return The new entity, or std::nullopt if no world is attached, @p type is unknown or
      * declared as a system, or a prefab native field has the wrong type. The error is logged.
@@ -143,6 +148,40 @@ public:
      * @note Never throws.
      */
     bool call(core::Entity entity, std::string_view method) noexcept;
+
+    /**
+     * @brief Sets the actions an entity reads through `self.input` until the next call.
+     *
+     * Entities never given an input read a neutral one: every axis is 0, nothing is pressed.
+     *
+     * @param entity Entity returned by spawn(). Unknown entities are ignored.
+     * @param input Actions for the coming ticks.
+     */
+    void set_input(core::Entity entity, InputState input) noexcept;
+
+    /**
+     * @brief Advances every live entity by one tick.
+     *
+     * In ascending id order, adds @p dt to each entity's `age`, then calls its `update(self, dt)`
+     * callback if it has one. Entities marked with `self:destroy()` are skipped. Entities spawned
+     * during the pass are first updated on the next call. An error raised by a callback is logged
+     * with its file and line and the other entities still run.
+     *
+     * @param dt Fixed time step in seconds.
+     * @note Never throws.
+     */
+    void update(float dt) noexcept;
+
+    /**
+     * @brief Removes every entity marked with `self:destroy()`.
+     *
+     * For each marked entity, calls its `on_destroy(self)` callback, forgets its script data and
+     * kills it in the world. Entities marked during these callbacks are removed in the same call.
+     *
+     * @return The number of entities removed.
+     * @note Never throws.
+     */
+    std::size_t flush_destroyed() noexcept;
 
 private:
     struct Impl;
