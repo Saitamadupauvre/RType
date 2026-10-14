@@ -35,6 +35,7 @@ engine_add_test(script SOURCES
     engine/script/ScriptDeclarationsTest.cpp
     engine/script/ScriptRequireTest.cpp
     engine/script/EntityHandleTest.cpp
+    engine/script/TickTest.cpp
 )
 engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
 engine_add_test(physics SOURCES
