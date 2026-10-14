@@ -37,6 +37,7 @@ engine_add_module(network
     SOURCES
         src/network/Client.cpp
         src/network/Module.cpp
+        src/network/Payloads.cpp
         src/network/ProtocolHandler.cpp
         src/network/Server.cpp
         src/network/UdpSocket.cpp

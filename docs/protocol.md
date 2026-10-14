@@ -70,10 +70,12 @@ Each type entry has the following layout:
 | Offset | Size | Field | Encoding |
 |---|---:|---|---|
 | 0 | 2 | `type_id` | Unsigned 16-bit, big-endian |
-| 2 | 1 | `name_length` | Unsigned 8-bit, maximum 63 |
-| 3 | Variable | `name` | UTF-8 bytes, exactly `name_length` bytes |
+| 2 | 1 | `name_length` | Unsigned 8-bit, from 1 to 63 |
+| 3 | Variable | `name` | Opaque bytes, exactly `name_length` bytes |
 
-The receiver rejects duplicate type IDs, duplicate names, a name length above 63, truncated entries, or entries extending beyond the declared payload length.
+Names are compared byte for byte and are not validated as UTF-8.
+
+The receiver rejects duplicate type IDs, duplicate names, a name length of 0 or above 63, truncated entries, or entries extending beyond the declared payload length.
 
 ## Input Payload
 
@@ -107,6 +109,8 @@ Each entity record has the following layout:
 | 8 | 2 | `y` | Signed 16-bit, big-endian virtual-world coordinate |
 | 10 | 2 | `vx` | Signed 16-bit, big-endian velocity in virtual units per second |
 | 12 | 2 | `vy` | Signed 16-bit, big-endian velocity in virtual units per second |
+
+A snapshot carries at most 84 entities, the largest count that fits in the maximum payload size. Protocol version `1` has no multi-packet snapshots: the sender must not encode more than 84 entities.
 
 The receiver rejects a snapshot unless its payload size is exactly `6 + entity_count * 14` and every `type_id` exists in the connection type table.
 

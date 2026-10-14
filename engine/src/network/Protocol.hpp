@@ -2,8 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace engine::network {
+
+using Bytes = std::vector<std::uint8_t>;
 
 inline constexpr std::size_t max_datagram_size = 1200;
 inline constexpr std::size_t encoded_packet_header_size = 13;
@@ -27,6 +30,8 @@ struct InputPayload {
     std::uint8_t action_flags{};
     std::int8_t move_x{};
     std::int8_t move_y{};
+
+    bool operator==(const InputPayload&) const = default;
 };
 
 struct PacketHeader {
