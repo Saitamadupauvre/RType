@@ -16,5 +16,6 @@ engine_add_plugin(graphics-raylib
         src/Plugin.cpp
         src/RaylibInput.cpp
         src/RaylibRenderer.cpp
+        src/TempDraw.cpp
     PRIVATE_DEPENDS engine::graphics graphics-raylib-letterbox raylib glfw
 )
