@@ -26,7 +26,7 @@ public:
     void end_frame() override { ++frames; }
 
     bool fullscreen{false};
-    Color last_clear{};
+    engine::graphics::Color last_clear{};
     int frames{0};
 
 private:
@@ -38,6 +38,15 @@ public:
     [[nodiscard]] bool is_key_down(Key key) const override { return key == down; }
     [[nodiscard]] bool is_key_pressed(Key) const override { return false; }
     [[nodiscard]] bool is_key_released(Key) const override { return false; }
+    [[nodiscard]] Key last_key_pressed() override { return Key::Unknown; }
+    [[nodiscard]] Vec2 mouse_position() const override { return {}; }
+    [[nodiscard]] bool is_mouse_down(engine::graphics::MouseButton) const override { return false; }
+    [[nodiscard]] bool is_mouse_pressed(engine::graphics::MouseButton) const override {
+        return false;
+    }
+    [[nodiscard]] bool is_mouse_released(engine::graphics::MouseButton) const override {
+        return false;
+    }
 
     Key down{Key::Unknown};
 };
@@ -79,7 +88,7 @@ TEST(GraphicsBackend, ExposesRendererAndInputThroughInterfaces) {
     IGraphicsBackend& backend = fake;
 
     ASSERT_TRUE(backend.renderer().open(WindowConfig{}));
-    backend.renderer().begin_frame(Color{.r = 1, .g = 2, .b = 3});
+    backend.renderer().begin_frame(engine::graphics::Color{.r = 1, .g = 2, .b = 3});
     backend.renderer().end_frame();
 
     EXPECT_FALSE(backend.renderer().should_close());

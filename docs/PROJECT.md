@@ -299,7 +299,9 @@ class IInput {   // raw keys; the engine's InputMap turns them into actions
     virtual bool is_key_released(Key) const = 0;
     virtual Key  last_key_pressed() = 0;   // for the key-remapping screen
     virtual Vec2 mouse_position() const = 0;
-    // ...
+    virtual bool is_mouse_down(MouseButton) const = 0;
+    virtual bool is_mouse_pressed(MouseButton) const = 0;
+    virtual bool is_mouse_released(MouseButton) const = 0;
 };
 
 class IAudio {   // separate music / effects volumes
