@@ -2,22 +2,29 @@
 
 ## Tomorrow: Payload Codecs
 
-Every payload follows the pattern already used by `InputPayload` in
-`engine/src/network/Payloads.cpp`:
+Every payload follows the pattern already used by `InputPayload`. Paths are
+relative to `engine/src/network/`:
 
-- the struct lives in `engine/src/network/Protocol.hpp` with
-  `bool operator==(const T&) const = default;`;
-- one `is_valid(const T&)` in the anonymous namespace of `Payloads.cpp`, used
-  by both the encoder and the decoder;
-- `encode_payload(const T&)` checks `is_valid`, writes with `ByteWriter`, and
-  returns `std::move(writer).take()`;
-- `decode_<message>(std::span<const std::uint8_t>)` reads with `ByteReader`,
-  returns `std::nullopt` on any failed read or when `!reader.at_end()`, then
-  checks `is_valid`;
-- declarations go in `Payloads.hpp`, marked `[[nodiscard]] ENGINE_NETWORK_EXPORT`;
-- tests go in `tests/engine/network/PayloadsTest.cpp`, one `TEST(<Struct>, ...)`
-  group per message: exact bytes, round trip, truncated, trailing bytes, and
-  every invalid value.
+- `protocol/Protocol.hpp` holds the wire constants, `MessageType` and
+  `PacketHeader`;
+- the struct lives in `protocol/Messages.hpp` with
+  `bool operator==(const T&) const = default;`, and is added to `Message`;
+- one `is_valid(const T&)` in `protocol/Validation.cpp`, used by both the
+  encoder and the decoder;
+- `encode_payload(const T&)` in `encoder/PayloadEncoder.cpp` checks `is_valid`,
+  writes with `bytes/ByteWriter.hpp`, and returns `std::move(writer).take()`;
+- `decode_<message>(std::span<const std::uint8_t>)` in
+  `decoder/PayloadDecoder.cpp` reads with `bytes/ByteReader.hpp`, returns
+  `std::nullopt` on any failed read or when `!reader.at_end()`, then checks
+  `is_valid`; event variants get a reader in the `event_readers` table of
+  `decoder/EventReader.cpp`;
+- declarations go in `encoder/PayloadEncoder.hpp` and
+  `decoder/PayloadDecoder.hpp`, marked `[[nodiscard]] ENGINE_NETWORK_EXPORT`;
+- tests mirror the folders under `tests/engine/network/`, one
+  `TEST(<Struct>, ...)` group per message: exact bytes and encoder rejections in
+  `encoder/PayloadEncoderTest.cpp`; round trip, truncated, trailing bytes and
+  decoder rejections in `decoder/PayloadDecoderTest.cpp`; shared sample
+  builders in `PayloadSamples.hpp`.
 
 ### 1. Fixed-size messages
 
@@ -35,7 +42,7 @@ Every payload follows the pattern already used by `InputPayload` in
 
 ### 2. Event message
 
-- [x] Structs in `Protocol.hpp`:
+- [x] Structs in `protocol/Messages.hpp`:
   - `SpawnEvent { std::uint32_t entity_id; std::uint16_t type_id; std::int16_t x; std::int16_t y; }`
   - `DestroyEvent { std::uint32_t entity_id; }`
   - `FireEvent { std::uint32_t source_entity_id; std::uint32_t projectile_entity_id; }`
@@ -50,7 +57,7 @@ Every payload follows the pattern already used by `InputPayload` in
 
 ### 3. Snapshot message
 
-- [x] Structs in `Protocol.hpp`:
+- [x] Structs in `protocol/Messages.hpp`:
   - `EntityState { std::uint32_t entity_id; std::uint16_t type_id; std::int16_t x, y, vx, vy; }`
   - `SnapshotPayload { std::uint32_t server_tick; std::vector<EntityState> entities; }`
   - constants `snapshot_prefix_size = 6`, `entity_record_size = 14`,
@@ -65,7 +72,7 @@ Every payload follows the pattern already used by `InputPayload` in
 
 ### 4. Connect accept message
 
-- [x] Structs in `Protocol.hpp`:
+- [x] Structs in `protocol/Messages.hpp`:
   - `TypeEntry { std::uint16_t type_id; std::string name; }`
   - `ConnectAcceptPayload { std::uint32_t client_nonce; std::uint32_t player_entity_id; std::vector<TypeEntry> types; }`
   - constants `max_type_name_length = 63`, `min_type_entry_size = 3`.
@@ -83,8 +90,9 @@ Every payload follows the pattern already used by `InputPayload` in
 
 ### 5. Typed message dispatch in `ProtocolHandler`
 
-- [x] In `ProtocolHandler.hpp`:
+- [x] In `protocol/Messages.hpp`:
   - `using Message = std::variant<ConnectRequestPayload, ConnectAcceptPayload, InputPayload, SnapshotPayload, EventPayload, HeartbeatPayload, DisconnectPayload>;`
+- [x] In `protocol/ProtocolHandler.hpp`:
   - `struct ReceivedMessage { PacketHeader header; Message message; };`
   - `std::optional<Bytes> encode(const Message& message, std::uint32_t sequence) const;`
   - `std::optional<ReceivedMessage> decode(std::span<const std::uint8_t> datagram) const;`
@@ -92,7 +100,7 @@ Every payload follows the pattern already used by `InputPayload` in
   whose `type` comes from `message_type_of(const T&)` overloads in `ProtocolHandler.cpp`.
 - [x] `decode`: `deserialize`, then look up the matching `decode_<message>` in the
   `message_decoders` table, wrapped into `Message`.
-- [x] Tests in `tests/engine/network/ProtocolHandlerTest.cpp`: every message type
+- [x] Tests in `tests/engine/network/protocol/ProtocolHandlerTest.cpp`: every message type
   round-trips through `encode` / `decode`, the header type matches the payload,
   and a valid header with a payload of the wrong message type is rejected.
 
