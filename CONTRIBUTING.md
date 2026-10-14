@@ -24,3 +24,12 @@ CI runs `cmake --workflow --preset ci`: run it locally before pushing.
 
 Code is formatted with clang-format (`.clang-format`): run the `format` target
 (`cmake --build --preset debug --target format`) before committing.
+
+Static analysis uses clang-tidy (`.clang-tidy`); CI treats every warning as an
+error (`cmake --workflow --preset tidy`). `NOLINT` markers are comments, which
+the code rules forbid: fix the code, or disable the check project-wide in
+`.clang-tidy` and document why below.
+
+| Disabled check | Reason |
+|---|---|
+| `clang-analyzer-optin.core.EnumCastOutOfRange` | Decoders turn untrusted bytes into enums and must reject out-of-range values; their tests have to cast such values (e.g. `static_cast<DisconnectReason>(9)`) to prove it. |
