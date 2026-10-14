@@ -83,16 +83,16 @@ Every payload follows the pattern already used by `InputPayload` in
 
 ### 5. Typed message dispatch in `ProtocolHandler`
 
-- [ ] In `ProtocolHandler.hpp`:
+- [x] In `ProtocolHandler.hpp`:
   - `using Message = std::variant<ConnectRequestPayload, ConnectAcceptPayload, InputPayload, SnapshotPayload, EventPayload, HeartbeatPayload, DisconnectPayload>;`
   - `struct ReceivedMessage { PacketHeader header; Message message; };`
   - `std::optional<Bytes> encode(const Message& message, std::uint32_t sequence) const;`
   - `std::optional<ReceivedMessage> decode(std::span<const std::uint8_t> datagram) const;`
-- [ ] `encode`: `std::visit` calls `encode_payload`, then `serialize` with a header
+- [x] `encode`: `std::visit` calls `encode_payload`, then `serialize` with a header
   whose `type` comes from `message_type_of(const T&)` overloads in `ProtocolHandler.cpp`.
-- [ ] `decode`: `deserialize`, then `switch (header.type)` to the matching
-  `decode_<message>`, wrapped into `Message`.
-- [ ] Tests in `tests/engine/network/ProtocolHandlerTest.cpp`: every message type
+- [x] `decode`: `deserialize`, then look up the matching `decode_<message>` in the
+  `message_decoders` table, wrapped into `Message`.
+- [x] Tests in `tests/engine/network/ProtocolHandlerTest.cpp`: every message type
   round-trips through `encode` / `decode`, the header type matches the payload,
   and a valid header with a payload of the wrong message type is rejected.
 
