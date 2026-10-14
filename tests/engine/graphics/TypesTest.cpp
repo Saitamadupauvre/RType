@@ -3,7 +3,6 @@
 #include "engine/graphics/Types.hpp"
 
 using namespace engine::graphics;
-using namespace engine::core;
 
 TEST(GraphicsTypes, ColorIsOpaqueByDefault) { EXPECT_EQ(Color{}.a, 255); }
 
