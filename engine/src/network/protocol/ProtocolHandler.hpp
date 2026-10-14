@@ -3,16 +3,13 @@
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <variant>
 
 #include "engine/network/Export.hpp"
 
+#include "Messages.hpp"
 #include "Protocol.hpp"
 
 namespace engine::network {
-
-using Message = std::variant<ConnectRequestPayload, ConnectAcceptPayload, InputPayload,
-                             SnapshotPayload, EventPayload, HeartbeatPayload, DisconnectPayload>;
 
 struct ENGINE_NETWORK_EXPORT DecodedPacket {
     PacketHeader header;
