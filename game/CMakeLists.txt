@@ -14,6 +14,11 @@ target_link_libraries(r-type_client_cli PRIVATE clap::clap)
 target_include_directories(r-type_client_cli PUBLIC client)
 rtype_set_warnings(r-type_client_cli)
 
+add_library(r-type_client_controls STATIC client/Controls.cpp)
+target_link_libraries(r-type_client_controls PUBLIC engine::graphics engine::script)
+target_include_directories(r-type_client_controls PUBLIC client)
+rtype_set_warnings(r-type_client_controls)
+
 add_executable(r-type_client client/main.cpp)
 target_link_libraries(r-type_client PRIVATE r-type_client_cli engine::core engine::script engine::network engine::graphics)
 target_compile_definitions(r-type_client PRIVATE

@@ -104,4 +104,5 @@ plugin_add_test(graphics-raylib
 )
 
 game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
-game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
+game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
+    LINKS r-type_client_cli r-type_client_controls)
