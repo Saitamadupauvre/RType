@@ -36,3 +36,8 @@ Output goes to `build/<preset>/bin/`:
 cmake --workflow --preset asan       # AddressSanitizer + UndefinedBehaviorSanitizer
 cmake --workflow --preset tidy       # clang-tidy
 ```
+
+**Formatting:** CI requires `clang-format 23.1.1`. Install with:
+```sh
+pipx install clang-format==23.1.1
+```

@@ -85,6 +85,16 @@ public:
     }
 
     /**
+     * @brief Checks if a component type can be used in this manager.
+     * @tparam T Component type.
+     * @return true if register_component<T>() was called on this manager.
+     */
+    template <typename T> [[nodiscard]] bool is_registered() const {
+        const ComponentTypeId id = component_type_id<T>();
+        return id < _pools.size() && _pools[id] != nullptr;
+    }
+
+    /**
      * @brief Attaches a component to an entity, replacing any previous one.
      * @param entity Living owner of the component.
      * @param component Value to store.
@@ -151,7 +161,7 @@ private:
         void erase(Entity entity) override { pool.erase(entity); }
     };
 
-    template <typename T> ComponentPool<T>& pool_of() {
+    template <typename T> [[nodiscard]] ComponentPool<T>& pool_of() {
         const ComponentTypeId id = component_type_id<T>();
         if (id >= _pools.size() || !_pools[id]) {
             throw ComponentNotRegistered(typeid(T).name());
