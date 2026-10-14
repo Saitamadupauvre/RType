@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include "engine/core/Vec2.hpp"
 #include "engine/graphics/Types.hpp"
 
 using namespace engine::graphics;
