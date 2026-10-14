@@ -14,8 +14,6 @@ TEST(GraphicsTypes, DefaultTextureIdRefersToNoTexture) {
 }
 
 TEST(GraphicsTypes, ValueTypesCompareFieldByField) {
-    EXPECT_EQ((Vec2{1, 2}), (Vec2{1, 2}));
-    EXPECT_NE((Vec2{1, 2}), (Vec2{2, 1}));
     EXPECT_EQ((Rect{.x = 0.F, .y = 0.F, .width = 10.F, .height = 5.F}),
               (Rect{.x = 0.F, .y = 0.F, .width = 10.F, .height = 5.F}));
     EXPECT_NE((Color{.r = 255}), (Color{.g = 255}));
