@@ -7,20 +7,13 @@
 #include "engine/core/EntityManager.hpp"
 
 using engine::core::EntityManager;
-using engine::core::Hitbox;
 using engine::core::Sprite;
 using engine::core::Tags;
-using engine::core::Vec2;
 
-TEST(Sprite, DefaultsToNoImage) {
+TEST(Sprite, DefaultsToNoImageAndWhite) {
     const Sprite sprite;
     EXPECT_TRUE(sprite.path.empty());
-}
-
-TEST(Hitbox, DefaultsToEmptyBoxAtOrigin) {
-    const Hitbox hitbox;
-    EXPECT_EQ(hitbox.offset, Vec2{});
-    EXPECT_EQ(hitbox.size, Vec2{});
+    EXPECT_EQ(sprite.color, (engine::core::Rgba{.r = 255, .g = 255, .b = 255, .a = 255}));
 }
 
 TEST(Tags, StartsEmpty) {
@@ -70,15 +63,12 @@ TEST(Tags, EmptyLabelIsALabel) {
 TEST(Components, StoredInEntityManager) {
     EntityManager manager;
     manager.register_component<Sprite>();
-    manager.register_component<Hitbox>();
     manager.register_component<Tags>();
 
     const auto entity = manager.spawn();
-    manager.add(entity, Sprite{.path = "ship.png"});
-    manager.add(entity, Hitbox{.offset = {1.0F, 2.0F}, .size = {32.0F, 16.0F}});
+    manager.add(entity, Sprite{.path = "ship.png", .color = {}});
     manager.add(entity, Tags{"player"});
 
     EXPECT_EQ(manager.get<Sprite>(entity).path, "ship.png");
-    EXPECT_EQ(manager.get<Hitbox>(entity).size, (Vec2{32.0F, 16.0F}));
     EXPECT_TRUE(manager.get<Tags>(entity).has("player"));
 }

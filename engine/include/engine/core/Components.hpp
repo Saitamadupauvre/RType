@@ -1,33 +1,34 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
-#include "engine/core/Vec2.hpp"
-
 namespace engine::core {
 
-/**
- * @brief Image drawn at an entity's position.
- *
- * @note The path is relative to the assets folder. An empty path means no image.
- */
-struct Sprite {
-    std::string path;
+/** @brief 8-bit RGBA color. Defaults to opaque white. */
+struct Rgba {
+    std::uint8_t r{255};
+    std::uint8_t g{255};
+    std::uint8_t b{255};
+    std::uint8_t a{255};
+
+    bool operator==(const Rgba&) const = default;
 };
 
 /**
- * @brief Axis-aligned box used for overlap tests.
+ * @brief Image drawn at an entity's position, tinted by a color.
  *
- * @note The box starts at the entity's position plus offset and spans size. A size with a zero
- * or negative side never overlaps anything.
+ * @note The path is relative to the assets folder. An empty path means no image: renderers may
+ * then draw a plain shape filled with the color.
  */
-struct Hitbox {
-    Vec2 offset;
-    Vec2 size;
+struct Sprite {
+    std::string path;
+    Rgba color;
 };
 
 /**
