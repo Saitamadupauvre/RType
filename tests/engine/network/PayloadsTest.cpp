@@ -1,6 +1,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -10,13 +11,19 @@
 using engine::network::ConnectRequestPayload;
 using engine::network::decode_connect_request;
 using engine::network::decode_disconnect;
+using engine::network::decode_event;
 using engine::network::decode_heartbeat;
 using engine::network::decode_input;
+using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::encode_payload;
+using engine::network::EventPayload;
+using engine::network::FireEvent;
 using engine::network::HeartbeatPayload;
 using engine::network::InputPayload;
+using engine::network::SoundEvent;
+using engine::network::SpawnEvent;
 
 TEST(InputPayload, EncodesFieldsInOrder) {
     const InputPayload input{.action_flags = 0x01, .move_x = -1, .move_y = 1};
@@ -198,4 +205,96 @@ TEST(DisconnectPayload, DecoderRejectsUndefinedReasons) {
 TEST(DisconnectPayload, DecoderRejectsWrongSize) {
     EXPECT_FALSE(decode_disconnect(std::vector<std::uint8_t>{}).has_value());
     EXPECT_FALSE(decode_disconnect(std::vector<std::uint8_t>{0x00, 0x00}).has_value());
+}
+
+namespace {
+
+std::array<EventPayload, 4> sample_events() {
+    return {
+        SpawnEvent{.entity_id = 0x0102'0304, .type_id = 0x0506, .x = -2, .y = 0x0708},
+        DestroyEvent{.entity_id = 0x0102'0304},
+        FireEvent{.source_entity_id = 0x0102'0304, .projectile_entity_id = 0x0506'0708},
+        SoundEvent{.source_entity_id = 0x0102'0304, .sound_id = 0x0506},
+    };
+}
+
+std::vector<std::uint8_t> encode_event(const EventPayload& event) {
+    auto bytes = encode_payload(event);
+    EXPECT_TRUE(bytes.has_value());
+    return bytes.value_or(std::vector<std::uint8_t>{});
+}
+
+} // namespace
+
+TEST(EventPayload, EncodesSpawnFieldsInOrder) {
+    const EventPayload event =
+        SpawnEvent{.entity_id = 0x0102'0304, .type_id = 0x0506, .x = -2, .y = 0x0708};
+
+    EXPECT_EQ(encode_event(event), (std::vector<std::uint8_t>{0x01, 0x01, 0x02, 0x03, 0x04, 0x05,
+                                                              0x06, 0xFF, 0xFE, 0x07, 0x08}));
+}
+
+TEST(EventPayload, EncodesDestroyFieldsInOrder) {
+    const EventPayload event = DestroyEvent{.entity_id = 0x0102'0304};
+
+    EXPECT_EQ(encode_event(event), (std::vector<std::uint8_t>{0x02, 0x01, 0x02, 0x03, 0x04}));
+}
+
+TEST(EventPayload, EncodesFireFieldsInOrder) {
+    const EventPayload event =
+        FireEvent{.source_entity_id = 0x0102'0304, .projectile_entity_id = 0x0506'0708};
+
+    EXPECT_EQ(encode_event(event),
+              (std::vector<std::uint8_t>{0x03, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}));
+}
+
+TEST(EventPayload, EncodesSoundFieldsInOrder) {
+    const EventPayload event = SoundEvent{.source_entity_id = 0x0102'0304, .sound_id = 0x0506};
+
+    EXPECT_EQ(encode_event(event),
+              (std::vector<std::uint8_t>{0x04, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06}));
+}
+
+TEST(EventPayload, RoundTripsEveryEvent) {
+    for (const auto& event : sample_events()) {
+        EXPECT_EQ(decode_event(encode_event(event)), event) << "index " << event.index();
+    }
+}
+
+TEST(EventPayload, DecoderRejectsEmptyPayload) {
+    EXPECT_FALSE(decode_event(std::vector<std::uint8_t>{}).has_value());
+}
+
+TEST(EventPayload, DecoderRejectsUnknownEventTypes) {
+    for (unsigned int type = 0; type <= 255; ++type) {
+        if (type >= 1 && type <= 4) {
+            continue;
+        }
+        std::vector<std::uint8_t> payload(11, 0x00);
+        payload.front() = static_cast<std::uint8_t>(type);
+
+        EXPECT_FALSE(decode_event(payload).has_value()) << "type " << type;
+    }
+}
+
+TEST(EventPayload, DecoderRejectsTruncatedEvents) {
+    for (const auto& event : sample_events()) {
+        const auto bytes = encode_event(event);
+
+        for (std::size_t size = 1; size < bytes.size(); ++size) {
+            const std::span<const std::uint8_t> truncated(bytes.data(), size);
+
+            EXPECT_FALSE(decode_event(truncated).has_value())
+                << "index " << event.index() << " size " << size;
+        }
+    }
+}
+
+TEST(EventPayload, DecoderRejectsTrailingBytes) {
+    for (const auto& event : sample_events()) {
+        auto bytes = encode_event(event);
+        bytes.push_back(0x00);
+
+        EXPECT_FALSE(decode_event(bytes).has_value()) << "index " << event.index();
+    }
 }
