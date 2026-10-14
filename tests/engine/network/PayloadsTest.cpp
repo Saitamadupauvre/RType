@@ -14,14 +14,19 @@ using engine::network::decode_disconnect;
 using engine::network::decode_event;
 using engine::network::decode_heartbeat;
 using engine::network::decode_input;
+using engine::network::decode_snapshot;
 using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::encode_payload;
+using engine::network::EntityState;
 using engine::network::EventPayload;
 using engine::network::FireEvent;
 using engine::network::HeartbeatPayload;
 using engine::network::InputPayload;
+using engine::network::max_payload_size;
+using engine::network::max_snapshot_entities;
+using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
 using engine::network::SpawnEvent;
 
@@ -297,4 +302,127 @@ TEST(EventPayload, DecoderRejectsTrailingBytes) {
 
         EXPECT_FALSE(decode_event(bytes).has_value()) << "index " << event.index();
     }
+}
+
+namespace {
+
+SnapshotPayload snapshot_with(std::size_t entity_count) {
+    SnapshotPayload snapshot{.server_tick = 0x0102'0304, .entities = {}};
+    for (std::size_t index = 0; index < entity_count; ++index) {
+        const auto value = static_cast<std::int16_t>(index);
+        snapshot.entities.push_back(EntityState{
+            .entity_id = static_cast<std::uint32_t>(index + 1),
+            .type_id = static_cast<std::uint16_t>(index % 3),
+            .x = value,
+            .y = static_cast<std::int16_t>(-value),
+            .vx = static_cast<std::int16_t>(value * 2),
+            .vy = static_cast<std::int16_t>(-value * 2),
+        });
+    }
+    return snapshot;
+}
+
+std::vector<std::uint8_t> encode_snapshot(const SnapshotPayload& snapshot) {
+    auto bytes = encode_payload(snapshot);
+    EXPECT_TRUE(bytes.has_value());
+    return bytes.value_or(std::vector<std::uint8_t>{});
+}
+
+} // namespace
+
+TEST(SnapshotPayload, EncodesFieldsInOrder) {
+    const SnapshotPayload snapshot{
+        .server_tick = 0x0102'0304,
+        .entities = {EntityState{
+            .entity_id = 0x0506'0708,
+            .type_id = 0x090A,
+            .x = -1,
+            .y = 2,
+            .vx = -3,
+            .vy = 4,
+        }},
+    };
+
+    const std::vector<std::uint8_t> prefix{0x01, 0x02, 0x03, 0x04, 0x00, 0x01};
+    const std::vector<std::uint8_t> record{0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0xFF,
+                                           0xFF, 0x00, 0x02, 0xFF, 0xFD, 0x00, 0x04};
+    std::vector<std::uint8_t> expected = prefix;
+    expected.insert(expected.end(), record.begin(), record.end());
+
+    EXPECT_EQ(encode_snapshot(snapshot), expected);
+}
+
+TEST(SnapshotPayload, EncodesEmptySnapshot) {
+    EXPECT_EQ(encode_snapshot(snapshot_with(0)),
+              (std::vector<std::uint8_t>{0x01, 0x02, 0x03, 0x04, 0x00, 0x00}));
+}
+
+TEST(SnapshotPayload, RoundTripsZeroOneAndMaximumEntities) {
+    for (const std::size_t count : {std::size_t{0}, std::size_t{1}, max_snapshot_entities}) {
+        const auto snapshot = snapshot_with(count);
+
+        EXPECT_EQ(decode_snapshot(encode_snapshot(snapshot)), snapshot) << "count " << count;
+    }
+}
+
+TEST(SnapshotPayload, MaximumSnapshotFitsInOnePayload) {
+    EXPECT_EQ(max_snapshot_entities, 84U);
+    EXPECT_LE(encode_snapshot(snapshot_with(max_snapshot_entities)).size(), max_payload_size);
+}
+
+TEST(SnapshotPayload, EncoderRejectsTooManyEntities) {
+    EXPECT_FALSE(encode_payload(snapshot_with(max_snapshot_entities + 1)).has_value());
+}
+
+TEST(SnapshotPayload, DecoderRejectsTruncatedPrefix) {
+    const auto bytes = encode_snapshot(snapshot_with(0));
+
+    for (std::size_t size = 0; size < bytes.size(); ++size) {
+        const std::span<const std::uint8_t> truncated(bytes.data(), size);
+
+        EXPECT_FALSE(decode_snapshot(truncated).has_value()) << "size " << size;
+    }
+}
+
+TEST(SnapshotPayload, DecoderRejectsTruncatedRecord) {
+    const auto bytes = encode_snapshot(snapshot_with(2));
+    const std::span<const std::uint8_t> truncated(bytes.data(), bytes.size() - 1);
+
+    EXPECT_FALSE(decode_snapshot(truncated).has_value());
+}
+
+TEST(SnapshotPayload, DecoderRejectsTrailingBytes) {
+    auto bytes = encode_snapshot(snapshot_with(2));
+    bytes.push_back(0x00);
+
+    EXPECT_FALSE(decode_snapshot(bytes).has_value());
+}
+
+TEST(SnapshotPayload, DecoderRejectsCountLargerThanRecords) {
+    auto bytes = encode_snapshot(snapshot_with(1));
+    bytes[5] = 0x02;
+
+    EXPECT_FALSE(decode_snapshot(bytes).has_value());
+}
+
+TEST(SnapshotPayload, DecoderRejectsCountSmallerThanRecords) {
+    auto bytes = encode_snapshot(snapshot_with(2));
+    bytes[5] = 0x01;
+
+    EXPECT_FALSE(decode_snapshot(bytes).has_value());
+}
+
+TEST(SnapshotPayload, DecoderRejectsHugeCountInShortPayload) {
+    const std::array<std::uint8_t, 13> payload{0x00, 0x00, 0x00, 0x01, 0xFF, 0xFF, 0x00,
+                                               0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    EXPECT_FALSE(decode_snapshot(payload).has_value());
+}
+
+TEST(SnapshotPayload, DecoderRejectsMoreThanMaximumEntities) {
+    const std::size_t count = max_snapshot_entities + 1;
+    std::vector<std::uint8_t> bytes{0x00, 0x00, 0x00, 0x01, 0x00, static_cast<std::uint8_t>(count)};
+    bytes.resize(bytes.size() + (count * engine::network::entity_record_size), 0x00);
+
+    EXPECT_FALSE(decode_snapshot(bytes).has_value());
 }

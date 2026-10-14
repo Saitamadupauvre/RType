@@ -116,6 +116,43 @@ std::optional<EventPayload> read_event(ByteReader& reader, std::uint8_t type) no
     return entry->read(reader);
 }
 
+bool is_valid(const SnapshotPayload& payload) noexcept {
+    return payload.entities.size() <= max_snapshot_entities;
+}
+
+void write_entity(ByteWriter& writer, const EntityState& entity) {
+    writer.write_u32(entity.entity_id);
+    writer.write_u16(entity.type_id);
+    writer.write_i16(entity.x);
+    writer.write_i16(entity.y);
+    writer.write_i16(entity.vx);
+    writer.write_i16(entity.vy);
+}
+
+std::optional<EntityState> read_entity(ByteReader& reader) noexcept {
+    const auto entity_id = reader.read_u32();
+    const auto type_id = reader.read_u16();
+    const auto x = reader.read_i16();
+    const auto y = reader.read_i16();
+    const auto vx = reader.read_i16();
+    const auto vy = reader.read_i16();
+    if (!entity_id || !type_id || !x || !y || !vx || !vy) {
+        return std::nullopt;
+    }
+    return EntityState{
+        .entity_id = *entity_id,
+        .type_id = *type_id,
+        .x = *x,
+        .y = *y,
+        .vx = *vx,
+        .vy = *vy,
+    };
+}
+
+bool has_exact_entity_records(const ByteReader& reader, std::size_t count) noexcept {
+    return count <= max_snapshot_entities && reader.remaining() == count * entity_record_size;
+}
+
 } // namespace
 
 EncodedPayload encode_payload(const InputPayload& payload) {
@@ -212,6 +249,40 @@ std::optional<EventPayload> decode_event(std::span<const std::uint8_t> payload) 
         return std::nullopt;
     }
     return event;
+}
+
+EncodedPayload encode_payload(const SnapshotPayload& payload) {
+    if (!is_valid(payload)) {
+        return std::nullopt;
+    }
+
+    ByteWriter writer;
+    writer.write_u32(payload.server_tick);
+    writer.write_u16(static_cast<std::uint16_t>(payload.entities.size()));
+    for (const auto& entity : payload.entities) {
+        write_entity(writer, entity);
+    }
+    return std::move(writer).take();
+}
+
+std::optional<SnapshotPayload> decode_snapshot(std::span<const std::uint8_t> payload) {
+    ByteReader reader(payload);
+    const auto server_tick = reader.read_u32();
+    const auto count = reader.read_u16();
+    if (!server_tick || !count || !has_exact_entity_records(reader, *count)) {
+        return std::nullopt;
+    }
+
+    SnapshotPayload snapshot{.server_tick = *server_tick, .entities = {}};
+    snapshot.entities.reserve(*count);
+    for (std::size_t index = 0; index < *count; ++index) {
+        const auto entity = read_entity(reader);
+        if (!entity) {
+            return std::nullopt;
+        }
+        snapshot.entities.push_back(*entity);
+    }
+    return snapshot;
 }
 
 } // namespace engine::network
