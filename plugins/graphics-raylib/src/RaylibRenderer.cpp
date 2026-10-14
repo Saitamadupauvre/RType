@@ -4,8 +4,6 @@
 
 namespace {
 
-constexpr engine::graphics::Vec2 virtual_resolution{.x = 1920.F, .y = 1080.F};
-
 ::Color to_raylib(engine::graphics::Color color) {
     return {.r = color.r, .g = color.g, .b = color.b, .a = color.a};
 }
