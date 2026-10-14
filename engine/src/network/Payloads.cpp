@@ -1,6 +1,9 @@
 #include "Payloads.hpp"
 
+#include <algorithm>
+#include <array>
 #include <utility>
+#include <variant>
 
 #include "ByteReader.hpp"
 #include "ByteWriter.hpp"
@@ -21,6 +24,96 @@ bool is_valid(const InputPayload& payload) noexcept {
 bool is_valid(const DisconnectPayload& payload) noexcept {
     return static_cast<std::uint8_t>(payload.reason) <=
            static_cast<std::uint8_t>(DisconnectReason::protocol_error);
+}
+
+void write_event_type(ByteWriter& writer, EventType type) {
+    writer.write_u8(static_cast<std::uint8_t>(type));
+}
+
+void write_event(ByteWriter& writer, const SpawnEvent& event) {
+    write_event_type(writer, EventType::spawn);
+    writer.write_u32(event.entity_id);
+    writer.write_u16(event.type_id);
+    writer.write_i16(event.x);
+    writer.write_i16(event.y);
+}
+
+void write_event(ByteWriter& writer, const DestroyEvent& event) {
+    write_event_type(writer, EventType::destroy);
+    writer.write_u32(event.entity_id);
+}
+
+void write_event(ByteWriter& writer, const FireEvent& event) {
+    write_event_type(writer, EventType::fire);
+    writer.write_u32(event.source_entity_id);
+    writer.write_u32(event.projectile_entity_id);
+}
+
+void write_event(ByteWriter& writer, const SoundEvent& event) {
+    write_event_type(writer, EventType::sound);
+    writer.write_u32(event.source_entity_id);
+    writer.write_u16(event.sound_id);
+}
+
+std::optional<EventPayload> read_spawn(ByteReader& reader) noexcept {
+    const auto entity_id = reader.read_u32();
+    const auto type_id = reader.read_u16();
+    const auto x = reader.read_i16();
+    const auto y = reader.read_i16();
+    if (!entity_id || !type_id || !x || !y) {
+        return std::nullopt;
+    }
+    return SpawnEvent{.entity_id = *entity_id, .type_id = *type_id, .x = *x, .y = *y};
+}
+
+std::optional<EventPayload> read_destroy(ByteReader& reader) noexcept {
+    const auto entity_id = reader.read_u32();
+    if (!entity_id) {
+        return std::nullopt;
+    }
+    return DestroyEvent{.entity_id = *entity_id};
+}
+
+std::optional<EventPayload> read_fire(ByteReader& reader) noexcept {
+    const auto source_entity_id = reader.read_u32();
+    const auto projectile_entity_id = reader.read_u32();
+    if (!source_entity_id || !projectile_entity_id) {
+        return std::nullopt;
+    }
+    return FireEvent{.source_entity_id = *source_entity_id,
+                     .projectile_entity_id = *projectile_entity_id};
+}
+
+std::optional<EventPayload> read_sound(ByteReader& reader) noexcept {
+    const auto source_entity_id = reader.read_u32();
+    const auto sound_id = reader.read_u16();
+    if (!source_entity_id || !sound_id) {
+        return std::nullopt;
+    }
+    return SoundEvent{.source_entity_id = *source_entity_id, .sound_id = *sound_id};
+}
+
+using EventReader = std::optional<EventPayload> (*)(ByteReader&) noexcept;
+
+struct EventReaderEntry {
+    EventType type;
+    EventReader read;
+};
+
+constexpr std::array event_readers{
+    EventReaderEntry{.type = EventType::spawn, .read = read_spawn},
+    EventReaderEntry{.type = EventType::destroy, .read = read_destroy},
+    EventReaderEntry{.type = EventType::fire, .read = read_fire},
+    EventReaderEntry{.type = EventType::sound, .read = read_sound},
+};
+
+std::optional<EventPayload> read_event(ByteReader& reader, std::uint8_t type) noexcept {
+    const auto entry =
+        std::ranges::find(event_readers, static_cast<EventType>(type), &EventReaderEntry::type);
+    if (entry == event_readers.end()) {
+        return std::nullopt;
+    }
+    return entry->read(reader);
 }
 
 } // namespace
@@ -99,6 +192,26 @@ std::optional<DisconnectPayload> decode_disconnect(std::span<const std::uint8_t>
         return std::nullopt;
     }
     return disconnect;
+}
+
+EncodedPayload encode_payload(const EventPayload& payload) {
+    ByteWriter writer;
+    std::visit([&writer](const auto& event) { write_event(writer, event); }, payload);
+    return std::move(writer).take();
+}
+
+std::optional<EventPayload> decode_event(std::span<const std::uint8_t> payload) {
+    ByteReader reader(payload);
+    const auto type = reader.read_u8();
+    if (!type) {
+        return std::nullopt;
+    }
+
+    auto event = read_event(reader, *type);
+    if (!event || !reader.at_end()) {
+        return std::nullopt;
+    }
+    return event;
 }
 
 } // namespace engine::network

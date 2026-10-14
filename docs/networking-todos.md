@@ -35,17 +35,17 @@ Every payload follows the pattern already used by `InputPayload` in
 
 ### 2. Event message
 
-- [ ] Structs in `Protocol.hpp`:
+- [x] Structs in `Protocol.hpp`:
   - `SpawnEvent { std::uint32_t entity_id; std::uint16_t type_id; std::int16_t x; std::int16_t y; }`
   - `DestroyEvent { std::uint32_t entity_id; }`
   - `FireEvent { std::uint32_t source_entity_id; std::uint32_t projectile_entity_id; }`
   - `SoundEvent { std::uint32_t source_entity_id; std::uint16_t sound_id; }`
   - `using EventPayload = std::variant<SpawnEvent, DestroyEvent, FireEvent, SoundEvent>;`
   - `enum class EventType : std::uint8_t { spawn = 1, destroy = 2, fire = 3, sound = 4 };`
-- [ ] `encode_payload(const EventPayload&)`: `std::visit` writes the event type byte,
+- [x] `encode_payload(const EventPayload&)`: `std::visit` writes the event type byte,
   then the fields in table order (`write_u32`, `write_u16`, `write_i16`).
-- [ ] `decode_event(payload)`: `read_u8()` for the type, `switch` to one reader per
-  event, then `at_end()`. Sizes: spawn 11, destroy 5, fire 9, sound 7.
+- [x] `decode_event(payload)`: `read_u8()` for the type, look up its reader in the
+  `event_readers` table, then `at_end()`. Sizes: spawn 11, destroy 5, fire 9, sound 7.
   Reject event type 0 and above 4.
 
 ### 3. Snapshot message
@@ -110,7 +110,7 @@ Every payload follows the pattern already used by `InputPayload` in
 - [ ] Encode and decode the `connect_accept` payload, rejecting duplicate type IDs or names, empty names, names above 63 bytes, and truncated entries.
 - [ ] Encode and decode the `snapshot` payload, rejecting sizes other than `6 + entity_count * 14` and more than 84 entities.
 - [ ] Validate snapshot and spawn `type_id` values against the connection type table.
-- [ ] Encode and decode the `event` payloads (`spawn`, `destroy`, `fire`, `sound`), rejecting unknown types and wrong fixed sizes.
+- [x] Encode and decode the `event` payloads (`spawn`, `destroy`, `fire`, `sound`), rejecting unknown types and wrong fixed sizes.
 - [x] Encode and decode the `disconnect` payload, rejecting undefined reasons.
 - [x] Reject non-empty `heartbeat` payloads.
 

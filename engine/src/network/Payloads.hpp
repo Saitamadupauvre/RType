@@ -33,4 +33,9 @@ decode_heartbeat(std::span<const std::uint8_t> payload);
 [[nodiscard]] ENGINE_NETWORK_EXPORT std::optional<DisconnectPayload>
 decode_disconnect(std::span<const std::uint8_t> payload);
 
+[[nodiscard]] ENGINE_NETWORK_EXPORT EncodedPayload encode_payload(const EventPayload& payload);
+
+[[nodiscard]] ENGINE_NETWORK_EXPORT std::optional<EventPayload>
+decode_event(std::span<const std::uint8_t> payload);
+
 } // namespace engine::network
