@@ -5,8 +5,8 @@
 
 #include <gtest/gtest.h>
 
-#include "ByteReader.hpp"
-#include "ByteWriter.hpp"
+#include "bytes/ByteReader.hpp"
+#include "bytes/ByteWriter.hpp"
 
 using engine::network::ByteReader;
 using engine::network::ByteWriter;

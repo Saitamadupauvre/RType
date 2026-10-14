@@ -12,7 +12,7 @@
 
 #include <gtest/gtest.h>
 
-#include "UdpSocket.hpp"
+#include "socket/UdpSocket.hpp"
 
 using engine::network::Endpoint;
 using engine::network::UdpSocket;

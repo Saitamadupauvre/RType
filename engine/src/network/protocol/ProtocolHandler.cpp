@@ -4,9 +4,10 @@
 #include <array>
 #include <utility>
 
-#include "ByteReader.hpp"
-#include "ByteWriter.hpp"
-#include "Payloads.hpp"
+#include "bytes/ByteReader.hpp"
+#include "bytes/ByteWriter.hpp"
+#include "decoder/PayloadDecoder.hpp"
+#include "encoder/PayloadEncoder.hpp"
 
 namespace engine::network {
 
