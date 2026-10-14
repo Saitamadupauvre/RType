@@ -43,4 +43,10 @@ decode_event(std::span<const std::uint8_t> payload);
 [[nodiscard]] ENGINE_NETWORK_EXPORT std::optional<SnapshotPayload>
 decode_snapshot(std::span<const std::uint8_t> payload);
 
+[[nodiscard]] ENGINE_NETWORK_EXPORT EncodedPayload
+encode_payload(const ConnectAcceptPayload& payload);
+
+[[nodiscard]] ENGINE_NETWORK_EXPORT std::optional<ConnectAcceptPayload>
+decode_connect_accept(std::span<const std::uint8_t> payload);
+
 } // namespace engine::network

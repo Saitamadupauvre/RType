@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -118,6 +119,25 @@ inline constexpr std::size_t snapshot_prefix_size = 6;
 inline constexpr std::size_t entity_record_size = 14;
 inline constexpr std::size_t max_snapshot_entities =
     (max_payload_size - snapshot_prefix_size) / entity_record_size;
+
+struct TypeEntry {
+    std::uint16_t type_id{};
+    std::string name;
+
+    bool operator==(const TypeEntry&) const = default;
+};
+
+struct ConnectAcceptPayload {
+    std::uint32_t client_nonce{};
+    std::uint32_t player_entity_id{};
+    std::vector<TypeEntry> types;
+
+    bool operator==(const ConnectAcceptPayload&) const = default;
+};
+
+inline constexpr std::size_t connect_accept_prefix_size = 10;
+inline constexpr std::size_t min_type_entry_size = 3;
+inline constexpr std::size_t max_type_name_length = 63;
 
 struct PacketHeader {
     std::uint32_t magic{};
