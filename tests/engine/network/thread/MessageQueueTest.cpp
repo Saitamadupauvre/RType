@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <numeric>
+#include <stop_token>
 #include <thread>
 #include <vector>
 
@@ -88,4 +89,50 @@ TEST(MessageQueue, DrainingWhileProducersPushLosesNothing) {
     EXPECT_TRUE(queue.drain().empty());
     std::ranges::sort(received);
     EXPECT_EQ(received, all_values());
+}
+
+TEST(MessageQueue, WaitAndDrainReturnsItemsAlreadyQueued) {
+    MessageQueue<int> queue;
+    const std::stop_source never_stopped;
+    queue.push(1);
+    queue.push(2);
+
+    EXPECT_EQ(queue.wait_and_drain(never_stopped.get_token()), (std::vector<int>{1, 2}));
+    EXPECT_TRUE(queue.drain().empty());
+}
+
+TEST(MessageQueue, WaitAndDrainWakesUpWhenAnotherThreadPushes) {
+    MessageQueue<int> queue;
+    std::vector<int> received;
+
+    std::jthread consumer([&queue, &received](std::stop_token stop_token) {
+        received = queue.wait_and_drain(stop_token);
+    });
+    queue.push(7);
+    consumer.join();
+
+    EXPECT_EQ(received, (std::vector<int>{7}));
+}
+
+TEST(MessageQueue, WaitAndDrainReturnsEmptyWhenStopIsRequested) {
+    MessageQueue<int> queue;
+    std::vector<int> received{-1};
+
+    std::jthread consumer([&queue, &received](std::stop_token stop_token) {
+        received = queue.wait_and_drain(stop_token);
+    });
+    consumer.request_stop();
+    consumer.join();
+
+    EXPECT_TRUE(received.empty());
+}
+
+TEST(MessageQueue, WaitAndDrainReturnsQueuedItemsEvenWhenStopIsRequested) {
+    MessageQueue<int> queue;
+    std::stop_source stop_source;
+    queue.push(3);
+
+    stop_source.request_stop();
+
+    EXPECT_EQ(queue.wait_and_drain(stop_source.get_token()), (std::vector<int>{3}));
 }
