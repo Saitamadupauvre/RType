@@ -1,6 +1,7 @@
 #include "UdpSocket.hpp"
 
 #include "OpGuard.hpp"
+#include "SocketError.hpp"
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -26,11 +27,9 @@ constexpr int send_flags = MSG_NOSIGNAL;
 constexpr int send_flags = 0;
 #endif
 
-std::error_code last_error() noexcept { return {errno, std::generic_category()}; }
+std::error_code last_error() noexcept { return socket_error_from_errno(errno); }
 
-std::error_code closed_socket_error() noexcept {
-    return std::make_error_code(std::errc::bad_file_descriptor);
-}
+std::error_code closed_socket_error() noexcept { return make_error_code(SocketError::closed); }
 
 int open_datagram_socket(int domain) noexcept {
 #ifdef SOCK_CLOEXEC
@@ -265,7 +264,7 @@ std::size_t UdpSocket::receive_from(std::span<std::uint8_t> buffer, Endpoint& fr
         }
 
         if (guard.closing()) {
-            ec = std::make_error_code(std::errc::operation_canceled);
+            ec = make_error_code(SocketError::canceled);
             return 0;
         }
 
@@ -285,7 +284,7 @@ std::size_t UdpSocket::receive_from(std::span<std::uint8_t> buffer, Endpoint& fr
         }
 
         if (!waits_forever && clock::now() >= deadline) {
-            ec = std::make_error_code(std::errc::timed_out);
+            ec = make_error_code(SocketError::timed_out);
             return 0;
         }
     }

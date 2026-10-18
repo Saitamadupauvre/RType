@@ -46,8 +46,11 @@ engine_add_module(network
         src/network/decoder/PayloadDecoder.cpp
         src/network/encoder/PayloadEncoder.cpp
         src/network/protocol/ProtocolHandler.cpp
+        src/network/protocol/TypeTable.cpp
         src/network/protocol/Validation.cpp
+        src/network/socket/SocketError.cpp
         src/network/socket/UdpSocket.cpp
+        src/network/thread/DatagramHandler.cpp
     DEPENDS engine::core
 )
 target_include_directories(engine-network PRIVATE src/network)

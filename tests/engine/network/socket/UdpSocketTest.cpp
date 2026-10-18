@@ -1,7 +1,10 @@
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
+#include <memory>
+#include <string>
 #include <string_view>
 #include <system_error>
 #include <thread>
@@ -12,9 +15,15 @@
 
 #include <gtest/gtest.h>
 
+#include "engine/core/log/Log.hpp"
+#include "engine/core/log/MemorySink.hpp"
+
+#include "socket/SocketError.hpp"
 #include "socket/UdpSocket.hpp"
 
+namespace logger = engine::core::log;
 using engine::network::Endpoint;
+using engine::network::SocketError;
 using engine::network::UdpSocket;
 using namespace std::chrono_literals;
 
@@ -92,12 +101,18 @@ TEST(UdpSocket, CreateOpensSocket) {
     EXPECT_TRUE(socket.is_open());
 }
 
-TEST(UdpSocket, CreateReportsUnsupportedDomain) {
+TEST(UdpSocket, CreateReportsUnsupportedDomainAsLoggedUnknownError) {
+    const auto sink = std::make_shared<logger::MemorySink>();
+    const logger::ScopedSink scoped(sink, logger::Level::Trace);
     std::error_code ec;
     const auto socket = UdpSocket::create(-1, ec);
 
-    EXPECT_TRUE(ec);
+    EXPECT_EQ(ec, SocketError::unknown);
     EXPECT_FALSE(socket.is_open());
+    const auto records = sink->records();
+    ASSERT_EQ(records.size(), 1U);
+    EXPECT_NE(records.front().message.find(std::to_string(EAFNOSUPPORT)), std::string::npos)
+        << records.front().message;
 }
 
 TEST(UdpSocket, ConstructorThrowsOnUnsupportedDomain) {
@@ -113,24 +128,35 @@ TEST(UdpSocket, CloseIsIdempotent) {
     EXPECT_FALSE(socket.is_open());
 }
 
-TEST(UdpSocket, OperationsOnClosedSocketReportBadDescriptor) {
+TEST(UdpSocket, OperationsOnClosedSocketReportClosed) {
     UdpSocket socket;
     const auto local = endpoint_of("127.0.0.1", 0);
     std::array<std::uint8_t, 4> buffer{};
     Endpoint from;
     std::error_code ec;
-    const auto bad_descriptor = std::make_error_code(std::errc::bad_file_descriptor);
 
     socket.bind(local, ec);
-    EXPECT_EQ(ec, bad_descriptor);
+    EXPECT_EQ(ec, SocketError::closed);
     socket.set_reuse_address(true, ec);
-    EXPECT_EQ(ec, bad_descriptor);
+    EXPECT_EQ(ec, SocketError::closed);
     std::ignore = socket.local_endpoint(ec);
-    EXPECT_EQ(ec, bad_descriptor);
+    EXPECT_EQ(ec, SocketError::closed);
     EXPECT_EQ(socket.send_to(buffer, local, ec), 0U);
-    EXPECT_EQ(ec, bad_descriptor);
+    EXPECT_EQ(ec, SocketError::closed);
     EXPECT_EQ(socket.receive_from(buffer, from, 0ms, ec), 0U);
-    EXPECT_EQ(ec, bad_descriptor);
+    EXPECT_EQ(ec, SocketError::closed);
+}
+
+TEST(UdpSocket, SendAfterCloseReportsClosed) {
+    auto socket = bound_loopback_socket();
+    const auto local = local_endpoint_of(socket);
+    std::array<std::uint8_t, 4> buffer{};
+    std::error_code ec;
+
+    socket.close();
+
+    EXPECT_EQ(socket.send_to(buffer, local, ec), 0U);
+    EXPECT_EQ(ec, SocketError::closed);
 }
 
 TEST(UdpSocket, MoveConstructionTransfersOwnership) {
@@ -169,7 +195,7 @@ TEST(UdpSocket, BindRejectsAddressAlreadyInUse) {
 
     second.bind(local_endpoint_of(first), ec);
 
-    EXPECT_EQ(ec, std::make_error_code(std::errc::address_in_use));
+    EXPECT_EQ(ec, SocketError::address_in_use);
 }
 
 TEST(UdpSocket, ReceiveTimesOutWhenNoDatagramIsQueued) {
@@ -179,7 +205,7 @@ TEST(UdpSocket, ReceiveTimesOutWhenNoDatagramIsQueued) {
     std::error_code ec;
 
     EXPECT_EQ(socket.receive_from(buffer, from, 0ms, ec), 0U);
-    EXPECT_EQ(ec, std::make_error_code(std::errc::timed_out));
+    EXPECT_EQ(ec, SocketError::timed_out);
 }
 
 TEST(UdpSocket, SendsAndReceivesDatagramOnLoopback) {
@@ -228,7 +254,6 @@ TEST(UdpSocket, CloseUnblocksReceiverWaitingForever) {
     socket.close();
     receiver.join();
 
-    EXPECT_TRUE(receive_error == std::errc::operation_canceled ||
-                receive_error == std::errc::bad_file_descriptor)
+    EXPECT_TRUE(receive_error == SocketError::canceled || receive_error == SocketError::closed)
         << receive_error.message();
 }
