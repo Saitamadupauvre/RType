@@ -1,6 +1,100 @@
 # Networking TODOs
 
-## Tomorrow: Payload Codecs
+## Monday: Network thread and message queues (#29)
+
+Goal: the server receives, decodes and validates datagrams on its own thread,
+and the game thread only exchanges decoded messages through two queues. No
+session logic yet (that is #19/#20). New files go in `engine/src/network/thread/`,
+tests in `tests/engine/network/thread/`.
+
+### 0. Housekeeping
+
+- [ ] Update the #29 issue body: it still says `asio::io_context`,
+  `asio::post` and `parse_packet`. We use our own `UdpSocket` and
+  `ProtocolHandler::decode`, and the outbox replaces `asio::post`.
+- [ ] Close #41 and #77–#81 by hand once `networking/base` is merged into
+  `dev` (`Closes` only fires on the default branch).
+- [ ] Delete the untracked `pr-stack/` and `protocol_codecs.md`.
+
+### 1. `MessageQueue<T>` (`thread/MessageQueue.hpp`, header-only template)
+
+  - [x] `void push(T value)`: locks a `std::mutex`, `push_back` into a `std::vector<T>`.
+  - [x] `std::vector<T> drain()`: locks, swaps the buffer with an empty vector,
+   returns it, so the game thread holds the lock only for the swap.
+  - [x] No `static` members (AGENTS.md: no global state in headers).
+  - [x] Tests in `thread/MessageQueueTest.cpp`:
+  - [x] drain on an empty queue returns an empty vector;
+  - [x] items come out in push order for a single producer;
+  - [x] 4 `std::jthread` producers push 10 000 distinct values each, join,
+     then one `drain()`: every value exactly once (sort and compare), no sleeps;
+  - [x] a consumer draining while producers push loses nothing (sum of all
+     drains equals everything pushed).
+
+### 2. Queue item types (`thread/NetworkMessages.hpp`)
+
+- [ ] `struct Inbound { Endpoint from; ReceivedMessage message; };`
+- [ ] `struct Outbound { Endpoint to; Message message; };`
+
+### 3. Datagram handling without threads (`thread/DatagramHandler.{hpp,cpp}`)
+
+Keep the per-datagram logic out of the thread so it is tested deterministically.
+
+- [ ] `std::optional<Inbound> handle_datagram(const ProtocolHandler&, std::span<const std::uint8_t>, const Endpoint& from)`:
+  `decode`, on failure `engine::core::log::warn` with `from.to_string()` and
+  the datagram size, return `std::nullopt`.
+- [ ] `std::optional<Bytes> encode_outbound(const ProtocolHandler&, const Outbound&, std::uint32_t sequence)`:
+  `encode`, log and drop on failure.
+- [ ] Tests: valid datagram becomes an `Inbound` with the right endpoint;
+  truncated, bad magic, wrong version, random bytes are dropped and logged
+  (check with `MemorySink`); invalid outbound payload (e.g. `InputPayload{.move_x = 2}`) is dropped.
+
+### 4. `NetworkThread` (`thread/NetworkThread.{hpp,cpp}`)
+
+- [ ] Owns the `UdpSocket`, a `ProtocolHandler`, the inbox
+  `MessageQueue<Inbound>`, the outbox `MessageQueue<Outbound>`, the outgoing
+  sequence counter and a `std::jthread` (declared last so it stops first).
+- [ ] `start(const Endpoint& bind_to, std::error_code& ec)`: create and bind
+  the socket on the caller's thread (so bind errors reach the caller), then
+  start the thread.
+- [ ] Loop while `!stop_token.stop_requested()`:
+  1. drain the outbox, `encode_outbound`, `send_to` each one;
+  2. `receive_from` into a `max_datagram_size` buffer with a short timeout
+     (e.g. 10 ms, a named constant) so the outbox is flushed regularly;
+  3. `timed_out` → continue; `operation_canceled`/`bad_file_descriptor` →
+     exit; other errors → log and continue;
+  4. `handle_datagram` → push into the inbox.
+- [ ] Game-thread API: `std::vector<Inbound> poll()` drains the inbox;
+  `void send(const Endpoint& to, Message message)` pushes into the outbox.
+  Only the network thread touches the socket.
+- [ ] `stop()`: `request_stop()`, flush the remaining outbox, `close()` the
+  socket (unblocks `receive_from`), join. Destructor calls `stop()`.
+- [ ] `local_endpoint()` so tests can bind port 0 and find the real port.
+- [ ] Tests in `thread/NetworkThreadTest.cpp` (loopback only, like `UdpSocketTest`):
+  - [ ] start on `127.0.0.1:0`, stop, destructor: no hang, no crash;
+  - [ ] binding a port already in use reports the error from `start`;
+  - [ ] a datagram sent by a plain `UdpSocket` shows up in `poll()` (wait with
+    a bounded loop on `poll()` plus a deadline, no fixed `sleep`);
+  - [ ] a garbage datagram never shows up in `poll()`;
+  - [ ] `send()` reaches a plain `UdpSocket` peer and decodes to the same `Message`;
+  - [ ] `stop()` with sends still queued flushes them before joining.
+
+### 5. Wire it up and check
+
+- [ ] Add the new `.cpp` files to `engine/CMakeLists.txt` and the tests to
+  `tests/CMakeLists.txt`.
+- [ ] `./fred.sh all` green.
+- [ ] `cmake --workflow --preset tsan` reports no data race (#29 acceptance criterion).
+- [ ] Update the "Server" checklist below and document the thread/queue
+  ownership in `docs/PROJECT.md` §7 (#89).
+
+### Next after #29
+
+- #19/#20 sessions: handshake and session table on the game thread, fed by
+  `NetworkThread::poll()`, tested with fake `Inbound` messages and `ManualClock`.
+- #83 (engine error codes for the socket) can be done any time before the
+  Windows work.
+
+## Payload codecs (done)
 
 Every payload follows the pattern already used by `InputPayload`. Paths are
 relative to `engine/src/network/`:
