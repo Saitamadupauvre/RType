@@ -32,8 +32,8 @@ tests in `tests/engine/network/thread/`.
 
 ### 2. Queue item types (`thread/NetworkMessages.hpp`)
 
-- [ ] `struct Inbound { Endpoint from; ReceivedMessage message; };`
-- [ ] `struct Outbound { Endpoint to; Message message; };`
+- [x] `struct Inbound { Endpoint from; ReceivedMessage message; };`
+- [x] `struct Outbound { Endpoint to; Message message; };`
 
 ### 3. Datagram handling without threads (`thread/DatagramHandler.{hpp,cpp}`)
 
