@@ -12,23 +12,24 @@ tests in `tests/engine/network/thread/`.
 - [x] Update the #29 issue body: it still says `asio::io_context`,
   `asio::post` and `parse_packet`. We use our own `UdpSocket` and
   `ProtocolHandler::decode`, and the outbox replaces `asio::post`.
-- [ ] Close #41 and #77–#81 by hand once `networking/base` is merged into
-  `dev` (`Closes` only fires on the default branch).
-- [ ] Delete the untracked `pr-stack/` and `protocol_codecs.md`.
+- [ ] Close #13, #14, #41, #77–#81, #82 and #83 by hand once
+  `networking/base` is merged into `dev` (`Closes` only fires on the default
+  branch).
+- [x] Delete the untracked `pr-stack/` and `protocol_codecs.md`.
 
 ### 1. `MessageQueue<T>` (`thread/MessageQueue.hpp`, header-only template)
 
-  - [x] `void push(T value)`: locks a `std::mutex`, `push_back` into a `std::vector<T>`.
-  - [x] `std::vector<T> drain()`: locks, swaps the buffer with an empty vector,
-   returns it, so the game thread holds the lock only for the swap.
-  - [x] No `static` members (AGENTS.md: no global state in headers).
-  - [x] Tests in `thread/MessageQueueTest.cpp`:
+- [x] `void push(T value)`: locks a `std::mutex`, `push_back` into a `std::vector<T>`.
+- [x] `std::vector<T> drain()`: locks, swaps the buffer with an empty vector,
+  returns it, so the game thread holds the lock only for the swap.
+- [x] No `static` members (AGENTS.md: no global state in headers).
+- [x] Tests in `thread/MessageQueueTest.cpp`:
   - [x] drain on an empty queue returns an empty vector;
   - [x] items come out in push order for a single producer;
   - [x] 4 `std::jthread` producers push 10 000 distinct values each, join,
-     then one `drain()`: every value exactly once (sort and compare), no sleeps;
+    then one `drain()`: every value exactly once (sort and compare), no sleeps;
   - [x] a consumer draining while producers push loses nothing (sum of all
-     drains equals everything pushed).
+    drains equals everything pushed).
 
 ### 2. Queue item types (`thread/NetworkMessages.hpp`)
 
@@ -80,19 +81,37 @@ Keep the per-datagram logic out of the thread so it is tested deterministically.
 
 ### 5. Wire it up and check
 
-- [ ] Add the new `.cpp` files to `engine/CMakeLists.txt` and the tests to
-  `tests/CMakeLists.txt`.
+- [x] Add `DatagramHandler.cpp` and the `MessageQueue` / `DatagramHandler`
+  tests to the CMake lists.
+- [ ] Add `NetworkThread.cpp` to `engine/CMakeLists.txt` and
+  `NetworkThreadTest.cpp` to `tests/CMakeLists.txt`.
 - [ ] `./fred.sh all` green.
 - [ ] `cmake --workflow --preset tsan` reports no data race (#29 acceptance criterion).
 - [ ] Update the "Server" checklist below and document the thread/queue
   ownership in `docs/PROJECT.md` §7 (#89).
 
+### Done alongside #29
+
+- [x] #82 `TypeTable` (`protocol/TypeTable.{hpp,cpp}`): `assign(connect_accept)`,
+  then `admits(Message)` drops and logs snapshots and spawn events with an
+  unknown `type_id`, and any snapshot or event received before `connect_accept`.
+- [x] #83 `SocketError` (`socket/SocketError.{hpp,cpp}`): engine-owned error
+  codes in their own `std::error_category`, mapped from `errno` in
+  `socket_error_from_errno`; unmapped values become `unknown` and are logged.
+  `UdpSocket` reports only these codes.
+- [x] #90 README "Run" section: arguments, `--help`, exit code `84`, local
+  example with one server and two clients.
+
 ### Next after #29
 
 - #19/#20 sessions: handshake and session table on the game thread, fed by
   `NetworkThread::poll()`, tested with fake `Inbound` messages and `ManualClock`.
-- #83 (engine error codes for the socket) can be done any time before the
-  Windows work.
+  Decide first how to add `Reject(reason)` and `PlayerLeft(player_id)` to the
+  protocol: neither exists yet.
+- Hook `TypeTable` into the client: `assign` on `connect_accept`, then drop
+  every `Inbound` that `admits` refuses.
+- #90 stays open until a client really connects (#19, #42); recheck the
+  README commands then.
 
 ## Payload codecs (done)
 
@@ -267,4 +286,4 @@ relative to `engine/src/network/`:
 - [x] Replace the Asio reference in `docs/PROJECT.md` with the socket-wrapper design.
 - [ ] Document the server thread, game thread, queues, and ownership boundaries.
 - [ ] Document how malformed packets and client crashes are handled.
-- [ ] Add build and run examples for `r-type_server` and `r-type_client`.
+- [x] Add build and run examples for `r-type_server` and `r-type_client` (README "Run").
