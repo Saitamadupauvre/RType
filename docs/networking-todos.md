@@ -9,7 +9,7 @@ tests in `tests/engine/network/thread/`.
 
 ### 0. Housekeeping
 
-- [ ] Update the #29 issue body: it still says `asio::io_context`,
+- [x] Update the #29 issue body: it still says `asio::io_context`,
   `asio::post` and `parse_packet`. We use our own `UdpSocket` and
   `ProtocolHandler::decode`, and the outbox replaces `asio::post`.
 - [ ] Close #41 and #77–#81 by hand once `networking/base` is merged into
@@ -39,12 +39,12 @@ tests in `tests/engine/network/thread/`.
 
 Keep the per-datagram logic out of the thread so it is tested deterministically.
 
-- [ ] `std::optional<Inbound> handle_datagram(const ProtocolHandler&, std::span<const std::uint8_t>, const Endpoint& from)`:
+- [x] `std::optional<Inbound> handle_datagram(const ProtocolHandler&, std::span<const std::uint8_t>, const Endpoint& from)`:
   `decode`, on failure `engine::core::log::warn` with `from.to_string()` and
   the datagram size, return `std::nullopt`.
-- [ ] `std::optional<Bytes> encode_outbound(const ProtocolHandler&, const Outbound&, std::uint32_t sequence)`:
+- [x] `std::optional<Bytes> encode_outbound(const ProtocolHandler&, const Outbound&, std::uint32_t sequence)`:
   `encode`, log and drop on failure.
-- [ ] Tests: valid datagram becomes an `Inbound` with the right endpoint;
+- [x] Tests: valid datagram becomes an `Inbound` with the right endpoint;
   truncated, bad magic, wrong version, random bytes are dropped and logged
   (check with `MemorySink`); invalid outbound payload (e.g. `InputPayload{.move_x = 2}`) is dropped.
 
@@ -60,7 +60,7 @@ Keep the per-datagram logic out of the thread so it is tested deterministically.
   1. drain the outbox, `encode_outbound`, `send_to` each one;
   2. `receive_from` into a `max_datagram_size` buffer with a short timeout
      (e.g. 10 ms, a named constant) so the outbox is flushed regularly;
-  3. `timed_out` → continue; `operation_canceled`/`bad_file_descriptor` →
+  3. `SocketError::timed_out` → continue; `SocketError::canceled`/`SocketError::closed` →
      exit; other errors → log and continue;
   4. `handle_datagram` → push into the inbox.
 - [ ] Game-thread API: `std::vector<Inbound> poll()` drains the inbox;
@@ -211,7 +211,7 @@ relative to `engine/src/network/`:
 - [x] Encode and decode the `connect_request` payload (4-byte client nonce).
 - [x] Encode and decode the `connect_accept` payload, rejecting duplicate type IDs or names, empty names, names above 63 bytes, and truncated entries.
 - [x] Encode and decode the `snapshot` payload, rejecting sizes other than `6 + entity_count * 14` and more than 84 entities.
-- [ ] Validate snapshot and spawn `type_id` values against the connection type table.
+- [x] Validate snapshot and spawn `type_id` values against the connection type table.
 - [x] Encode and decode the `event` payloads (`spawn`, `destroy`, `fire`, `sound`), rejecting unknown types and wrong fixed sizes.
 - [x] Encode and decode the `disconnect` payload, rejecting undefined reasons.
 - [x] Reject non-empty `heartbeat` payloads.
@@ -223,7 +223,7 @@ relative to `engine/src/network/`:
 - [x] Implement socket creation, bind, send, and receive.
 - [x] Keep POSIX socket headers confined to private transport implementation files.
 - [ ] Add the Windows socket implementation behind the same transport interface (postponed, see PROJECT.md §2).
-- [ ] Translate platform socket failures into engine errors without exposing platform types.
+- [x] Translate platform socket failures into engine errors without exposing platform types.
 
 ## Server
 
