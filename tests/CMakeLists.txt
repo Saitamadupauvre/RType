@@ -45,6 +45,7 @@ engine_add_test(network SOURCES
     engine/network/encoder/PayloadEncoderTest.cpp
     engine/network/protocol/ProtocolHandlerTest.cpp
     engine/network/socket/UdpSocketTest.cpp
+    engine/network/thread/MessageQueueTest.cpp
 )
 target_include_directories(engine_network_tests PRIVATE
     "${PROJECT_SOURCE_DIR}/engine/src/network"
