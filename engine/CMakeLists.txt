@@ -51,6 +51,7 @@ engine_add_module(network
         src/network/socket/SocketError.cpp
         src/network/socket/UdpSocket.cpp
         src/network/thread/DatagramHandler.cpp
+        src/network/thread/NetworkIo.cpp
     DEPENDS engine::core
 )
 target_include_directories(engine-network PRIVATE src/network)
