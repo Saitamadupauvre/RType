@@ -85,17 +85,18 @@ std::vector<Outbound> ServerSessions::admit(const Endpoint& from,
     return {accept_message(session, request)};
 }
 
+std::vector<Outbound> ServerSessions::broadcast(const Message& message) const {
+    std::vector<Outbound> outbound;
+    outbound.reserve(sessions_.size());
+    for (const auto& session : sessions_) {
+        outbound.push_back(Outbound{.to = session.endpoint, .message = message});
+    }
+    return outbound;
+}
+
 std::vector<Outbound> ServerSessions::leave(std::uint32_t player_id) {
     events_.get().publish(PlayerLeft{.player_id = player_id});
-
-    std::vector<Outbound> notices;
-    notices.reserve(sessions_.size());
-    for (const auto& session : sessions_) {
-        notices.push_back(
-            Outbound{.to = session.endpoint,
-                     .message = EventPayload{PlayerLeftEvent{.player_entity_id = player_id}}});
-    }
-    return notices;
+    return broadcast(EventPayload{PlayerLeftEvent{.player_entity_id = player_id}});
 }
 
 void ServerSessions::store_input(Session& session, const InputPayload& input,
