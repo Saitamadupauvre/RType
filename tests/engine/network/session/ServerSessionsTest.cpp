@@ -249,6 +249,23 @@ TEST_F(ServerSessionsTest, ClientsTimingOutTogetherAreNotNotifiedAboutEachOther)
     EXPECT_EQ(left, (std::vector<std::uint32_t>{1, 2}));
 }
 
+TEST_F(ServerSessionsTest, BroadcastAddressesEverySession) {
+    connect_players(5000, 3);
+    const Message message = HeartbeatPayload{};
+
+    const auto outbound = sessions.broadcast(message);
+
+    ASSERT_EQ(outbound.size(), 3U);
+    for (std::size_t index = 0; index < outbound.size(); ++index) {
+        EXPECT_EQ(outbound[index].to, client(static_cast<std::uint16_t>(5000 + index)));
+        EXPECT_EQ(outbound[index].message, message);
+    }
+}
+
+TEST_F(ServerSessionsTest, BroadcastWithoutSessionsSendsNothing) {
+    EXPECT_TRUE(sessions.broadcast(HeartbeatPayload{}).empty());
+}
+
 TEST_F(ServerSessionsTest, NewSessionStartsWithIdleInput) {
     connect(5000);
 
