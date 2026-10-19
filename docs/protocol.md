@@ -101,6 +101,8 @@ An input message has a three-byte payload. The server identifies the player from
 
 The server must reject input payloads that are not exactly three bytes, have reserved action bits set, or contain movement values outside `-1`, `0`, and `1`.
 
+The client sends its current input every tick while connected; an input also counts as a heartbeat. The server keeps only the latest input of each session, starting from an idle input (no action, no movement). An input whose packet sequence is not newer than the last accepted input of that session (duplicated or out of order, with wrap-around) is ignored, but still refreshes the session. Inputs from an endpoint without a session are ignored.
+
 ## Snapshot Payload
 
 A snapshot is an authoritative world state at one server tick. It has a six-byte prefix followed by fixed-size entity records.

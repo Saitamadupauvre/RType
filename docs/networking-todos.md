@@ -188,6 +188,23 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
   while connecting → `rejected`; any other `disconnect` → `disconnected`.
 - [x] `disconnect()`: sends `disconnect(normal)` once.
 
+## Inputs (#21)
+
+- [x] `protocol/Sequence.hpp`: `is_newer_sequence(candidate, latest)`, true
+  when `candidate` is ahead by less than half the 32-bit range (wrap-around).
+- [x] `Session` gains `input` (latest `InputPayload`, idle at first) and
+  `input_sequence` (packet sequence of that input).
+- [x] `ServerSessions::handle`: an input from a session is stored only when its
+  header sequence is newer than `input_sequence`; duplicated or out-of-order
+  inputs are dropped (logged at debug) but still refresh `last_seen`. Inputs
+  from unknown endpoints are ignored. Applying them to entities is the game
+  loop's job (#42).
+- [x] `ClientConnection::send_input(InputPayload)`: only while connected, and
+  postpones the next heartbeat.
+- [x] Malformed inputs (movement out of range, reserved action bits, wrong
+  size) are dropped and logged by `handle_datagram` on the receive thread.
+- [x] `docs/protocol.md`: input rules.
+
 ### Next after #19/#20
 
 - Wire `NetworkIo` + `ServerSessions` into `NetworkServer`, and `NetworkIo`
@@ -195,7 +212,6 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
   each tick `poll()` → `handle` → `send`, then `drop_timed_out()` / `update()`.
 - `player_entity_id` currently carries the session's player id (1 to 4): the
   game loop will spawn the player entity on `PlayerJoined`.
-- #21 inputs: keep the latest input per session in `ServerSessions`.
 - Hook `TypeTable` into the client: `assign` on `connect_accept`, then drop
   every `Inbound` that `admits` refuses.
 - Client side of a server timeout (#85): no heartbeat from the server yet.
@@ -366,7 +382,7 @@ relative to `engine/src/network/`:
 - [x] Add protocol tests for valid headers and payloads.
 - [x] Add protocol tests for truncated packets, invalid lengths, unknown types, and random bytes.
 - [ ] Add deterministic transport tests with a fake transport instead of real network timing.
-- [ ] Add server tests for queued input processing and heartbeat timeouts.
+- [x] Add server tests for queued input processing and heartbeat timeouts.
 - [ ] Add client tests for stale, duplicated, and out-of-order snapshots.
 - [ ] Add payload tests for every message: valid, truncated, oversized, out-of-range values, and random bytes.
 
