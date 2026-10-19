@@ -24,6 +24,7 @@ using engine::core::event::EventBus;
 using engine::core::time::ManualClock;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
+using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::Endpoint;
@@ -37,6 +38,8 @@ using engine::network::Replicated;
 using engine::network::ServerNetwork;
 using engine::network::ServerSessionsConfig;
 using engine::network::SnapshotPayload;
+using engine::network::SoundEvent;
+using engine::network::SpawnEvent;
 using namespace std::chrono_literals;
 
 Endpoint client(std::uint16_t port) {
@@ -159,6 +162,73 @@ TEST_F(ServerNetworkTest, CrashedClientIsDroppedOnALaterTickAndOthersAreTold) {
     EXPECT_EQ(outbound[1].to, client(5001));
     EXPECT_EQ(outbound[1].message, Message{EventPayload{PlayerLeftEvent{.player_entity_id = 1}}});
     ASSERT_EQ(network.sessions().size(), 1U);
+}
+
+TEST_F(ServerNetworkTest, QueuedEventsReachEveryPlayerInOrderBeforeTheSnapshot) {
+    connect_clients();
+    const EventPayload spawn{SpawnEvent{.entity_id = 1, .type_id = 1, .x = 2, .y = 3}};
+    const EventPayload sound{SoundEvent{.source_entity_id = 1, .sound_id = 4}};
+    const EventPayload destroy{DestroyEvent{.entity_id = 1}};
+
+    network.queue_event(spawn);
+    network.queue_event(sound);
+    network.queue_event(destroy);
+    const auto outbound = network.snapshot(registry);
+
+    for (const auto port : {5000, 5001}) {
+        std::vector<Message> received;
+        for (const auto& message : outbound) {
+            if (message.to == client(static_cast<std::uint16_t>(port))) {
+                received.push_back(message.message);
+            }
+        }
+        ASSERT_EQ(received.size(), 4U) << port;
+        EXPECT_EQ(received[0], Message{spawn});
+        EXPECT_EQ(received[1], Message{sound});
+        EXPECT_EQ(received[2], Message{destroy});
+        EXPECT_TRUE(std::holds_alternative<SnapshotPayload>(received[3]));
+    }
+}
+
+TEST_F(ServerNetworkTest, EventsAreSentOnce) {
+    connect_clients();
+    network.queue_event(DestroyEvent{.entity_id = 1});
+    static_cast<void>(network.snapshot(registry));
+
+    const auto outbound = network.snapshot(registry);
+
+    EXPECT_EQ(outbound.size(), 2U);
+    EXPECT_EQ(snapshots_to(outbound, client(5000)).size(), 1U);
+    EXPECT_EQ(snapshots_to(outbound, client(5001)).size(), 1U);
+}
+
+TEST_F(ServerNetworkTest, APlayerJoiningLaterOnlyGetsLaterEvents) {
+    const EventPayload before{DestroyEvent{.entity_id = 1}};
+    const EventPayload after{DestroyEvent{.entity_id = 2}};
+    static_cast<void>(network.receive({from(client(5000), ConnectRequestPayload{})}));
+    network.queue_event(before);
+    static_cast<void>(network.receive({from(client(5001), ConnectRequestPayload{})}));
+    network.queue_event(after);
+
+    const auto outbound = network.snapshot(registry);
+
+    std::vector<Message> late_player;
+    for (const auto& message : outbound) {
+        if (message.to == client(5001) && std::holds_alternative<EventPayload>(message.message)) {
+            late_player.push_back(message.message);
+        }
+    }
+    EXPECT_EQ(late_player, (std::vector<Message>{after}));
+}
+
+TEST_F(ServerNetworkTest, EventsWithoutPlayersAreDropped) {
+    network.queue_event(DestroyEvent{.entity_id = 1});
+    static_cast<void>(network.receive({from(client(5000), ConnectRequestPayload{})}));
+
+    const auto outbound = network.snapshot(registry);
+
+    ASSERT_EQ(outbound.size(), 1U);
+    EXPECT_TRUE(std::holds_alternative<SnapshotPayload>(outbound.front().message));
 }
 
 TEST_F(ServerNetworkTest, ShutdownTellsEveryPlayerAndEndsTheirSessions) {

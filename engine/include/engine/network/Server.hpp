@@ -10,6 +10,7 @@
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Export.hpp"
+#include "engine/network/Replicated.hpp"
 
 namespace engine::network {
 
@@ -21,6 +22,9 @@ struct ENGINE_NETWORK_EXPORT ServerOptions {
     std::uint16_t port;
     /** @brief Number of player slots. A client arriving when all are taken is rejected. */
     std::size_t max_players;
+    /** @brief Type table sent to every client in `connect_accept`: every `Replicated::type_id`
+     * and `EntitySpawned::type_id` the game uses. */
+    std::vector<ReplicatedType> types = {};
 };
 
 /**
@@ -48,7 +52,11 @@ struct ENGINE_NETWORK_EXPORT PlayerInput {
  *    disconnections, inputs) and removes players silent for longer than the session timeout.
  *    `PlayerJoined` and `PlayerLeft` are published on the event bus during this call.
  * 2. inputs(): the latest input of each connected player, for the game to apply.
- * 3. send_snapshot(): sends every entity with `Replicated` and `Position` to every player.
+ * 3. During the tick, the game publishes `EntitySpawned`, `EntityDestroyed`, `ShotFired` and
+ *    `SoundPlayed` on the event bus. Each one is queued for the players connected at that
+ *    moment.
+ * 4. send_snapshot(): sends the queued events in the order published, then every entity with
+ *    `Replicated` and `Position`, to every player.
  *
  * Malformed packets are dropped and logged; they never reach the game.
  *
@@ -69,8 +77,9 @@ public:
     /**
      * @brief Binds the UDP port and starts the network threads.
      *
-     * @param ec Set when the port cannot be bound (for example already in use), cleared
-     * otherwise.
+     * @param ec Set to `std::errc::invalid_argument` when `ServerOptions::types` has a
+     * duplicate id or name, or a name that is empty or longer than 63 bytes; set when the port
+     * cannot be bound (for example already in use); cleared otherwise.
      * @return `true` when the server is listening.
      */
     bool start(std::error_code& ec);
@@ -98,6 +107,8 @@ public:
 
     /**
      * @brief Advances the server tick and sends a snapshot of the registry to every player.
+     *
+     * The game events queued since the last call are sent first.
      *
      * @param registry The server world. Only entities with `Replicated` and `Position` are sent.
      */

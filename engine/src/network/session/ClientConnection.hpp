@@ -12,6 +12,7 @@
 #include "engine/network/Export.hpp"
 
 #include "protocol/Messages.hpp"
+#include "protocol/TypeTable.hpp"
 #include "socket/UdpSocket.hpp"
 #include "thread/NetworkMessages.hpp"
 
@@ -39,7 +40,7 @@ public:
         return disconnect_reason_;
     }
     [[nodiscard]] std::uint32_t player_id() const noexcept { return player_id_; }
-    [[nodiscard]] const std::vector<TypeEntry>& types() const noexcept { return types_; }
+    [[nodiscard]] const TypeTable& type_table() const noexcept { return type_table_; }
 
 private:
     [[nodiscard]] bool is_live() const noexcept;
@@ -60,7 +61,7 @@ private:
     core::time::Duration last_sent_{};
     core::time::Duration last_received_{};
     std::uint32_t player_id_{0};
-    std::vector<TypeEntry> types_;
+    TypeTable type_table_;
 };
 
 } // namespace engine::network

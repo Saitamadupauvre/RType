@@ -170,6 +170,8 @@ The `player_left` event payload is five bytes: one-byte event type `5` followed 
 
 The receiver rejects unknown event types, an event with an incorrect fixed payload size, and a spawn event with an unknown `type_id`.
 
+The server sends the events of a tick to every connected session after the tick, in the order they happened, before that tick's snapshot. An event goes only to the sessions that existed when it happened: a client that connects later never receives earlier events. A client drops every snapshot and event that arrives before `connect_accept`. Until acknowledgements exist (protocol version 2), events are sent once and are not retransmitted.
+
 ## Heartbeat Payload
 
 A heartbeat payload is empty. Both peers may send it periodically to prove that their UDP endpoint remains reachable. A peer that does not receive any valid packet or heartbeat before the configured timeout is considered disconnected. The client sends heartbeats while it has no input to send; the server does not need to, since its snapshots already reach every client each tick.

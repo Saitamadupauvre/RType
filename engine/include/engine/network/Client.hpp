@@ -56,12 +56,17 @@ struct ENGINE_NETWORK_EXPORT EntitySnapshot {
  *
  * 1. update(): handles every packet received since the last call, resends the connect request
  *    or a heartbeat when due, and ends the connection when the server stays silent for longer
- *    than the timeout.
+ *    than the timeout. Game events from the server (`EntitySpawned`, `EntityDestroyed`,
+ *    `ShotFired`, `SoundPlayed`, `PlayerLeft`) are published on the event bus during this call,
+ *    in the order received.
  * 2. send_input(): sends the current input of the local player while connected.
  * 3. entities(): the newest world received from the server, for the game to draw.
  *
  * When the connection ends, for any reason, the network threads are stopped and `Disconnected`
  * is published once on the event bus. Packets arriving afterwards are ignored.
+ *
+ * Snapshots and spawn events are checked against the type table the server sent in
+ * `connect_accept`: one with a type id missing from the table is dropped whole and logged.
  *
  * @note Not thread-safe: call every member from the same thread. The clock and the event bus
  * must outlive the client. One client makes at most one connection.

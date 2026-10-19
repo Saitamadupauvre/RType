@@ -43,6 +43,7 @@ engine_add_test(network SOURCES
     engine/network/bytes/ByteWriterTest.cpp
     engine/network/decoder/PayloadDecoderTest.cpp
     engine/network/encoder/PayloadEncoderTest.cpp
+    engine/network/event/GameEventsTest.cpp
     engine/network/protocol/ProtocolHandlerTest.cpp
     engine/network/protocol/SequenceTest.cpp
     engine/network/protocol/TypeTableTest.cpp

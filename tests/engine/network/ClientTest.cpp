@@ -4,6 +4,7 @@
 #include <functional>
 #include <optional>
 #include <span>
+#include <string>
 #include <system_error>
 #include <thread>
 #include <utility>
@@ -41,14 +42,20 @@ using engine::network::ConnectRequestPayload;
 using engine::network::Disconnected;
 using engine::network::DisconnectReason;
 using engine::network::Endpoint;
+using engine::network::EntityDestroyed;
+using engine::network::EntitySpawned;
 using engine::network::max_datagram_size;
 using engine::network::Message;
 using engine::network::NetworkClient;
 using engine::network::NetworkServer;
+using engine::network::PlayerLeft;
 using engine::network::ProtocolHandler;
 using engine::network::ReceivedMessage;
 using engine::network::Replicated;
+using engine::network::ReplicatedType;
 using engine::network::ServerOptions;
+using engine::network::ShotFired;
+using engine::network::SoundPlayed;
 using engine::network::UdpSocket;
 using namespace std::chrono_literals;
 
@@ -120,7 +127,7 @@ private:
 class NetworkClientTest : public testing::Test {
 protected:
     NetworkClientTest() {
-        bus.subscribe<Disconnected>(
+        client_bus.subscribe<Disconnected>(
             [this](const Disconnected& event) { reasons.push_back(event.reason); });
     }
 
@@ -140,11 +147,20 @@ protected:
             [&] { return joining.state() != ConnectionState::connecting; }));
     }
 
+    void wait_for_client(const std::function<bool()>& done) {
+        ASSERT_TRUE(wait_until([this] { client.update(); }, done));
+    }
+
     SteadyClock clock;
-    EventBus bus;
+    EventBus server_bus;
+    EventBus client_bus;
     std::vector<DisconnectReason> reasons;
-    NetworkServer server{clock, bus, ServerOptions{.port = 0, .max_players = 1}};
-    NetworkClient client{clock, bus};
+    NetworkServer server{clock, server_bus,
+                         ServerOptions{.port = 0,
+                                       .max_players = 1,
+                                       .types = {ReplicatedType{.type_id = 1, .name = "player"},
+                                                 ReplicatedType{.type_id = 2, .name = "enemy"}}}};
+    NetworkClient client{clock, client_bus};
 };
 
 } // namespace
@@ -215,7 +231,7 @@ TEST_F(NetworkClientTest, ReceivesTheWorldAndSendsInputs) {
 TEST_F(NetworkClientTest, ReportsServerFullWhenRejected) {
     start_server();
     connect(client);
-    NetworkClient second(clock, bus);
+    NetworkClient second(clock, client_bus);
 
     connect(second);
 
@@ -245,6 +261,111 @@ TEST_F(NetworkClientTest, ReportsServerShutdownOnceAndKeepsTheLastWorld) {
     client.update();
     client.disconnect();
     EXPECT_EQ(reasons, (std::vector{DisconnectReason::server_shutdown}));
+}
+
+TEST_F(NetworkClientTest, PublishesGameEventsInTheOrderTheServerPublishedThem) {
+    std::vector<std::string> received;
+    client_bus.subscribe<EntitySpawned>([&received](const EntitySpawned& event) {
+        received.push_back("spawn " + std::to_string(event.entity_id) + " type " +
+                           std::to_string(event.type_id) + " at " +
+                           std::to_string(static_cast<int>(event.x)) + "," +
+                           std::to_string(static_cast<int>(event.y)));
+    });
+    client_bus.subscribe<SoundPlayed>([&received](const SoundPlayed& event) {
+        received.push_back("sound " + std::to_string(event.sound_id));
+    });
+    client_bus.subscribe<ShotFired>([&received](const ShotFired& event) {
+        received.push_back("shot " + std::to_string(event.projectile_entity_id));
+    });
+    client_bus.subscribe<EntityDestroyed>([&received](const EntityDestroyed& event) {
+        received.push_back("destroy " + std::to_string(event.entity_id));
+    });
+    EntityManager registry;
+    start_server();
+    connect(client);
+
+    server_bus.publish(EntitySpawned{.entity_id = 4, .type_id = 2, .x = 10.4F, .y = -3.6F});
+    server_bus.publish(SoundPlayed{.source_entity_id = 4, .sound_id = 7});
+    server_bus.publish(ShotFired{.source_entity_id = 4, .projectile_entity_id = 5});
+    server_bus.publish(EntityDestroyed{.entity_id = 4});
+    server.send_snapshot(registry);
+
+    wait_for_client([&received] { return received.size() == 4; });
+    EXPECT_EQ(received, (std::vector<std::string>{"spawn 4 type 2 at 10,-4", "sound 7", "shot 5",
+                                                  "destroy 4"}));
+}
+
+TEST_F(NetworkClientTest, PublishesPlayerLeftWhenAnotherPlayerLeaves) {
+    NetworkServer two_players(clock, server_bus, ServerOptions{.port = 0, .max_players = 2});
+    std::error_code ec;
+    ASSERT_TRUE(two_players.start(ec)) << ec.message();
+    EventBus other_bus;
+    NetworkClient other(clock, other_bus);
+    std::vector<std::uint32_t> left;
+    client_bus.subscribe<PlayerLeft>(
+        [&left](const PlayerLeft& event) { left.push_back(event.player_id); });
+    const auto join = [&](NetworkClient& joining) {
+        ASSERT_TRUE(joining.connect("127.0.0.1", two_players.port(), ec)) << ec.message();
+        ASSERT_TRUE(wait_until(
+            [&] {
+                two_players.receive();
+                joining.update();
+            },
+            [&] { return joining.state() == ConnectionState::connected; }));
+    };
+    join(client);
+    join(other);
+
+    other.disconnect();
+
+    ASSERT_TRUE(wait_until(
+        [&] {
+            two_players.receive();
+            client.update();
+        },
+        [&left] { return !left.empty(); }));
+    EXPECT_EQ(left, (std::vector<std::uint32_t>{2}));
+}
+
+TEST_F(NetworkClientTest, DropsASnapshotWithATypeMissingFromTheTable) {
+    std::vector<std::uint32_t> spawned;
+    client_bus.subscribe<EntitySpawned>(
+        [&spawned](const EntitySpawned& event) { spawned.push_back(event.entity_id); });
+    EntityManager registry;
+    registry.register_component<Replicated>();
+    registry.register_component<Position>();
+    const auto unknown = registry.spawn();
+    registry.add(unknown, Replicated{.type_id = 9});
+    registry.add(unknown, Position{1.0F, 1.0F});
+    start_server();
+    connect(client);
+
+    server.send_snapshot(registry);
+    registry.get<Replicated>(unknown).type_id = 1;
+    server_bus.publish(EntitySpawned{.entity_id = 3, .type_id = 1, .x = 0.0F, .y = 0.0F});
+    server.send_snapshot(registry);
+
+    wait_for_client([&spawned] { return !spawned.empty(); });
+    EXPECT_NE(client.server_tick(), std::optional<std::uint32_t>{1U});
+    wait_for_client([this] { return client.server_tick() == 2U; });
+    ASSERT_EQ(client.entities().size(), 1U);
+    EXPECT_EQ(client.entities().front().type_id, 1);
+}
+
+TEST_F(NetworkClientTest, DropsASpawnEventWithATypeMissingFromTheTable) {
+    std::vector<std::uint16_t> spawned;
+    client_bus.subscribe<EntitySpawned>(
+        [&spawned](const EntitySpawned& event) { spawned.push_back(event.type_id); });
+    EntityManager registry;
+    start_server();
+    connect(client);
+
+    server_bus.publish(EntitySpawned{.entity_id = 3, .type_id = 9, .x = 0.0F, .y = 0.0F});
+    server_bus.publish(EntitySpawned{.entity_id = 4, .type_id = 1, .x = 0.0F, .y = 0.0F});
+    server.send_snapshot(registry);
+
+    wait_for_client([this] { return client.server_tick().has_value(); });
+    EXPECT_EQ(spawned, (std::vector<std::uint16_t>{1}));
 }
 
 TEST_F(NetworkClientTest, DisconnectTellsTheServerAndReportsNormalOnce) {

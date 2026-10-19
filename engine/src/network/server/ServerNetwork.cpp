@@ -29,9 +29,13 @@ std::vector<Outbound> ServerNetwork::receive(const std::vector<Inbound>& inbound
     return outbound;
 }
 
+void ServerNetwork::queue_event(const EventPayload& event) {
+    append(queued_events_, sessions_.broadcast(event));
+}
+
 std::vector<Outbound> ServerNetwork::snapshot(core::EntityManager& registry) {
     ++server_tick_;
-    std::vector<Outbound> outbound;
+    auto outbound = std::exchange(queued_events_, {});
     if (sessions_.sessions().empty()) {
         return outbound;
     }
