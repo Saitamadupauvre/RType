@@ -26,6 +26,8 @@ public:
     [[nodiscard]] std::uint16_t port() const noexcept;
     [[nodiscard]] std::string to_string() const;
 
+    [[nodiscard]] bool operator==(const Endpoint& other) const noexcept;
+
     [[nodiscard]] const sockaddr* addr() const noexcept {
         return reinterpret_cast<const sockaddr*>(&storage_);
     }
