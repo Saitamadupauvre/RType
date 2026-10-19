@@ -5,8 +5,13 @@ target_link_libraries(r-type_server_cli PRIVATE clap::clap)
 target_include_directories(r-type_server_cli PUBLIC server)
 rtype_set_warnings(r-type_server_cli)
 
+add_library(r-type_server_app STATIC server/ServerApp.cpp)
+target_link_libraries(r-type_server_app PUBLIC r-type_server_cli engine::core engine::network)
+target_include_directories(r-type_server_app PUBLIC server)
+rtype_set_warnings(r-type_server_app)
+
 add_executable(r-type_server server/main.cpp)
-target_link_libraries(r-type_server PRIVATE r-type_server_cli engine::core engine::script engine::network)
+target_link_libraries(r-type_server PRIVATE r-type_server_app r-type_server_cli engine::core engine::script engine::network)
 rtype_set_warnings(r-type_server)
 
 add_library(r-type_client_cli STATIC client/Cli.cpp)

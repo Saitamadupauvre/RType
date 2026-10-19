@@ -46,6 +46,7 @@ engine_add_test(network SOURCES
     engine/network/protocol/ProtocolHandlerTest.cpp
     engine/network/protocol/SequenceTest.cpp
     engine/network/protocol/TypeTableTest.cpp
+    engine/network/server/ServerNetworkTest.cpp
     engine/network/session/ClientConnectionTest.cpp
     engine/network/session/ServerSessionsTest.cpp
     engine/network/snapshot/SnapshotBuilderTest.cpp
@@ -125,6 +126,7 @@ plugin_add_test(graphics-raylib
     LINKS graphics-raylib-letterbox
 )
 
-game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
+game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
+    LINKS r-type_server_cli r-type_server_app)
 game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
 
