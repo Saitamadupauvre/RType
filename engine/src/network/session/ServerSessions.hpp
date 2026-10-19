@@ -38,6 +38,7 @@ public:
 
     [[nodiscard]] std::vector<Outbound> handle(const Inbound& inbound);
     [[nodiscard]] std::vector<Outbound> drop_timed_out();
+    [[nodiscard]] std::vector<Outbound> broadcast(const Message& message) const;
 
     [[nodiscard]] const std::vector<Session>& sessions() const noexcept { return sessions_; }
 

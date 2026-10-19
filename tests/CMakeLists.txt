@@ -48,6 +48,8 @@ engine_add_test(network SOURCES
     engine/network/protocol/TypeTableTest.cpp
     engine/network/session/ClientConnectionTest.cpp
     engine/network/session/ServerSessionsTest.cpp
+    engine/network/snapshot/SnapshotBuilderTest.cpp
+    engine/network/snapshot/SnapshotReceiverTest.cpp
     engine/network/socket/SocketErrorTest.cpp
     engine/network/socket/UdpSocketTest.cpp
     engine/network/thread/DatagramHandlerTest.cpp
