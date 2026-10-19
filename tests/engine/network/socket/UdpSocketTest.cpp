@@ -86,6 +86,36 @@ TEST(Endpoint, DefaultIsInvalid) {
     EXPECT_EQ(endpoint.size(), 0U);
 }
 
+TEST(Endpoint, EqualWhenAddressAndPortMatch) {
+    EXPECT_EQ(endpoint_of("127.0.0.1", 4242), endpoint_of("127.0.0.1", 4242));
+    EXPECT_EQ(endpoint_of("::1", 4242), endpoint_of("::1", 4242));
+    EXPECT_EQ(Endpoint{}, Endpoint{});
+}
+
+TEST(Endpoint, DiffersByAddressPortOrFamily) {
+    EXPECT_NE(endpoint_of("127.0.0.1", 4242), endpoint_of("127.0.0.2", 4242));
+    EXPECT_NE(endpoint_of("127.0.0.1", 4242), endpoint_of("127.0.0.1", 4243));
+    EXPECT_NE(endpoint_of("::1", 4242), endpoint_of("::2", 4242));
+    EXPECT_NE(endpoint_of("::1", 4242), endpoint_of("::1", 4243));
+    EXPECT_NE(endpoint_of("127.0.0.1", 4242), endpoint_of("::ffff:127.0.0.1", 4242));
+    EXPECT_NE(endpoint_of("127.0.0.1", 4242), Endpoint{});
+}
+
+TEST(Endpoint, ReceivedSenderEqualsItsLocalEndpoint) {
+    auto receiver = bound_loopback_socket();
+    auto sender = bound_loopback_socket();
+    const std::array<std::uint8_t, 1> payload{1};
+    std::array<std::uint8_t, 4> buffer{};
+    Endpoint from;
+    std::error_code ec;
+
+    sender.send_to(payload, local_endpoint_of(receiver), ec);
+    receiver.receive_from(buffer, from, 1s, ec);
+
+    ASSERT_FALSE(ec) << ec.message();
+    EXPECT_EQ(from, local_endpoint_of(sender));
+}
+
 TEST(UdpSocket, DefaultConstructedIsClosed) {
     const UdpSocket socket;
 

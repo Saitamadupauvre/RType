@@ -20,6 +20,7 @@ using engine::network::InputPayload;
 using engine::network::max_payload_size;
 using engine::network::max_snapshot_entities;
 using engine::network::max_type_name_length;
+using engine::network::PlayerLeftEvent;
 using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
 using engine::network::SpawnEvent;
@@ -66,8 +67,14 @@ TEST(DisconnectPayload, EncodesReasonAsOneByte) {
     EXPECT_EQ(encode_payload(disconnect), (std::vector<std::uint8_t>{0x02}));
 }
 
+TEST(DisconnectPayload, EncodesServerFullReason) {
+    const DisconnectPayload disconnect{.reason = DisconnectReason::server_full};
+
+    EXPECT_EQ(encode_payload(disconnect), (std::vector<std::uint8_t>{0x04}));
+}
+
 TEST(DisconnectPayload, EncoderRejectsUndefinedReasons) {
-    for (unsigned int value = 4; value <= 255; ++value) {
+    for (unsigned int value = 5; value <= 255; ++value) {
         const DisconnectPayload disconnect{.reason = static_cast<DisconnectReason>(value)};
 
         EXPECT_FALSE(encode_payload(disconnect).has_value()) << "reason " << value;
@@ -103,6 +110,12 @@ TEST(EventPayload, EncodesSoundFieldsInOrder) {
 
     EXPECT_EQ(encoded(event),
               (std::vector<std::uint8_t>{0x04, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06}));
+}
+
+TEST(EventPayload, EncodesPlayerLeftFieldsInOrder) {
+    const EventPayload event = PlayerLeftEvent{.player_entity_id = 0x0102'0304};
+
+    EXPECT_EQ(encoded(event), (std::vector<std::uint8_t>{0x05, 0x01, 0x02, 0x03, 0x04}));
 }
 
 TEST(SnapshotPayload, EncodesFieldsInOrder) {
