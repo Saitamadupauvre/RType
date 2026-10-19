@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <vector>
 
 #include "engine/core/event/EventBus.hpp"
@@ -26,6 +27,8 @@ struct Session {
     Endpoint endpoint;
     std::uint32_t player_id{};
     core::time::Duration last_seen{};
+    InputPayload input{};
+    std::optional<std::uint32_t> input_sequence{};
 };
 
 class ENGINE_NETWORK_EXPORT ServerSessions {
@@ -42,6 +45,7 @@ private:
     [[nodiscard]] std::vector<Outbound> admit(const Endpoint& from,
                                               const ConnectRequestPayload& request);
     [[nodiscard]] std::vector<Outbound> leave(std::uint32_t player_id);
+    static void store_input(Session& session, const InputPayload& input, std::uint32_t sequence);
     [[nodiscard]] Outbound accept_message(const Session& session,
                                           const ConnectRequestPayload& request) const;
     [[nodiscard]] std::uint32_t free_player_id() const;
