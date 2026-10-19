@@ -153,11 +153,13 @@ void NetworkClient::disconnect() {
 }
 
 ConnectionState NetworkClient::state() const {
-    return impl_->connection ? impl_->connection->state() : ConnectionState::disconnected;
+    const auto& connection = impl_->connection;
+    return connection ? connection->state() : ConnectionState::disconnected;
 }
 
 std::uint32_t NetworkClient::player_id() const {
-    return impl_->connection ? impl_->connection->player_id() : 0;
+    const auto& connection = impl_->connection;
+    return connection ? connection->player_id() : 0;
 }
 
 std::optional<std::uint32_t> NetworkClient::server_tick() const {
@@ -174,7 +176,8 @@ std::vector<EntitySnapshot> NetworkClient::entities() const {
 }
 
 NetworkStats NetworkClient::stats() const {
-    return impl_->connection ? impl_->connection->stats() : NetworkStats{};
+    const auto& connection = impl_->connection;
+    return connection ? connection->stats() : NetworkStats{};
 }
 
 } // namespace engine::network
