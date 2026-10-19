@@ -63,6 +63,26 @@ TEST(MessageQueue, DrainEmptiesTheQueue) {
     EXPECT_TRUE(queue.drain().empty());
 }
 
+TEST(MessageQueue, FullQueueRejectsPushAndKeepsQueuedItems) {
+    MessageQueue<int> queue(2);
+
+    EXPECT_TRUE(queue.push(1));
+    EXPECT_TRUE(queue.push(2));
+    EXPECT_FALSE(queue.push(3));
+
+    EXPECT_EQ(queue.drain(), (std::vector<int>{1, 2}));
+}
+
+TEST(MessageQueue, DrainMakesRoomInFullQueue) {
+    MessageQueue<int> queue(1);
+    queue.push(1);
+
+    static_cast<void>(queue.drain());
+
+    EXPECT_TRUE(queue.push(2));
+    EXPECT_EQ(queue.drain(), (std::vector<int>{2}));
+}
+
 TEST(MessageQueue, ConcurrentProducersDeliverEveryValueExactlyOnce) {
     MessageQueue<int> queue;
 
