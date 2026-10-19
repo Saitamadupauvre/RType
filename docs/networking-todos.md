@@ -224,6 +224,31 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
 - [x] `docs/protocol.md`: multi-packet snapshots, what is replicated, client
   rules.
 
+## Server game loop, networking side (#42)
+
+- [x] `server/ServerNetwork.{hpp,cpp}` (private, no sockets): one tick of
+  networking. `receive(inbound)` runs every message through `ServerSessions`
+  and then `drop_timed_out()`; `snapshot(registry)` advances the server tick and
+  broadcasts every packet of `build_snapshots` (nothing when nobody is
+  connected). Both return the `Outbound` to send. Tested end to end with fake
+  messages and `ManualClock`.
+- [x] Public `NetworkServer` (`engine/include/engine/network/Server.hpp`),
+  pimpl over `NetworkIo` + `ServerNetwork`: `ServerOptions { port,
+  max_players }`, `start(ec)` (binds `0.0.0.0:port`), `stop()`, `receive()`,
+  `inputs()` (public `PlayerInput`), `send_snapshot(registry)`, `port()`,
+  `player_count()`. Tested over loopback.
+- [x] `game/server/ServerApp.{hpp,cpp}` (`r-type_server_app`): owns the event
+  bus, registry (registers `Replicated`, `Position`, `Velocity`), system
+  scheduler and `NetworkServer`. `tick(step)`: `receive()` → systems →
+  `send_snapshot()`. `run(should_stop)` drives it with a 60 Hz
+  `FixedStepLoop`, then stops the network.
+- [x] `main.cpp` stays thin: CLI, `start` (exit `84` when the port cannot be
+  bound), SIGINT/SIGTERM set a flag that stops `run`.
+- [ ] Lua `tick` and applying `inputs()` to player entities: needs the tick
+  phase order (#46) and the game scripts.
+- [ ] Client side: `NetworkClient` over `NetworkIo` + `ClientConnection` +
+  `SnapshotReceiver` (#23, #28).
+
 ### Next after #19/#20
 
 - Wire `NetworkIo` + `ServerSessions` into `NetworkServer`, and `NetworkIo`

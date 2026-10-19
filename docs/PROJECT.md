@@ -183,15 +183,17 @@ int main(int argc, char** argv)
 {
     engine::World world;
     engine::LuaRuntime lua(world);
-    engine::NetworkServer net(parse_port(argc, argv));   // runs its own receive and send threads
+    engine::network::NetworkServer net(clock, events, {.port = port, .max_players = max_players});
+    net.start(ec);                   // binds the port, runs its own receive and send threads
 
     lua.load_game("scripts");
 
-    engine::FixedLoop loop(60);
-    loop.run([&](float dt) {
-        net.receive_inputs(world);   // drains the thread-safe queue
-        lua.tick(dt);                // systems, entity updates, coroutines
-        engine::physics::step(world, dt);
+    engine::core::time::FixedStepLoop loop(clock);   // 60 Hz
+    loop.run_frame([&](auto step) {
+        net.receive();               // sessions, timeouts, latest input of each player
+        apply(net.inputs(), world);
+        lua.tick(step);              // systems, entity updates, coroutines
+        engine::physics::step(world, step);
         net.send_snapshot(world);    // queues it for the send thread
     });
 }
