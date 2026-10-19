@@ -82,7 +82,7 @@ The receiver rejects duplicate type IDs, duplicate names, a name length of 0 or 
 1. The client sends `connect_request` with a fresh `client_nonce`. Without an answer it resends the request after a retry interval, and gives up after a bounded number of attempts.
 2. The server answers with one of:
    - `connect_accept` carrying the same nonce, the player ID and the type table;
-   - `disconnect` with reason `server_full` when every player slot (4) is taken. No session is created.
+   - `disconnect` with reason `server_full` when every player slot is taken. The number of slots is set by the game (`r-type_server --max-players`, 1 to 4, default 4). No session is created.
 3. A repeated `connect_request` from an endpoint that already has a session is answered with `connect_accept` again, with the same player ID. It does not create a second session.
 4. Once connected, the client sends `heartbeat` at a fixed interval. Any valid packet from the client refreshes its session.
 5. A session ends when the client sends `disconnect`, or when the server receives nothing from it for longer than the session timeout. On timeout the server sends `disconnect` with reason `timeout` to that client. In both cases every remaining client receives a `player_left` event and the player ID becomes free.

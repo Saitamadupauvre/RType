@@ -157,7 +157,9 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
 
 ### 2. `ServerSessions` (`session/ServerSessions.{hpp,cpp}`)
 
-- [x] `ServerSessionsConfig { max_players = 4, timeout = 5s, types }`.
+- [x] `ServerSessionsConfig { max_players, timeout = 5s, types }`. The engine
+  has no default player count: the game passes it, from `r-type_server
+  --max-players` (1 to 4, default 4), like the port.
 - [x] `handle(Inbound)`:
   - `connect_request` from a new endpoint: `connect_accept` with the lowest
     free player id and the type table, or `disconnect(server_full)` when full;

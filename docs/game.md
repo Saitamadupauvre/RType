@@ -38,7 +38,7 @@ add_dependencies(r-type_client graphics-raylib)
 
 | Executable | Usage | Role |
 |---|---|---|
-| `r-type_server` | `./r-type_server <port>` | Authoritative: runs all game logic, sends snapshots. |
+| `r-type_server` | `./r-type_server <port> [--max-players <1-4>]` | Authoritative: runs all game logic, sends snapshots. |
 | `r-type_client` | `./r-type_client <server-ip> <port>` | Sends inputs, displays what the server replicates. |
 
 Both exit with code `84` on invalid arguments.
