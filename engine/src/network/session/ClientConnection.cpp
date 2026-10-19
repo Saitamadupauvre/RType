@@ -9,7 +9,8 @@ namespace engine::network {
 
 ClientConnection::ClientConnection(const core::time::IClock& clock, const Endpoint& server,
                                    std::uint32_t client_nonce, ClientConnectionConfig config)
-    : clock_(clock), server_(server), client_nonce_(client_nonce), config_(config) {}
+    : clock_(clock), server_(server), client_nonce_(client_nonce), config_(config),
+      traffic_(clock.now()) {}
 
 std::optional<Outbound> ClientConnection::update() {
     const auto now = clock_.get().now();
@@ -34,10 +35,15 @@ bool ClientConnection::handle(const Inbound& inbound) {
         return false;
     }
 
-    last_received_ = clock_.get().now();
+    const auto now = clock_.get().now();
+    last_received_ = now;
+    traffic_.on_received(inbound.message, now);
     const auto& message = inbound.message.message;
     if (!type_table_.admits(message)) {
         return false;
+    }
+    if (std::holds_alternative<HeartbeatPayload>(message)) {
+        on_heartbeat_answer(now);
     }
     if (const auto* accept = std::get_if<ConnectAcceptPayload>(&message)) {
         on_accept(*accept);
@@ -51,7 +57,6 @@ std::optional<Outbound> ClientConnection::send_input(const InputPayload& input) 
     if (state_ != ConnectionState::connected) {
         return std::nullopt;
     }
-    last_sent_ = clock_.get().now();
     return to_server(input);
 }
 
@@ -90,11 +95,19 @@ std::optional<Outbound> ClientConnection::keep_alive(core::time::Duration now) {
                         server_.to_string());
         return std::nullopt;
     }
-    if (now - last_sent_ < config_.heartbeat_interval) {
+    if (now - last_heartbeat_ < config_.heartbeat_interval) {
         return std::nullopt;
     }
-    last_sent_ = now;
+    last_heartbeat_ = now;
+    unanswered_heartbeat_ = now;
     return to_server(HeartbeatPayload{});
+}
+
+void ClientConnection::on_heartbeat_answer(core::time::Duration now) {
+    if (unanswered_heartbeat_) {
+        traffic_.on_round_trip(now - *unanswered_heartbeat_);
+        unanswered_heartbeat_.reset();
+    }
 }
 
 void ClientConnection::on_accept(const ConnectAcceptPayload& accept) {
@@ -102,6 +115,7 @@ void ClientConnection::on_accept(const ConnectAcceptPayload& accept) {
         return;
     }
     state_ = ConnectionState::connected;
+    last_heartbeat_ = clock_.get().now();
     player_id_ = accept.player_entity_id;
     type_table_.assign(accept);
     core::log::info("network: connected to {} as player {}", server_.to_string(), player_id_);
@@ -124,8 +138,11 @@ void ClientConnection::end(ConnectionState state, DisconnectReason reason) {
     disconnect_reason_ = reason;
 }
 
-Outbound ClientConnection::to_server(Message message) const {
-    return Outbound{.to = server_, .message = std::move(message)};
+Outbound ClientConnection::to_server(Message message) {
+    traffic_.on_sent(message, clock_.get().now());
+    return Outbound{.to = server_, .message = std::move(message), .sequence = next_sequence_++};
 }
+
+NetworkStats ClientConnection::stats() const { return traffic_.stats(clock_.get().now()); }
 
 } // namespace engine::network

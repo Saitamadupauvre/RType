@@ -55,6 +55,7 @@ engine_add_module(network
         src/network/snapshot/SnapshotBuilder.cpp
         src/network/snapshot/SnapshotReceiver.cpp
         src/network/socket/SocketError.cpp
+        src/network/stats/TrafficMeter.cpp
         src/network/socket/UdpSocket.cpp
         src/network/thread/DatagramHandler.cpp
         src/network/thread/NetworkIo.cpp

@@ -1,14 +1,18 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Export.hpp"
+#include "engine/network/Stats.hpp"
 
 #include "session/ServerSessions.hpp"
+#include "stats/TrafficMeter.hpp"
 #include "thread/NetworkMessages.hpp"
 
 namespace engine::network {
@@ -27,8 +31,13 @@ public:
         return sessions_.sessions();
     }
     [[nodiscard]] std::uint32_t server_tick() const noexcept { return server_tick_; }
+    [[nodiscard]] std::vector<PlayerStats> stats() const { return sessions_.stats(); }
 
 private:
+    void report_stats();
+
+    std::reference_wrapper<const core::time::IClock> clock_;
+    core::time::Duration last_report_;
     ServerSessions sessions_;
     std::vector<Outbound> queued_events_;
     std::uint32_t server_tick_{0};

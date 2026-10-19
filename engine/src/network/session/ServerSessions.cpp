@@ -23,20 +23,25 @@ std::vector<Outbound> ServerSessions::handle(const Inbound& inbound) {
 
     if (session == sessions_.end()) {
         if (request != nullptr) {
-            return admit(inbound.from, *request);
+            return admit(inbound, *request);
         }
         core::log::debug("network: ignored message from unknown endpoint {}",
                          inbound.from.to_string());
         return {};
     }
 
-    session->last_seen = clock_.get().now();
+    const auto now = clock_.get().now();
+    session->last_seen = now;
+    session->traffic.on_received(inbound.message, now);
     if (request != nullptr) {
         return {accept_message(*session, *request)};
     }
     if (const auto* input = std::get_if<InputPayload>(&message)) {
         store_input(*session, *input, inbound.message.header.sequence);
         return {};
+    }
+    if (std::holds_alternative<HeartbeatPayload>(message)) {
+        return {send_to(*session, HeartbeatPayload{})};
     }
     if (std::holds_alternative<DisconnectPayload>(message)) {
         const auto player_id = session->player_id;
@@ -59,37 +64,41 @@ std::vector<Outbound> ServerSessions::drop_timed_out() {
     std::erase_if(sessions_, timed_out);
 
     std::vector<Outbound> outbound;
-    for (const auto& session : expired) {
+    for (auto& session : expired) {
         core::log::info("network: player {} at {} timed out", session.player_id,
                         session.endpoint.to_string());
         outbound.push_back(
-            Outbound{.to = session.endpoint,
-                     .message = DisconnectPayload{.reason = DisconnectReason::timeout}});
+            send_to(session, DisconnectPayload{.reason = DisconnectReason::timeout}));
         std::ranges::move(leave(session.player_id), std::back_inserter(outbound));
     }
     return outbound;
 }
 
-std::vector<Outbound> ServerSessions::admit(const Endpoint& from,
+std::vector<Outbound> ServerSessions::admit(const Inbound& inbound,
                                             const ConnectRequestPayload& request) {
+    const auto& from = inbound.from;
     if (sessions_.size() >= config_.max_players) {
         core::log::info("network: rejected {}: server full", from.to_string());
         return {Outbound{.to = from,
                          .message = DisconnectPayload{.reason = DisconnectReason::server_full}}};
     }
 
-    const auto& session = sessions_.emplace_back(
-        Session{.endpoint = from, .player_id = free_player_id(), .last_seen = clock_.get().now()});
+    const auto now = clock_.get().now();
+    auto& session = sessions_.emplace_back(Session{.endpoint = from,
+                                                   .player_id = free_player_id(),
+                                                   .last_seen = now,
+                                                   .traffic = TrafficMeter(now)});
+    session.traffic.on_received(inbound.message, now);
     core::log::info("network: player {} joined from {}", session.player_id, from.to_string());
     events_.get().publish(PlayerJoined{.player_id = session.player_id});
     return {accept_message(session, request)};
 }
 
-std::vector<Outbound> ServerSessions::broadcast(const Message& message) const {
+std::vector<Outbound> ServerSessions::broadcast(const Message& message) {
     std::vector<Outbound> outbound;
     outbound.reserve(sessions_.size());
-    for (const auto& session : sessions_) {
-        outbound.push_back(Outbound{.to = session.endpoint, .message = message});
+    for (auto& session : sessions_) {
+        outbound.push_back(send_to(session, message));
     }
     return outbound;
 }
@@ -98,6 +107,17 @@ std::vector<Outbound> ServerSessions::close_all(DisconnectReason reason) {
     auto outbound = broadcast(DisconnectPayload{.reason = reason});
     sessions_.clear();
     return outbound;
+}
+
+std::vector<PlayerStats> ServerSessions::stats() const {
+    const auto now = clock_.get().now();
+    std::vector<PlayerStats> stats;
+    stats.reserve(sessions_.size());
+    for (const auto& session : sessions_) {
+        stats.push_back(
+            PlayerStats{.player_id = session.player_id, .network = session.traffic.stats(now)});
+    }
+    return stats;
 }
 
 std::vector<Outbound> ServerSessions::leave(std::uint32_t player_id) {
@@ -116,12 +136,17 @@ void ServerSessions::store_input(Session& session, const InputPayload& input,
     session.input_sequence = sequence;
 }
 
-Outbound ServerSessions::accept_message(const Session& session,
+Outbound ServerSessions::send_to(Session& session, Message message) const {
+    session.traffic.on_sent(message, clock_.get().now());
+    return Outbound{
+        .to = session.endpoint, .message = std::move(message), .sequence = session.next_sequence++};
+}
+
+Outbound ServerSessions::accept_message(Session& session,
                                         const ConnectRequestPayload& request) const {
-    return Outbound{.to = session.endpoint,
-                    .message = ConnectAcceptPayload{.client_nonce = request.client_nonce,
-                                                    .player_entity_id = session.player_id,
-                                                    .types = config_.types}};
+    return send_to(session, ConnectAcceptPayload{.client_nonce = request.client_nonce,
+                                                 .player_entity_id = session.player_id,
+                                                 .types = config_.types});
 }
 
 std::uint32_t ServerSessions::free_player_id() const {

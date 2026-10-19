@@ -54,8 +54,9 @@ Endpoint endpoint(std::uint16_t port) {
 
 Endpoint server_endpoint() { return endpoint(4242); }
 
-Inbound from(const Endpoint& sender, Message message) {
-    return Inbound{.from = sender, .message = {.header = {}, .message = std::move(message)}};
+Inbound from(const Endpoint& sender, Message message, std::uint32_t sequence = 0) {
+    return Inbound{.from = sender,
+                   .message = {.header = {.sequence = sequence}, .message = std::move(message)}};
 }
 
 Inbound accept_from_server(std::uint32_t nonce = sample_nonce) {
@@ -232,18 +233,64 @@ TEST_F(ClientConnectionTest, SendsInputOnlyWhileConnected) {
     EXPECT_FALSE(connection.send_input(input).has_value());
 }
 
-TEST_F(ClientConnectionTest, InputPostponesNextHeartbeat) {
+TEST_F(ClientConnectionTest, HeartbeatsKeepTheirPaceWhileSendingInputs) {
     connect();
     clock.advance(heartbeat_interval - 1ms);
-
     static_cast<void>(connection.send_input(InputPayload{}));
-    clock.advance(heartbeat_interval - 1ms);
-    EXPECT_FALSE(connection.update().has_value());
 
     clock.advance(1ms);
     const auto heartbeat = connection.update();
+
     ASSERT_TRUE(heartbeat.has_value());
     EXPECT_EQ(heartbeat->message, Message{HeartbeatPayload{}});
+}
+
+TEST_F(ClientConnectionTest, NumbersEveryPacketToTheServerInOrder) {
+    const auto request = connection.update();
+    connection.handle(accept_from_server());
+    const auto input = connection.send_input(InputPayload{});
+    const auto goodbye = connection.disconnect();
+
+    ASSERT_TRUE(request && input && goodbye);
+    EXPECT_EQ(request->sequence, 0U);
+    EXPECT_EQ(input->sequence, 1U);
+    EXPECT_EQ(goodbye->sequence, 2U);
+}
+
+TEST_F(ClientConnectionTest, MeasuresRoundTripFromTheHeartbeatAnswer) {
+    connect();
+    EXPECT_FALSE(connection.stats().round_trip_time.has_value());
+    clock.advance(heartbeat_interval);
+    ASSERT_TRUE(connection.update().has_value());
+
+    clock.advance(40ms);
+    connection.handle(from(server_endpoint(), HeartbeatPayload{}));
+
+    EXPECT_EQ(connection.stats().round_trip_time, 40ms);
+}
+
+TEST_F(ClientConnectionTest, IgnoresAHeartbeatAnswerWithoutAPendingHeartbeat) {
+    connect();
+
+    connection.handle(from(server_endpoint(), HeartbeatPayload{}));
+
+    EXPECT_FALSE(connection.stats().round_trip_time.has_value());
+}
+
+TEST_F(ClientConnectionTest, CountsTrafficWithTheServer) {
+    connect();
+    clock.advance(heartbeat_interval);
+    static_cast<void>(connection.update());
+    connection.handle(from(server_endpoint(), HeartbeatPayload{}, 1));
+
+    clock.advance(heartbeat_interval);
+    const auto stats = connection.stats();
+
+    EXPECT_EQ(stats.packets_sent_per_second, 1U);
+    EXPECT_EQ(stats.packets_received_per_second, 1U);
+    EXPECT_EQ(stats.bytes_sent_per_second, 13U);
+    EXPECT_EQ(stats.bytes_received_per_second, 13U);
+    EXPECT_EQ(stats.packets_lost, 0U);
 }
 
 TEST_F(ClientConnectionTest, ServerDisconnectEndsConnection) {

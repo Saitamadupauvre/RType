@@ -14,6 +14,7 @@
 #include "protocol/Messages.hpp"
 #include "protocol/TypeTable.hpp"
 #include "socket/UdpSocket.hpp"
+#include "stats/TrafficMeter.hpp"
 #include "thread/NetworkMessages.hpp"
 
 namespace engine::network {
@@ -41,15 +42,17 @@ public:
     }
     [[nodiscard]] std::uint32_t player_id() const noexcept { return player_id_; }
     [[nodiscard]] const TypeTable& type_table() const noexcept { return type_table_; }
+    [[nodiscard]] NetworkStats stats() const;
 
 private:
     [[nodiscard]] bool is_live() const noexcept;
     [[nodiscard]] std::optional<Outbound> retry_connect(core::time::Duration now);
     [[nodiscard]] std::optional<Outbound> keep_alive(core::time::Duration now);
+    void on_heartbeat_answer(core::time::Duration now);
     void on_accept(const ConnectAcceptPayload& accept);
     void on_disconnect(const DisconnectPayload& disconnect);
     void end(ConnectionState state, DisconnectReason reason);
-    [[nodiscard]] Outbound to_server(Message message) const;
+    [[nodiscard]] Outbound to_server(Message message);
 
     std::reference_wrapper<const core::time::IClock> clock_;
     Endpoint server_;
@@ -60,8 +63,12 @@ private:
     std::size_t attempts_{0};
     core::time::Duration last_sent_{};
     core::time::Duration last_received_{};
+    core::time::Duration last_heartbeat_{};
+    std::optional<core::time::Duration> unanswered_heartbeat_;
+    std::uint32_t next_sequence_{0};
     std::uint32_t player_id_{0};
     TypeTable type_table_;
+    TrafficMeter traffic_;
 };
 
 } // namespace engine::network

@@ -30,7 +30,7 @@ public:
     void stop();
 
     [[nodiscard]] std::vector<Inbound> poll();
-    void send(const Endpoint& to, Message message);
+    void send(Outbound outbound);
 
     [[nodiscard]] Endpoint local_endpoint(std::error_code& ec) const;
 
@@ -44,7 +44,6 @@ private:
     ProtocolHandler protocol_;
     MessageQueue<Inbound> inbox_;
     MessageQueue<Outbound> outbox_;
-    std::uint32_t next_sequence_{0};
     std::jthread receive_thread_;
     std::jthread send_thread_;
 };

@@ -54,6 +54,7 @@ engine_add_test(network SOURCES
     engine/network/snapshot/SnapshotReceiverTest.cpp
     engine/network/socket/SocketErrorTest.cpp
     engine/network/socket/UdpSocketTest.cpp
+    engine/network/stats/TrafficMeterTest.cpp
     engine/network/thread/DatagramHandlerTest.cpp
     engine/network/thread/MessageQueueTest.cpp
     engine/network/thread/NetworkIoTest.cpp

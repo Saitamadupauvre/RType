@@ -57,7 +57,7 @@ struct NetworkServer::ImplNet {
 
     void send_all(std::vector<Outbound> outbound) {
         for (auto& message : outbound) {
-            io.send(message.to, std::move(message.message));
+            io.send(std::move(message));
         }
     }
 
@@ -116,5 +116,7 @@ std::uint16_t NetworkServer::port() const {
 }
 
 std::size_t NetworkServer::player_count() const { return impl_->network.sessions().size(); }
+
+std::vector<PlayerStats> NetworkServer::stats() const { return impl_->network.stats(); }
 
 } // namespace engine::network

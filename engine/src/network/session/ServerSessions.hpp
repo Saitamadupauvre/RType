@@ -10,9 +10,11 @@
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Export.hpp"
+#include "engine/network/Stats.hpp"
 
 #include "protocol/Messages.hpp"
 #include "socket/UdpSocket.hpp"
+#include "stats/TrafficMeter.hpp"
 #include "thread/NetworkMessages.hpp"
 
 namespace engine::network {
@@ -29,6 +31,8 @@ struct Session {
     core::time::Duration last_seen{};
     InputPayload input{};
     std::optional<std::uint32_t> input_sequence{};
+    std::uint32_t next_sequence{};
+    TrafficMeter traffic{};
 };
 
 class ENGINE_NETWORK_EXPORT ServerSessions {
@@ -38,17 +42,19 @@ public:
 
     [[nodiscard]] std::vector<Outbound> handle(const Inbound& inbound);
     [[nodiscard]] std::vector<Outbound> drop_timed_out();
-    [[nodiscard]] std::vector<Outbound> broadcast(const Message& message) const;
+    [[nodiscard]] std::vector<Outbound> broadcast(const Message& message);
     [[nodiscard]] std::vector<Outbound> close_all(DisconnectReason reason);
 
     [[nodiscard]] const std::vector<Session>& sessions() const noexcept { return sessions_; }
+    [[nodiscard]] std::vector<PlayerStats> stats() const;
 
 private:
-    [[nodiscard]] std::vector<Outbound> admit(const Endpoint& from,
+    [[nodiscard]] std::vector<Outbound> admit(const Inbound& inbound,
                                               const ConnectRequestPayload& request);
     [[nodiscard]] std::vector<Outbound> leave(std::uint32_t player_id);
     static void store_input(Session& session, const InputPayload& input, std::uint32_t sequence);
-    [[nodiscard]] Outbound accept_message(const Session& session,
+    [[nodiscard]] Outbound send_to(Session& session, Message message) const;
+    [[nodiscard]] Outbound accept_message(Session& session,
                                           const ConnectRequestPayload& request) const;
     [[nodiscard]] std::uint32_t free_player_id() const;
 

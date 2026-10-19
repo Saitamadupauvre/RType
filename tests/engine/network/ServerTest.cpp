@@ -222,6 +222,20 @@ TEST_F(NetworkServerTest, SendsItsTypeTableAndPublishedEventsToPlayers) {
     EXPECT_TRUE(std::holds_alternative<SnapshotPayload>(snapshot->message));
 }
 
+TEST_F(NetworkServerTest, ReportsStatsForEachConnectedPlayer) {
+    start();
+    EXPECT_TRUE(server.stats().empty());
+    auto peer = bound_peer();
+
+    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, server.port());
+    ASSERT_TRUE(receive_until(server, [this] { return server.player_count() == 1; }));
+
+    const auto stats = server.stats();
+    ASSERT_EQ(stats.size(), 1U);
+    EXPECT_EQ(stats.front().player_id, 1U);
+    EXPECT_EQ(stats.front().network.packets_lost, 0U);
+}
+
 TEST_F(NetworkServerTest, StopTellsConnectedPlayersTheServerIsShuttingDown) {
     start();
     auto peer = bound_peer();
