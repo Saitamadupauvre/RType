@@ -22,9 +22,12 @@ using engine::network::ClientConnectionConfig;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectionState;
 using engine::network::ConnectRequestPayload;
+using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::Endpoint;
+using engine::network::EntityState;
+using engine::network::EventPayload;
 using engine::network::HeartbeatPayload;
 using engine::network::Inbound;
 using engine::network::InputPayload;
@@ -33,6 +36,7 @@ using engine::network::Outbound;
 using engine::network::ServerSessions;
 using engine::network::ServerSessionsConfig;
 using engine::network::SnapshotPayload;
+using engine::network::SpawnEvent;
 using engine::network::TypeEntry;
 using namespace std::chrono_literals;
 
@@ -63,6 +67,17 @@ Inbound accept_from_server(std::uint32_t nonce = sample_nonce) {
 
 Inbound disconnect_from_server(DisconnectReason reason) {
     return from(server_endpoint(), DisconnectPayload{.reason = reason});
+}
+
+Message snapshot_of_type(std::uint16_t type_id) {
+    return SnapshotPayload{
+        .server_tick = 1,
+        .entities = {
+            EntityState{.entity_id = 1, .type_id = type_id, .x = 0, .y = 0, .vx = 0, .vy = 0}}};
+}
+
+Message spawn_of_type(std::uint16_t type_id) {
+    return EventPayload{SpawnEvent{.entity_id = 1, .type_id = type_id, .x = 0, .y = 0}};
 }
 
 Message connect_request() { return ConnectRequestPayload{.client_nonce = sample_nonce}; }
@@ -125,7 +140,40 @@ TEST_F(ClientConnectionTest, ConnectsOnAcceptWithMatchingNonce) {
 
     EXPECT_EQ(connection.state(), ConnectionState::connected);
     EXPECT_EQ(connection.player_id(), 3U);
-    EXPECT_EQ(connection.types(), (std::vector<TypeEntry>{{.type_id = 1, .name = "player"}}));
+    EXPECT_TRUE(connection.type_table().is_known(1));
+    EXPECT_FALSE(connection.type_table().is_known(2));
+}
+
+TEST_F(ClientConnectionTest, DropsSnapshotsAndEventsBeforeConnectAccept) {
+    static_cast<void>(connection.update());
+
+    EXPECT_FALSE(connection.handle(from(server_endpoint(), snapshot_of_type(1))));
+    EXPECT_FALSE(connection.handle(from(server_endpoint(), EventPayload{DestroyEvent{}})));
+}
+
+TEST_F(ClientConnectionTest, AcceptsSnapshotsAndSpawnsWithKnownTypes) {
+    connect();
+
+    EXPECT_TRUE(connection.handle(from(server_endpoint(), snapshot_of_type(1))));
+    EXPECT_TRUE(connection.handle(from(server_endpoint(), spawn_of_type(1))));
+    EXPECT_TRUE(connection.handle(from(server_endpoint(), EventPayload{DestroyEvent{}})));
+}
+
+TEST_F(ClientConnectionTest, DropsAWholeSnapshotWithOneUnknownType) {
+    connect();
+    auto snapshot = snapshot_of_type(1);
+    std::get<SnapshotPayload>(snapshot).entities.push_back(
+        EntityState{.entity_id = 2, .type_id = 2, .x = 0, .y = 0, .vx = 0, .vy = 0});
+
+    EXPECT_FALSE(connection.handle(from(server_endpoint(), snapshot)));
+    EXPECT_EQ(connection.state(), ConnectionState::connected);
+}
+
+TEST_F(ClientConnectionTest, DropsASpawnWithAnUnknownType) {
+    connect();
+
+    EXPECT_FALSE(connection.handle(from(server_endpoint(), spawn_of_type(2))));
+    EXPECT_EQ(connection.state(), ConnectionState::connected);
 }
 
 TEST_F(ClientConnectionTest, IgnoresAcceptWithAnotherNonce) {

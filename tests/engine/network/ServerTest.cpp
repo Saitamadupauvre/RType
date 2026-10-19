@@ -31,9 +31,12 @@ using engine::core::event::EventBus;
 using engine::core::time::SteadyClock;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
+using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::Endpoint;
+using engine::network::EntityDestroyed;
+using engine::network::EventPayload;
 using engine::network::InputPayload;
 using engine::network::max_datagram_size;
 using engine::network::Message;
@@ -42,9 +45,11 @@ using engine::network::PlayerJoined;
 using engine::network::ProtocolHandler;
 using engine::network::ReceivedMessage;
 using engine::network::Replicated;
+using engine::network::ReplicatedType;
 using engine::network::ServerOptions;
 using engine::network::SnapshotPayload;
 using engine::network::SocketError;
+using engine::network::TypeEntry;
 using engine::network::UdpSocket;
 using namespace std::chrono_literals;
 
@@ -170,6 +175,51 @@ TEST_F(NetworkServerTest, ServesAClientOverLoopback) {
     EXPECT_EQ(payload.server_tick, 1U);
     ASSERT_EQ(payload.entities.size(), 1U);
     EXPECT_EQ(payload.entities.front().y, 4);
+}
+
+TEST_F(NetworkServerTest, StartRejectsAnInvalidTypeTable) {
+    NetworkServer duplicated(clock, bus,
+                             ServerOptions{.port = 0,
+                                           .max_players = 1,
+                                           .types = {ReplicatedType{.type_id = 1, .name = "a"},
+                                                     ReplicatedType{.type_id = 1, .name = "b"}}});
+    NetworkServer unnamed(clock, bus,
+                          ServerOptions{.port = 0,
+                                        .max_players = 1,
+                                        .types = {ReplicatedType{.type_id = 1, .name = ""}}});
+    std::error_code ec;
+
+    EXPECT_FALSE(duplicated.start(ec));
+    EXPECT_EQ(ec, std::errc::invalid_argument);
+    EXPECT_FALSE(unnamed.start(ec));
+    EXPECT_EQ(ec, std::errc::invalid_argument);
+}
+
+TEST_F(NetworkServerTest, SendsItsTypeTableAndPublishedEventsToPlayers) {
+    NetworkServer typed(clock, bus,
+                        ServerOptions{.port = 0,
+                                      .max_players = 1,
+                                      .types = {ReplicatedType{.type_id = 3, .name = "bydo"}}});
+    std::error_code ec;
+    ASSERT_TRUE(typed.start(ec)) << ec.message();
+    auto peer = bound_peer();
+    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, typed.port());
+    ASSERT_TRUE(receive_until(typed, [&typed] { return typed.player_count() == 1; }));
+    const auto accept = receive_from_server(peer);
+    ASSERT_TRUE(accept.has_value());
+    EXPECT_EQ(std::get<ConnectAcceptPayload>(accept->message).types,
+              (std::vector<TypeEntry>{{.type_id = 3, .name = "bydo"}}));
+    EntityManager registry;
+
+    bus.publish(EntityDestroyed{.entity_id = 12});
+    typed.send_snapshot(registry);
+
+    const auto event = receive_from_server(peer);
+    ASSERT_TRUE(event.has_value());
+    EXPECT_EQ(event->message, Message{EventPayload{DestroyEvent{.entity_id = 12}}});
+    const auto snapshot = receive_from_server(peer);
+    ASSERT_TRUE(snapshot.has_value());
+    EXPECT_TRUE(std::holds_alternative<SnapshotPayload>(snapshot->message));
 }
 
 TEST_F(NetworkServerTest, StopTellsConnectedPlayersTheServerIsShuttingDown) {

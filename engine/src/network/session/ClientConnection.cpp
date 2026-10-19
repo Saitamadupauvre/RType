@@ -36,6 +36,9 @@ bool ClientConnection::handle(const Inbound& inbound) {
 
     last_received_ = clock_.get().now();
     const auto& message = inbound.message.message;
+    if (!type_table_.admits(message)) {
+        return false;
+    }
     if (const auto* accept = std::get_if<ConnectAcceptPayload>(&message)) {
         on_accept(*accept);
     } else if (const auto* disconnect = std::get_if<DisconnectPayload>(&message)) {
@@ -100,7 +103,7 @@ void ClientConnection::on_accept(const ConnectAcceptPayload& accept) {
     }
     state_ = ConnectionState::connected;
     player_id_ = accept.player_entity_id;
-    types_ = accept.types;
+    type_table_.assign(accept);
     core::log::info("network: connected to {} as player {}", server_.to_string(), player_id_);
 }
 
