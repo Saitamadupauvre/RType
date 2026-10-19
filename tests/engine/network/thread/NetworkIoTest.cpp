@@ -42,6 +42,7 @@ using engine::network::max_type_name_length;
 using engine::network::Message;
 using engine::network::min_type_entry_size;
 using engine::network::NetworkIo;
+using engine::network::Outbound;
 using engine::network::ProtocolHandler;
 using engine::network::ReceivedMessage;
 using engine::network::SocketError;
@@ -195,7 +196,7 @@ TEST(NetworkIo, RestartsAfterStop) {
     auto peer = bound_peer();
 
     send_raw(peer, encoded(sample_message()), local_endpoint_of(io));
-    io.send(local_endpoint_of(peer), sample_message());
+    io.send(Outbound{.to = local_endpoint_of(peer), .message = sample_message()});
 
     EXPECT_EQ(poll_until_received(io).size(), 1U);
     const auto received = receive_decoded(peer);
@@ -281,11 +282,12 @@ TEST(NetworkIo, SendReachesPeerAndDecodesToSameMessage) {
     start_on_loopback(io);
     auto peer = bound_peer();
 
-    io.send(local_endpoint_of(peer), sample_message());
+    io.send(Outbound{.to = local_endpoint_of(peer), .message = sample_message(), .sequence = 41});
     const auto received = receive_decoded(peer);
 
     ASSERT_TRUE(received.has_value());
     EXPECT_EQ(received->message, sample_message());
+    EXPECT_EQ(received->header.sequence, 41U);
 }
 
 TEST(NetworkIo, StopFlushesQueuedSendsBeforeJoining) {
@@ -295,8 +297,8 @@ TEST(NetworkIo, StopFlushesQueuedSendsBeforeJoining) {
     const auto to = local_endpoint_of(peer);
     constexpr std::uint32_t queued = 3;
 
-    for (std::uint32_t i = 0; i < queued; ++i) {
-        io.send(to, sample_message());
+    for (std::uint32_t sequence = 0; sequence < queued; ++sequence) {
+        io.send(Outbound{.to = to, .message = sample_message(), .sequence = sequence});
     }
     io.stop();
 
@@ -315,7 +317,7 @@ TEST(NetworkIo, SendIsDeliveredWhileNoDatagramArrives) {
     const auto to = local_endpoint_of(peer);
 
     for (std::uint32_t sequence = 0; sequence < 3; ++sequence) {
-        io.send(to, HeartbeatPayload{});
+        io.send(Outbound{.to = to, .message = HeartbeatPayload{}, .sequence = sequence});
         const auto received = receive_decoded(peer);
         ASSERT_TRUE(received.has_value());
         EXPECT_EQ(received->header.sequence, sequence);

@@ -342,3 +342,49 @@ TEST_F(ServerSessionsTest, ReconnectedSessionAcceptsInputWithLowerSequence) {
 
     EXPECT_EQ(sessions.sessions().front().input.move_x, -1);
 }
+
+TEST_F(ServerSessionsTest, AnswersEveryHeartbeatWithAHeartbeat) {
+    connect(5000);
+
+    const auto replies = sessions.handle(from(client(5000), HeartbeatPayload{}, 1));
+
+    ASSERT_EQ(replies.size(), 1U);
+    EXPECT_EQ(replies.front().to, client(5000));
+    EXPECT_EQ(replies.front().message, Message{HeartbeatPayload{}});
+}
+
+TEST_F(ServerSessionsTest, NumbersPacketsSeparatelyForEachSession) {
+    connect(5000);
+    connect(5001);
+
+    const auto first = sessions.broadcast(HeartbeatPayload{});
+    const auto second = sessions.broadcast(HeartbeatPayload{});
+
+    ASSERT_EQ(first.size(), 2U);
+    ASSERT_EQ(second.size(), 2U);
+    EXPECT_EQ(first[0].sequence, 1U);
+    EXPECT_EQ(first[1].sequence, 1U);
+    EXPECT_EQ(second[0].sequence, 2U);
+    EXPECT_EQ(second[1].sequence, 2U);
+}
+
+TEST_F(ServerSessionsTest, ReportsTrafficOfEachPlayer) {
+    connect(5000);
+    connect(5001);
+    for (const std::uint32_t sequence : {1U, 2U, 5U}) {
+        static_cast<void>(sessions.handle(input_from(client(5001), sequence, 0)));
+    }
+    clock.advance(1s);
+
+    const auto stats = sessions.stats();
+
+    ASSERT_EQ(stats.size(), 2U);
+    EXPECT_EQ(stats[0].player_id, 1U);
+    EXPECT_EQ(stats[0].network.packets_received_per_second, 1U);
+    EXPECT_EQ(stats[0].network.packets_sent_per_second, 1U);
+    EXPECT_EQ(stats[0].network.packets_lost, 0U);
+    EXPECT_EQ(stats[1].player_id, 2U);
+    EXPECT_EQ(stats[1].network.packets_received_per_second, 4U);
+    EXPECT_EQ(stats[1].network.packets_lost, 2U);
+    EXPECT_FALSE(stats[1].network.round_trip_time.has_value());
+}

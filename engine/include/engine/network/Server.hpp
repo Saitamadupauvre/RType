@@ -11,6 +11,7 @@
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Export.hpp"
 #include "engine/network/Replicated.hpp"
+#include "engine/network/Stats.hpp"
 
 namespace engine::network {
 
@@ -123,6 +124,12 @@ public:
      * @return Number of connected players.
      */
     [[nodiscard]] std::size_t player_count() const;
+
+    /**
+     * @return Traffic of every connected player. A summary is also logged every 10 seconds
+     * during receive().
+     */
+    [[nodiscard]] std::vector<PlayerStats> stats() const;
 
 private:
     struct ImplNet;

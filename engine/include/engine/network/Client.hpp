@@ -10,6 +10,7 @@
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Export.hpp"
+#include "engine/network/Stats.hpp"
 
 namespace engine::network {
 
@@ -143,6 +144,12 @@ public:
      * @return Every entity of the newest snapshot received. Kept after the connection ends.
      */
     [[nodiscard]] std::vector<EntitySnapshot> entities() const;
+
+    /**
+     * @return Traffic exchanged with the server, round-trip time included; all zero before
+     * connect(). A summary is also logged every 10 seconds during update().
+     */
+    [[nodiscard]] NetworkStats stats() const;
 
 private:
     struct ImplNet;

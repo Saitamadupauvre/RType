@@ -2,15 +2,18 @@
 
 #include <functional>
 #include <random>
+#include <string>
 #include <utility>
 #include <variant>
 
+#include "engine/core/log/Log.hpp"
 #include "engine/network/Events.hpp"
 
 #include "event/GameEvents.hpp"
 #include "session/ClientConnection.hpp"
 #include "snapshot/SnapshotReceiver.hpp"
 #include "socket/UdpSocket.hpp"
+#include "stats/TrafficMeter.hpp"
 #include "thread/NetworkIo.hpp"
 
 namespace engine::network {
@@ -44,8 +47,17 @@ struct NetworkClient::ImplNet {
 
     void send(std::optional<Outbound> outbound) {
         if (outbound) {
-            io.send(outbound->to, std::move(outbound->message));
+            io.send(std::move(*outbound));
         }
+    }
+
+    void report_stats(const ClientConnection& live) {
+        const auto now = clock.get().now();
+        if (now - last_report < stats_report_interval) {
+            return;
+        }
+        last_report = now;
+        core::log::info("network: server {}: {}", server_label, summarize(live.stats()));
     }
 
     void handle(ClientConnection& live, const Inbound& inbound) {
@@ -81,6 +93,8 @@ struct NetworkClient::ImplNet {
     std::reference_wrapper<core::event::EventBus> events;
     std::optional<ClientConnection> connection;
     SnapshotReceiver snapshots;
+    std::string server_label;
+    core::time::Duration last_report{};
     bool reported{false};
     NetworkIo io;
 };
@@ -107,6 +121,8 @@ bool NetworkClient::connect(std::string_view server_ip, std::uint16_t port, std:
         return false;
     }
     impl_->connection.emplace(impl_->clock.get(), *server, fresh_nonce());
+    impl_->server_label = server->to_string();
+    impl_->last_report = impl_->clock.get().now();
     return true;
 }
 
@@ -120,6 +136,7 @@ void NetworkClient::update() {
         impl_->handle(live, inbound);
     }
     impl_->send(live.update());
+    impl_->report_stats(live);
     impl_->report_end();
 }
 
@@ -154,6 +171,10 @@ std::vector<EntitySnapshot> NetworkClient::entities() const {
         entities.push_back(to_entity_snapshot(state));
     }
     return entities;
+}
+
+NetworkStats NetworkClient::stats() const {
+    return impl_->connection ? impl_->connection->stats() : NetworkStats{};
 }
 
 } // namespace engine::network

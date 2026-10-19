@@ -44,6 +44,7 @@ using engine::network::DisconnectReason;
 using engine::network::Endpoint;
 using engine::network::EntityDestroyed;
 using engine::network::EntitySpawned;
+using engine::network::HeartbeatPayload;
 using engine::network::max_datagram_size;
 using engine::network::Message;
 using engine::network::NetworkClient;
@@ -401,6 +402,36 @@ TEST(NetworkClient, GivesUpAndReportsTimeoutWhenNoServerAnswers) {
 
     EXPECT_EQ(client.state(), ConnectionState::gave_up);
     EXPECT_EQ(reasons, (std::vector{DisconnectReason::timeout}));
+}
+
+TEST(NetworkClient, MeasuresTheRoundTripToTheServer) {
+    ManualClock clock;
+    EventBus bus;
+    FakeServer fake;
+    NetworkClient client(clock, bus);
+    EXPECT_FALSE(client.stats().round_trip_time.has_value());
+    std::error_code ec;
+    ASSERT_TRUE(client.connect("127.0.0.1", fake.port(), ec)) << ec.message();
+    client.update();
+    const auto request = fake.receive();
+    ASSERT_TRUE(request.has_value());
+    const auto nonce = std::get<ConnectRequestPayload>(request->message.message).client_nonce;
+    fake.send(request->from,
+              ConnectAcceptPayload{.client_nonce = nonce, .player_entity_id = 1, .types = {}});
+    ASSERT_TRUE(wait_until([&client] { client.update(); },
+                           [&client] { return client.state() == ConnectionState::connected; }));
+
+    clock.advance(1s);
+    client.update();
+    const auto heartbeat = fake.receive();
+    ASSERT_TRUE(heartbeat.has_value());
+    EXPECT_TRUE(std::holds_alternative<HeartbeatPayload>(heartbeat->message.message));
+    clock.advance(20ms);
+    fake.send(heartbeat->from, HeartbeatPayload{});
+
+    ASSERT_TRUE(wait_until([&client] { client.update(); },
+                           [&client] { return client.stats().round_trip_time.has_value(); }));
+    EXPECT_EQ(client.stats().round_trip_time, std::chrono::nanoseconds{20ms});
 }
 
 TEST(NetworkClient, ReportsTimeoutWhenTheServerGoesSilent) {
