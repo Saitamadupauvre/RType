@@ -183,7 +183,7 @@ int main(int argc, char** argv)
 {
     engine::World world;
     engine::LuaRuntime lua(world);
-    engine::NetworkServer net(parse_port(argc, argv));   // runs its own network thread
+    engine::NetworkServer net(parse_port(argc, argv));   // runs its own receive and send threads
 
     lua.load_game("scripts");
 
@@ -192,7 +192,7 @@ int main(int argc, char** argv)
         net.receive_inputs(world);   // drains the thread-safe queue
         lua.tick(dt);                // systems, entity updates, coroutines
         engine::physics::step(world, dt);
-        net.send_snapshot(world);
+        net.send_snapshot(world);    // queues it for the send thread
     });
 }
 ```
@@ -230,9 +230,10 @@ Usage:
 
 - **Authoritative:** clients send **inputs** (actions), never positions. The server simulates and replicates the result. This prevents trivial cheating.
 - **Multithreaded:**
-  - a **network thread** receives packets, validates them and pushes messages into a thread-safe queue;
-  - the **game thread** drains the queue at each tick, runs the simulation and sends snapshots.
-  The game loop never blocks waiting for a client.
+  - a **receive thread** reads datagrams, decodes and validates them, and pushes valid messages into the inbox queue; invalid packets are dropped and logged there and never reach the game;
+  - the **game thread** drains the inbox at each tick, runs the simulation and pushes snapshots and events into the outbox queue;
+  - a **send thread** sleeps until the outbox has messages, then encodes and sends them.
+  The game loop never blocks waiting for a client or for the socket: it only touches the two queues. Only the receive thread reads from the socket and only the send thread writes to it.
 - **Resilient:**
   - a client that stops sending heartbeats is disconnected after a timeout and the other players are notified;
   - a malformed packet is dropped and logged, never trusted;

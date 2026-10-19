@@ -2,8 +2,9 @@
 
 ## Monday: Network thread and message queues (#29)
 
-Goal: the server receives, decodes and validates datagrams on its own thread,
-and the game thread only exchanges decoded messages through two queues. No
+Goal: a receive thread decodes and validates datagrams, a send thread encodes
+and sends replies, and the game thread only exchanges decoded messages through
+two queues (`docs/PROJECT.md` §7). No
 session logic yet (that is #19/#20). New files go in `engine/src/network/thread/`,
 tests in `tests/engine/network/thread/`.
 
@@ -30,6 +31,17 @@ tests in `tests/engine/network/thread/`.
     then one `drain()`: every value exactly once (sort and compare), no sleeps;
   - [x] a consumer draining while producers push loses nothing (sum of all
     drains equals everything pushed).
+- [x] `std::vector<T> wait_and_drain(std::stop_token)` so the send thread sleeps
+  instead of polling: a `std::condition_variable_any ready_`, `push` calls
+  `ready_.notify_one()` after unlocking, `wait_and_drain` uses
+  `ready_.wait(lock, stop_token, [this] { return !items_.empty(); })` then swaps
+  like `drain()`. Returns whatever is queued, so it is empty only when stop is
+  requested with nothing queued.
+  - [x] items already queued come back without waiting;
+  - [x] a push from another thread wakes the waiting consumer (no sleep:
+    the consumer `std::jthread` is joined after the push);
+  - [x] `request_stop()` on an empty queue returns an empty vector;
+  - [x] items queued before the stop still come back.
 
 ### 2. Queue item types (`thread/NetworkMessages.hpp`)
 
@@ -49,46 +61,70 @@ Keep the per-datagram logic out of the thread so it is tested deterministically.
   truncated, bad magic, wrong version, random bytes are dropped and logged
   (check with `MemorySink`); invalid outbound payload (e.g. `InputPayload{.move_x = 2}`) is dropped.
 
-### 4. `NetworkThread` (`thread/NetworkThread.{hpp,cpp}`)
+### 4. `NetworkIo` (`thread/NetworkIo.{hpp,cpp}`)
 
-- [ ] Owns the `UdpSocket`, a `ProtocolHandler`, the inbox
+- [x] Owns the `UdpSocket`, a `ProtocolHandler`, the inbox
   `MessageQueue<Inbound>`, the outbox `MessageQueue<Outbound>`, the outgoing
-  sequence counter and a `std::jthread` (declared last so it stops first).
-- [ ] `start(const Endpoint& bind_to, std::error_code& ec)`: create and bind
+  sequence counter and two `std::jthread`s, `receive_thread_` and
+  `send_thread_`, declared last so they stop before the data they use.
+- [x] `start(const Endpoint& bind_to, std::error_code& ec)`: create and bind
   the socket on the caller's thread (so bind errors reach the caller), then
-  start the thread.
-- [ ] Loop while `!stop_token.stop_requested()`:
-  1. drain the outbox, `encode_outbound`, `send_to` each one;
-  2. `receive_from` into a `max_datagram_size` buffer with a short timeout
-     (e.g. 10 ms, a named constant) so the outbox is flushed regularly;
-  3. `SocketError::timed_out` → continue; `SocketError::canceled`/`SocketError::closed` →
-     exit; other errors → log and continue;
-  4. `handle_datagram` → push into the inbox.
-- [ ] Game-thread API: `std::vector<Inbound> poll()` drains the inbox;
+  start both threads. A second `start` while running reports
+  `std::errc::already_connected`.
+- [x] Receive thread, `run_receive(stop_token)`: loop on `receive_one(buffer)`
+  with a `max_datagram_size + 1` buffer:
+  1. `receive_from` with `wait_forever` (no timeout: `close()` wakes it up);
+  2. `SocketError::canceled`/`SocketError::closed` → return `false` (exit);
+     other errors → log and return `true`;
+  3. more than `max_datagram_size` bytes → log and drop (a 1200-byte buffer
+     would silently truncate it, and a full-size valid packet with trailing
+     bytes would be accepted);
+  4. `handle_datagram` → push into the inbox. The inbox is bounded
+     (`default_inbox_capacity`, 4096): when the game thread falls behind, extra
+     messages are dropped and logged instead of growing memory without limit.
+- [x] `MessageQueue` takes an optional capacity; `push` returns `false` when full.
+- [x] Send thread, `run_send(stop_token)`: loop on
+  `outbox_.wait_and_drain(stop_token)` → `send_all`, which runs
+  `encode_outbound` with `next_sequence_++` and `send_to` for each message;
+  log send errors and keep going. Only this thread touches `next_sequence_`.
+- [x] Game-thread API: `std::vector<Inbound> poll()` drains the inbox;
   `void send(const Endpoint& to, Message message)` pushes into the outbox.
-  Only the network thread touches the socket.
-- [ ] `stop()`: `request_stop()`, flush the remaining outbox, `close()` the
-  socket (unblocks `receive_from`), join. Destructor calls `stop()`.
-- [ ] `local_endpoint()` so tests can bind port 0 and find the real port.
-- [ ] Tests in `thread/NetworkThreadTest.cpp` (loopback only, like `UdpSocketTest`):
-  - [ ] start on `127.0.0.1:0`, stop, destructor: no hang, no crash;
-  - [ ] binding a port already in use reports the error from `start`;
-  - [ ] a datagram sent by a plain `UdpSocket` shows up in `poll()` (wait with
+  Only the receive thread reads from the socket and only the send thread
+  writes to it.
+- [x] `stop()`, in this order:
+  1. `send_thread_.request_stop()` and join: it sends what is left in the
+     outbox (`drain()` once more after the wait returns) and exits;
+  2. `close()` the socket: wakes the receive thread with `SocketError::canceled`;
+  3. `receive_thread_.request_stop()` and join.
+  Closing before the send thread has flushed loses the last messages with
+  `SocketError::closed`. Idempotent; the destructor calls `stop()`.
+- [x] `local_endpoint()` so tests can bind port 0 and find the real port.
+- [x] Tests in `thread/NetworkIoTest.cpp` (loopback only, like `UdpSocketTest`):
+  - [x] start on `127.0.0.1:0`, stop, destructor: no hang, no crash;
+  - [x] binding a port already in use reports the error from `start`;
+  - [x] a second `start` while running is refused;
+  - [x] `start` after `stop` works again;
+  - [x] a full-size datagram is accepted, one byte more is dropped and logged;
+  - [x] a full inbox drops and logs extra messages;
+  - [x] a datagram sent by a plain `UdpSocket` shows up in `poll()` (wait with
     a bounded loop on `poll()` plus a deadline, no fixed `sleep`);
-  - [ ] a garbage datagram never shows up in `poll()`;
-  - [ ] `send()` reaches a plain `UdpSocket` peer and decodes to the same `Message`;
-  - [ ] `stop()` with sends still queued flushes them before joining.
+  - [x] a garbage datagram never shows up in `poll()`;
+  - [x] `send()` reaches a plain `UdpSocket` peer and decodes to the same `Message`;
+  - [x] `stop()` with sends still queued flushes them before joining;
+  - [x] `send()` reaches the peer while no datagram arrives (the send thread
+    never waits on the receive side).
 
 ### 5. Wire it up and check
 
 - [x] Add `DatagramHandler.cpp` and the `MessageQueue` / `DatagramHandler`
   tests to the CMake lists.
-- [ ] Add `NetworkThread.cpp` to `engine/CMakeLists.txt` and
-  `NetworkThreadTest.cpp` to `tests/CMakeLists.txt`.
+- [x] Add `NetworkIo.cpp` to `engine/CMakeLists.txt` and
+  `NetworkIoTest.cpp` to `tests/CMakeLists.txt`.
 - [ ] `./fred.sh all` green.
 - [ ] `cmake --workflow --preset tsan` reports no data race (#29 acceptance criterion).
-- [ ] Update the "Server" checklist below and document the thread/queue
-  ownership in `docs/PROJECT.md` §7 (#89).
+- [x] Describe the receive, game and send threads in `docs/PROJECT.md` §7.
+- [ ] Update the "Server" checklist below; the full thread/queue/failure
+  documentation is #89.
 
 ### Done alongside #29
 
@@ -105,7 +141,7 @@ Keep the per-datagram logic out of the thread so it is tested deterministically.
 ### Next after #29
 
 - #19/#20 sessions: handshake and session table on the game thread, fed by
-  `NetworkThread::poll()`, tested with fake `Inbound` messages and `ManualClock`.
+  `NetworkIo::poll()`, tested with fake `Inbound` messages and `ManualClock`.
   Decide first how to add `Reject(reason)` and `PlayerLeft(player_id)` to the
   protocol: neither exists yet.
 - Hook `TypeTable` into the client: `assign` on `connect_accept`, then drop
