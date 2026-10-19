@@ -268,9 +268,25 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
   player before closing.
 - [ ] Use `NetworkClient` in `game/client/main.cpp` (#24), draw `entities()`
   (#23), send keyboard input (#17/#18).
-- [ ] Hook `TypeTable` into the client: needs the server to send a real type
-  table in `connect_accept` (today `ServerOptions` has no types, so every
-  entity would be dropped).
+
+## Game events and type table checks (#84, #82)
+
+- [x] Public game events in `Events.hpp`: `EntitySpawned`, `EntityDestroyed`,
+  `ShotFired`, `SoundPlayed`. On the server the game publishes them on the
+  bus; `NetworkServer` queues each one for the sessions connected at that
+  moment and sends the queue, in order, before the next snapshot. On the
+  client `NetworkClient` publishes them (and `PlayerLeft`) on its bus.
+- [x] `event/GameEvents.{hpp,cpp}`: public event ↔ `EventPayload`.
+- [x] `ServerOptions::types` (public `ReplicatedType`) is sent in
+  `connect_accept`; `start()` refuses an invalid table (`invalid_argument`).
+- [x] `ClientConnection` keeps a `TypeTable`: snapshots and events before
+  `connect_accept`, and snapshots or spawns with an unknown type id, are
+  dropped and logged.
+- [ ] Events are sent once: per-session queue and retransmission wait for
+  acknowledgements (#86).
+- [ ] The game declares its types (`ServerApp` passes none yet) and publishes
+  the events, from Lua `spawn`/`destroy`/`play` once the server tick runs the
+  scripts (#46).
 
 ### Next after #19/#20
 
@@ -279,8 +295,6 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
   each tick `poll()` → `handle` → `send`, then `drop_timed_out()` / `update()`.
 - `player_entity_id` currently carries the session's player id (1 to 4): the
   game loop will spawn the player entity on `PlayerJoined`.
-- Hook `TypeTable` into the client: `assign` on `connect_accept`, then drop
-  every `Inbound` that `admits` refuses.
 - #90 stays open until a client really connects (#19, #42); recheck the
   README commands then.
 
