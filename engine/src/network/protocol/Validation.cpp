@@ -56,7 +56,7 @@ bool is_valid(const ConnectAcceptPayload& payload) {
 
 bool is_valid(const DisconnectPayload& payload) noexcept {
     return static_cast<std::uint8_t>(payload.reason) <=
-           static_cast<std::uint8_t>(DisconnectReason::protocol_error);
+           static_cast<std::uint8_t>(DisconnectReason::server_full);
 }
 
 } // namespace engine::network
