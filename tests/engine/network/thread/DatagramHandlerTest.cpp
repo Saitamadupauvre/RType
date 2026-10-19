@@ -30,6 +30,10 @@ using engine::network::Outbound;
 using engine::network::ProtocolHandler;
 
 constexpr std::size_t header_version_offset = 4;
+constexpr std::size_t header_payload_size_offset = 11;
+constexpr std::size_t input_payload_size = 3;
+constexpr std::size_t input_action_flags_offset = engine::network::encoded_packet_header_size;
+constexpr std::size_t input_move_x_offset = input_action_flags_offset + 1;
 constexpr std::uint32_t sample_sequence = 7;
 
 Endpoint sample_endpoint() {
@@ -113,6 +117,28 @@ TEST_F(DatagramHandler, DropsWrongVersion) {
 }
 
 TEST_F(DatagramHandler, DropsRandomBytes) { expect_dropped_and_logged(random_bytes(64)); }
+
+TEST_F(DatagramHandler, DropsInputWithOutOfRangeMovement) {
+    auto datagram = valid_datagram();
+    datagram[input_move_x_offset] = 2;
+
+    expect_dropped_and_logged(datagram);
+}
+
+TEST_F(DatagramHandler, DropsInputWithReservedActionBits) {
+    auto datagram = valid_datagram();
+    datagram[input_action_flags_offset] = 0x80;
+
+    expect_dropped_and_logged(datagram);
+}
+
+TEST_F(DatagramHandler, DropsInputWithWrongPayloadSize) {
+    auto datagram = valid_datagram();
+    datagram.push_back(0);
+    datagram[header_payload_size_offset + 1] = static_cast<std::uint8_t>(input_payload_size + 1);
+
+    expect_dropped_and_logged(datagram);
+}
 
 TEST_F(DatagramHandler, EncodesValidOutboundWithSequence) {
     const Outbound outbound{.to = sample_endpoint(), .message = sample_message()};

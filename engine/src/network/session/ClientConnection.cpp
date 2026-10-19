@@ -37,6 +37,14 @@ void ClientConnection::handle(const Inbound& inbound) {
     }
 }
 
+std::optional<Outbound> ClientConnection::send_input(const InputPayload& input) {
+    if (state_ != ConnectionState::connected) {
+        return std::nullopt;
+    }
+    last_sent_ = clock_.get().now();
+    return to_server(input);
+}
+
 std::optional<Outbound> ClientConnection::disconnect() {
     if (state_ != ConnectionState::connecting && state_ != ConnectionState::connected) {
         return std::nullopt;

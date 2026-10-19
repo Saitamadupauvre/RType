@@ -8,6 +8,8 @@
 #include "engine/core/log/Log.hpp"
 #include "engine/network/Events.hpp"
 
+#include "protocol/Sequence.hpp"
+
 namespace engine::network {
 
 ServerSessions::ServerSessions(const core::time::IClock& clock, core::event::EventBus& events,
@@ -31,6 +33,10 @@ std::vector<Outbound> ServerSessions::handle(const Inbound& inbound) {
     session->last_seen = clock_.get().now();
     if (request != nullptr) {
         return {accept_message(*session, *request)};
+    }
+    if (const auto* input = std::get_if<InputPayload>(&message)) {
+        store_input(*session, *input, inbound.message.header.sequence);
+        return {};
     }
     if (std::holds_alternative<DisconnectPayload>(message)) {
         const auto player_id = session->player_id;
@@ -90,6 +96,17 @@ std::vector<Outbound> ServerSessions::leave(std::uint32_t player_id) {
                      .message = EventPayload{PlayerLeftEvent{.player_entity_id = player_id}}});
     }
     return notices;
+}
+
+void ServerSessions::store_input(Session& session, const InputPayload& input,
+                                 std::uint32_t sequence) {
+    if (session.input_sequence && !is_newer_sequence(sequence, *session.input_sequence)) {
+        core::log::debug("network: dropped stale input {} from player {}", sequence,
+                         session.player_id);
+        return;
+    }
+    session.input = input;
+    session.input_sequence = sequence;
 }
 
 Outbound ServerSessions::accept_message(const Session& session,

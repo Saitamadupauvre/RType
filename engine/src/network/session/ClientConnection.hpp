@@ -37,6 +37,7 @@ public:
 
     [[nodiscard]] std::optional<Outbound> update();
     void handle(const Inbound& inbound);
+    [[nodiscard]] std::optional<Outbound> send_input(const InputPayload& input);
     [[nodiscard]] std::optional<Outbound> disconnect();
 
     [[nodiscard]] ConnectionState state() const noexcept { return state_; }

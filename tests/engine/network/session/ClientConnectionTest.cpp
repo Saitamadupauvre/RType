@@ -27,6 +27,7 @@ using engine::network::DisconnectReason;
 using engine::network::Endpoint;
 using engine::network::HeartbeatPayload;
 using engine::network::Inbound;
+using engine::network::InputPayload;
 using engine::network::Message;
 using engine::network::Outbound;
 using engine::network::ServerSessions;
@@ -164,6 +165,34 @@ TEST_F(ClientConnectionTest, SendsHeartbeatsAtFixedIntervalOnceConnected) {
     EXPECT_EQ(heartbeat->to, server_endpoint());
     EXPECT_EQ(heartbeat->message, Message{HeartbeatPayload{}});
     EXPECT_FALSE(connection.update().has_value());
+}
+
+TEST_F(ClientConnectionTest, SendsInputOnlyWhileConnected) {
+    const InputPayload input{.action_flags = 1, .move_x = -1, .move_y = 1};
+    EXPECT_FALSE(connection.send_input(input).has_value());
+
+    connect();
+    const auto outbound = connection.send_input(input);
+
+    ASSERT_TRUE(outbound.has_value());
+    EXPECT_EQ(outbound->to, server_endpoint());
+    EXPECT_EQ(outbound->message, Message{input});
+    static_cast<void>(connection.disconnect());
+    EXPECT_FALSE(connection.send_input(input).has_value());
+}
+
+TEST_F(ClientConnectionTest, InputPostponesNextHeartbeat) {
+    connect();
+    clock.advance(heartbeat_interval - 1ms);
+
+    static_cast<void>(connection.send_input(InputPayload{}));
+    clock.advance(heartbeat_interval - 1ms);
+    EXPECT_FALSE(connection.update().has_value());
+
+    clock.advance(1ms);
+    const auto heartbeat = connection.update();
+    ASSERT_TRUE(heartbeat.has_value());
+    EXPECT_EQ(heartbeat->message, Message{HeartbeatPayload{}});
 }
 
 TEST_F(ClientConnectionTest, ServerDisconnectEndsConnection) {
