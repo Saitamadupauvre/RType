@@ -41,4 +41,8 @@ std::vector<Outbound> ServerNetwork::snapshot(core::EntityManager& registry) {
     return outbound;
 }
 
+std::vector<Outbound> ServerNetwork::shutdown() {
+    return sessions_.close_all(DisconnectReason::server_shutdown);
+}
+
 } // namespace engine::network

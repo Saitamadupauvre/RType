@@ -1,12 +1,155 @@
 #include "engine/network/Client.hpp"
 
+#include <functional>
+#include <random>
+#include <utility>
+#include <variant>
+
+#include "engine/network/Events.hpp"
+
+#include "session/ClientConnection.hpp"
+#include "snapshot/SnapshotReceiver.hpp"
+#include "socket/UdpSocket.hpp"
+#include "thread/NetworkIo.hpp"
+
 namespace engine::network {
 
-NetworkClient::NetworkClient(std::string_view server_address, std::uint16_t port)
-    : server_address_(server_address), port_(port) {}
+namespace {
 
-std::string_view NetworkClient::server_address() const noexcept { return server_address_; }
+Endpoint any_local_endpoint(const Endpoint& server) {
+    const auto any_address = server.addr()->sa_family == AF_INET6 ? "::" : "0.0.0.0";
+    return Endpoint::from_string(any_address, 0).value_or(Endpoint{});
+}
 
-std::uint16_t NetworkClient::port() const noexcept { return port_; }
+std::uint32_t fresh_nonce() {
+    std::random_device random;
+    return random();
+}
+
+EntitySnapshot to_entity_snapshot(const EntityState& state) {
+    return EntitySnapshot{.entity_id = state.entity_id,
+                          .type_id = state.type_id,
+                          .x = static_cast<float>(state.x),
+                          .y = static_cast<float>(state.y),
+                          .vx = static_cast<float>(state.vx),
+                          .vy = static_cast<float>(state.vy)};
+}
+
+} // namespace
+
+struct NetworkClient::ImplNet {
+    ImplNet(const core::time::IClock& game_clock, core::event::EventBus& game_events)
+        : clock(game_clock), events(game_events) {}
+
+    void send(std::optional<Outbound> outbound) {
+        if (outbound) {
+            io.send(outbound->to, std::move(outbound->message));
+        }
+    }
+
+    void handle(ClientConnection& live, const Inbound& inbound) {
+        if (!live.handle(inbound) || live.state() != ConnectionState::connected) {
+            return;
+        }
+        if (const auto* snapshot = std::get_if<SnapshotPayload>(&inbound.message.message)) {
+            snapshots.receive(*snapshot);
+        }
+    }
+
+    void close() {
+        if (connection) {
+            send(connection->disconnect());
+        }
+        io.stop();
+    }
+
+    void report_end() {
+        const auto reason = connection ? connection->disconnect_reason() : std::nullopt;
+        if (!reason || reported) {
+            return;
+        }
+        reported = true;
+        io.stop();
+        events.get().publish(Disconnected{.reason = *reason});
+    }
+
+    std::reference_wrapper<const core::time::IClock> clock;
+    std::reference_wrapper<core::event::EventBus> events;
+    std::optional<ClientConnection> connection;
+    SnapshotReceiver snapshots;
+    bool reported{false};
+    NetworkIo io;
+};
+
+NetworkClient::NetworkClient(const core::time::IClock& clock, core::event::EventBus& events)
+    : impl_(std::make_unique<ImplNet>(clock, events)) {}
+
+NetworkClient::~NetworkClient() { impl_->close(); }
+
+bool NetworkClient::connect(std::string_view server_ip, std::uint16_t port, std::error_code& ec) {
+    ec.clear();
+    if (impl_->connection) {
+        ec = std::make_error_code(std::errc::already_connected);
+        return false;
+    }
+    const auto server = Endpoint::from_string(server_ip, port);
+    if (!server) {
+        ec = std::make_error_code(std::errc::invalid_argument);
+        return false;
+    }
+
+    impl_->io.start(any_local_endpoint(*server), ec);
+    if (ec) {
+        return false;
+    }
+    impl_->connection.emplace(impl_->clock.get(), *server, fresh_nonce());
+    return true;
+}
+
+void NetworkClient::update() {
+    auto& connection = impl_->connection;
+    if (!connection || impl_->reported) {
+        return;
+    }
+    auto& live = *connection;
+    for (const auto& inbound : impl_->io.poll()) {
+        impl_->handle(live, inbound);
+    }
+    impl_->send(live.update());
+    impl_->report_end();
+}
+
+void NetworkClient::send_input(std::uint8_t action_flags, std::int8_t move_x, std::int8_t move_y) {
+    if (auto& connection = impl_->connection) {
+        impl_->send(connection->send_input(
+            InputPayload{.action_flags = action_flags, .move_x = move_x, .move_y = move_y}));
+    }
+}
+
+void NetworkClient::disconnect() {
+    impl_->close();
+    impl_->report_end();
+}
+
+ConnectionState NetworkClient::state() const {
+    return impl_->connection ? impl_->connection->state() : ConnectionState::disconnected;
+}
+
+std::uint32_t NetworkClient::player_id() const {
+    return impl_->connection ? impl_->connection->player_id() : 0;
+}
+
+std::optional<std::uint32_t> NetworkClient::server_tick() const {
+    return impl_->snapshots.server_tick();
+}
+
+std::vector<EntitySnapshot> NetworkClient::entities() const {
+    std::vector<EntitySnapshot> entities;
+    entities.reserve(impl_->snapshots.entities().size());
+    for (const auto& state : impl_->snapshots.entities()) {
+        entities.push_back(to_entity_snapshot(state));
+    }
+    return entities;
+}
 
 } // namespace engine::network

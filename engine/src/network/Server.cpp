@@ -8,9 +8,9 @@
 
 namespace engine::network {
 
-struct NetworkServer::Impl {
-    Impl(const core::time::IClock& clock, core::event::EventBus& events,
-         ServerOptions server_options)
+struct NetworkServer::ImplNet {
+    ImplNet(const core::time::IClock& clock, core::event::EventBus& events,
+            ServerOptions server_options)
         : options(server_options),
           network(clock, events, ServerSessionsConfig{.max_players = server_options.max_players}) {}
 
@@ -27,7 +27,7 @@ struct NetworkServer::Impl {
 
 NetworkServer::NetworkServer(const core::time::IClock& clock, core::event::EventBus& events,
                              ServerOptions options)
-    : impl_(std::make_unique<Impl>(clock, events, options)) {}
+    : impl_(std::make_unique<ImplNet>(clock, events, options)) {}
 
 NetworkServer::~NetworkServer() = default;
 
@@ -37,7 +37,10 @@ bool NetworkServer::start(std::error_code& ec) {
     return !ec;
 }
 
-void NetworkServer::stop() { impl_->io.stop(); }
+void NetworkServer::stop() {
+    impl_->send_all(impl_->network.shutdown());
+    impl_->io.stop();
+}
 
 void NetworkServer::receive() { impl_->send_all(impl_->network.receive(impl_->io.poll())); }
 

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "engine/core/time/IClock.hpp"
+#include "engine/network/Client.hpp"
 #include "engine/network/Export.hpp"
 
 #include "protocol/Messages.hpp"
@@ -16,18 +17,11 @@
 
 namespace engine::network {
 
-enum class ConnectionState : std::uint8_t {
-    connecting,
-    connected,
-    rejected,
-    gave_up,
-    disconnected,
-};
-
 struct ClientConnectionConfig {
     core::time::Duration retry_interval = std::chrono::milliseconds(500);
     std::size_t max_attempts = 5;
     core::time::Duration heartbeat_interval = std::chrono::seconds(1);
+    core::time::Duration server_timeout = std::chrono::seconds(5);
 };
 
 class ENGINE_NETWORK_EXPORT ClientConnection {
@@ -36,19 +30,24 @@ public:
                      std::uint32_t client_nonce, ClientConnectionConfig config = {});
 
     [[nodiscard]] std::optional<Outbound> update();
-    void handle(const Inbound& inbound);
+    bool handle(const Inbound& inbound);
     [[nodiscard]] std::optional<Outbound> send_input(const InputPayload& input);
     [[nodiscard]] std::optional<Outbound> disconnect();
 
     [[nodiscard]] ConnectionState state() const noexcept { return state_; }
+    [[nodiscard]] std::optional<DisconnectReason> disconnect_reason() const noexcept {
+        return disconnect_reason_;
+    }
     [[nodiscard]] std::uint32_t player_id() const noexcept { return player_id_; }
     [[nodiscard]] const std::vector<TypeEntry>& types() const noexcept { return types_; }
 
 private:
+    [[nodiscard]] bool is_live() const noexcept;
     [[nodiscard]] std::optional<Outbound> retry_connect(core::time::Duration now);
-    [[nodiscard]] std::optional<Outbound> send_heartbeat(core::time::Duration now);
+    [[nodiscard]] std::optional<Outbound> keep_alive(core::time::Duration now);
     void on_accept(const ConnectAcceptPayload& accept);
     void on_disconnect(const DisconnectPayload& disconnect);
+    void end(ConnectionState state, DisconnectReason reason);
     [[nodiscard]] Outbound to_server(Message message) const;
 
     std::reference_wrapper<const core::time::IClock> clock_;
@@ -56,8 +55,10 @@ private:
     std::uint32_t client_nonce_;
     ClientConnectionConfig config_;
     ConnectionState state_{ConnectionState::connecting};
+    std::optional<DisconnectReason> disconnect_reason_;
     std::size_t attempts_{0};
     core::time::Duration last_sent_{};
+    core::time::Duration last_received_{};
     std::uint32_t player_id_{0};
     std::vector<TypeEntry> types_;
 };

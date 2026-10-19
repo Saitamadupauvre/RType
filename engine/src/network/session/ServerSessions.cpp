@@ -94,6 +94,12 @@ std::vector<Outbound> ServerSessions::broadcast(const Message& message) const {
     return outbound;
 }
 
+std::vector<Outbound> ServerSessions::close_all(DisconnectReason reason) {
+    auto outbound = broadcast(DisconnectPayload{.reason = reason});
+    sessions_.clear();
+    return outbound;
+}
+
 std::vector<Outbound> ServerSessions::leave(std::uint32_t player_id) {
     events_.get().publish(PlayerLeft{.player_id = player_id});
     return broadcast(EventPayload{PlayerLeftEvent{.player_entity_id = player_id}});

@@ -76,7 +76,11 @@ public:
     bool start(std::error_code& ec);
 
     /**
-     * @brief Sends the replies still queued, then closes the socket and joins the threads.
+     * @brief Ends every session, sends the messages still queued, then closes the socket and
+     * joins the threads.
+     *
+     * Every connected player receives `disconnect` with reason `server_shutdown`. `PlayerLeft`
+     * is not published for them.
      *
      * @note Idempotent; the destructor calls it.
      */
@@ -110,8 +114,8 @@ public:
     [[nodiscard]] std::size_t player_count() const;
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
+    struct ImplNet;
+    std::unique_ptr<ImplNet> impl_;
 };
 
 #ifdef _MSC_VER

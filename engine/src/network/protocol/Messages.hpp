@@ -5,6 +5,8 @@
 #include <variant>
 #include <vector>
 
+#include "engine/network/Events.hpp"
+
 namespace engine::network {
 
 struct ConnectRequestPayload {
@@ -101,14 +103,6 @@ using EventPayload = std::variant<SpawnEvent, DestroyEvent, FireEvent, SoundEven
 
 struct HeartbeatPayload {
     bool operator==(const HeartbeatPayload&) const = default;
-};
-
-enum class DisconnectReason : std::uint8_t {
-    normal = 0,
-    timeout = 1,
-    server_shutdown = 2,
-    protocol_error = 3,
-    server_full = 4,
 };
 
 struct DisconnectPayload {
