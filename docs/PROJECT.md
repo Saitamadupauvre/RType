@@ -206,16 +206,18 @@ int main(int argc, char** argv)
     engine::graphics::GraphicsPlugin gfx("plugins/graphics-raylib");
     engine::World world;
     engine::LuaRuntime lua(world);
-    engine::NetworkClient net(argv[1], parse_port(argc, argv));
+    engine::network::NetworkClient net(clock, events);
+    net.connect(argv[1], parse_port(argc, argv), ec);   // exit 84 on ec
 
     lua.load_game("scripts");   // only to know how each entity type looks
 
     gfx->renderer().open({ .width = 1280, .height = 720, .title = "R-Type" });
     while (!gfx->renderer().should_close()) {
-        net.send_inputs(input_map.read(gfx->input()));
-        net.apply_snapshots(world);
-        render(world, gfx->renderer());
+        net.update();                // snapshots, retries, heartbeats, server timeout
+        net.send_input(input_map.read(gfx->input()));
+        render(net.entities(), gfx->renderer());
     }
+    net.disconnect();
 }
 ```
 

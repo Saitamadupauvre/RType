@@ -246,8 +246,31 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
   bound), SIGINT/SIGTERM set a flag that stops `run`.
 - [ ] Lua `tick` and applying `inputs()` to player entities: needs the tick
   phase order (#46) and the game scripts.
-- [ ] Client side: `NetworkClient` over `NetworkIo` + `ClientConnection` +
-  `SnapshotReceiver` (#23, #28).
+- [x] Client side: `NetworkClient` over `NetworkIo` + `ClientConnection` +
+  `SnapshotReceiver` (see below).
+
+## `NetworkClient` and server disconnection on the client (#85)
+
+- [x] Public `NetworkClient` (`engine/include/engine/network/Client.hpp`),
+  pimpl over `NetworkIo` + `ClientConnection` + `SnapshotReceiver`:
+  `connect(ip, port, ec)` (binds a free local port), `update()`,
+  `send_input(flags, x, y)`, `disconnect()`, `state()`, `player_id()`,
+  `server_tick()`, `entities()` (public `EntitySnapshot`, world units).
+- [x] `ConnectionState` and `DisconnectReason` moved to public headers.
+- [x] The client ends the connection on any `disconnect` from the server, or
+  after 5 s without a packet from it (`ClientConnectionConfig::server_timeout`).
+  Packets after the end are ignored.
+- [x] When the connection ends, the network threads stop and `Disconnected
+  { reason }` is published once on the client's event bus (`server_full` when
+  rejected, `timeout` when the server never answered or went silent, `normal`
+  after `disconnect()`).
+- [x] `NetworkServer::stop()` sends `disconnect(server_shutdown)` to every
+  player before closing.
+- [ ] Use `NetworkClient` in `game/client/main.cpp` (#24), draw `entities()`
+  (#23), send keyboard input (#17/#18).
+- [ ] Hook `TypeTable` into the client: needs the server to send a real type
+  table in `connect_accept` (today `ServerOptions` has no types, so every
+  entity would be dropped).
 
 ### Next after #19/#20
 
@@ -258,7 +281,6 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
   game loop will spawn the player entity on `PlayerJoined`.
 - Hook `TypeTable` into the client: `assign` on `connect_accept`, then drop
   every `Inbound` that `admits` refuses.
-- Client side of a server timeout (#85): no heartbeat from the server yet.
 - #90 stays open until a client really connects (#19, #42); recheck the
   README commands then.
 
