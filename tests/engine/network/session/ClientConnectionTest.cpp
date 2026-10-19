@@ -32,12 +32,14 @@ using engine::network::Message;
 using engine::network::Outbound;
 using engine::network::ServerSessions;
 using engine::network::ServerSessionsConfig;
+using engine::network::SnapshotPayload;
 using engine::network::TypeEntry;
 using namespace std::chrono_literals;
 
 constexpr auto retry_interval = 500ms;
 constexpr std::size_t max_attempts = 3;
 constexpr auto heartbeat_interval = 1s;
+constexpr auto server_timeout = 3s;
 constexpr std::uint32_t sample_nonce = 0xCAFE;
 
 Endpoint endpoint(std::uint16_t port) {
@@ -77,7 +79,8 @@ protected:
     ClientConnection connection{clock, server_endpoint(), sample_nonce,
                                 ClientConnectionConfig{.retry_interval = retry_interval,
                                                        .max_attempts = max_attempts,
-                                                       .heartbeat_interval = heartbeat_interval}};
+                                                       .heartbeat_interval = heartbeat_interval,
+                                                       .server_timeout = server_timeout}};
 };
 
 } // namespace
@@ -215,6 +218,105 @@ TEST_F(ClientConnectionTest, DisconnectSendsNormalDisconnectOnlyOnce) {
     EXPECT_EQ(goodbye->message, Message{DisconnectPayload{.reason = DisconnectReason::normal}});
     EXPECT_EQ(connection.state(), ConnectionState::disconnected);
     EXPECT_FALSE(connection.disconnect().has_value());
+}
+
+TEST_F(ClientConnectionTest, HasNoDisconnectReasonWhileLive) {
+    EXPECT_FALSE(connection.disconnect_reason().has_value());
+
+    connect();
+
+    EXPECT_FALSE(connection.disconnect_reason().has_value());
+}
+
+TEST_F(ClientConnectionTest, ReportsEachReasonSentByTheServer) {
+    for (const auto reason :
+         {DisconnectReason::normal, DisconnectReason::timeout, DisconnectReason::server_shutdown,
+          DisconnectReason::protocol_error, DisconnectReason::server_full}) {
+        ClientConnection client(clock, server_endpoint(), sample_nonce);
+        static_cast<void>(client.update());
+        client.handle(accept_from_server());
+
+        client.handle(disconnect_from_server(reason));
+
+        EXPECT_EQ(client.state(), ConnectionState::disconnected) << static_cast<int>(reason);
+        EXPECT_EQ(client.disconnect_reason(), reason);
+    }
+}
+
+TEST_F(ClientConnectionTest, ReportsRejectionAsServerFull) {
+    static_cast<void>(connection.update());
+
+    connection.handle(disconnect_from_server(DisconnectReason::server_full));
+
+    EXPECT_EQ(connection.disconnect_reason(), DisconnectReason::server_full);
+}
+
+TEST_F(ClientConnectionTest, ReportsGivingUpAsTimeout) {
+    for (std::size_t attempt = 0; attempt <= max_attempts; ++attempt) {
+        static_cast<void>(connection.update());
+        clock.advance(retry_interval);
+    }
+
+    EXPECT_EQ(connection.state(), ConnectionState::gave_up);
+    EXPECT_EQ(connection.disconnect_reason(), DisconnectReason::timeout);
+}
+
+TEST_F(ClientConnectionTest, ReportsOwnDisconnectAsNormal) {
+    connect();
+
+    static_cast<void>(connection.disconnect());
+
+    EXPECT_EQ(connection.disconnect_reason(), DisconnectReason::normal);
+}
+
+TEST_F(ClientConnectionTest, TimesOutWhenTheServerStaysSilent) {
+    connect();
+
+    clock.advance(server_timeout);
+    EXPECT_TRUE(connection.update().has_value());
+    EXPECT_EQ(connection.state(), ConnectionState::connected);
+
+    clock.advance(1ns);
+    EXPECT_FALSE(connection.update().has_value());
+    EXPECT_EQ(connection.state(), ConnectionState::disconnected);
+    EXPECT_EQ(connection.disconnect_reason(), DisconnectReason::timeout);
+}
+
+TEST_F(ClientConnectionTest, AnyPacketFromTheServerPostponesTheTimeout) {
+    connect();
+    clock.advance(server_timeout);
+
+    EXPECT_TRUE(connection.handle(
+        from(server_endpoint(), SnapshotPayload{.server_tick = 1, .entities = {}})));
+    clock.advance(server_timeout);
+    static_cast<void>(connection.update());
+
+    EXPECT_EQ(connection.state(), ConnectionState::connected);
+}
+
+TEST_F(ClientConnectionTest, PacketsFromAnotherEndpointDoNotPostponeTheTimeout) {
+    connect();
+    clock.advance(server_timeout);
+
+    EXPECT_FALSE(
+        connection.handle(from(endpoint(6000), SnapshotPayload{.server_tick = 1, .entities = {}})));
+    clock.advance(1ns);
+    static_cast<void>(connection.update());
+
+    EXPECT_EQ(connection.state(), ConnectionState::disconnected);
+}
+
+TEST_F(ClientConnectionTest, IgnoresPacketsAfterTheConnectionEnded) {
+    connect();
+    static_cast<void>(connection.disconnect());
+
+    EXPECT_FALSE(connection.handle(accept_from_server()));
+    EXPECT_FALSE(connection.handle(disconnect_from_server(DisconnectReason::server_shutdown)));
+
+    EXPECT_EQ(connection.state(), ConnectionState::disconnected);
+    EXPECT_EQ(connection.disconnect_reason(), DisconnectReason::normal);
+    clock.advance(server_timeout * 2);
+    EXPECT_FALSE(connection.update().has_value());
 }
 
 TEST(ClientConnection, CompletesHandshakeAndDisconnectWithServerSessions) {

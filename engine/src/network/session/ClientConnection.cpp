@@ -17,24 +17,31 @@ std::optional<Outbound> ClientConnection::update() {
         return retry_connect(now);
     }
     if (state_ == ConnectionState::connected) {
-        return send_heartbeat(now);
+        return keep_alive(now);
     }
     return std::nullopt;
 }
 
-void ClientConnection::handle(const Inbound& inbound) {
+bool ClientConnection::handle(const Inbound& inbound) {
     if (inbound.from != server_) {
         core::log::debug("network: ignored message from {}, not the server",
                          inbound.from.to_string());
-        return;
+        return false;
+    }
+    if (!is_live()) {
+        core::log::debug("network: ignored message from {} after the connection ended",
+                         server_.to_string());
+        return false;
     }
 
+    last_received_ = clock_.get().now();
     const auto& message = inbound.message.message;
     if (const auto* accept = std::get_if<ConnectAcceptPayload>(&message)) {
         on_accept(*accept);
     } else if (const auto* disconnect = std::get_if<DisconnectPayload>(&message)) {
         on_disconnect(*disconnect);
     }
+    return true;
 }
 
 std::optional<Outbound> ClientConnection::send_input(const InputPayload& input) {
@@ -46,11 +53,15 @@ std::optional<Outbound> ClientConnection::send_input(const InputPayload& input) 
 }
 
 std::optional<Outbound> ClientConnection::disconnect() {
-    if (state_ != ConnectionState::connecting && state_ != ConnectionState::connected) {
+    if (!is_live()) {
         return std::nullopt;
     }
-    state_ = ConnectionState::disconnected;
+    end(ConnectionState::disconnected, DisconnectReason::normal);
     return to_server(DisconnectPayload{.reason = DisconnectReason::normal});
+}
+
+bool ClientConnection::is_live() const noexcept {
+    return state_ == ConnectionState::connecting || state_ == ConnectionState::connected;
 }
 
 std::optional<Outbound> ClientConnection::retry_connect(core::time::Duration now) {
@@ -58,7 +69,7 @@ std::optional<Outbound> ClientConnection::retry_connect(core::time::Duration now
         return std::nullopt;
     }
     if (attempts_ >= config_.max_attempts) {
-        state_ = ConnectionState::gave_up;
+        end(ConnectionState::gave_up, DisconnectReason::timeout);
         core::log::warn("network: no answer from {} after {} connect attempts", server_.to_string(),
                         attempts_);
         return std::nullopt;
@@ -69,7 +80,13 @@ std::optional<Outbound> ClientConnection::retry_connect(core::time::Duration now
     return to_server(ConnectRequestPayload{.client_nonce = client_nonce_});
 }
 
-std::optional<Outbound> ClientConnection::send_heartbeat(core::time::Duration now) {
+std::optional<Outbound> ClientConnection::keep_alive(core::time::Duration now) {
+    if (now - last_received_ > config_.server_timeout) {
+        end(ConnectionState::disconnected, DisconnectReason::timeout);
+        core::log::warn("network: lost {}: no packet received before the timeout",
+                        server_.to_string());
+        return std::nullopt;
+    }
     if (now - last_sent_ < config_.heartbeat_interval) {
         return std::nullopt;
     }
@@ -90,14 +107,18 @@ void ClientConnection::on_accept(const ConnectAcceptPayload& accept) {
 void ClientConnection::on_disconnect(const DisconnectPayload& disconnect) {
     if (state_ == ConnectionState::connecting &&
         disconnect.reason == DisconnectReason::server_full) {
-        state_ = ConnectionState::rejected;
+        end(ConnectionState::rejected, disconnect.reason);
         core::log::warn("network: {} rejected the connection: server full", server_.to_string());
         return;
     }
-    if (state_ == ConnectionState::connecting || state_ == ConnectionState::connected) {
-        state_ = ConnectionState::disconnected;
-        core::log::info("network: disconnected by {}", server_.to_string());
-    }
+    end(ConnectionState::disconnected, disconnect.reason);
+    core::log::info("network: disconnected by {} (reason {})", server_.to_string(),
+                    static_cast<int>(disconnect.reason));
+}
+
+void ClientConnection::end(ConnectionState state, DisconnectReason reason) {
+    state_ = state;
+    disconnect_reason_ = reason;
 }
 
 Outbound ClientConnection::to_server(Message message) const {
