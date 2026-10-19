@@ -46,8 +46,13 @@ Endpoint client(std::uint16_t port) {
     return endpoint.value_or(Endpoint{});
 }
 
-Inbound from(const Endpoint& endpoint, Message message) {
-    return Inbound{.from = endpoint, .message = {.header = {}, .message = std::move(message)}};
+Inbound from(const Endpoint& endpoint, Message message, std::uint32_t sequence = 0) {
+    return Inbound{.from = endpoint,
+                   .message = {.header = {.sequence = sequence}, .message = std::move(message)}};
+}
+
+Inbound input_from(const Endpoint& endpoint, std::uint32_t sequence, std::int8_t move_x) {
+    return from(endpoint, InputPayload{.action_flags = 1, .move_x = move_x, .move_y = 0}, sequence);
 }
 
 Inbound connect_from(const Endpoint& endpoint, std::uint32_t nonce = sample_nonce) {
@@ -242,4 +247,81 @@ TEST_F(ServerSessionsTest, ClientsTimingOutTogetherAreNotNotifiedAboutEachOther)
     }
     EXPECT_TRUE(sessions.sessions().empty());
     EXPECT_EQ(left, (std::vector<std::uint32_t>{1, 2}));
+}
+
+TEST_F(ServerSessionsTest, NewSessionStartsWithIdleInput) {
+    connect(5000);
+
+    EXPECT_EQ(sessions.sessions().front().input, InputPayload{});
+}
+
+TEST_F(ServerSessionsTest, StoresLatestInputOfEachSession) {
+    connect_players(5000, 2);
+
+    EXPECT_TRUE(sessions.handle(input_from(client(5000), 3, 1)).empty());
+    static_cast<void>(sessions.handle(input_from(client(5001), 3, -1)));
+    static_cast<void>(sessions.handle(input_from(client(5000), 4, -1)));
+
+    EXPECT_EQ(sessions.sessions()[0].input.move_x, -1);
+    EXPECT_EQ(sessions.sessions()[0].input.action_flags, 1);
+    EXPECT_EQ(sessions.sessions()[1].input.move_x, -1);
+}
+
+TEST_F(ServerSessionsTest, IgnoresOutOfOrderInput) {
+    connect(5000);
+
+    static_cast<void>(sessions.handle(input_from(client(5000), 10, 1)));
+    static_cast<void>(sessions.handle(input_from(client(5000), 9, -1)));
+
+    EXPECT_EQ(sessions.sessions().front().input.move_x, 1);
+}
+
+TEST_F(ServerSessionsTest, IgnoresDuplicateInput) {
+    connect(5000);
+
+    static_cast<void>(sessions.handle(input_from(client(5000), 10, 1)));
+    static_cast<void>(sessions.handle(input_from(client(5000), 10, -1)));
+
+    EXPECT_EQ(sessions.sessions().front().input.move_x, 1);
+}
+
+TEST_F(ServerSessionsTest, AcceptsInputAcrossSequenceWrap) {
+    connect(5000);
+
+    static_cast<void>(sessions.handle(input_from(client(5000), 0xFFFF'FFFF, 1)));
+    static_cast<void>(sessions.handle(input_from(client(5000), 0, -1)));
+
+    EXPECT_EQ(sessions.sessions().front().input.move_x, -1);
+}
+
+TEST_F(ServerSessionsTest, OlderInputStillKeepsSessionAlive) {
+    connect(5000);
+    static_cast<void>(sessions.handle(input_from(client(5000), 10, 1)));
+    clock.advance(4s);
+
+    static_cast<void>(sessions.handle(input_from(client(5000), 9, -1)));
+    clock.advance(4s);
+
+    EXPECT_TRUE(sessions.drop_timed_out().empty());
+}
+
+TEST_F(ServerSessionsTest, IgnoresInputFromUnknownEndpoint) {
+    connect(5000);
+
+    EXPECT_TRUE(sessions.handle(input_from(client(6000), 1, 1)).empty());
+
+    ASSERT_EQ(sessions.sessions().size(), 1U);
+    EXPECT_EQ(sessions.sessions().front().input, InputPayload{});
+}
+
+TEST_F(ServerSessionsTest, ReconnectedSessionAcceptsInputWithLowerSequence) {
+    connect(5000);
+    static_cast<void>(sessions.handle(input_from(client(5000), 500, 1)));
+    static_cast<void>(
+        sessions.handle(from(client(5000), disconnect_with(DisconnectReason::normal))));
+    connect(5000);
+
+    static_cast<void>(sessions.handle(input_from(client(5000), 2, -1)));
+
+    EXPECT_EQ(sessions.sessions().front().input.move_x, -1);
 }
