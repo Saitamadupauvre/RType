@@ -31,6 +31,8 @@ using engine::core::event::EventBus;
 using engine::core::time::SteadyClock;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
+using engine::network::DisconnectPayload;
+using engine::network::DisconnectReason;
 using engine::network::Endpoint;
 using engine::network::InputPayload;
 using engine::network::max_datagram_size;
@@ -168,4 +170,20 @@ TEST_F(NetworkServerTest, ServesAClientOverLoopback) {
     EXPECT_EQ(payload.server_tick, 1U);
     ASSERT_EQ(payload.entities.size(), 1U);
     EXPECT_EQ(payload.entities.front().y, 4);
+}
+
+TEST_F(NetworkServerTest, StopTellsConnectedPlayersTheServerIsShuttingDown) {
+    start();
+    auto peer = bound_peer();
+    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, server.port());
+    ASSERT_TRUE(receive_until(server, [this] { return server.player_count() == 1; }));
+    ASSERT_TRUE(receive_from_server(peer).has_value());
+
+    server.stop();
+
+    const auto goodbye = receive_from_server(peer);
+    ASSERT_TRUE(goodbye.has_value());
+    EXPECT_EQ(goodbye->message,
+              Message{DisconnectPayload{.reason = DisconnectReason::server_shutdown}});
+    EXPECT_EQ(server.player_count(), 0U);
 }

@@ -20,6 +20,7 @@ public:
 
     [[nodiscard]] std::vector<Outbound> receive(const std::vector<Inbound>& inbound);
     [[nodiscard]] std::vector<Outbound> snapshot(core::EntityManager& registry);
+    [[nodiscard]] std::vector<Outbound> shutdown();
 
     [[nodiscard]] const std::vector<Session>& sessions() const noexcept {
         return sessions_.sessions();

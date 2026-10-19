@@ -161,6 +161,21 @@ TEST_F(ServerNetworkTest, CrashedClientIsDroppedOnALaterTickAndOthersAreTold) {
     ASSERT_EQ(network.sessions().size(), 1U);
 }
 
+TEST_F(ServerNetworkTest, ShutdownTellsEveryPlayerAndEndsTheirSessions) {
+    connect_clients();
+    const Message shutdown{DisconnectPayload{.reason = DisconnectReason::server_shutdown}};
+
+    const auto outbound = network.shutdown();
+
+    ASSERT_EQ(outbound.size(), 2U);
+    EXPECT_EQ(outbound[0].to, client(5000));
+    EXPECT_EQ(outbound[0].message, shutdown);
+    EXPECT_EQ(outbound[1].to, client(5001));
+    EXPECT_EQ(outbound[1].message, shutdown);
+    EXPECT_TRUE(network.sessions().empty());
+    EXPECT_TRUE(network.shutdown().empty());
+}
+
 TEST_F(ServerNetworkTest, MessagesFromStrangersDoNotDisturbTheTick) {
     connect_clients();
 
