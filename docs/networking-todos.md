@@ -205,6 +205,25 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
   size) are dropped and logged by `handle_datagram` on the receive thread.
 - [x] `docs/protocol.md`: input rules.
 
+## Snapshots (#22)
+
+- [x] Public `engine::network::Replicated { type_id }`
+  (`engine/include/engine/network/Replicated.hpp`): marks the entities sent in
+  snapshots. Registered by the game on the server registry.
+- [x] `snapshot/SnapshotBuilder.{hpp,cpp}`:
+  `build_snapshots(EntityManager&, server_tick)` queries `Replicated` +
+  `Position` (+ `Velocity` when present) and returns snapshot packets of at
+  most `max_snapshot_entities` (84), all with the same tick; an empty world
+  still gives one empty snapshot. `to_wire_coordinate` rounds and clamps floats
+  to `int16` (NaN becomes 0).
+- [x] `ServerSessions::broadcast(Message)`: one `Outbound` per session; also
+  used for `player_left`, and ready for events (#84).
+- [x] `snapshot/SnapshotReceiver.{hpp,cpp}` (client): keeps the newest tick,
+  merges packets of the same tick by `entity_id`, ignores older ticks (with
+  wrap-around via `is_newer_sequence`).
+- [x] `docs/protocol.md`: multi-packet snapshots, what is replicated, client
+  rules.
+
 ### Next after #19/#20
 
 - Wire `NetworkIo` + `ServerSessions` into `NetworkServer`, and `NetworkIo`
@@ -369,11 +388,11 @@ relative to `engine/src/network/`:
 
 ## Reliability And Performance
 
-- [ ] Use sequence numbers to discard duplicated and stale snapshots.
+- [x] Use sequence numbers to discard duplicated and stale snapshots.
 - [ ] Identify reliable messages such as connection, spawn, destruction, and disconnection.
 - [ ] Define acknowledgement and retransmission behavior for reliable UDP messages.
 - [ ] Keep packets below the path MTU to avoid fragmentation.
-- [ ] Lift the 84-entity snapshot limit (multi-packet snapshots or delta compression), and update `docs/protocol.md`.
+- [x] Lift the 84-entity snapshot limit (multi-packet snapshots or delta compression), and update `docs/protocol.md`.
 - [ ] Measure packet rate, bandwidth use, latency, packet loss, and reordering.
 - [ ] Evaluate client-side prediction and snapshot interpolation after the authoritative path works.
 
@@ -383,7 +402,7 @@ relative to `engine/src/network/`:
 - [x] Add protocol tests for truncated packets, invalid lengths, unknown types, and random bytes.
 - [ ] Add deterministic transport tests with a fake transport instead of real network timing.
 - [x] Add server tests for queued input processing and heartbeat timeouts.
-- [ ] Add client tests for stale, duplicated, and out-of-order snapshots.
+- [x] Add client tests for stale, duplicated, and out-of-order snapshots.
 - [ ] Add payload tests for every message: valid, truncated, oversized, out-of-range values, and random bytes.
 
 ## Documentation

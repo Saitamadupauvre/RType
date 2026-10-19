@@ -124,7 +124,15 @@ Each entity record has the following layout:
 | 10 | 2 | `vx` | Signed 16-bit, big-endian velocity in virtual units per second |
 | 12 | 2 | `vy` | Signed 16-bit, big-endian velocity in virtual units per second |
 
-A snapshot carries at most 84 entities, the largest count that fits in the maximum payload size. Protocol version `1` has no multi-packet snapshots: the sender must not encode more than 84 entities.
+A snapshot packet carries at most 84 entities, the largest count that fits in the maximum payload size. A larger world is sent as several snapshot packets with the same `server_tick`, each holding at most 84 entities. The format of each packet does not change.
+
+The server replicates every entity that has the engine's `Replicated` component (its `type_id`) and a position; the velocity is zero when the entity has none. `entity_id` is the entity index. Coordinates and velocities are rounded to the nearest integer and clamped to the signed 16-bit range.
+
+The client keeps the world of the newest `server_tick` it has received, comparing ticks with wrap-around like sequence numbers:
+
+- a newer tick replaces the whole world with the packet's entities;
+- another packet of the same tick is merged in, an entity already present being updated rather than duplicated;
+- an older tick is ignored.
 
 The receiver rejects a snapshot unless its payload size is exactly `6 + entity_count * 14` and every `type_id` exists in the connection type table.
 
