@@ -7,6 +7,7 @@
 
 #include "engine/network/Events.hpp"
 
+#include "event/GameEvents.hpp"
 #include "session/ClientConnection.hpp"
 #include "snapshot/SnapshotReceiver.hpp"
 #include "socket/UdpSocket.hpp"
@@ -51,8 +52,11 @@ struct NetworkClient::ImplNet {
         if (!live.handle(inbound) || live.state() != ConnectionState::connected) {
             return;
         }
-        if (const auto* snapshot = std::get_if<SnapshotPayload>(&inbound.message.message)) {
+        const auto& message = inbound.message.message;
+        if (const auto* snapshot = std::get_if<SnapshotPayload>(&message)) {
             snapshots.receive(*snapshot);
+        } else if (const auto* event = std::get_if<EventPayload>(&message)) {
+            publish_received(events, *event);
         }
     }
 

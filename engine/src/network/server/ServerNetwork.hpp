@@ -19,6 +19,7 @@ public:
                   ServerSessionsConfig config);
 
     [[nodiscard]] std::vector<Outbound> receive(const std::vector<Inbound>& inbound);
+    void queue_event(const EventPayload& event);
     [[nodiscard]] std::vector<Outbound> snapshot(core::EntityManager& registry);
     [[nodiscard]] std::vector<Outbound> shutdown();
 
@@ -29,6 +30,7 @@ public:
 
 private:
     ServerSessions sessions_;
+    std::vector<Outbound> queued_events_;
     std::uint32_t server_tick_{0};
 };
 
