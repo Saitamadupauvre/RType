@@ -44,6 +44,7 @@ engine_add_test(network SOURCES
     engine/network/decoder/PayloadDecoderTest.cpp
     engine/network/encoder/PayloadEncoderTest.cpp
     engine/network/protocol/ProtocolHandlerTest.cpp
+    engine/network/protocol/SequenceTest.cpp
     engine/network/protocol/TypeTableTest.cpp
     engine/network/session/ClientConnectionTest.cpp
     engine/network/session/ServerSessionsTest.cpp
