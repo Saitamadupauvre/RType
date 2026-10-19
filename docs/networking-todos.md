@@ -120,10 +120,10 @@ Keep the per-datagram logic out of the thread so it is tested deterministically.
   tests to the CMake lists.
 - [x] Add `NetworkIo.cpp` to `engine/CMakeLists.txt` and
   `NetworkIoTest.cpp` to `tests/CMakeLists.txt`.
-- [ ] `./fred.sh all` green.
-- [ ] `cmake --workflow --preset tsan` reports no data race (#29 acceptance criterion).
+- [x] `./fred.sh all` green.
+- [x] `cmake --workflow --preset tsan` reports no data race (#29 acceptance criterion).
 - [x] Describe the receive, game and send threads in `docs/PROJECT.md` §7.
-- [ ] Update the "Server" checklist below; the full thread/queue/failure
+- [x] Update the "Server" checklist below; the full thread/queue/failure
   documentation is #89.
 
 ### Done alongside #29
@@ -138,14 +138,67 @@ Keep the per-datagram logic out of the thread so it is tested deterministically.
 - [x] #90 README "Run" section: arguments, `--help`, exit code `84`, local
   example with one server and two clients.
 
-### Next after #29
+## Sessions: connect, disconnect and timeouts (#19, #20)
 
-- #19/#20 sessions: handshake and session table on the game thread, fed by
-  `NetworkIo::poll()`, tested with fake `Inbound` messages and `ManualClock`.
-  Decide first how to add `Reject(reason)` and `PlayerLeft(player_id)` to the
-  protocol: neither exists yet.
+Game-thread logic on decoded messages: it takes `Inbound`, returns `Outbound`,
+reads time from an injected `IClock` and never touches a socket. New files go
+in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
+
+### 1. Protocol additions
+
+- [x] `Reject(reason)` is `disconnect` with the new reason
+  `DisconnectReason::server_full = 4`, sent in answer to `connect_request`.
+- [x] `PlayerLeft(player_id)` is the new event `PlayerLeftEvent
+  { player_entity_id }`, `EventType::player_left = 5`, 5 bytes.
+- [x] Encoder, `event_readers` table, validation and codec tests updated.
+- [x] `docs/protocol.md`: new values and a "Connection Flow" section.
+- [x] `Endpoint::operator==` (family, port, address), so sessions are keyed
+  by endpoint without going through strings.
+
+### 2. `ServerSessions` (`session/ServerSessions.{hpp,cpp}`)
+
+- [x] `ServerSessionsConfig { max_players, timeout = 5s, types }`. The engine
+  has no default player count: the game passes it, from `r-type_server
+  --max-players` (1 to 4, default 4), like the port.
+- [x] `handle(Inbound)`:
+  - `connect_request` from a new endpoint: `connect_accept` with the lowest
+    free player id and the type table, or `disconnect(server_full)` when full;
+  - `connect_request` from a known endpoint: same `connect_accept` again
+    (idempotent, no new session, no new event);
+  - any message from a known endpoint refreshes `last_seen`;
+  - `disconnect` from a known endpoint ends the session;
+  - anything else from an unknown endpoint is ignored and logged at debug.
+- [x] `drop_timed_out()`: sessions silent for longer than `timeout` get
+  `disconnect(timeout)`; sessions that time out together are not told about
+  each other.
+- [x] Ending a session sends `player_left` to every remaining session and
+  frees the player id.
+- [x] `PlayerJoined` / `PlayerLeft` published on the `EventBus`
+  (`engine/include/engine/network/Events.hpp`).
+
+### 3. `ClientConnection` (`session/ClientConnection.{hpp,cpp}`)
+
+- [x] `ClientConnectionConfig { retry_interval = 500ms, max_attempts = 5,
+  heartbeat_interval = 1s }`; the nonce is injected.
+- [x] `update()`: sends `connect_request` and retries every
+  `retry_interval`, then `gave_up` after `max_attempts`; once connected,
+  sends a `heartbeat` every `heartbeat_interval`.
+- [x] `handle(Inbound)`: only from the server endpoint. `connect_accept` with
+  the right nonce → `connected` (player id, types); `disconnect(server_full)`
+  while connecting → `rejected`; any other `disconnect` → `disconnected`.
+- [x] `disconnect()`: sends `disconnect(normal)` once.
+
+### Next after #19/#20
+
+- Wire `NetworkIo` + `ServerSessions` into `NetworkServer`, and `NetworkIo`
+  + `ClientConnection` into `NetworkClient`, from the game loop (#42):
+  each tick `poll()` → `handle` → `send`, then `drop_timed_out()` / `update()`.
+- `player_entity_id` currently carries the session's player id (1 to 4): the
+  game loop will spawn the player entity on `PlayerJoined`.
+- #21 inputs: keep the latest input per session in `ServerSessions`.
 - Hook `TypeTable` into the client: `assign` on `connect_accept`, then drop
   every `Inbound` that `admits` refuses.
+- Client side of a server timeout (#85): no heartbeat from the server yet.
 - #90 stays open until a client really connects (#19, #42); recheck the
   README commands then.
 
@@ -282,13 +335,13 @@ relative to `engine/src/network/`:
 
 ## Server
 
-- [ ] Start a dedicated network thread that receives UDP datagrams without blocking the game loop.
-- [ ] Decode and validate packets on the network thread.
-- [ ] Queue valid client inputs for the game thread.
+- [x] Start a dedicated network thread that receives UDP datagrams without blocking the game loop.
+- [x] Decode and validate packets on the network thread.
+- [x] Queue valid client inputs for the game thread.
 - [ ] Apply queued inputs at the start of each fixed server tick.
 - [ ] Send authoritative snapshots and game events to connected clients.
-- [ ] Track client endpoints and heartbeat deadlines.
-- [ ] Remove timed-out clients and notify the remaining clients.
+- [x] Track client endpoints and heartbeat deadlines.
+- [x] Remove timed-out clients and notify the remaining clients.
 
 ## Client
 

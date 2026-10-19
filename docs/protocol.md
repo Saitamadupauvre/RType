@@ -77,6 +77,18 @@ Names are compared byte for byte and are not validated as UTF-8.
 
 The receiver rejects duplicate type IDs, duplicate names, a name length of 0 or above 63, truncated entries, or entries extending beyond the declared payload length.
 
+### Connection Flow
+
+1. The client sends `connect_request` with a fresh `client_nonce`. Without an answer it resends the request after a retry interval, and gives up after a bounded number of attempts.
+2. The server answers with one of:
+   - `connect_accept` carrying the same nonce, the player ID and the type table;
+   - `disconnect` with reason `server_full` when every player slot is taken. The number of slots is set by the game (`r-type_server --max-players`, 1 to 4, default 4). No session is created.
+3. A repeated `connect_request` from an endpoint that already has a session is answered with `connect_accept` again, with the same player ID. It does not create a second session.
+4. Once connected, the client sends `heartbeat` at a fixed interval. Any valid packet from the client refreshes its session.
+5. A session ends when the client sends `disconnect`, or when the server receives nothing from it for longer than the session timeout. On timeout the server sends `disconnect` with reason `timeout` to that client. In both cases every remaining client receives a `player_left` event and the player ID becomes free.
+
+Packets from an endpoint without a session, other than `connect_request`, are ignored. A client with another protocol version never reaches this flow: its datagrams fail header validation and are dropped and logged.
+
 ## Input Payload
 
 An input message has a three-byte payload. The server identifies the player from the endpoint and session established by the connection flow. The payload contains no client ID or player position.
@@ -124,6 +136,7 @@ An event payload begins with a one-byte event type. Each event packet contains o
 | 2 | `destroy` | `entity_id` |
 | 3 | `fire` | `source_entity_id`, `projectile_entity_id` |
 | 4 | `sound` | `source_entity_id`, `sound_id` |
+| 5 | `player_left` | `player_entity_id` |
 
 The `spawn` event payload is 11 bytes.
 
@@ -141,6 +154,8 @@ The `fire` event payload is nine bytes: one-byte event type `3`, followed by uns
 
 The `sound` event payload is seven bytes: one-byte event type `4`, followed by unsigned 32-bit big-endian `source_entity_id` and unsigned 16-bit big-endian `sound_id`.
 
+The `player_left` event payload is five bytes: one-byte event type `5` followed by the unsigned 32-bit big-endian `player_entity_id` of the player whose session ended.
+
 The receiver rejects unknown event types, an event with an incorrect fixed payload size, and a spawn event with an unknown `type_id`.
 
 ## Heartbeat Payload
@@ -157,6 +172,9 @@ The disconnect payload contains one byte.
 | 1 | `timeout` |
 | 2 | `server_shutdown` |
 | 3 | `protocol_error` |
+| 4 | `server_full` |
+
+The server sends `server_full` in answer to a `connect_request` when no player slot is free.
 
 Receivers reject a disconnect payload unless it is exactly one byte and contains a defined reason.
 

@@ -40,13 +40,14 @@ next to the engine libraries and the `plugins/` folder. They find their files
 relative to the executable, so they can be started from any directory.
 
 ```sh
-./build/debug/bin/r-type_server <port>
+./build/debug/bin/r-type_server <port> [--max-players <n>]
 ./build/debug/bin/r-type_client <server-ip> <port>
 ```
 
 | Executable      | Argument    | Meaning                                       |
 |-----------------|-------------|-----------------------------------------------|
 | `r-type_server` | `port`      | UDP port to listen on, `1`–`65535`            |
+| `r-type_server` | `-p, --max-players` | Maximum connected players, `1`–`4`, default `4` |
 | `r-type_client` | `server-ip` | Address of the server, e.g. `127.0.0.1`       |
 | `r-type_client` | `port`      | UDP port of the server, `1`–`65535`           |
 | both            | `-h, --help`| Print the usage and exit with code `0`        |

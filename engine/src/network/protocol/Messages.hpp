@@ -59,6 +59,7 @@ enum class EventType : std::uint8_t {
     destroy = 2,
     fire = 3,
     sound = 4,
+    player_left = 5,
 };
 
 struct SpawnEvent {
@@ -90,7 +91,13 @@ struct SoundEvent {
     bool operator==(const SoundEvent&) const = default;
 };
 
-using EventPayload = std::variant<SpawnEvent, DestroyEvent, FireEvent, SoundEvent>;
+struct PlayerLeftEvent {
+    std::uint32_t player_entity_id{};
+
+    bool operator==(const PlayerLeftEvent&) const = default;
+};
+
+using EventPayload = std::variant<SpawnEvent, DestroyEvent, FireEvent, SoundEvent, PlayerLeftEvent>;
 
 struct HeartbeatPayload {
     bool operator==(const HeartbeatPayload&) const = default;
@@ -101,6 +108,7 @@ enum class DisconnectReason : std::uint8_t {
     timeout = 1,
     server_shutdown = 2,
     protocol_error = 3,
+    server_full = 4,
 };
 
 struct DisconnectPayload {

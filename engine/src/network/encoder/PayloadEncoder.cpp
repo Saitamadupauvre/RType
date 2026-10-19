@@ -57,6 +57,11 @@ void write_event(ByteWriter& writer, const SoundEvent& event) {
     writer.write_u16(event.sound_id);
 }
 
+void write_event(ByteWriter& writer, const PlayerLeftEvent& event) {
+    write_event_type(writer, EventType::player_left);
+    writer.write_u32(event.player_entity_id);
+}
+
 } // namespace
 
 EncodedPayload encode_payload(const ConnectRequestPayload& payload) {

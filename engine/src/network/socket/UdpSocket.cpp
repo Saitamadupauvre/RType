@@ -97,6 +97,31 @@ std::uint16_t Endpoint::port() const noexcept {
     return 0;
 }
 
+bool Endpoint::operator==(const Endpoint& other) const noexcept {
+    if (storage_.ss_family != other.storage_.ss_family) {
+        return false;
+    }
+
+    if (storage_.ss_family == AF_INET) {
+        sockaddr_in lhs{};
+        sockaddr_in rhs{};
+        std::memcpy(&lhs, &storage_, sizeof(lhs));
+        std::memcpy(&rhs, &other.storage_, sizeof(rhs));
+        return lhs.sin_port == rhs.sin_port && lhs.sin_addr.s_addr == rhs.sin_addr.s_addr;
+    }
+
+    if (storage_.ss_family == AF_INET6) {
+        sockaddr_in6 lhs{};
+        sockaddr_in6 rhs{};
+        std::memcpy(&lhs, &storage_, sizeof(lhs));
+        std::memcpy(&rhs, &other.storage_, sizeof(rhs));
+        return lhs.sin6_port == rhs.sin6_port && lhs.sin6_scope_id == rhs.sin6_scope_id &&
+               std::memcmp(&lhs.sin6_addr, &rhs.sin6_addr, sizeof(lhs.sin6_addr)) == 0;
+    }
+
+    return true;
+}
+
 std::string Endpoint::to_string() const {
     std::array<char, INET6_ADDRSTRLEN> text{};
 

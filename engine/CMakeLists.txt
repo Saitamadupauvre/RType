@@ -48,6 +48,8 @@ engine_add_module(network
         src/network/protocol/ProtocolHandler.cpp
         src/network/protocol/TypeTable.cpp
         src/network/protocol/Validation.cpp
+        src/network/session/ClientConnection.cpp
+        src/network/session/ServerSessions.cpp
         src/network/socket/SocketError.cpp
         src/network/socket/UdpSocket.cpp
         src/network/thread/DatagramHandler.cpp

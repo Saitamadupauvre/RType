@@ -19,7 +19,7 @@ template <typename Payload> std::vector<std::uint8_t> encoded(const Payload& pay
     return bytes.value_or(std::vector<std::uint8_t>{});
 }
 
-inline std::array<engine::network::EventPayload, 4> sample_events() {
+inline std::array<engine::network::EventPayload, 5> sample_events() {
     return {
         engine::network::SpawnEvent{
             .entity_id = 0x0102'0304, .type_id = 0x0506, .x = -2, .y = 0x0708},
@@ -27,6 +27,7 @@ inline std::array<engine::network::EventPayload, 4> sample_events() {
         engine::network::FireEvent{.source_entity_id = 0x0102'0304,
                                    .projectile_entity_id = 0x0506'0708},
         engine::network::SoundEvent{.source_entity_id = 0x0102'0304, .sound_id = 0x0506},
+        engine::network::PlayerLeftEvent{.player_entity_id = 0x0102'0304},
     };
 }
 

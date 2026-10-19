@@ -143,11 +143,10 @@ TEST(HeartbeatPayload, DecoderRejectsNonEmptyPayload) {
 }
 
 TEST(DisconnectPayload, RoundTripsEveryDefinedReason) {
-    constexpr std::array<DisconnectReason, 4> reasons{
-        DisconnectReason::normal,
-        DisconnectReason::timeout,
-        DisconnectReason::server_shutdown,
-        DisconnectReason::protocol_error,
+    constexpr std::array<DisconnectReason, 5> reasons{
+        DisconnectReason::normal,          DisconnectReason::timeout,
+        DisconnectReason::server_shutdown, DisconnectReason::protocol_error,
+        DisconnectReason::server_full,
     };
 
     for (const auto reason : reasons) {
@@ -158,7 +157,7 @@ TEST(DisconnectPayload, RoundTripsEveryDefinedReason) {
 }
 
 TEST(DisconnectPayload, DecoderRejectsUndefinedReasons) {
-    for (unsigned int value = 4; value <= 255; ++value) {
+    for (unsigned int value = 5; value <= 255; ++value) {
         const std::array<std::uint8_t, 1> payload{static_cast<std::uint8_t>(value)};
 
         EXPECT_FALSE(decode_disconnect(payload).has_value()) << "reason " << value;
@@ -182,7 +181,7 @@ TEST(EventPayload, DecoderRejectsEmptyPayload) {
 
 TEST(EventPayload, DecoderRejectsUnknownEventTypes) {
     for (unsigned int type = 0; type <= 255; ++type) {
-        if (type >= 1 && type <= 4) {
+        if (type >= 1 && type <= 5) {
             continue;
         }
         std::vector<std::uint8_t> payload(11, 0x00);
