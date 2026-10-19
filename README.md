@@ -53,7 +53,9 @@ relative to the executable, so they can be started from any directory.
 | both            | `-h, --help`| Print the usage and exit with code `0`        |
 
 A missing or invalid argument prints the error and the usage, and exits with
-code `84`.
+code `84`. The server also exits with `84` when it cannot listen on the port
+(for example when it is already in use). It runs until `Ctrl+C` (SIGINT) or
+SIGTERM, then sends what is left and exits with `0`.
 
 A local game with one server and two clients, each in its own terminal:
 
