@@ -288,6 +288,20 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
   the events, from Lua `spawn`/`destroy`/`play` once the server tick runs the
   scripts (#46).
 
+## Network statistics (#87)
+
+- [x] Sequences are per peer and assigned on the game thread
+  (`Outbound::sequence`): each server session and the client count their
+  own. `NetworkIo::send(Outbound)` no longer numbers packets.
+- [x] `stats/TrafficMeter`: packets and bytes per second over 1 s windows of
+  the engine clock, loss and reordering from sequences, latest round trip.
+- [x] The server answers each client heartbeat; the client sends one every
+  second even while sending inputs, and measures the round trip.
+- [x] Public `NetworkStats` / `PlayerStats` (`Stats.hpp`):
+  `NetworkServer::stats()`, `NetworkClient::stats()`, summary logged every
+  10 s. Everything lives on the game thread: no lock.
+- [ ] Round-trip time on the server side needs acknowledgements (#86).
+
 ### Next after #19/#20
 
 - Wire `NetworkIo` + `ServerSessions` into `NetworkServer`, and `NetworkIo`

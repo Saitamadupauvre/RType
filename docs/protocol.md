@@ -84,7 +84,7 @@ The receiver rejects duplicate type IDs, duplicate names, a name length of 0 or 
    - `connect_accept` carrying the same nonce, the player ID and the type table;
    - `disconnect` with reason `server_full` when every player slot is taken. The number of slots is set by the game (`r-type_server --max-players`, 1 to 4, default 4). No session is created.
 3. A repeated `connect_request` from an endpoint that already has a session is answered with `connect_accept` again, with the same player ID. It does not create a second session.
-4. Once connected, the client sends `heartbeat` at a fixed interval. Any valid packet from the client refreshes its session.
+4. Once connected, the client sends `heartbeat` at a fixed interval and the server answers each one with `heartbeat`. Any valid packet from the client refreshes its session.
 5. A session ends when the client sends `disconnect`, or when the server receives nothing from it for longer than the session timeout. On timeout the server sends `disconnect` with reason `timeout` to that client. In both cases every remaining client receives a `player_left` event and the player ID becomes free.
 6. When the server stops, it sends `disconnect` with reason `server_shutdown` to every client and ends every session.
 7. The client ends the connection when it receives `disconnect` from the server (any reason), or when it receives nothing from the server for longer than its timeout (5 seconds). The server sends a snapshot to every session each tick, so a running server is never silent. Once the connection has ended, the client ignores every packet from the server.
@@ -174,7 +174,7 @@ The server sends the events of a tick to every connected session after the tick,
 
 ## Heartbeat Payload
 
-A heartbeat payload is empty. Both peers may send it periodically to prove that their UDP endpoint remains reachable. A peer that does not receive any valid packet or heartbeat before the configured timeout is considered disconnected. The client sends heartbeats while it has no input to send; the server does not need to, since its snapshots already reach every client each tick.
+A heartbeat payload is empty. Both peers may send it periodically to prove that their UDP endpoint remains reachable. A peer that does not receive any valid packet or heartbeat before the configured timeout is considered disconnected. The client sends a heartbeat every second while connected, inputs or not. The server answers each one with a heartbeat, and the client uses the delay as its round-trip time. The server never sends heartbeats of its own: its snapshots already reach every client each tick.
 
 ## Disconnect Payload
 
@@ -194,7 +194,7 @@ Receivers reject a disconnect payload unless it is exactly one byte and contains
 
 ## Sequence Numbers
 
-Each sender increments its packet sequence for every datagram it sends. Receivers use sequence numbers to detect duplicated and stale packets. Sequence numbers wrap from `0xFFFFFFFF` to `0`.
+Each sender keeps one packet sequence per peer and increments it for every datagram it sends to that peer: the server numbers each session separately, starting at `0`. Receivers use sequence numbers to detect duplicated and stale packets, and to measure loss (gaps) and reordering (a packet older than the newest one). Sequence numbers wrap from `0xFFFFFFFF` to `0`.
 
 ## Receiver Rules
 
