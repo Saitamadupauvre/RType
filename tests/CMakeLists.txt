@@ -144,3 +144,4 @@ game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cp
     game/client/TemporaryNetworkViewTest.cpp
     LINKS r-type_client_cli r-type_client_controls r-type_client_draw
     r-type_client_temporary_network)
+game_add_test(common SOURCES game/common/ActionCodecTest.cpp LINKS r-type_common)

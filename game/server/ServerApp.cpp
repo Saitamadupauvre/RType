@@ -1,19 +1,20 @@
 #include "ServerApp.hpp"
 
-#include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
-#include <string>
-#include <string_view>
+#include <limits>
+#include <optional>
 #include <system_error>
 #include <thread>
+#include <utility>
 
+#include "ActionCodec.hpp"
 #include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/Entity.hpp"
+#include "engine/core/log/Log.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/network/Events.hpp"
-#include "engine/network/Replicated.hpp"
-#include "engine/script/InputState.hpp"
 
 namespace rtype::server {
 
@@ -22,32 +23,7 @@ namespace {
 using namespace std::chrono_literals;
 
 constexpr auto idle_between_frames = 1ms;
-constexpr std::uint16_t player_type_id = 1;
-constexpr std::string_view player_entity_type = "square";
-constexpr std::uint8_t fire_flag = 1U;
-constexpr float axis_range = 127.F;
-constexpr float spawn_x = 100.F;
-constexpr float first_spawn_y = 120.F;
-constexpr float spawn_spacing = 140.F;
-
-float to_axis(std::int8_t value) {
-    return std::clamp(static_cast<float>(value) / axis_range, -1.F, 1.F);
-}
-
-engine::script::InputState to_input_state(const engine::network::PlayerInput& input) {
-    engine::script::InputState state;
-    state.axes.emplace("move_x", to_axis(input.move_x));
-    state.axes.emplace("move_y", to_axis(input.move_y));
-    if ((input.action_flags & fire_flag) != 0) {
-        state.pressed.emplace("fire");
-    }
-    return state;
-}
-
-engine::core::Vec2 spawn_position(std::uint32_t player_id) {
-    const auto slot = static_cast<float>(player_id % max_supported_players);
-    return {spawn_x, first_spawn_y + (slot * spawn_spacing)};
-}
+constexpr std::size_t max_type_name_length = 63;
 
 template <typename Component> void register_if_missing(engine::core::EntityManager& registry) {
     if (!registry.is_registered<Component>()) {
@@ -55,28 +31,60 @@ template <typename Component> void register_if_missing(engine::core::EntityManag
     }
 }
 
+std::vector<engine::network::ReplicatedType> load_game(engine::script::ScriptRuntime& runtime,
+                                                       engine::core::EntityManager& registry,
+                                                       const std::filesystem::path& scripts) {
+    runtime.attach_world(registry);
+    if (!scripts.empty()) {
+        runtime.load_scripts(scripts);
+    }
+    std::vector<engine::network::ReplicatedType> types;
+    for (std::string& name : runtime.entity_types()) {
+        if (name.size() > max_type_name_length ||
+            types.size() == std::numeric_limits<std::uint16_t>::max()) {
+            engine::core::log::warn("server: entity type '{}' cannot be replicated", name);
+            continue;
+        }
+        const auto type_id = static_cast<std::uint16_t>(types.size() + 1);
+        types.push_back({.type_id = type_id, .name = std::move(name)});
+    }
+    return types;
+}
+
+std::unordered_map<std::string, std::uint16_t>
+index_types(const std::vector<engine::network::ReplicatedType>& types) {
+    std::unordered_map<std::string, std::uint16_t> ids;
+    for (const auto& type : types) {
+        ids.emplace(type.name, type.type_id);
+    }
+    return ids;
+}
+
+std::uint8_t wire_owner(std::optional<std::uint32_t> owner) {
+    if (!owner || *owner > std::numeric_limits<std::uint8_t>::max()) {
+        return 0;
+    }
+    return static_cast<std::uint8_t>(*owner);
+}
+
 } // namespace
 
 ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig& config,
                      const std::filesystem::path& scripts)
-    : clock_(clock),
-      network_(
-          clock, events_,
-          engine::network::ServerOptions{
-              .port = config.port,
-              .max_players = config.max_players,
-              .types = {{.type_id = player_type_id, .name = std::string(player_entity_type)}}}) {
+    : clock_(clock), _types(load_game(_runtime, registry_, scripts)),
+      _type_ids(index_types(_types)),
+      network_(clock, events_,
+               engine::network::ServerOptions{
+                   .port = config.port, .max_players = config.max_players, .types = _types}) {
     register_if_missing<engine::network::Replicated>(registry_);
     register_if_missing<engine::core::Position>(registry_);
     register_if_missing<engine::core::Velocity>(registry_);
-    _runtime.attach_world(registry_);
-    if (!scripts.empty()) {
-        _runtime.load_scripts(scripts);
-    }
     events_.subscribe<engine::network::PlayerJoined>(
-        [this](const engine::network::PlayerJoined& joined) { spawn_player(joined.player_id); });
+        [this](const engine::network::PlayerJoined& joined) {
+            _runtime.player_joined(joined.player_id);
+        });
     events_.subscribe<engine::network::PlayerLeft>(
-        [this](const engine::network::PlayerLeft& left) { remove_player(left.player_id); });
+        [this](const engine::network::PlayerLeft& left) { _runtime.player_left(left.player_id); });
 }
 
 bool ServerApp::start(std::string& error) {
@@ -95,46 +103,42 @@ void ServerApp::tick(engine::core::time::Duration step) {
     _runtime.update(dt);
     _runtime.flush_destroyed();
     systems_.run(registry_, dt);
+    replicate();
     network_.send_snapshot(registry_);
 }
 
 void ServerApp::apply_inputs(const std::vector<engine::network::PlayerInput>& inputs) {
     for (const auto& input : inputs) {
-        const auto player = _players.find(input.player_id);
-        if (player != _players.end()) {
-            _runtime.set_input(player->second, to_input_state(input));
+        _runtime.set_player_input(input.player_id,
+                                  common::unpack_input({.action_flags = input.action_flags,
+                                                        .move_x = input.move_x,
+                                                        .move_y = input.move_y}));
+    }
+}
+
+void ServerApp::replicate() {
+    std::vector<std::pair<engine::core::Entity, engine::network::Replicated>> updates;
+    registry_.query<engine::core::Position>().each(
+        [&](engine::core::Entity entity, const engine::core::Position&) {
+            const auto type = _runtime.entity_type(entity);
+            if (!type) {
+                return;
+            }
+            const auto type_id = _type_ids.find(*type);
+            if (type_id == _type_ids.end()) {
+                return;
+            }
+            updates.emplace_back(entity, engine::network::Replicated{
+                                             .type_id = type_id->second,
+                                             .owner = wire_owner(_runtime.entity_owner(entity))});
+        });
+    for (const auto& [entity, replicated] : updates) {
+        if (registry_.has<engine::network::Replicated>(entity)) {
+            registry_.get<engine::network::Replicated>(entity) = replicated;
+        } else {
+            registry_.add(entity, replicated);
         }
     }
-}
-
-std::optional<engine::core::Entity> ServerApp::player_entity(std::uint32_t player_id) const {
-    const auto player = _players.find(player_id);
-    if (player == _players.end()) {
-        return std::nullopt;
-    }
-    return player->second;
-}
-
-void ServerApp::spawn_player(std::uint32_t player_id) {
-    if (_players.contains(player_id)) {
-        return;
-    }
-    const auto entity = _runtime.spawn(player_entity_type, spawn_position(player_id));
-    if (!entity) {
-        return;
-    }
-    registry_.add(*entity, engine::network::Replicated{.type_id = player_type_id});
-    _players.emplace(player_id, *entity);
-}
-
-void ServerApp::remove_player(std::uint32_t player_id) {
-    const auto player = _players.find(player_id);
-    if (player == _players.end()) {
-        return;
-    }
-    _runtime.release(player->second);
-    registry_.kill(player->second);
-    _players.erase(player);
 }
 
 void ServerApp::run(const std::function<bool()>& should_stop) {

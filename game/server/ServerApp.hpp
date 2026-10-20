@@ -3,17 +3,16 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
-#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "Cli.hpp"
-#include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/SystemScheduler.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
+#include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
@@ -30,24 +29,26 @@ public:
     void stop();
 
     void apply_inputs(const std::vector<engine::network::PlayerInput>& inputs);
-    [[nodiscard]] std::optional<engine::core::Entity> player_entity(std::uint32_t player_id) const;
+    void replicate();
 
     [[nodiscard]] engine::core::EntityManager& registry() noexcept { return registry_; }
     [[nodiscard]] engine::core::SystemScheduler& systems() noexcept { return systems_; }
     [[nodiscard]] engine::core::event::EventBus& events() noexcept { return events_; }
     [[nodiscard]] engine::network::NetworkServer& network() noexcept { return network_; }
+    [[nodiscard]] engine::script::ScriptRuntime& script() noexcept { return _runtime; }
+    [[nodiscard]] const std::vector<engine::network::ReplicatedType>& types() const noexcept {
+        return _types;
+    }
 
 private:
-    void spawn_player(std::uint32_t player_id);
-    void remove_player(std::uint32_t player_id);
-
     std::reference_wrapper<const engine::core::time::IClock> clock_;
     engine::core::event::EventBus events_;
     engine::core::EntityManager registry_;
     engine::core::SystemScheduler systems_;
-    engine::network::NetworkServer network_;
     engine::script::ScriptRuntime _runtime;
-    std::unordered_map<std::uint32_t, engine::core::Entity> _players;
+    std::vector<engine::network::ReplicatedType> _types;
+    std::unordered_map<std::string, std::uint16_t> _type_ids;
+    engine::network::NetworkServer network_;
 };
 
 } // namespace rtype::server

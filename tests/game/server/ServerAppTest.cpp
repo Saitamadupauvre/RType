@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,7 @@
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
 
+using engine::core::Entity;
 using engine::core::EntityManager;
 using engine::core::time::Duration;
 using engine::core::time::ManualClock;
@@ -29,8 +31,31 @@ constexpr ServerConfig config{.port = 4242, .max_players = 4};
 const std::filesystem::path players_scripts =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "players";
 
+std::vector<Entity> owned_by(ServerApp& app, std::uint32_t player_id) {
+    std::vector<Entity> owned;
+    app.registry().query<engine::core::Position>().each(
+        [&](Entity entity, const engine::core::Position&) {
+            if (app.script().entity_owner(entity) == player_id) {
+                owned.push_back(entity);
+            }
+        });
+    return owned;
+}
+
+Entity ship_of(ServerApp& app, std::uint32_t player_id) {
+    const auto owned = owned_by(app, player_id);
+    if (owned.size() != 1) {
+        throw std::runtime_error("expected one entity for player " + std::to_string(player_id));
+    }
+    return owned.front();
+}
+
 engine::core::Vec2 position_of(ServerApp& app, std::uint32_t player_id) {
-    return app.registry().get<engine::core::Position>(*app.player_entity(player_id)).pos;
+    return app.registry().get<engine::core::Position>(ship_of(app, player_id)).pos;
+}
+
+PlayerInput input_for(std::uint32_t player_id, std::int8_t move_x, std::int8_t move_y) {
+    return {.player_id = player_id, .action_flags = 0, .move_x = move_x, .move_y = move_y};
 }
 
 } // namespace
@@ -82,62 +107,78 @@ TEST(ServerApp, StartReportsPortAlreadyInUse) {
     EXPECT_NE(error.find(std::to_string(first.network().port())), std::string::npos) << error;
 }
 
-TEST(ServerApp, JoiningPlayerGetsAReplicatedSquare) {
+TEST(ServerApp, TypeTableListsDeclaredEntitiesInOrder) {
     const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
+    const ServerApp app(clock, config, players_scripts);
 
-    app.events().publish(PlayerJoined{.player_id = 1});
-
-    const auto entity = app.player_entity(1);
-    ASSERT_TRUE(entity.has_value());
-    EXPECT_TRUE(app.registry().has<engine::network::Replicated>(*entity));
-    EXPECT_TRUE(app.registry().has<engine::core::Position>(*entity));
+    ASSERT_EQ(app.types().size(), 2U);
+    EXPECT_EQ(app.types()[0].name, "scenery");
+    EXPECT_EQ(app.types()[0].type_id, 1U);
+    EXPECT_EQ(app.types()[1].name, "square");
+    EXPECT_EQ(app.types()[1].type_id, 2U);
 }
 
-TEST(ServerApp, PlayersSpawnAtDifferentPositions) {
+TEST(ServerApp, JoiningPlayerGetsTheEntitiesOfOnPlayerJoined) {
     const ManualClock clock;
     ServerApp app(clock, config, players_scripts);
 
     app.events().publish(PlayerJoined{.player_id = 1});
     app.events().publish(PlayerJoined{.player_id = 2});
 
+    EXPECT_EQ(owned_by(app, 1).size(), 1U);
     EXPECT_NE(position_of(app, 1).y, position_of(app, 2).y);
 }
 
-TEST(ServerApp, DuplicateJoinKeepsTheFirstSquare) {
+TEST(ServerApp, ReplicateTagsScriptEntitiesWithTypeAndOwner) {
     const ManualClock clock;
     ServerApp app(clock, config, players_scripts);
-    app.events().publish(PlayerJoined{.player_id = 1});
-    const auto first = app.player_entity(1);
+    app.events().publish(PlayerJoined{.player_id = 3});
 
-    app.events().publish(PlayerJoined{.player_id = 1});
+    app.replicate();
 
-    EXPECT_EQ(app.player_entity(1), first);
+    const auto& replicated = app.registry().get<engine::network::Replicated>(ship_of(app, 3));
+    EXPECT_EQ(replicated.type_id, 2U);
+    EXPECT_EQ(replicated.owner, 3U);
 }
 
-TEST(ServerApp, LeavingPlayerSquareIsDestroyed) {
+TEST(ServerApp, ReplicateClearsOwnerOnceThePlayerHasLeft) {
     const ManualClock clock;
     ServerApp app(clock, config, players_scripts);
     app.events().publish(PlayerJoined{.player_id = 1});
-    const auto entity = *app.player_entity(1);
+    const Entity ship = ship_of(app, 1);
+    app.replicate();
+    app.script().run_string("for _, e in ipairs(find_player(1):entities()) do e.owner = nil end",
+                            "test");
+
+    app.replicate();
+
+    EXPECT_EQ(app.registry().get<engine::network::Replicated>(ship).owner, 0U);
+}
+
+TEST(ServerApp, EntitiesNotSpawnedByScriptsAreNotReplicated) {
+    const ManualClock clock;
+    ServerApp app(clock, config, players_scripts);
+    const Entity native = app.registry().spawn();
+    app.registry().add(native, engine::core::Position{});
+
+    app.replicate();
+
+    EXPECT_FALSE(app.registry().has<engine::network::Replicated>(native));
+}
+
+TEST(ServerApp, LeavingPlayerEntitiesAreDestroyedOnTheNextTick) {
+    const ManualClock clock;
+    ServerApp app(clock, config, players_scripts);
+    app.events().publish(PlayerJoined{.player_id = 1});
+    const Entity ship = ship_of(app, 1);
 
     app.events().publish(PlayerLeft{.player_id = 1});
+    app.tick(tick_step);
 
-    EXPECT_FALSE(app.player_entity(1).has_value());
-    EXPECT_FALSE(app.registry().alive(entity));
+    EXPECT_FALSE(app.registry().alive(ship));
 }
 
-TEST(ServerApp, UnknownPlayerLeavingIsIgnored) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
-    app.events().publish(PlayerJoined{.player_id = 1});
-
-    app.events().publish(PlayerLeft{.player_id = 7});
-
-    EXPECT_TRUE(app.player_entity(1).has_value());
-}
-
-TEST(ServerApp, InputMovesOnlyThatPlayerSquare) {
+TEST(ServerApp, InputMovesOnlyThatPlayerEntity) {
     const ManualClock clock;
     ServerApp app(clock, config, players_scripts);
     app.events().publish(PlayerJoined{.player_id = 1});
@@ -145,7 +186,7 @@ TEST(ServerApp, InputMovesOnlyThatPlayerSquare) {
     const auto start_one = position_of(app, 1);
     const auto start_two = position_of(app, 2);
 
-    app.apply_inputs({PlayerInput{.player_id = 1, .action_flags = 0, .move_x = 127, .move_y = 0}});
+    app.apply_inputs({input_for(1, 127, 0)});
     app.tick(tick_step);
 
     EXPECT_FLOAT_EQ(position_of(app, 1).x, start_one.x + 1.F);
@@ -159,7 +200,7 @@ TEST(ServerApp, InputAxisIsClampedToUnitRange) {
     app.events().publish(PlayerJoined{.player_id = 1});
     const auto start = position_of(app, 1);
 
-    app.apply_inputs({PlayerInput{.player_id = 1, .action_flags = 0, .move_x = 0, .move_y = -128}});
+    app.apply_inputs({input_for(1, 0, -128)});
     app.tick(tick_step);
 
     EXPECT_FLOAT_EQ(position_of(app, 1).y, start.y - 1.F);
@@ -171,17 +212,19 @@ TEST(ServerApp, InputFromUnknownPlayerIsIgnored) {
     app.events().publish(PlayerJoined{.player_id = 1});
     const auto start = position_of(app, 1);
 
-    app.apply_inputs({PlayerInput{.player_id = 9, .action_flags = 0, .move_x = 127, .move_y = 0}});
+    app.apply_inputs({input_for(9, 127, 0)});
     app.tick(tick_step);
 
     EXPECT_FLOAT_EQ(position_of(app, 1).x, start.x);
 }
 
-TEST(ServerApp, JoinWithoutScriptsSpawnsNothing) {
+TEST(ServerApp, MissingScriptsGiveAnEmptyGame) {
     const ManualClock clock;
     ServerApp app(clock, config, std::filesystem::path(RTYPE_FIXTURES_DIR) / "missing");
 
     app.events().publish(PlayerJoined{.player_id = 1});
+    app.tick(tick_step);
 
-    EXPECT_FALSE(app.player_entity(1).has_value());
+    EXPECT_TRUE(app.types().empty());
+    EXPECT_TRUE(owned_by(app, 1).empty());
 }

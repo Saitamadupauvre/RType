@@ -49,9 +49,11 @@ entry points over generic `ServerApp` / `ClientApp` classes from the engine.
 
 ## Multiplayer demo
 
-Every connected player gets a white square on the server. Arrow keys (or
-`ZQSD`) move it; every client sees every square. The server runs the Lua
-game; the client only sends inputs and draws the snapshot.
+`main.lua` gives every connected player a square in the colour of its slot
+(`on_player_joined`) and removes it when the player leaves
+(`on_player_left`). Arrow keys (or `ZQSD`) move it; every client sees every
+square and outlines its own. The server runs the Lua game; the client only
+sends inputs and draws the snapshot.
 
 ```sh
 cmake --build --preset ninja-debug
@@ -64,8 +66,11 @@ cd build/ninja-debug/bin
 - Move one square: the other window shows the same position.
 - Close one client: its square disappears from the other window.
 
-The client side lives in `game/client/TemporaryNetworkView.*` until the
-snapshot display (#23) and the client loop (#24) replace it.
+`ServerApp` holds no game rule: it forwards joins, leaves and inputs to the
+script runtime and replicates every scripted entity with its declared type,
+owner and colour. It is the generic server of Part 2. The client drawing
+lives in `game/client/TemporaryNetworkView.*` until the snapshot display
+(#23) and the client loop (#24) replace it.
 
 ## Scripts
 

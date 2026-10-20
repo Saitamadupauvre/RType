@@ -4,6 +4,7 @@
 #include <iostream>
 #include <system_error>
 
+#include "ActionCodec.hpp"
 #include "Cli.hpp"
 #include "Controls.hpp"
 #include "Starfield.hpp"
@@ -68,11 +69,11 @@ int main(int argc, char** argv) {
         const auto controls = rtype::client::read_controls(input);
         loop.run_frame([&](engine::core::time::Duration step) {
             starfield.update(std::chrono::duration<float>(step).count());
-            const auto sent = rtype::client::temporary_to_network_input(controls);
+            const auto sent = rtype::common::pack_input(controls);
             network.send_input(sent.action_flags, sent.move_x, sent.move_y);
         });
         starfield.draw(renderer);
-        rtype::client::temporary_draw_snapshot(renderer, network.entities());
+        rtype::client::temporary_draw_snapshot(renderer, network.entities(), network.player_id());
         renderer.end_frame();
     }
 
