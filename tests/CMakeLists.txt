@@ -129,7 +129,8 @@ plugin_add_test(graphics-raylib
     SOURCES
         plugins/graphics-raylib/LetterboxTest.cpp
         plugins/graphics-raylib/KeyMapTest.cpp
-    LINKS graphics-raylib-letterbox graphics-raylib-keymap
+        plugins/graphics-raylib/TextureTableTest.cpp
+    LINKS graphics-raylib-letterbox graphics-raylib-keymap graphics-raylib-textures
 )
 
 game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
@@ -138,4 +139,5 @@ game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
 
 game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
 game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
-    LINKS r-type_client_cli r-type_client_controls)
+    game/client/WorldDrawTest.cpp
+    LINKS r-type_client_cli r-type_client_controls r-type_client_draw)

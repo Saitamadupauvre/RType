@@ -36,6 +36,18 @@ struct TextureId {
     bool operator==(const TextureId&) const = default;
 };
 
+/** @brief Part of a texture drawn into a rectangle of the virtual space. */
+struct SpriteDraw {
+    /** @brief Texture to draw; the default value draws the placeholder texture. */
+    TextureId texture;
+    /** @brief Region of the texture to draw, in texture pixels. */
+    Rect source;
+    /** @brief Where the region is drawn, in virtual units; it is stretched to fit. */
+    Rect dest;
+    /** @brief Color multiplied with the texture; white keeps it unchanged. */
+    Color tint{.r = 255, .g = 255, .b = 255, .a = 255};
+};
+
 /** @brief Settings used to open a window. */
 struct WindowConfig {
     int width{1280};

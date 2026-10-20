@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <string>
 #include <type_traits>
 
 #include "engine/core/Vec2.hpp"
@@ -22,8 +23,17 @@ public:
     [[nodiscard]] bool should_close() const override { return !_open; }
     void set_fullscreen(bool enabled) override { fullscreen = enabled; }
     [[nodiscard]] Vec2 virtual_size() const override { return {1920, 1080}; }
+    [[nodiscard]] TextureId load_texture(const std::string&) override { return {}; }
+    void unload_texture(TextureId) override {}
+    [[nodiscard]] Vec2 texture_size(TextureId) const override { return {}; }
     void begin_frame(Color clear) override { last_clear = clear; }
     void end_frame() override { ++frames; }
+    void draw_sprite(const SpriteDraw&) override {}
+    void draw_rect(const Rect&, Color, bool) override {}
+    void draw_circle(Vec2, float, Color) override {}
+    void draw_line(Vec2, Vec2, float, Color) override {}
+    void draw_text(const std::string&, Vec2, float, Color) override {}
+    [[nodiscard]] Vec2 measure_text(const std::string&, float) const override { return {}; }
 
     bool fullscreen{false};
     engine::graphics::Color last_clear{};

@@ -4,7 +4,7 @@
 
 #include "Cli.hpp"
 #include "Controls.hpp"
-#include "TempDraw.hpp"
+#include "WorldDraw.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
@@ -70,11 +70,7 @@ int main(int argc, char** argv) {
 
     const engine::core::time::SteadyClock clock;
     engine::core::time::FixedStepLoop loop(clock);
-    // TEMPORARY(#72): replace with the real renderer API.
-    const rtype::client::TempDraw temp_draw(plugin_path, executable_dir / "assets");
-    if (!temp_draw.ready()) {
-        std::cerr << "Temporary draw functions missing from the graphics plugin\n";
-    }
+    rtype::client::WorldDraw world_draw(renderer, executable_dir / "assets");
 
     while (!renderer.should_close()) {
         renderer.begin_frame(background);
@@ -82,7 +78,7 @@ int main(int argc, char** argv) {
         loop.run_frame([&](engine::core::time::Duration step) {
             tick(world, runtime, controls, std::chrono::duration<float>(step).count());
         });
-        temp_draw.draw_world(world);
+        world_draw.draw(world);
         renderer.end_frame();
     }
 

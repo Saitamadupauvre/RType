@@ -24,11 +24,15 @@ set_target_properties(graphics-raylib-keymap PROPERTIES
 )
 engine_set_warnings(graphics-raylib-keymap)
 
+add_library(graphics-raylib-textures INTERFACE)
+target_include_directories(graphics-raylib-textures INTERFACE src)
+target_link_libraries(graphics-raylib-textures INTERFACE engine::graphics)
+
 engine_add_plugin(graphics-raylib
     SOURCES
         src/Plugin.cpp
         src/RaylibInput.cpp
         src/RaylibRenderer.cpp
-        src/TempDraw.cpp
-    PRIVATE_DEPENDS engine::graphics graphics-raylib-letterbox graphics-raylib-keymap raylib glfw
+    PRIVATE_DEPENDS engine::graphics graphics-raylib-letterbox graphics-raylib-keymap
+        graphics-raylib-textures raylib glfw
 )

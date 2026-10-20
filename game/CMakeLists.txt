@@ -24,8 +24,13 @@ target_link_libraries(r-type_client_controls PUBLIC engine::graphics engine::scr
 target_include_directories(r-type_client_controls PUBLIC client)
 rtype_set_warnings(r-type_client_controls)
 
-add_executable(r-type_client client/main.cpp client/TempDraw.cpp)
-target_link_libraries(r-type_client PRIVATE r-type_client_cli r-type_client_controls engine::core engine::script engine::network engine::graphics)
+add_library(r-type_client_draw STATIC client/WorldDraw.cpp)
+target_link_libraries(r-type_client_draw PUBLIC engine::core engine::graphics)
+target_include_directories(r-type_client_draw PUBLIC client)
+rtype_set_warnings(r-type_client_draw)
+
+add_executable(r-type_client client/main.cpp)
+target_link_libraries(r-type_client PRIVATE r-type_client_cli r-type_client_controls r-type_client_draw engine::core engine::script engine::network engine::graphics)
 add_custom_command(TARGET r-type_client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/scripts $<TARGET_FILE_DIR:r-type_client>/scripts
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:r-type_client>/assets

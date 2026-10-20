@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "engine/core/Vec2.hpp"
 #include "engine/graphics/IGraphicsBackend.hpp"
 
@@ -12,8 +14,25 @@ public:
     [[nodiscard]] bool should_close() const override { return true; }
     void set_fullscreen(bool) override {}
     [[nodiscard]] engine::core::Vec2 virtual_size() const override { return {1920, 1080}; }
+    [[nodiscard]] engine::graphics::TextureId load_texture(const std::string&) override {
+        return {};
+    }
+    void unload_texture(engine::graphics::TextureId) override {}
+    [[nodiscard]] engine::core::Vec2 texture_size(engine::graphics::TextureId) const override {
+        return {};
+    }
     void begin_frame(engine::graphics::Color) override {}
     void end_frame() override {}
+    void draw_sprite(const engine::graphics::SpriteDraw&) override {}
+    void draw_rect(const engine::graphics::Rect&, engine::graphics::Color, bool) override {}
+    void draw_circle(engine::core::Vec2, float, engine::graphics::Color) override {}
+    void draw_line(engine::core::Vec2, engine::core::Vec2, float,
+                   engine::graphics::Color) override {}
+    void draw_text(const std::string&, engine::core::Vec2, float,
+                   engine::graphics::Color) override {}
+    [[nodiscard]] engine::core::Vec2 measure_text(const std::string&, float) const override {
+        return {};
+    }
 };
 
 class Input final : public engine::graphics::IInput {
