@@ -57,6 +57,7 @@ entry points over generic `ServerApp` / `ClientApp` classes from the engine.
   to know how entities look.
 
 The full Lua API is described in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
+How to structure gameplay code is described in [writing-the-game.md](writing-the-game.md).
 
 ## Runtime layout
 

@@ -27,6 +27,7 @@ engine_add_test(core SOURCES
     engine/core/time/FixedStepLoopTest.cpp
     engine/core/Vec2Test.cpp
     engine/core/ComponentPhysicsTest.cpp
+    engine/core/ComponentsTest.cpp
     engine/core/DynamicLibraryTest.cpp
 )
 engine_add_test(script SOURCES
@@ -34,6 +35,7 @@ engine_add_test(script SOURCES
     engine/script/ScriptDeclarationsTest.cpp
     engine/script/ScriptRequireTest.cpp
     engine/script/EntityHandleTest.cpp
+    engine/script/TickTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
@@ -124,11 +126,16 @@ function(plugin_add_test name)
 endfunction()
 
 plugin_add_test(graphics-raylib
-    SOURCES plugins/graphics-raylib/LetterboxTest.cpp
-    LINKS graphics-raylib-letterbox
+    SOURCES
+        plugins/graphics-raylib/LetterboxTest.cpp
+        plugins/graphics-raylib/KeyMapTest.cpp
+    LINKS graphics-raylib-letterbox graphics-raylib-keymap
 )
 
 game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
     LINKS r-type_server_cli r-type_server_app)
 game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
 
+game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
+game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
+    LINKS r-type_client_cli r-type_client_controls)

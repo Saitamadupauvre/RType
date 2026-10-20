@@ -5,14 +5,6 @@
 
 namespace engine::graphics {
 
-/** @brief 2D vector in virtual units. */
-struct Vec2 {
-    float x{0.F};
-    float y{0.F};
-
-    bool operator==(const Vec2&) const = default;
-};
-
 /** @brief Axis-aligned rectangle in virtual units; origin at the top-left, Y pointing down. */
 struct Rect {
     float x{0.F};
@@ -50,6 +42,13 @@ struct WindowConfig {
     int height{720};
     std::string title{"engine"};
     bool fullscreen{false};
+};
+
+/** @brief Mouse buttons, independent of any backend. */
+enum class MouseButton : std::uint8_t {
+    Left,
+    Right,
+    Middle,
 };
 
 /** @brief Physical keyboard keys, independent of any backend. */
@@ -91,6 +90,23 @@ enum class Key : std::uint8_t {
     Num7,
     Num8,
     Num9,
+    Numpad0,
+    Numpad1,
+    Numpad2,
+    Numpad3,
+    Numpad4,
+    Numpad5,
+    Numpad6,
+    Numpad7,
+    Numpad8,
+    Numpad9,
+    NumpadDecimal,
+    NumpadDivide,
+    NumpadMultiply,
+    NumpadSubtract,
+    NumpadAdd,
+    NumpadEnter,
+    NumpadEqual,
     Up,
     Down,
     Left,
@@ -106,6 +122,43 @@ enum class Key : std::uint8_t {
     RightControl,
     LeftAlt,
     RightAlt,
+    LeftSuper,
+    RightSuper,
+    Menu,
+    Insert,
+    Delete,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    CapsLock,
+    ScrollLock,
+    NumLock,
+    PrintScreen,
+    Pause,
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
+    Apostrophe,
+    Comma,
+    Minus,
+    Period,
+    Slash,
+    Semicolon,
+    Equal,
+    LeftBracket,
+    RightBracket,
+    Backslash,
+    GraveAccent,
 };
 
 } // namespace engine::graphics

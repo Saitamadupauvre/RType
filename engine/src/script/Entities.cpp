@@ -5,10 +5,12 @@
 #include <format>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 #include "Declarations.hpp"
 #include "NativeFields.hpp"
 #include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/Components.hpp"
 #include "engine/core/log/Log.hpp"
 
 namespace engine::script {
@@ -17,7 +19,7 @@ namespace {
 
 namespace log = engine::core::log;
 
-constexpr std::array<std::string_view, 3> read_only_fields{"id", "type", "age"};
+constexpr std::array<std::string_view, 4> read_only_fields{"id", "type", "age", "input"};
 
 bool is_read_only(std::string_view name) {
     return std::ranges::find(read_only_fields, name) != read_only_fields.end();
@@ -33,9 +35,18 @@ template <typename Component> void register_if_missing(core::EntityManager& worl
     }
 }
 
+float input_axis(const InputState& input, std::string_view name) {
+    const auto found = input.axes.find(name);
+    return found == input.axes.end() ? 0.F : found->second;
+}
+
+bool input_pressed(const InputState& input, std::string_view name) {
+    return input.pressed.contains(name);
+}
+
 } // namespace
 
-Entities::Entities(sol::state& lua) : _lua(lua) {
+Entities::Entities(sol::state& lua) : _lua(lua), _methods(lua.create_table()) {
     sol::table types = _lua.create_table();
     types.new_usertype<EntityHandle>(
         "EntityHandle", sol::no_constructor, sol::meta_function::index,
@@ -45,11 +56,21 @@ Entities::Entities(sol::state& lua) : _lua(lua) {
         sol::meta_function::new_index,
         [this](sol::this_state state, const EntityHandle& handle, const sol::object& key,
                const sol::object& value) { set(state, handle, key, value); });
+    types.new_usertype<InputState>("InputState", sol::no_constructor, "axis", &input_axis,
+                                   "pressed", &input_pressed);
+    _methods.set_function("destroy", [this](sol::this_state state, const EntityHandle& handle) {
+        destroy(state, handle);
+    });
+    _methods.set_function("has_tag",
+                          [this](sol::this_state state, const EntityHandle& handle,
+                                 std::string_view label) { return has_tag(state, handle, label); });
 }
 
 void Entities::attach(core::EntityManager& world) {
     register_if_missing<core::Position>(world);
     register_if_missing<core::Velocity>(world);
+    register_if_missing<core::Sprite>(world);
+    register_if_missing<core::Tags>(world);
     _world = &world;
 }
 
@@ -81,7 +102,8 @@ std::optional<core::Entity> Entities::spawn(const Declaration& declaration,
                               Record{.type = declaration.name,
                                      .data = _lua.create_table(),
                                      .prefab = declaration.prefab,
-                                     .handle = sol::make_object(_lua, EntityHandle{entity})});
+                                     .handle = sol::make_object(_lua, EntityHandle{entity}),
+                                     .input = {}});
     return entity;
 }
 
@@ -103,8 +125,11 @@ sol::object Entities::spawn_from_lua(sol::this_state state, const Declaration& d
             throw;
         }
     }
+    finish_spawn(*entity);
     return handle;
 }
+
+void Entities::finish_spawn(core::Entity entity) { invoke(entity, "on_spawn"); }
 
 void Entities::release(core::Entity entity) { _records.erase(entity.id()); }
 
@@ -114,12 +139,57 @@ bool Entities::call(core::Entity entity, std::string_view method) {
         log::error("lua: cannot call '{}' on destroyed entity (id {})", method, entity.id());
         return false;
     }
+    return invoke(entity, method);
+}
+
+void Entities::set_input(core::Entity entity, InputState input) {
+    const auto found = _records.find(entity.id());
+    if (found != _records.end()) {
+        found->second.input = std::move(input);
+    }
+}
+
+void Entities::update(float dt) {
+    for (const core::Entity entity : live_entities()) {
+        const auto found = _records.find(entity.id());
+        if (found == _records.end() || found->second.doomed || !_world->alive(entity)) {
+            continue;
+        }
+        found->second.age += dt;
+        invoke(entity, "update", dt);
+    }
+}
+
+std::size_t Entities::flush_destroyed() {
+    std::size_t destroyed = 0;
+    while (!_doomed.empty()) {
+        for (const core::Entity entity : std::exchange(_doomed, {})) {
+            if (!_records.contains(entity.id())) {
+                continue;
+            }
+            invoke(entity, "on_destroy");
+            release(entity);
+            if (_world->alive(entity)) {
+                _world->kill(entity);
+            }
+            ++destroyed;
+        }
+    }
+    return destroyed;
+}
+
+template <typename... Args>
+bool Entities::invoke(core::Entity entity, std::string_view method, Args&&... args) {
+    const auto found = _records.find(entity.id());
+    if (found == _records.end() || _world == nullptr || !_world->alive(entity)) {
+        return false;
+    }
     const auto function = found->second.prefab.raw_get<sol::object>(method);
     if (function.get_type() != sol::type::function) {
         return false;
     }
     const sol::object self = found->second.handle;
-    return report(function.as<sol::protected_function>()(self));
+    return report(function.as<sol::protected_function>()(self, std::forward<Args>(args)...));
 }
 
 sol::object Entities::get(sol::this_state state, const EntityHandle& handle,
@@ -133,8 +203,18 @@ sol::object Entities::get(sol::this_state state, const EntityHandle& handle,
         if (name == "type") {
             return sol::make_object(state, record.type);
         }
+        if (name == "age") {
+            return sol::make_object(state, record.age);
+        }
+        if (name == "input") {
+            return sol::make_object(state, record.input);
+        }
         if (const auto field = find_native_field(name)) {
             return field->read(state, *_world, handle.entity);
+        }
+        auto method = _methods.raw_get<sol::object>(name);
+        if (!is_nil(method)) {
+            return method;
         }
     }
     auto own = record.data.raw_get<sol::object>(key);
@@ -182,6 +262,36 @@ Entities::Record& Entities::live_record(sol::this_state state, const EntityHandl
                                              caller_location(state), handle.entity.id()));
     }
     return found->second;
+}
+
+void Entities::destroy(sol::this_state state, const EntityHandle& handle) {
+    Record& record = live_record(state, handle);
+    if (record.doomed) {
+        return;
+    }
+    record.doomed = true;
+    _doomed.push_back(handle.entity);
+}
+
+bool Entities::has_tag(sol::this_state state, const EntityHandle& handle, std::string_view label) {
+    live_record(state, handle);
+    return _world->has<core::Tags>(handle.entity) &&
+           _world->get<core::Tags>(handle.entity).has(label);
+}
+
+std::vector<core::Entity> Entities::live_entities() const {
+    std::vector<core::Entity::Id> ids;
+    ids.reserve(_records.size());
+    for (const auto& [id, record] : _records) {
+        ids.push_back(id);
+    }
+    std::ranges::sort(ids);
+    std::vector<core::Entity> entities;
+    entities.reserve(ids.size());
+    for (const core::Entity::Id id : ids) {
+        entities.emplace_back(id);
+    }
+    return entities;
 }
 
 } // namespace engine::script
