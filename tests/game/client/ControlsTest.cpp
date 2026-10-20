@@ -18,6 +18,15 @@ public:
     [[nodiscard]] bool is_key_down(Key key) const override { return _held.contains(key); }
     [[nodiscard]] bool is_key_pressed(Key) const override { return false; }
     [[nodiscard]] bool is_key_released(Key) const override { return false; }
+    [[nodiscard]] Key last_key_pressed() override { return Key::Unknown; }
+    [[nodiscard]] engine::core::Vec2 mouse_position() const override { return {}; }
+    [[nodiscard]] bool is_mouse_down(engine::graphics::MouseButton) const override { return false; }
+    [[nodiscard]] bool is_mouse_pressed(engine::graphics::MouseButton) const override {
+        return false;
+    }
+    [[nodiscard]] bool is_mouse_released(engine::graphics::MouseButton) const override {
+        return false;
+    }
 
 private:
     std::set<Key> _held;
