@@ -27,6 +27,7 @@ engine_add_test(core SOURCES
     engine/core/time/FixedStepLoopTest.cpp
     engine/core/Vec2Test.cpp
     engine/core/ComponentPhysicsTest.cpp
+    engine/core/ComponentsTest.cpp
     engine/core/DynamicLibraryTest.cpp
 )
 engine_add_test(script SOURCES
@@ -34,6 +35,7 @@ engine_add_test(script SOURCES
     engine/script/ScriptDeclarationsTest.cpp
     engine/script/ScriptRequireTest.cpp
     engine/script/EntityHandleTest.cpp
+    engine/script/TickTest.cpp
 )
 engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
 engine_add_test(physics SOURCES
@@ -102,4 +104,5 @@ plugin_add_test(graphics-raylib
 )
 
 game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
-game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
+game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
+    LINKS r-type_client_cli r-type_client_controls)

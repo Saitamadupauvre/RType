@@ -259,7 +259,11 @@ std::optional<core::Entity> ScriptRuntime::spawn(std::string_view type,
             log::error("lua: cannot spawn unknown entity '{}'", type);
             return std::nullopt;
         }
-        return _impl->entities.spawn(found->second, position);
+        const auto entity = _impl->entities.spawn(found->second, position);
+        if (entity) {
+            _impl->entities.finish_spawn(*entity);
+        }
+        return entity;
     } catch (const std::exception& exception) {
         log::error("lua: cannot spawn '{}': {}", type, exception.what());
     } catch (...) {
@@ -279,6 +283,31 @@ bool ScriptRuntime::call(core::Entity entity, std::string_view method) noexcept 
         log::error("lua: {}: unknown error", method);
     }
     return false;
+}
+
+void ScriptRuntime::set_input(core::Entity entity, InputState input) noexcept {
+    _impl->entities.set_input(entity, std::move(input));
+}
+
+void ScriptRuntime::update(float dt) noexcept {
+    try {
+        _impl->entities.update(dt);
+    } catch (const std::exception& exception) {
+        log::error("lua: update: {}", exception.what());
+    } catch (...) {
+        log::error("lua: update: unknown error");
+    }
+}
+
+std::size_t ScriptRuntime::flush_destroyed() noexcept {
+    try {
+        return _impl->entities.flush_destroyed();
+    } catch (const std::exception& exception) {
+        log::error("lua: flush_destroyed: {}", exception.what());
+    } catch (...) {
+        log::error("lua: flush_destroyed: unknown error");
+    }
+    return 0;
 }
 
 } // namespace engine::script

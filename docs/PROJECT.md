@@ -442,7 +442,7 @@ Both forms produce the same internal representation.
 
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
+| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
 | Free fields | `health`, `speed`, `points` | Lua table of the entity | Scripts only |
 | Callbacks | `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
@@ -465,6 +465,10 @@ self:remove_tag("phase2")
 self:distance_to(other)
 self:move_to(x, y, duration)  -- inside a coroutine
 ```
+
+`sprite` is a path relative to `assets/`. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a square of that color (temporary, until the renderer API lands). It reads back as a new table.
+
+`self:destroy()` only marks the entity: it stays usable until the end of the tick, is skipped by later `update` calls, then `on_destroy(self)` runs and the entity is removed. Calling it twice has no extra effect. `on_spawn(self)` runs once the entity and its `spawn` overrides are in place.
 
 **Performance tip:** prefer setting `vx` / `vy` over moving the entity in `update`; native movement runs entirely in C++.
 
@@ -558,7 +562,9 @@ function update(self, dt)
 end
 ```
 
-Key bindings are data, editable by the player (remapping):
+`self.input` is available on every entity and is read-only. `input:axis(name)` returns a value in [-1, 1] (`move_x`: left/right, `move_y`: up/down), `input:pressed(name)` is true while the action is held. Entities that receive no input read a neutral one (axes 0, nothing pressed). The local client gives its input to every entity tagged `"player"`.
+
+Key bindings are data, editable by the player (remapping, not implemented yet; the defaults below are built in):
 
 ```lua
 -- config/input.lua
@@ -621,7 +627,7 @@ speed  = 150         -- server only
 
 Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
 
-- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `tags`, `layer`, `age`, `id`, `type`, `input`.
+- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `tags`, `layer`, `age`, `id`, `type`, `input`.
 - Callbacks: `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior`.
 - Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `random`, `world`, `log`, `synced`.
 
