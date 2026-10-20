@@ -363,7 +363,7 @@ The loader refuses a plugin built for another API version, and the backend is al
 ### 10.2 Loading order
 
 1. Load every declaration file (entities and systems are registered, nothing is spawned).
-2. Call `on_start()` from `main.lua`.
+2. Call `on_start()` from `main.lua`. `on_player_joined(player)` and `on_player_left(player)` are called later, whenever a player connects or leaves.
 
 Since `spawn` is only used once the game has started, file order never matters.
 
@@ -464,6 +464,7 @@ self.vx, self.vy    -- velocity: moved by the C++ engine every tick
 self.age            -- seconds since spawn (read-only)
 self.id             -- unique id (read-only)
 self.type           -- declared name, e.g. "bydo" (read-only)
+self.owner          -- player controlling the entity, or nil
 
 self:destroy()                -- deferred to the end of the tick
 self:has_tag("enemy")
@@ -477,6 +478,8 @@ self:move_to(x, y, duration)  -- inside a coroutine
 
 `self:destroy()` only marks the entity: it stays usable until the end of the tick, is skipped by later `update` calls, then `on_destroy(self)` runs and the entity is removed. Calling it twice has no extra effect. `on_spawn(self)` runs once the entity and its `spawn` overrides are in place.
 
+`owner` takes a player handle or `nil`, also as a `spawn` override (`spawn("ship", { owner = player })`). The entity then reads that player's input through `self.input`, and clients receive the owner so each one can highlight its own entities. Once the player leaves, `owner` reads `nil`.
+
 **Performance tip:** prefer setting `vx` / `vy` over moving the entity in `update`; native movement runs entirely in C++.
 
 ### 10.6 Global functions
@@ -487,6 +490,10 @@ spawn("bydo", { x = 1900, y = 300, speed = 200 })   -- optional field overrides
 find_all("enemy")          -- entities with a tag
 find_first("player")
 count("enemy")
+
+-- players
+players()                  -- connected players, by ascending id
+find_player(1)             -- player handle, or nil
 
 -- time
 after(2, function() ... end)     -- run once after 2 s
@@ -569,7 +576,25 @@ function update(self, dt)
 end
 ```
 
-`self.input` is available on every entity and is read-only. `input:axis(name)` returns a value in [-1, 1] (`move_x`: left/right, `move_y`: up/down), `input:pressed(name)` is true while the action is held. Entities that receive no input read a neutral one (axes 0, nothing pressed). The local client gives its input to every entity tagged `"player"`.
+`self.input` is available on every entity and is read-only. `input:axis(name)` returns a value in [-1, 1] (`move_x`: left/right, `move_y`: up/down), `input:pressed(name)` is true while the action is held. An entity reads the input of its `owner`; entities without one read a neutral input (axes 0, nothing pressed).
+
+Players are handled by two optional callbacks of `main.lua`. The engine calls them when a client connects or leaves; scripts never see the network:
+
+```lua
+function on_player_joined(player)
+    spawn("ship", { x = 100, y = 120 + player.slot * 140, owner = player })
+end
+
+function on_player_left(player)
+    for _, owned in ipairs(player:entities()) do
+        owned:destroy()
+    end
+end
+```
+
+A player handle has `id` (stable while connected), `slot` (lowest free index from 0, reused after a departure), `connected`, and `player:entities()` (live entities it owns). Without `on_player_left`, the engine destroys the player's entities itself. Errors in either callback are logged and the game continues.
+
+Button actions travel as bits in the order of the shared action list (`fire` is bit 0), axes as signed bytes; the server and the client use the same table, so the layout cannot drift.
 
 Key bindings are data, editable by the player (remapping, not implemented yet; the defaults below are built in):
 
@@ -634,9 +659,9 @@ speed  = 150         -- server only
 
 Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
 
-- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `tags`, `layer`, `age`, `id`, `type`, `input`.
-- Callbacks: `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `random`, `world`, `log`, `synced`.
+- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
+- Callbacks: `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
 
 ### 10.13 Error handling and sandbox
 
