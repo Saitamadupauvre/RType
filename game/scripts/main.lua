@@ -11,3 +11,6 @@ entity "square" {
         self.y = self.y + input:axis("move_y") * self.speed * dt
     end,
 }
+
+function on_start()
+end
