@@ -104,7 +104,8 @@ std::optional<core::Entity> Entities::spawn(const Declaration& declaration,
                                      .data = _lua.create_table(),
                                      .prefab = declaration.prefab,
                                      .handle = sol::make_object(_lua, EntityHandle{entity}),
-                                     .input = {}});
+                                     .input = {},
+                                     .owner = std::nullopt});
     return entity;
 }
 

@@ -114,21 +114,21 @@ bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
     modules.emplace(root);
     bool success = true;
     bool found_entry_point = false;
-    std::optional<sol::environment> main;
+    std::optional<sol::environment> entry;
     for (const fs::path& relative : files) {
         const sol::environment environment(lua, sol::create, lua.globals());
         const bool loaded = load_declaration_file(root, relative, environment);
         success = loaded && success;
         if (relative == fs::path(entry_point)) {
             found_entry_point = true;
-            main = loaded ? std::optional(environment) : std::nullopt;
+            entry = loaded ? std::optional(environment) : std::nullopt;
         }
     }
     if (!found_entry_point) {
         log::error("lua: {} has no {}", root.string(), entry_point);
         return false;
     }
-    return main && start(*main) && success;
+    return entry && start(*entry) && success;
 }
 
 bool ScriptRuntime::Impl::load_declaration_file(const fs::path& root, const fs::path& relative,
