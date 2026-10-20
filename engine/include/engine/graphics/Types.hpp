@@ -5,14 +5,6 @@
 
 namespace engine::graphics {
 
-/** @brief 2D vector in virtual units. */
-struct Vec2 {
-    float x{0.F};
-    float y{0.F};
-
-    bool operator==(const Vec2&) const = default;
-};
-
 /** @brief Axis-aligned rectangle in virtual units; origin at the top-left, Y pointing down. */
 struct Rect {
     float x{0.F};

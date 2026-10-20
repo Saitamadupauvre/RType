@@ -4,14 +4,14 @@
 
 namespace {
 
-constexpr engine::graphics::Vec2 virtual_resolution{.x = 1920.F, .y = 1080.F};
+constexpr engine::core::Vec2 virtual_resolution{1920, 1080};
 
 ::Color to_raylib(engine::graphics::Color color) {
     return {.r = color.r, .g = color.g, .b = color.b, .a = color.a};
 }
 
-engine::graphics::Vec2 window_size() {
-    return {.x = static_cast<float>(GetScreenWidth()), .y = static_cast<float>(GetScreenHeight())};
+engine::core::Vec2 window_size() {
+    return {static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())};
 }
 
 } // namespace
@@ -58,7 +58,7 @@ void RaylibRenderer::set_fullscreen(bool enabled) {
     }
 }
 
-engine::graphics::Vec2 RaylibRenderer::virtual_size() const { return virtual_resolution; }
+engine::core::Vec2 RaylibRenderer::virtual_size() const { return virtual_resolution; }
 
 void RaylibRenderer::begin_frame(engine::graphics::Color clear) {
     _clear = clear;

@@ -2,8 +2,7 @@
 
 #include <algorithm>
 
-engine::graphics::Rect letterbox(engine::graphics::Vec2 window,
-                                 engine::graphics::Vec2 virtual_size) {
+engine::graphics::Rect letterbox(engine::core::Vec2 window, engine::core::Vec2 virtual_size) {
     const float scale = std::min(window.x / virtual_size.x, window.y / virtual_size.y);
     const float width = virtual_size.x * scale;
     const float height = virtual_size.y * scale;

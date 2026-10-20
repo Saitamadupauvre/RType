@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/core/Vec2.hpp"
 #include "engine/graphics/IGraphicsBackend.hpp"
 
 namespace fixture {
@@ -10,9 +11,7 @@ public:
     void close() override {}
     [[nodiscard]] bool should_close() const override { return true; }
     void set_fullscreen(bool) override {}
-    [[nodiscard]] engine::graphics::Vec2 virtual_size() const override {
-        return {.x = 1920.F, .y = 1080.F};
-    }
+    [[nodiscard]] engine::core::Vec2 virtual_size() const override { return {1920, 1080}; }
     void begin_frame(engine::graphics::Color) override {}
     void end_frame() override {}
 };

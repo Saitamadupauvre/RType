@@ -3,10 +3,12 @@
 #include <memory>
 #include <type_traits>
 
+#include "engine/core/Vec2.hpp"
 #include "engine/graphics/IGraphicsBackend.hpp"
 #include "engine/graphics/PluginApi.hpp"
 
 using namespace engine::graphics;
+using namespace engine::core;
 
 namespace {
 
@@ -19,7 +21,7 @@ public:
     void close() override { _open = false; }
     [[nodiscard]] bool should_close() const override { return !_open; }
     void set_fullscreen(bool enabled) override { fullscreen = enabled; }
-    [[nodiscard]] Vec2 virtual_size() const override { return {.x = 1920.F, .y = 1080.F}; }
+    [[nodiscard]] Vec2 virtual_size() const override { return {1920, 1080}; }
     void begin_frame(Color clear) override { last_clear = clear; }
     void end_frame() override { ++frames; }
 
@@ -81,7 +83,7 @@ TEST(GraphicsBackend, ExposesRendererAndInputThroughInterfaces) {
     backend.renderer().end_frame();
 
     EXPECT_FALSE(backend.renderer().should_close());
-    EXPECT_EQ(backend.renderer().virtual_size(), (Vec2{.x = 1920.F, .y = 1080.F}));
+    EXPECT_EQ(backend.renderer().virtual_size(), (Vec2{1920, 1080}));
     EXPECT_FALSE(backend.input().is_key_down(Key::Space));
 }
 
