@@ -47,6 +47,26 @@ In Part 1 each `main` assembles the engine modules explicitly: reading it
 shows the whole tick (server) or frame (client). In Part 2 they become thin
 entry points over generic `ServerApp` / `ClientApp` classes from the engine.
 
+## Multiplayer demo
+
+Every connected player gets a white square on the server. Arrow keys (or
+`ZQSD`) move it; every client sees every square. The server runs the Lua
+game; the client only sends inputs and draws the snapshot.
+
+```sh
+cmake --build --preset ninja-debug
+cd build/ninja-debug/bin
+./r-type_server 4242
+./r-type_client 127.0.0.1 4242
+./r-type_client 127.0.0.1 4242
+```
+
+- Move one square: the other window shows the same position.
+- Close one client: its square disappears from the other window.
+
+The client side lives in `game/client/TemporaryNetworkView.*` until the
+snapshot display (#23) and the client loop (#24) replace it.
+
 ## Scripts
 
 - Every `.lua` file under `game/scripts/` is loaded recursively, except
