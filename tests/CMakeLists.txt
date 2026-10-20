@@ -99,8 +99,10 @@ function(plugin_add_test name)
 endfunction()
 
 plugin_add_test(graphics-raylib
-    SOURCES plugins/graphics-raylib/LetterboxTest.cpp
-    LINKS graphics-raylib-letterbox
+    SOURCES
+        plugins/graphics-raylib/LetterboxTest.cpp
+        plugins/graphics-raylib/KeyMapTest.cpp
+    LINKS graphics-raylib-letterbox graphics-raylib-keymap
 )
 
 game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)

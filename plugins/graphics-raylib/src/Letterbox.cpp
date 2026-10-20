@@ -11,3 +11,13 @@ engine::graphics::Rect letterbox(engine::core::Vec2 window, engine::core::Vec2 v
             .width = width,
             .height = height};
 }
+
+engine::core::Vec2 window_to_virtual(engine::core::Vec2 point, engine::core::Vec2 window,
+                                     engine::core::Vec2 virtual_size) {
+    const engine::graphics::Rect view = letterbox(window, virtual_size);
+    if (view.width <= 0.F || view.height <= 0.F) {
+        return {};
+    }
+    return {(point.x - view.x) * virtual_size.x / view.width,
+            (point.y - view.y) * virtual_size.y / view.height};
+}
