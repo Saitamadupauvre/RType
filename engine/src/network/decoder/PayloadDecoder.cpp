@@ -42,7 +42,12 @@ std::optional<EntityState> read_entity(ByteReader& reader) noexcept {
     const auto y = reader.read_i16();
     const auto vx = reader.read_i16();
     const auto vy = reader.read_i16();
-    if (!entity_id || !type_id || !x || !y || !vx || !vy) {
+    const auto owner = reader.read_u8();
+    const auto r = reader.read_u8();
+    const auto g = reader.read_u8();
+    const auto b = reader.read_u8();
+    const auto a = reader.read_u8();
+    if (!entity_id || !type_id || !x || !y || !vx || !vy || !owner || !r || !g || !b || !a) {
         return std::nullopt;
     }
     return EntityState{
@@ -52,6 +57,11 @@ std::optional<EntityState> read_entity(ByteReader& reader) noexcept {
         .y = *y,
         .vx = *vx,
         .vy = *vy,
+        .owner = *owner,
+        .r = *r,
+        .g = *g,
+        .b = *b,
+        .a = *a,
     };
 }
 

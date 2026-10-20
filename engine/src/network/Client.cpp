@@ -36,7 +36,9 @@ EntitySnapshot to_entity_snapshot(const EntityState& state) {
                           .x = static_cast<float>(state.x),
                           .y = static_cast<float>(state.y),
                           .vx = static_cast<float>(state.vx),
-                          .vy = static_cast<float>(state.vy)};
+                          .vy = static_cast<float>(state.vy),
+                          .owner = state.owner,
+                          .color = {.r = state.r, .g = state.g, .b = state.b, .a = state.a}};
 }
 
 } // namespace

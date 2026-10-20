@@ -213,6 +213,16 @@ TEST(EventPayload, DecoderRejectsTrailingBytes) {
     }
 }
 
+TEST(SnapshotPayload, RoundTripsOwnerAndColor) {
+    const engine::network::SnapshotPayload snapshot{
+        .server_tick = 9,
+        .entities = {engine::network::EntityState{
+            .entity_id = 1, .type_id = 1, .owner = 3, .r = 1, .g = 2, .b = 3, .a = 4}},
+    };
+
+    EXPECT_EQ(decode_snapshot(encoded(snapshot)), snapshot);
+}
+
 TEST(SnapshotPayload, RoundTripsZeroOneAndMaximumEntities) {
     for (const std::size_t count : {std::size_t{0}, std::size_t{1}, max_snapshot_entities}) {
         const auto snapshot = snapshot_with(count);

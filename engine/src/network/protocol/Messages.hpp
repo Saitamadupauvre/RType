@@ -45,6 +45,11 @@ struct EntityState {
     std::int16_t y{};
     std::int16_t vx{};
     std::int16_t vy{};
+    std::uint8_t owner{};
+    std::uint8_t r{255};
+    std::uint8_t g{255};
+    std::uint8_t b{255};
+    std::uint8_t a{255};
 
     bool operator==(const EntityState&) const = default;
 };

@@ -7,6 +7,7 @@
 #include <limits>
 
 #include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/Components.hpp"
 #include "engine/network/Replicated.hpp"
 
 #include "protocol/Protocol.hpp"
@@ -22,6 +23,13 @@ core::Vec2 velocity_of(core::EntityManager& registry, core::Entity entity) {
     return registry.get<core::Velocity>(entity).vel;
 }
 
+core::Rgba color_of(core::EntityManager& registry, core::Entity entity) {
+    if (!registry.is_registered<core::Sprite>() || !registry.has<core::Sprite>(entity)) {
+        return {};
+    }
+    return registry.get<core::Sprite>(entity).color;
+}
+
 std::vector<EntityState> replicated_states(core::EntityManager& registry) {
     std::vector<EntityState> states;
     if (!registry.is_registered<Replicated>() || !registry.is_registered<core::Position>()) {
@@ -31,12 +39,18 @@ std::vector<EntityState> replicated_states(core::EntityManager& registry) {
     registry.query<Replicated, core::Position>().each(
         [&](core::Entity entity, const Replicated& replicated, const core::Position& position) {
             const auto velocity = velocity_of(registry, entity);
+            const auto color = color_of(registry, entity);
             states.push_back(EntityState{.entity_id = entity.index(),
                                          .type_id = replicated.type_id,
                                          .x = to_wire_coordinate(position.pos.x),
                                          .y = to_wire_coordinate(position.pos.y),
                                          .vx = to_wire_coordinate(velocity.x),
-                                         .vy = to_wire_coordinate(velocity.y)});
+                                         .vy = to_wire_coordinate(velocity.y),
+                                         .owner = replicated.owner,
+                                         .r = color.r,
+                                         .g = color.g,
+                                         .b = color.b,
+                                         .a = color.a});
         });
     return states;
 }

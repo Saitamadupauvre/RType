@@ -7,6 +7,7 @@
 #include <system_error>
 #include <vector>
 
+#include "engine/core/Components.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Export.hpp"
@@ -42,6 +43,10 @@ struct ENGINE_NETWORK_EXPORT EntitySnapshot {
     float y;
     float vx;
     float vy;
+    /** @brief `Replicated::owner`: compare it with NetworkClient::player_id(). `0` for none. */
+    std::uint8_t owner = 0;
+    /** @brief Sprite color of the entity on the server. */
+    core::Rgba color;
 };
 
 #ifdef _MSC_VER

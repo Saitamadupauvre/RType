@@ -128,12 +128,18 @@ TEST(SnapshotPayload, EncodesFieldsInOrder) {
             .y = 2,
             .vx = -3,
             .vy = 4,
+            .owner = 0x0B,
+            .r = 0x0C,
+            .g = 0x0D,
+            .b = 0x0E,
+            .a = 0x0F,
         }},
     };
 
     const std::vector<std::uint8_t> prefix{0x01, 0x02, 0x03, 0x04, 0x00, 0x01};
     const std::vector<std::uint8_t> record{0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0xFF,
-                                           0xFF, 0x00, 0x02, 0xFF, 0xFD, 0x00, 0x04};
+                                           0xFF, 0x00, 0x02, 0xFF, 0xFD, 0x00, 0x04,
+                                           0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
     std::vector<std::uint8_t> expected = prefix;
     expected.insert(expected.end(), record.begin(), record.end());
 
@@ -146,7 +152,7 @@ TEST(SnapshotPayload, EncodesEmptySnapshot) {
 }
 
 TEST(SnapshotPayload, MaximumSnapshotFitsInOnePayload) {
-    EXPECT_EQ(max_snapshot_entities, 84U);
+    EXPECT_EQ(max_snapshot_entities, 62U);
     EXPECT_LE(encoded(snapshot_with(max_snapshot_entities)).size(), max_payload_size);
 }
 
