@@ -30,6 +30,7 @@ engine/                     C++ engine, shared libraries engine-<module>
   src/<module>/             implementation and private headers
 plugins/<name>/             runtime plugins (bin/plugins/), e.g. graphics-raylib
 game/server, game/client    r-type_server / r-type_client entry points
+game/sandbox/               r-type_sandbox: scratch executable to try the engine out
 game/scripts/               Lua game code (main.lua is the entry point)
 assets/                     sprites, sounds, music
 tests/engine/<module>/      tests of one engine module
