@@ -41,6 +41,28 @@ TEST(ServerCli, AcceptsPortBounds) {
     EXPECT_EQ(parse_cli(args({"65535"})).config, ServerConfig{.port = 65535});
 }
 
+TEST(ServerCli, DefaultsToFourPlayers) {
+    const auto result = parse_cli(args({"4242"}));
+
+    ASSERT_TRUE(result.config.has_value());
+    EXPECT_EQ(result.config->max_players, 4U);
+}
+
+TEST(ServerCli, AcceptsMaxPlayersWithShortAndLongFlag) {
+    EXPECT_EQ(parse_cli(args({"4242", "--max-players", "2"})).config,
+              (ServerConfig{.port = 4242, .max_players = 2}));
+    EXPECT_EQ(parse_cli(args({"-p", "1", "4242"})).config,
+              (ServerConfig{.port = 4242, .max_players = 1}));
+}
+
+TEST(ServerCli, RejectsMaxPlayersOutOfRange) {
+    expect_rejected(args({"4242", "--max-players", "0"}));
+    expect_rejected(args({"4242", "--max-players", "5"}));
+    expect_rejected(args({"4242", "--max-players", "-1"}));
+    expect_rejected(args({"4242", "--max-players", "two"}));
+    expect_rejected(args({"4242", "--max-players"}));
+}
+
 TEST(ServerCli, PrintsHelpWithShortAndLongFlag) {
     for (const std::string flag : {"-h", "--help"}) {
         const auto result = parse_cli(args({flag}));

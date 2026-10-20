@@ -37,7 +37,34 @@ engine_add_test(script SOURCES
     engine/script/EntityHandleTest.cpp
     engine/script/TickTest.cpp
 )
-engine_add_test(network SOURCES engine/network/ModuleTest.cpp)
+engine_add_test(network SOURCES
+    engine/network/ClientTest.cpp
+    engine/network/ModuleTest.cpp
+    engine/network/ServerTest.cpp
+    engine/network/bytes/ByteReaderTest.cpp
+    engine/network/bytes/ByteWriterTest.cpp
+    engine/network/decoder/PayloadDecoderTest.cpp
+    engine/network/encoder/PayloadEncoderTest.cpp
+    engine/network/event/GameEventsTest.cpp
+    engine/network/protocol/ProtocolHandlerTest.cpp
+    engine/network/protocol/SequenceTest.cpp
+    engine/network/protocol/TypeTableTest.cpp
+    engine/network/server/ServerNetworkTest.cpp
+    engine/network/session/ClientConnectionTest.cpp
+    engine/network/session/ServerSessionsTest.cpp
+    engine/network/snapshot/SnapshotBuilderTest.cpp
+    engine/network/snapshot/SnapshotReceiverTest.cpp
+    engine/network/socket/SocketErrorTest.cpp
+    engine/network/socket/UdpSocketTest.cpp
+    engine/network/stats/TrafficMeterTest.cpp
+    engine/network/thread/DatagramHandlerTest.cpp
+    engine/network/thread/MessageQueueTest.cpp
+    engine/network/thread/NetworkIoTest.cpp
+)
+target_include_directories(engine_network_tests PRIVATE
+    "${PROJECT_SOURCE_DIR}/engine/src/network"
+    "${CMAKE_CURRENT_SOURCE_DIR}/engine/network"
+)
 engine_add_test(physics SOURCES
     engine/physics/PhysicsSystemTest.cpp
     engine/physics/CollisionsTest.cpp
@@ -104,6 +131,10 @@ plugin_add_test(graphics-raylib
         plugins/graphics-raylib/KeyMapTest.cpp
     LINKS graphics-raylib-letterbox graphics-raylib-keymap
 )
+
+game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
+    LINKS r-type_server_cli r-type_server_app)
+game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
 
 game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
 game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp

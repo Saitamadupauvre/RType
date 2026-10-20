@@ -13,7 +13,7 @@ A module promises three things to the code that uses it:
    from `find_package(engine)` and the game does not change.
 2. **A public API made only of engine types**: headers in
    `engine/include/engine/<name>/`, with every public symbol marked
-   `ENGINE_<NAME>_EXPORT`. No third-party header (Lua, Asio, Raylib...) ever
+   `ENGINE_<NAME>_EXPORT`. No third-party header (Lua, Raylib, POSIX sockets...) ever
    appears there.
 3. **Nothing else**: every symbol not marked with the export macro is hidden,
    and everything in `engine/src/<name>/` is private.

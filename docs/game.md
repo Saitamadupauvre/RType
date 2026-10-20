@@ -19,7 +19,7 @@ The game is a **user** of the engine, exactly like a second game would be.
 - It includes only public engine headers: `#include "engine/<module>/..."`.
   Nothing from `engine/src/`.
 - It never links a plugin: the client loads `graphics-raylib` at runtime.
-- It never uses a third-party library directly: Lua, Asio and Raylib are
+- It never uses a third-party library directly: Lua, Raylib and the OS socket API are
   reached only through the engine.
 
 In the other direction, the engine never knows the game: nothing under
@@ -38,7 +38,7 @@ add_dependencies(r-type_client graphics-raylib)
 
 | Executable | Usage | Role |
 |---|---|---|
-| `r-type_server` | `./r-type_server <port>` | Authoritative: runs all game logic, sends snapshots. |
+| `r-type_server` | `./r-type_server <port> [--max-players <1-4>]` | Authoritative: runs all game logic, sends snapshots. |
 | `r-type_client` | `./r-type_client <server-ip> <port>` | Sends inputs, displays what the server replicates. |
 
 Both exit with code `84` on invalid arguments.

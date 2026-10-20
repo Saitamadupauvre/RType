@@ -10,8 +10,13 @@ CliResult parse_cli(const std::vector<std::string>& args) {
 
     auto& help = app.flag("-h,--help", "Show this help message.");
     auto& port = app.positional<std::uint16_t>("port", "UDP port to listen on.").range(1, 65535);
+    auto& max_players =
+        app.option<std::size_t>("-p,--max-players", "Maximum number of connected players.")
+            .range(1, max_supported_players)
+            .default_value(max_supported_players);
 
     app.example(program + " 4242", "Start the server on port 4242.");
+    app.example(program + " 4242 --max-players 2", "Start a server for two players.");
 
     const bool ok = app.parse(args);
 
@@ -21,7 +26,9 @@ CliResult parse_cli(const std::vector<std::string>& args) {
                 .message = help ? app.help() : app.error()};
     }
 
-    return {.config = ServerConfig{.port = port.get()}, .exit_code = 0, .message = ""};
+    return {.config = ServerConfig{.port = port.get(), .max_players = max_players.get()},
+            .exit_code = 0,
+            .message = ""};
 }
 
 } // namespace rtype::server

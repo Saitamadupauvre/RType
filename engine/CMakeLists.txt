@@ -38,9 +38,30 @@ engine_add_module(script
 )
 
 engine_add_module(network
-    SOURCES src/network/Module.cpp
+    SOURCES
+        src/network/Client.cpp
+        src/network/Module.cpp
+        src/network/Server.cpp
+        src/network/decoder/EventReader.cpp
+        src/network/decoder/PayloadDecoder.cpp
+        src/network/encoder/PayloadEncoder.cpp
+        src/network/event/GameEvents.cpp
+        src/network/protocol/ProtocolHandler.cpp
+        src/network/protocol/TypeTable.cpp
+        src/network/protocol/Validation.cpp
+        src/network/server/ServerNetwork.cpp
+        src/network/session/ClientConnection.cpp
+        src/network/session/ServerSessions.cpp
+        src/network/snapshot/SnapshotBuilder.cpp
+        src/network/snapshot/SnapshotReceiver.cpp
+        src/network/socket/SocketError.cpp
+        src/network/stats/TrafficMeter.cpp
+        src/network/socket/UdpSocket.cpp
+        src/network/thread/DatagramHandler.cpp
+        src/network/thread/NetworkIo.cpp
     DEPENDS engine::core
 )
+target_include_directories(engine-network PRIVATE src/network)
 
 engine_add_module(physics
     SOURCES
