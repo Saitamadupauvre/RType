@@ -1,9 +1,11 @@
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 
 #include "Cli.hpp"
 #include "Controls.hpp"
+#include "Starfield.hpp"
 #include "WorldDraw.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
@@ -21,6 +23,7 @@ using engine::core::EntityManager;
 using engine::core::Tags;
 
 constexpr engine::graphics::Color background{.r = 0, .g = 0, .b = 0, .a = 255};
+constexpr std::uint32_t starfield_seed = 1987;
 
 void give_controls_to_players(EntityManager& world, engine::script::ScriptRuntime& runtime,
                               const engine::script::InputState& controls) {
@@ -71,13 +74,17 @@ int main(int argc, char** argv) {
     const engine::core::time::SteadyClock clock;
     engine::core::time::FixedStepLoop loop(clock);
     rtype::client::WorldDraw world_draw(renderer, executable_dir / "assets");
+    rtype::client::Starfield starfield(starfield_seed, renderer.virtual_size());
 
     while (!renderer.should_close()) {
         renderer.begin_frame(background);
         const engine::script::InputState controls = rtype::client::read_controls(input);
         loop.run_frame([&](engine::core::time::Duration step) {
-            tick(world, runtime, controls, std::chrono::duration<float>(step).count());
+            const float dt = std::chrono::duration<float>(step).count();
+            starfield.update(dt);
+            tick(world, runtime, controls, dt);
         });
+        starfield.draw(renderer);
         world_draw.draw(world);
         renderer.end_frame();
     }

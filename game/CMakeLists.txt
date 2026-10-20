@@ -24,7 +24,7 @@ target_link_libraries(r-type_client_controls PUBLIC engine::graphics engine::scr
 target_include_directories(r-type_client_controls PUBLIC client)
 rtype_set_warnings(r-type_client_controls)
 
-add_library(r-type_client_draw STATIC client/WorldDraw.cpp)
+add_library(r-type_client_draw STATIC client/Starfield.cpp client/WorldDraw.cpp)
 target_link_libraries(r-type_client_draw PUBLIC engine::core engine::graphics)
 target_include_directories(r-type_client_draw PUBLIC client)
 rtype_set_warnings(r-type_client_draw)
