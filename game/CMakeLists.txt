@@ -6,12 +6,15 @@ target_include_directories(r-type_server_cli PUBLIC server)
 rtype_set_warnings(r-type_server_cli)
 
 add_library(r-type_server_app STATIC server/ServerApp.cpp)
-target_link_libraries(r-type_server_app PUBLIC r-type_server_cli engine::core engine::network)
+target_link_libraries(r-type_server_app PUBLIC r-type_server_cli engine::core engine::network engine::script)
 target_include_directories(r-type_server_app PUBLIC server)
 rtype_set_warnings(r-type_server_app)
 
 add_executable(r-type_server server/main.cpp)
 target_link_libraries(r-type_server PRIVATE r-type_server_app r-type_server_cli engine::core engine::script engine::network)
+add_custom_command(TARGET r-type_server POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/scripts $<TARGET_FILE_DIR:r-type_server>/scripts
+)
 rtype_set_warnings(r-type_server)
 
 add_library(r-type_client_cli STATIC client/Cli.cpp)

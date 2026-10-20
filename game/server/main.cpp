@@ -2,6 +2,7 @@
 #include "ServerApp.hpp"
 #include "engine/core/time/SteadyClock.hpp"
 #include <csignal>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -22,7 +23,8 @@ int main(int argc, char** argv) {
     }
 
     const engine::core::time::SteadyClock clock;
-    rtype::server::ServerApp app(clock, *result.config);
+    const std::filesystem::path scripts = std::filesystem::path(argv[0]).parent_path() / "scripts";
+    rtype::server::ServerApp app(clock, *result.config, scripts);
     std::string error;
     if (!app.start(error)) {
         std::cerr << error << "\n";
