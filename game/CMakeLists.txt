@@ -41,6 +41,20 @@ target_compile_definitions(r-type_client PRIVATE
 add_dependencies(r-type_client graphics-raylib)
 rtype_set_warnings(r-type_client)
 
+option(RTYPE_BUILD_SANDBOX "Build the r-type_sandbox executable" ON)
+if(RTYPE_BUILD_SANDBOX)
+    add_executable(r-type_sandbox sandbox/main.cpp)
+    target_link_libraries(r-type_sandbox PRIVATE r-type_client_draw engine::core engine::graphics)
+    add_custom_command(TARGET r-type_sandbox POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:r-type_sandbox>/assets
+    )
+    target_compile_definitions(r-type_sandbox PRIVATE
+        GRAPHICS_PLUGIN_FILE="$<TARGET_FILE_NAME:graphics-raylib>"
+    )
+    add_dependencies(r-type_sandbox graphics-raylib)
+    rtype_set_warnings(r-type_sandbox)
+endif()
+
 install(TARGETS r-type_server r-type_client RUNTIME DESTINATION bin)
 install(DIRECTORY scripts/ DESTINATION bin/scripts)
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/assets/ DESTINATION bin/assets PATTERN .gitkeep EXCLUDE)
