@@ -8,7 +8,6 @@ namespace rtype::common {
 
 namespace {
 
-constexpr float axis_range = 127.F;
 constexpr std::size_t max_buttons = 8;
 constexpr std::string_view move_x = "move_x";
 constexpr std::string_view move_y = "move_y";
@@ -18,12 +17,10 @@ std::int8_t pack_axis(const engine::script::InputState& state, std::string_view 
     if (found == state.axes.end()) {
         return 0;
     }
-    return static_cast<std::int8_t>(std::lround(std::clamp(found->second, -1.F, 1.F) * axis_range));
+    return static_cast<std::int8_t>(std::lround(std::clamp(found->second, -1.F, 1.F)));
 }
 
-float unpack_axis(std::int8_t value) {
-    return std::clamp(static_cast<float>(value) / axis_range, -1.F, 1.F);
-}
+float unpack_axis(std::int8_t value) { return std::clamp(static_cast<float>(value), -1.F, 1.F); }
 
 std::size_t usable(std::span<const std::string_view> buttons) {
     return std::min(buttons.size(), max_buttons);

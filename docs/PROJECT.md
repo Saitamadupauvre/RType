@@ -594,7 +594,7 @@ end
 
 A player handle has `id` (stable while connected), `slot` (lowest free index from 0, reused after a departure), `connected`, and `player:entities()` (live entities it owns). Without `on_player_left`, the engine destroys the player's entities itself. Errors in either callback are logged and the game continues.
 
-Button actions travel as bits in the order of the shared action list (`fire` is bit 0), axes as signed bytes; the server and the client use the same table, so the layout cannot drift.
+Button actions travel as bits in the order of the shared action list (`fire` is bit 0), axes as `-1`, `0` or `1` (the protocol rounds them); the server and the client use the same table, so the layout cannot drift.
 
 Key bindings are data, editable by the player (remapping, not implemented yet; the defaults below are built in):
 

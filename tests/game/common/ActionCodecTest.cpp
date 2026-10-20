@@ -15,16 +15,22 @@ TEST(ActionCodec, NeutralInputPacksToZero) {
     EXPECT_EQ(pack_input(InputState{}), (PackedInput{.action_flags = 0, .move_x = 0, .move_y = 0}));
 }
 
-TEST(ActionCodec, FullAxesUseTheWholeRange) {
+TEST(ActionCodec, FullAxesPackToUnitSteps) {
     const InputState state{.axes = {{"move_x", 1.F}, {"move_y", -1.F}}, .pressed = {}};
 
-    EXPECT_EQ(pack_input(state), (PackedInput{.action_flags = 0, .move_x = 127, .move_y = -127}));
+    EXPECT_EQ(pack_input(state), (PackedInput{.action_flags = 0, .move_x = 1, .move_y = -1}));
+}
+
+TEST(ActionCodec, PartialAxesRoundToTheNearestProtocolStep) {
+    const InputState state{.axes = {{"move_x", 0.4F}, {"move_y", -0.6F}}, .pressed = {}};
+
+    EXPECT_EQ(pack_input(state), (PackedInput{.action_flags = 0, .move_x = 0, .move_y = -1}));
 }
 
 TEST(ActionCodec, OutOfRangeAxesAreClamped) {
     const InputState state{.axes = {{"move_x", 4.F}, {"move_y", -9.F}}, .pressed = {}};
 
-    EXPECT_EQ(pack_input(state), (PackedInput{.action_flags = 0, .move_x = 127, .move_y = -127}));
+    EXPECT_EQ(pack_input(state), (PackedInput{.action_flags = 0, .move_x = 1, .move_y = -1}));
 }
 
 TEST(ActionCodec, ButtonBitFollowsItsPositionInTheList) {
@@ -41,7 +47,7 @@ TEST(ActionCodec, UnknownPressedActionsAreNotSent) {
 }
 
 TEST(ActionCodec, UnpackRestoresAxesAndButtons) {
-    const auto state = unpack_input(PackedInput{.action_flags = 1, .move_x = 127, .move_y = -127});
+    const auto state = unpack_input(PackedInput{.action_flags = 1, .move_x = 1, .move_y = -1});
 
     EXPECT_FLOAT_EQ(state.axes.at("move_x"), 1.F);
     EXPECT_FLOAT_EQ(state.axes.at("move_y"), -1.F);
@@ -64,4 +70,19 @@ TEST(ActionCodec, RoundTripKeepsPressedButtons) {
     const InputState state{.axes = {{"move_x", 0.F}, {"move_y", 0.F}}, .pressed = {"fire"}};
 
     EXPECT_EQ(unpack_input(pack_input(state)).pressed, state.pressed);
+}
+
+TEST(ActionCodec, PackedInputAlwaysFitsTheProtocol) {
+    for (const float axis : {-5.F, -1.F, -0.5F, 0.F, 0.49F, 1.F, 7.F}) {
+        const InputState state{.axes = {{"move_x", axis}, {"move_y", -axis}},
+                               .pressed = {"fire", "unknown"}};
+
+        const auto packed = pack_input(state);
+
+        EXPECT_GE(packed.move_x, -1) << axis;
+        EXPECT_LE(packed.move_x, 1) << axis;
+        EXPECT_GE(packed.move_y, -1) << axis;
+        EXPECT_LE(packed.move_y, 1) << axis;
+        EXPECT_EQ(packed.action_flags & ~1U, 0U) << axis;
+    }
 }

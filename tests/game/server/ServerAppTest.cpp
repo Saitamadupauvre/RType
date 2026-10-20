@@ -186,7 +186,7 @@ TEST(ServerApp, InputMovesOnlyThatPlayerEntity) {
     const auto start_one = position_of(app, 1);
     const auto start_two = position_of(app, 2);
 
-    app.apply_inputs({input_for(1, 127, 0)});
+    app.apply_inputs({input_for(1, 1, 0)});
     app.tick(tick_step);
 
     EXPECT_FLOAT_EQ(position_of(app, 1).x, start_one.x + 1.F);
@@ -212,7 +212,7 @@ TEST(ServerApp, InputFromUnknownPlayerIsIgnored) {
     app.events().publish(PlayerJoined{.player_id = 1});
     const auto start = position_of(app, 1);
 
-    app.apply_inputs({input_for(9, 127, 0)});
+    app.apply_inputs({input_for(9, 1, 0)});
     app.tick(tick_step);
 
     EXPECT_FLOAT_EQ(position_of(app, 1).x, start.x);
