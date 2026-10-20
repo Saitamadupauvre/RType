@@ -14,13 +14,14 @@ namespace {
 
 namespace log = engine::core::log;
 
-constexpr std::array<std::string_view, 16> reserved_globals{
-    "entity", "system", "query", "spawn", "find_all", "find_first", "count", "after",
-    "every",  "wait",   "play",  "music", "random",   "world",      "log",   "synced",
+constexpr std::array<std::string_view, 18> reserved_globals{
+    "entity", "system", "query", "spawn",  "find_all", "find_first",
+    "count",  "after",  "every", "wait",   "play",     "music",
+    "random", "world",  "log",   "synced", "players",  "find_player",
 };
 
-constexpr std::array<std::string_view, 6> engine_owned_fields{"age",   "id",      "type",
-                                                              "input", "destroy", "has_tag"};
+constexpr std::array<std::string_view, 7> engine_owned_fields{"age",   "id",      "type",   "input",
+                                                              "owner", "destroy", "has_tag"};
 
 constexpr std::array<std::string_view, 5> callbacks{"on_spawn", "update", "on_hit", "on_destroy",
                                                     "behavior"};

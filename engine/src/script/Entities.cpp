@@ -46,7 +46,8 @@ bool input_pressed(const InputState& input, std::string_view name) {
 
 } // namespace
 
-Entities::Entities(sol::state& lua) : _lua(lua), _methods(lua.create_table()) {
+Entities::Entities(sol::state& lua, const Players& players)
+    : _lua(lua), _players(players), _methods(lua.create_table()) {
     sol::table types = _lua.create_table();
     types.new_usertype<EntityHandle>(
         "EntityHandle", sol::no_constructor, sol::meta_function::index,
@@ -207,7 +208,11 @@ sol::object Entities::get(sol::this_state state, const EntityHandle& handle,
             return sol::make_object(state, record.age);
         }
         if (name == "input") {
-            return sol::make_object(state, record.input);
+            return sol::make_object(state, input_of(record));
+        }
+        if (name == "owner") {
+            return record.owner ? player_object(state, *record.owner)
+                                : sol::make_object(state, sol::lua_nil);
         }
         if (const auto field = find_native_field(name)) {
             return field->read(state, *_world, handle.entity);
@@ -232,6 +237,10 @@ void Entities::set(sol::this_state state, const EntityHandle& handle, const sol:
         if (is_read_only(name)) {
             throw std::runtime_error(
                 std::format("{}entity field '{}' is read-only", caller_location(state), name));
+        }
+        if (name == "owner") {
+            set_owner(state, record, value);
+            return;
         }
         if (const auto field = find_native_field(name)) {
             field->write(state, *_world, handle.entity, value);
@@ -265,12 +274,82 @@ Entities::Record& Entities::live_record(sol::this_state state, const EntityHandl
 }
 
 void Entities::destroy(sol::this_state state, const EntityHandle& handle) {
-    Record& record = live_record(state, handle);
-    if (record.doomed) {
+    live_record(state, handle);
+    doom(handle.entity);
+}
+
+void Entities::doom(core::Entity entity) {
+    const auto found = _records.find(entity.id());
+    if (found == _records.end() || found->second.doomed) {
         return;
     }
-    record.doomed = true;
-    _doomed.push_back(handle.entity);
+    found->second.doomed = true;
+    _doomed.push_back(entity);
+}
+
+std::vector<core::Entity> Entities::owned_by(std::uint32_t player_id) const {
+    std::vector<core::Entity> owned;
+    for (const core::Entity entity : live_entities()) {
+        const Record& record = _records.at(entity.id());
+        if (!record.doomed && record.owner == player_id) {
+            owned.push_back(entity);
+        }
+    }
+    return owned;
+}
+
+std::optional<std::string> Entities::type_of(core::Entity entity) const {
+    const auto found = _records.find(entity.id());
+    if (found == _records.end()) {
+        return std::nullopt;
+    }
+    return found->second.type;
+}
+
+std::optional<std::uint32_t> Entities::owner_of(core::Entity entity) const {
+    const auto found = _records.find(entity.id());
+    if (found == _records.end() || !found->second.owner ||
+        !_players.contains(*found->second.owner)) {
+        return std::nullopt;
+    }
+    return found->second.owner;
+}
+
+sol::object Entities::handle_of(core::Entity entity) const {
+    return _records.at(entity.id()).handle;
+}
+
+sol::object Entities::player_object(sol::this_state state, std::uint32_t player_id) const {
+    if (!_players.contains(player_id)) {
+        return sol::make_object(state, sol::lua_nil);
+    }
+    return sol::make_object(state, PlayerHandle{player_id});
+}
+
+const InputState& Entities::input_of(const Record& record) const {
+    if (record.owner) {
+        if (const InputState* owned = _players.input(*record.owner)) {
+            return *owned;
+        }
+    }
+    return record.input;
+}
+
+void Entities::set_owner(sol::this_state state, Record& record, const sol::object& value) {
+    if (is_nil(value)) {
+        record.owner.reset();
+        return;
+    }
+    if (!value.is<PlayerHandle>()) {
+        throw std::runtime_error(
+            std::format("{}entity field 'owner' must be a player or nil", caller_location(state)));
+    }
+    const std::uint32_t player_id = value.as<PlayerHandle>().id;
+    if (!_players.contains(player_id)) {
+        throw std::runtime_error(
+            std::format("{}player {} is not connected", caller_location(state), player_id));
+    }
+    record.owner = player_id;
 }
 
 bool Entities::has_tag(sol::this_state state, const EntityHandle& handle, std::string_view label) {
