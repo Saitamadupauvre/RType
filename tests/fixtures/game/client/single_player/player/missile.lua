@@ -1,4 +1,5 @@
 local config = require("config")
+local roster = require("roster")
 
 entity "missile"
 
@@ -7,9 +8,23 @@ color = { r = 255, g = 220, b = 60 }
 speed = config.missile.speed
 size  = config.missile.size
 
+function on_spawn(self)
+    roster.add(self, "missiles")
+end
+
+function on_destroy(self)
+    roster.remove(self)
+end
+
+function on_hit(self, other)
+    if other:has_tag("enemy") then
+        roster.destroy(self)
+    end
+end
+
 function update(self, dt)
     self.x = self.x + self.speed * dt
     if self.x >= config.world.width then
-        self:destroy()
+        roster.destroy(self)
     end
 end

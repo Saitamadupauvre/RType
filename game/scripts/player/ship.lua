@@ -1,4 +1,5 @@
 local config = require("config")
+local roster = require("roster")
 
 entity "ship"
 
@@ -10,6 +11,20 @@ cooldown = 0
 
 local function clamp(value, low, high)
     return math.max(low, math.min(value, high))
+end
+
+function on_spawn(self)
+    roster.add(self, "players")
+end
+
+function on_destroy(self)
+    roster.remove(self)
+end
+
+function on_hit(self, other)
+    if other:has_tag("enemy") then
+        roster.destroy(self)
+    end
 end
 
 function steer(self, input, dt)
