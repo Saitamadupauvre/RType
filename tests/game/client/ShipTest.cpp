@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <filesystem>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -52,10 +51,14 @@ class ShipTest : public ::testing::Test {
 protected:
     EntityManager _world;
     ScriptRuntime _runtime;
+    Entity _ship{0, 0};
 
     void SetUp() override {
         _runtime.attach_world(_world);
         ASSERT_TRUE(_runtime.load_scripts(game_scripts));
+        const auto ship = _runtime.spawn("ship", ship_start);
+        ASSERT_TRUE(ship.has_value());
+        _ship = *ship;
     }
 
     [[nodiscard]] std::vector<Entity> tagged(const std::string& label) {
@@ -68,36 +71,20 @@ protected:
         return found;
     }
 
-    [[nodiscard]] std::vector<Entity> players() { return tagged("player"); }
-
     [[nodiscard]] std::size_t missiles() { return tagged("missile").size(); }
 
-    [[nodiscard]] Entity ship() {
-        const auto found = players();
-        if (found.size() != 1) {
-            throw std::runtime_error("expected exactly one ship");
-        }
-        return found.front();
-    }
+    [[nodiscard]] Vec2 position() { return _world.get<Position>(_ship).pos; }
 
-    [[nodiscard]] Vec2 position() { return _world.get<Position>(ship()).pos; }
+    void place(Vec2 at) { _world.get<Position>(_ship).pos = at; }
 
-    void place(Vec2 at) { _world.get<Position>(ship()).pos = at; }
+    void steer(float move_x, float move_y) { _runtime.set_input(_ship, moving(move_x, move_y)); }
 
-    void steer(float move_x, float move_y) { _runtime.set_input(ship(), moving(move_x, move_y)); }
-
-    void hold_fire() { _runtime.set_input(ship(), firing()); }
+    void hold_fire() { _runtime.set_input(_ship, firing()); }
 };
 
 } // namespace
 
-TEST_F(ShipTest, StartSpawnsOneShipAtItsStartPosition) {
-    EXPECT_EQ(players().size(), 1U);
-    EXPECT_FLOAT_EQ(position().x, ship_start.x);
-    EXPECT_FLOAT_EQ(position().y, ship_start.y);
-}
-
-TEST_F(ShipTest, IsDrawn) { EXPECT_TRUE(_world.has<Sprite>(ship())); }
+TEST_F(ShipTest, IsDrawn) { EXPECT_TRUE(_world.has<Sprite>(_ship)); }
 
 TEST_F(ShipTest, StaysStillWithoutInput) {
     _runtime.update(1.F);

@@ -34,6 +34,7 @@ public:
     explicit Game(int seed) {
         _runtime.attach_world(_world);
         _loaded = _runtime.load_scripts(game_scripts) &&
+                  _runtime.spawn("bydo_spawner").has_value() &&
                   _runtime.run_string(std::format("math.randomseed({})", seed), "seed");
     }
 

@@ -3,7 +3,7 @@ local roster = require("roster")
 
 entity "ship"
 
-tags     = { "player" }
+tags     = { "player", "ship" }
 color    = { r = 80, g = 160, b = 255 }
 speed    = config.ship.speed
 size     = config.ship.size

@@ -42,6 +42,8 @@ protected:
     void SetUp() override {
         _runtime.attach_world(_world);
         ASSERT_TRUE(_runtime.load_scripts(game_scripts));
+        ASSERT_TRUE(_runtime.spawn("collisions").has_value());
+        ASSERT_TRUE(_runtime.spawn("ship", ship_start).has_value());
     }
 
     Entity spawn(const std::string& type, Vec2 at) {
@@ -112,7 +114,7 @@ TEST_F(CollisionTest, OneMissileDestroysOnlyOneBydo) {
 TEST_F(CollisionTest, BydoHittingTheShipDestroysTheShipOnly) {
     const Entity bydo = spawn("bydo", {ship_start.x + 10.F, ship_start.y + 10.F});
     tick();
-    EXPECT_TRUE(tagged("player").empty());
+    EXPECT_TRUE(tagged("ship").empty());
     EXPECT_TRUE(_world.alive(bydo));
 }
 
@@ -120,7 +122,7 @@ TEST_F(CollisionTest, ShipDoesNotDestroyMissiles) {
     const Entity missile = spawn("missile", {ship_start.x + 10.F, ship_start.y + 10.F});
     tick();
     EXPECT_TRUE(_world.alive(missile));
-    EXPECT_EQ(tagged("player").size(), 1U);
+    EXPECT_EQ(tagged("ship").size(), 1U);
 }
 
 TEST_F(CollisionTest, DestroyedEntitiesNeverBreakTheNextTicks) {
