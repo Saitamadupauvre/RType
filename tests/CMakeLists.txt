@@ -141,5 +141,5 @@ game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.c
 game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
     game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp game/client/ShipTest.cpp
     game/client/MissileTest.cpp game/client/BydoTest.cpp game/client/SpawnerTest.cpp
-    game/client/CollisionTest.cpp
+    game/client/CollisionTest.cpp game/client/GameFlowTest.cpp
     LINKS r-type_client_cli r-type_client_controls r-type_client_draw engine::script)
