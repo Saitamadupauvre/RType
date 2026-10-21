@@ -19,7 +19,7 @@ using engine::script::ScriptRuntime;
 namespace {
 
 constexpr float bydo_speed = 300.F;
-constexpr float bydo_size = 64.F;
+constexpr float bydo_width = 64.F;
 
 const std::filesystem::path game_scripts =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "client" / "single_player";
@@ -62,7 +62,7 @@ TEST_F(BydoTest, MovesLeftAtItsSpeed) {
 TEST_F(BydoTest, StaysAliveWhilePartlyVisible) {
     const Entity bydo = bydo_at({0.F, 300.F});
     tick(0.1F);
-    EXPECT_GT(_world.get<Position>(bydo).pos.x, -bydo_size);
+    EXPECT_GT(_world.get<Position>(bydo).pos.x, -bydo_width);
     EXPECT_TRUE(_world.alive(bydo));
 }
 

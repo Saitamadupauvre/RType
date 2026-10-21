@@ -23,7 +23,8 @@ namespace {
 
 constexpr float spawn_interval = 1.5F;
 constexpr float world_width = 1920.F;
-constexpr float max_y = 1080.F - 64.F;
+constexpr float bydo_height = 64.F;
+constexpr float max_y = 1080.F - bydo_height;
 constexpr std::size_t waves = 20;
 
 const std::filesystem::path game_scripts =

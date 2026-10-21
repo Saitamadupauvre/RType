@@ -25,8 +25,8 @@ using engine::script::ScriptRuntime;
 namespace {
 
 constexpr Vec2 ship_start{160.F, 508.F};
-constexpr float bydo_size = 64.F;
-constexpr float missile_size = 16.F;
+constexpr float bydo_height = 64.F;
+constexpr float missile_width = 16.F;
 constexpr float short_tick = 0.01F;
 
 const std::filesystem::path game_scripts =
@@ -87,7 +87,7 @@ TEST_F(CollisionTest, MissileHittingABydoDestroysBoth) {
 }
 
 TEST_F(CollisionTest, MissileTouchingABydoEdgeDoesNotHitIt) {
-    const Entity missile = spawn("missile", {1000.F - missile_size, 300.F});
+    const Entity missile = spawn("missile", {1000.F - missile_width, 300.F});
     const Entity bydo = spawn("bydo", {1000.F, 300.F});
     _runtime.update(0.F);
     _runtime.flush_destroyed();
@@ -106,7 +106,7 @@ TEST_F(CollisionTest, MissileFarFromABydoDestroysNeither) {
 TEST_F(CollisionTest, OneMissileDestroysOnlyOneBydo) {
     spawn("missile", {1000.F, 300.F});
     spawn("bydo", {1000.F, 290.F});
-    spawn("bydo", {1000.F, 300.F - (bydo_size / 2.F)});
+    spawn("bydo", {1000.F, 300.F - (bydo_height / 2.F)});
     tick();
     EXPECT_EQ(tagged("enemy").size(), 1U);
 }

@@ -23,12 +23,13 @@ using engine::script::ScriptRuntime;
 
 namespace {
 
-constexpr float ship_size = 64.F;
+constexpr float ship_width = 64.F;
+constexpr float ship_height = 64.F;
 constexpr float ship_speed = 500.F;
 constexpr Vec2 ship_start{160.F, 508.F};
-constexpr float max_x = 1920.F - ship_size;
-constexpr float max_y = 1080.F - ship_size;
-constexpr float missile_size = 16.F;
+constexpr float max_x = 1920.F - ship_width;
+constexpr float max_y = 1080.F - ship_height;
+constexpr float missile_height = 16.F;
 constexpr float half_cooldown = 0.125F;
 
 const std::filesystem::path game_scripts =
@@ -126,8 +127,8 @@ TEST_F(ShipTest, FireSpawnsAMissileAtTheNoseOfTheShip) {
     const auto spawned = tagged("missile");
     ASSERT_EQ(spawned.size(), 1U);
     const Vec2 missile = _world.get<Position>(spawned.front()).pos;
-    EXPECT_FLOAT_EQ(missile.x, ship_start.x + ship_size);
-    EXPECT_FLOAT_EQ(missile.y, ship_start.y + ((ship_size - missile_size) / 2.F));
+    EXPECT_FLOAT_EQ(missile.x, ship_start.x + ship_width);
+    EXPECT_FLOAT_EQ(missile.y, ship_start.y + ((ship_height - missile_height) / 2.F));
 }
 
 TEST_F(ShipTest, HoldingFireShootsOncePerCooldown) {

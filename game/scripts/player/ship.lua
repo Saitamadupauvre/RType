@@ -6,7 +6,8 @@ entity "ship"
 tags     = { "player", "ship" }
 color    = { r = 80, g = 160, b = 255 }
 speed    = config.ship.speed
-size     = config.ship.size
+width    = config.ship.width
+height   = config.ship.height
 cooldown = 0
 
 local function clamp(value, low, high)
@@ -29,8 +30,8 @@ end
 
 function steer(self, input, dt)
     local bounds = config.world
-    self.x = clamp(self.x + input:axis("move_x") * self.speed * dt, 0, bounds.width - self.size)
-    self.y = clamp(self.y + input:axis("move_y") * self.speed * dt, 0, bounds.height - self.size)
+    self.x = clamp(self.x + input:axis("move_x") * self.speed * dt, 0, bounds.width - self.width)
+    self.y = clamp(self.y + input:axis("move_y") * self.speed * dt, 0, bounds.height - self.height)
 end
 
 function shoot(self, input, dt)
@@ -39,8 +40,8 @@ function shoot(self, input, dt)
         return
     end
     spawn("missile", {
-        x = self.x + self.size,
-        y = self.y + (self.size - config.missile.size) / 2,
+        x = self.x + self.width,
+        y = self.y + (self.height - config.missile.height) / 2,
     })
     self.cooldown = config.ship.fire_cooldown
 end
