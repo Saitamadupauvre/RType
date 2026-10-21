@@ -7,7 +7,7 @@ elapsed = 0
 function spawn_bydo(self)
     spawn("bydo", {
         x = config.world.width,
-        y = math.random(0, config.world.height - config.bydo.height),
+        y = math.random(0, config.world.height - config.bydo.hitbox.h),
     })
 end
 

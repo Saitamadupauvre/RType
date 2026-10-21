@@ -6,8 +6,7 @@ entity "ship"
 tags     = { "player", "ship" }
 sprite   = "sprites/ship.png"
 speed    = config.ship.speed
-width    = config.ship.width
-height   = config.ship.height
+hitbox   = config.ship.hitbox
 cooldown = 0
 
 local function clamp(value, low, high)
@@ -30,8 +29,8 @@ end
 
 function steer(self, input, dt)
     local bounds = config.world
-    self.x = clamp(self.x + input:axis("move_x") * self.speed * dt, 0, bounds.width - self.width)
-    self.y = clamp(self.y + input:axis("move_y") * self.speed * dt, 0, bounds.height - self.height)
+    self.x = clamp(self.x + input:axis("move_x") * self.speed * dt, 0, bounds.width - self.hitbox.w)
+    self.y = clamp(self.y + input:axis("move_y") * self.speed * dt, 0, bounds.height - self.hitbox.h)
 end
 
 function shoot(self, input, dt)
@@ -40,8 +39,8 @@ function shoot(self, input, dt)
         return
     end
     spawn("missile", {
-        x = self.x + self.width,
-        y = self.y + (self.height - config.missile.height) / 2,
+        x = self.x + self.hitbox.w,
+        y = self.y + (self.hitbox.h - config.missile.hitbox.h) / 2,
     })
     self.cooldown = config.ship.fire_cooldown
 end

@@ -6,8 +6,7 @@ entity "missile"
 tags   = { "missile" }
 sprite = "sprites/missile.png"
 speed  = config.missile.speed
-width  = config.missile.width
-height = config.missile.height
+hitbox = config.missile.hitbox
 
 function on_spawn(self)
     roster.add(self, "missiles")

@@ -6,8 +6,7 @@ entity "bydo"
 tags   = { "enemy" }
 sprite = "sprites/bydo.png"
 speed  = config.bydo.speed
-width  = config.bydo.width
-height = config.bydo.height
+hitbox = config.bydo.hitbox
 
 function on_spawn(self)
     roster.add(self, "enemies")
@@ -25,7 +24,7 @@ end
 
 function update(self, dt)
     self.x = self.x - self.speed * dt
-    if self.x <= -self.width then
+    if self.x <= -self.hitbox.w then
         roster.destroy(self)
     end
 end
