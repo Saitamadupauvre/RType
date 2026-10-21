@@ -4,7 +4,7 @@ local roster = require("roster")
 entity "ship"
 
 tags     = { "player", "ship" }
-color    = { r = 80, g = 160, b = 255 }
+sprite   = "sprites/ship.png"
 speed    = config.ship.speed
 width    = config.ship.width
 height   = config.ship.height

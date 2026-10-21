@@ -4,7 +4,7 @@ local roster = require("roster")
 entity "bydo"
 
 tags   = { "enemy" }
-color  = { r = 230, g = 70, b = 70 }
+sprite = "sprites/bydo.png"
 speed  = config.bydo.speed
 width  = config.bydo.width
 height = config.bydo.height

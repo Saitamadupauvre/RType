@@ -50,7 +50,11 @@ protected:
 
 } // namespace
 
-TEST_F(MissileTest, IsDrawn) { EXPECT_TRUE(_world.has<Sprite>(launch({100.F, 300.F}))); }
+TEST_F(MissileTest, IsDrawnWithItsSprite) {
+    const Entity missile = launch({100.F, 300.F});
+    ASSERT_TRUE(_world.has<Sprite>(missile));
+    EXPECT_EQ(_world.get<Sprite>(missile).path, "sprites/missile.png");
+}
 
 TEST_F(MissileTest, MovesRightAtItsSpeed) {
     const Entity missile = launch({100.F, 300.F});

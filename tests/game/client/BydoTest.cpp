@@ -19,7 +19,7 @@ using engine::script::ScriptRuntime;
 namespace {
 
 constexpr float bydo_speed = 300.F;
-constexpr float bydo_width = 64.F;
+constexpr float bydo_width = 63.F;
 
 const std::filesystem::path game_scripts =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "client" / "single_player";
@@ -50,7 +50,11 @@ protected:
 
 } // namespace
 
-TEST_F(BydoTest, IsDrawn) { EXPECT_TRUE(_world.has<Sprite>(bydo_at({1000.F, 300.F}))); }
+TEST_F(BydoTest, IsDrawnWithItsSprite) {
+    const Entity bydo = bydo_at({1000.F, 300.F});
+    ASSERT_TRUE(_world.has<Sprite>(bydo));
+    EXPECT_EQ(_world.get<Sprite>(bydo).path, "sprites/bydo.png");
+}
 
 TEST_F(BydoTest, MovesLeftAtItsSpeed) {
     const Entity bydo = bydo_at({1000.F, 300.F});

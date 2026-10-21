@@ -23,7 +23,7 @@ using engine::script::ScriptRuntime;
 
 namespace {
 
-constexpr Vec2 ship_start{160.F, 508.F};
+constexpr Vec2 ship_start{160.F, 522.F};
 constexpr float spawn_interval = 1.5F;
 constexpr float frame = 1.F / 60.F;
 constexpr float world_width = 1920.F;

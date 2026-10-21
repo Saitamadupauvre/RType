@@ -24,9 +24,9 @@ using engine::script::ScriptRuntime;
 
 namespace {
 
-constexpr Vec2 ship_start{160.F, 508.F};
-constexpr float bydo_height = 64.F;
-constexpr float missile_width = 16.F;
+constexpr Vec2 ship_start{160.F, 522.F};
+constexpr float bydo_height = 72.F;
+constexpr float missile_width = 48.F;
 constexpr float short_tick = 0.01F;
 
 const std::filesystem::path game_scripts =

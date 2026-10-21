@@ -4,7 +4,7 @@ local roster = require("roster")
 entity "missile"
 
 tags   = { "missile" }
-color  = { r = 255, g = 220, b = 60 }
+sprite = "sprites/missile.png"
 speed  = config.missile.speed
 width  = config.missile.width
 height = config.missile.height

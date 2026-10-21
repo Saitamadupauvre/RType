@@ -23,13 +23,13 @@ using engine::script::ScriptRuntime;
 
 namespace {
 
-constexpr float ship_width = 64.F;
-constexpr float ship_height = 64.F;
+constexpr float ship_width = 96.F;
+constexpr float ship_height = 36.F;
 constexpr float ship_speed = 500.F;
-constexpr Vec2 ship_start{160.F, 508.F};
+constexpr Vec2 ship_start{160.F, 522.F};
 constexpr float max_x = 1920.F - ship_width;
 constexpr float max_y = 1080.F - ship_height;
-constexpr float missile_height = 16.F;
+constexpr float missile_height = 24.F;
 constexpr float half_cooldown = 0.125F;
 
 const std::filesystem::path game_scripts =
@@ -85,7 +85,10 @@ protected:
 
 } // namespace
 
-TEST_F(ShipTest, IsDrawn) { EXPECT_TRUE(_world.has<Sprite>(_ship)); }
+TEST_F(ShipTest, IsDrawnWithItsSprite) {
+    ASSERT_TRUE(_world.has<Sprite>(_ship));
+    EXPECT_EQ(_world.get<Sprite>(_ship).path, "sprites/ship.png");
+}
 
 TEST_F(ShipTest, StaysStillWithoutInput) {
     _runtime.update(1.F);
