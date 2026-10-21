@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <filesystem>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "engine/core/ComponentPhysics.hpp"
@@ -26,14 +28,22 @@ constexpr float ship_speed = 500.F;
 constexpr Vec2 ship_start{160.F, 508.F};
 constexpr float max_x = 1920.F - ship_size;
 constexpr float max_y = 1080.F - ship_size;
+constexpr float missile_size = 16.F;
+constexpr float half_cooldown = 0.125F;
 
-const std::filesystem::path ship_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "client" / "ship";
+const std::filesystem::path game_scripts =
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "client" / "single_player";
 
 InputState moving(float move_x, float move_y) {
     InputState input;
     input.axes.emplace("move_x", move_x);
     input.axes.emplace("move_y", move_y);
+    return input;
+}
+
+InputState firing() {
+    InputState input = moving(0.F, 0.F);
+    input.pressed.emplace("fire");
     return input;
 }
 
@@ -44,18 +54,22 @@ protected:
 
     void SetUp() override {
         _runtime.attach_world(_world);
-        ASSERT_TRUE(_runtime.load_scripts(ship_scripts));
+        ASSERT_TRUE(_runtime.load_scripts(game_scripts));
     }
 
-    [[nodiscard]] std::vector<Entity> players() {
+    [[nodiscard]] std::vector<Entity> tagged(const std::string& label) {
         std::vector<Entity> found;
         _world.query<Tags>().each([&](Entity entity, const Tags& tags) {
-            if (tags.has("player")) {
+            if (tags.has(label)) {
                 found.push_back(entity);
             }
         });
         return found;
     }
+
+    [[nodiscard]] std::vector<Entity> players() { return tagged("player"); }
+
+    [[nodiscard]] std::size_t missiles() { return tagged("missile").size(); }
 
     [[nodiscard]] Entity ship() {
         const auto found = players();
@@ -70,6 +84,8 @@ protected:
     void place(Vec2 at) { _world.get<Position>(ship()).pos = at; }
 
     void steer(float move_x, float move_y) { _runtime.set_input(ship(), moving(move_x, move_y)); }
+
+    void hold_fire() { _runtime.set_input(ship(), firing()); }
 };
 
 } // namespace
@@ -107,4 +123,29 @@ TEST_F(ShipTest, StopsAtTheRightAndBottomEdgesWithItsWholeBodyVisible) {
     _runtime.update(1.F);
     EXPECT_FLOAT_EQ(position().x, max_x);
     EXPECT_FLOAT_EQ(position().y, max_y);
+}
+
+TEST_F(ShipTest, DoesNotShootWithoutFire) {
+    _runtime.update(1.F);
+    EXPECT_EQ(missiles(), 0U);
+}
+
+TEST_F(ShipTest, FireSpawnsAMissileAtTheNoseOfTheShip) {
+    hold_fire();
+    _runtime.update(half_cooldown);
+    const auto spawned = tagged("missile");
+    ASSERT_EQ(spawned.size(), 1U);
+    const Vec2 missile = _world.get<Position>(spawned.front()).pos;
+    EXPECT_FLOAT_EQ(missile.x, ship_start.x + ship_size);
+    EXPECT_FLOAT_EQ(missile.y, ship_start.y + ((ship_size - missile_size) / 2.F));
+}
+
+TEST_F(ShipTest, HoldingFireShootsOncePerCooldown) {
+    hold_fire();
+    _runtime.update(half_cooldown);
+    EXPECT_EQ(missiles(), 1U);
+    _runtime.update(half_cooldown);
+    EXPECT_EQ(missiles(), 1U);
+    _runtime.update(half_cooldown);
+    EXPECT_EQ(missiles(), 2U);
 }
