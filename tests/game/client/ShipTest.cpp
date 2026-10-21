@@ -16,6 +16,7 @@
 using engine::core::Entity;
 using engine::core::EntityManager;
 using engine::core::Position;
+using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::Vec2;
 using engine::script::InputState;
@@ -95,6 +96,8 @@ TEST_F(ShipTest, StartSpawnsOneShipAtItsStartPosition) {
     EXPECT_FLOAT_EQ(position().x, ship_start.x);
     EXPECT_FLOAT_EQ(position().y, ship_start.y);
 }
+
+TEST_F(ShipTest, IsDrawn) { EXPECT_TRUE(_world.has<Sprite>(ship())); }
 
 TEST_F(ShipTest, StaysStillWithoutInput) {
     _runtime.update(1.F);

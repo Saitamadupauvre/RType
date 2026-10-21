@@ -3,6 +3,7 @@ local config = require("config")
 entity "ship"
 
 tags     = { "player" }
+color    = { r = 80, g = 160, b = 255 }
 speed    = config.ship.speed
 size     = config.ship.size
 cooldown = 0

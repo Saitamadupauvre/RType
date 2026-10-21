@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/script/ScriptRuntime.hpp"
@@ -11,6 +12,7 @@
 using engine::core::Entity;
 using engine::core::EntityManager;
 using engine::core::Position;
+using engine::core::Sprite;
 using engine::core::Vec2;
 using engine::script::ScriptRuntime;
 
@@ -47,6 +49,8 @@ protected:
 };
 
 } // namespace
+
+TEST_F(MissileTest, IsDrawn) { EXPECT_TRUE(_world.has<Sprite>(launch({100.F, 300.F}))); }
 
 TEST_F(MissileTest, MovesRightAtItsSpeed) {
     const Entity missile = launch({100.F, 300.F});
