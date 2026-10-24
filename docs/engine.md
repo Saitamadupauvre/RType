@@ -43,7 +43,9 @@ Component types are identified by stable names registered in a `.cpp` of
 - opens only `base`, `math`, `string`, `table`, `coroutine`; removes `dofile`,
   `loadfile` and bytecode loading; `require` only reaches `lib/`;
 - spawns scripted entities, maps native fields (`x`, `y`, `vx`, `vy`,
-  `sprite`, `color`, `tags`) to C++ components and keeps free fields in Lua;
+  `sprite`, `color`, `tags`, `hitbox`, `collides_with`) to C++ components and
+  keeps free fields in Lua; `hitbox` becomes a non-resolving `PhysicsBody` +
+  `AABBCollider` of `engine-physics`;
 - calls `update`, `on_spawn`, `on_destroy` and the `main.lua` callbacks
   through protected calls: an error is logged with file and line and the game
   continues;
@@ -51,7 +53,10 @@ Component types are identified by stable names registered in a `.cpp` of
   player's input to the entities they own;
 - registers the sounds and musics declared with `sounds { ... }` and
   `musics { ... }`, and queues `play(...)` / `music(...)` requests for the
-  host (`sound_names()`, `music_names()`, `take_audio_commands()`).
+  host (`sound_names()`, `music_names()`, `take_audio_commands()`);
+- turns overlaps reported by the host (`collide(first, second)`) into
+  `on_collide(self, other)` calls, filtered by each entity's `collides_with`
+  tags.
 
 The Lua API is specified in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
 
@@ -66,9 +71,10 @@ statistics behind two classes, `NetworkServer` and `NetworkClient`. See
 `PhysicsSystem` integrates forces, acceleration and velocity of entities with
 a `PhysicsBody` (static or dynamic, mass, gravity, collision layer and mask),
 detects overlaps between `AABBCollider` and `CircleCollider` shapes, resolves
-them and publishes collision events on the event bus. R-Type does not use it
-yet: its collisions are still done in Lua (see
-[Writing the game](writing-the-game.md#current-state)).
+them and publishes collision events on the event bus once every pair has
+been checked, so handlers may spawn or destroy entities. The R-Type server
+runs it every tick and forwards each `CollisionEvent` to the script runtime;
+scripted entities only use it for detection (`resolve_collisions = false`).
 
 ### graphics
 

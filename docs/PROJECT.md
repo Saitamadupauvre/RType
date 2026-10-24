@@ -382,11 +382,10 @@ This section is the specification of the Lua API. Not everything is implemented 
 | `system "name"` declarations | Parsed and validated; systems do not run yet |
 | `spawn(type, overrides)`, `players()`, `find_player(id)` | Implemented |
 | `main.lua`: `on_start`, `on_player_joined`, `on_player_left` | Implemented |
-| Entity fields `x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `id`, `type`, `age`, `input`, `owner`; free fields | Implemented |
-| Entity methods `destroy()`, `has_tag()`; callbacks `on_spawn`, `update`, `on_destroy` | Implemented |
-| `on_hit` | Called by the game's Lua collision pass, not by the engine yet |
+| Entity fields `x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`, `id`, `type`, `age`, `input`, `owner`; free fields | Implemented |
+| Entity methods `destroy()`, `has_tag()`; callbacks `on_spawn`, `update`, `on_collide`, `on_destroy` | Implemented |
+| Native collisions: `engine-physics` detects `hitbox` overlaps in the server tick and calls `on_collide` (see §10.5) | Implemented |
 | Native movement from `vx` / `vy` in the server tick | Not yet: scripts move entities by writing `x` / `y` |
-| `hitbox` as a native field, native collisions | Not yet (`engine-physics` exists, not wired) |
 | `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
 | `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
 
@@ -420,9 +419,10 @@ Since `spawn` is only used once the game has started, file order never matters.
 entity "bydo"
 
 -- native fields: handled by the C++ engine
-sprite = "bydo.png"
-hitbox = { w = 32, h = 32 }
-tags   = { "enemy" }
+sprite        = "bydo.png"
+hitbox        = { w = 32, h = 32 }
+tags          = { "enemy" }
+collides_with = { "player_missile" }
 
 -- free fields: invented by the developer
 health = 1
@@ -440,8 +440,8 @@ function update(self, dt)
     if self.x < -50 then self:destroy() end
 end
 
-function on_hit(self, other)
-    if other:has_tag("player_missile") then self:damage(1) end
+function on_collide(self, other)
+    self:damage(1)
 end
 
 -- custom methods: as many as needed
@@ -493,9 +493,9 @@ Both forms produce the same internal representation.
 
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
+| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
 | Free fields | `health`, `speed`, `points` | Lua table of the entity | Scripts only |
-| Callbacks | `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
+| Callbacks | `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
 
 Methods are not copied into each instance: they stay in the prefab table, so reloading a file updates every live entity.
@@ -519,6 +519,20 @@ self:move_to(x, y, duration)  -- inside a coroutine
 ```
 
 `sprite` is a path relative to `assets/`. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a square of that color (temporary, until the renderer API lands). It reads back as a new table.
+
+`hitbox = { w, h }` gives the entity a rectangular collider of positive size, anchored at its top-left `x`, `y` (the same corner the sprite is drawn from). `collides_with` is an array of tags: the entity's `on_collide(self, other)` is called on every tick its hitbox overlaps (strictly, touching edges do not count) the hitbox of an entity carrying one of those tags. Both read back as new tables, and both can change at any time, like `tags`. Collisions are one-sided: a missile with `collides_with = { "enemy" }` and an enemy with `collides_with = { "missile" }` each get their own call; an enemy without `collides_with` is never told. Both calls of a pair run even if the first destroys an entity, but an entity destroyed earlier in the tick gets no further collision. Detection runs in C++ (`engine-physics`) after every `update`, so it costs nothing in Lua.
+
+```lua
+entity "bydo_shot"
+
+tags          = { "enemy_shot" }
+hitbox        = { w = 24, h = 24 }
+collides_with = { "player" }
+
+function on_collide(self, other)
+    self:destroy()
+end
+```
 
 `self:destroy()` only marks the entity: it stays usable until the end of the tick, is skipped by later `update` calls, then `on_destroy(self)` runs and the entity is removed. Calling it twice has no extra effect. `on_spawn(self)` runs once the entity and its `spawn` overrides are in place.
 
@@ -688,7 +702,7 @@ end
 ### 10.10 Networking from the script's point of view
 
 - Scripts are written once; the developer does not write network code.
-- All logic (`update`, `on_hit`, `behavior`, systems) runs **on the server only**.
+- All logic (`update`, `on_collide`, `behavior`, systems) runs **on the server only**.
 - Clients load the same declarations only to know how each entity type looks (sprite).
 - `play` and `music` are sent to clients as events; clients receive the declared names in `connect_accept`.
 - Native fields are replicated automatically. A free field is replicated only when marked:
@@ -706,7 +720,7 @@ speed  = 150         -- server only
 2. Run Lua systems.
 3. Run entity `update` callbacks and resume coroutines; fire `after` / `every` timers.
 4. Native movement (`vx`, `vy`).
-5. Collisions → `on_hit` callbacks.
+5. Collisions (`engine-physics`) → `on_collide` callbacks.
 6. Destroy entities marked for destruction → `on_destroy` callbacks.
 7. Send snapshot to clients.
 
@@ -714,8 +728,8 @@ speed  = 150         -- server only
 
 Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
 
-- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
-- Callbacks: `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
+- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
+- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
 - Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
 
 ### 10.13 Error handling and sandbox
@@ -820,10 +834,11 @@ Part 1 status:
 | Starfield | Done |
 | Network: protocol, threads, sessions, timeouts, snapshots, statistics | Done |
 | Lua runtime: declarations, entities, players, sandbox | Done |
-| Player movement and shooting, Bydo spawning, collisions, game over | Done (in Lua) |
+| Player movement and shooting, Bydo spawning, game over | Done (in Lua) |
+| Collisions | Done (`engine-physics` in the server tick, `on_collide` in Lua) |
 | Up to 4 players, distinguishable, crash notification | Done |
 | Sound: audio plugin, Lua `play` / `music`, replication, volumes | Done |
-| Enemy missiles | To do |
+| Enemy missiles | Done |
 | Accessibility settings | To do, see [Accessibility](accessibility.md) |
 | Documentation | Done |
 | Tag `v1.0` | To do |
@@ -843,7 +858,7 @@ Part 1 status:
 | Topic | Question | Proposal |
 |---|---|---|
 | Package manager | vcpkg or CPM? | **Decided:** vcpkg (manifest mode) |
-| Native fields | Final list | `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `tags`, `layer`, maybe `animation` |
+| Native fields | Final list | `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `collides_with`, `tags`, maybe `animation` |
 | Naming | `update` or `on_update`; `after`/`every` or a `timer` object | `update`, `after`/`every` |
 | Destruction | Immediate or deferred? | **Decided:** deferred to the end of the tick |
 | Levels | System, or dedicated `level` declaration with a `behavior` coroutine | Dedicated declaration |
