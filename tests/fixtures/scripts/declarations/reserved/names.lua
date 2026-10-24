@@ -5,5 +5,5 @@ entity "ship" {
     id = 3,
     play = function() end,
     update = 3,
-    on_hit = function(self, other) end,
+    on_collide = function(self, other) end,
 }

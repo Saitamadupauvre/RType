@@ -148,7 +148,7 @@ TEST_F(ScriptDeclarationsTest, DoesNotWarnOnNativeFieldsOrFunctionCallbacks) {
     EXPECT_TRUE(_runtime.load_scripts(declarations_fixture("reserved")));
 
     EXPECT_FALSE(logged(logger::Level::Warn, {"'sprite'"}));
-    EXPECT_FALSE(logged(logger::Level::Warn, {"'on_hit'"}));
+    EXPECT_FALSE(logged(logger::Level::Warn, {"'on_collide'"}));
 }
 
 TEST_F(ScriptDeclarationsTest, WarnsOnFileDeclaringNothing) {
