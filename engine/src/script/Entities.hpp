@@ -36,6 +36,7 @@ public:
     bool call(core::Entity entity, std::string_view method);
     void set_input(core::Entity entity, InputState input);
     void update(float dt);
+    void collide(core::Entity first, core::Entity second);
     std::size_t flush_destroyed();
     void doom(core::Entity entity);
     [[nodiscard]] std::vector<core::Entity> owned_by(std::uint32_t player_id) const;
@@ -68,6 +69,8 @@ private:
     void set_owner(sol::this_state state, Record& record, const sol::object& value);
     bool has_tag(sol::this_state state, const EntityHandle& handle, std::string_view label);
     [[nodiscard]] std::vector<core::Entity> live_entities() const;
+    [[nodiscard]] bool is_active(core::Entity entity) const;
+    [[nodiscard]] bool wants_collision(core::Entity entity, core::Entity other) const;
 
     sol::state& _lua;
     const Players& _players;

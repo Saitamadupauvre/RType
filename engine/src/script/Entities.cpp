@@ -12,6 +12,7 @@
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/log/Log.hpp"
+#include "engine/physics/Components.hpp"
 
 namespace engine::script {
 
@@ -72,6 +73,10 @@ void Entities::attach(core::EntityManager& world) {
     register_if_missing<core::Velocity>(world);
     register_if_missing<core::Sprite>(world);
     register_if_missing<core::Tags>(world);
+    register_if_missing<CollisionFilter>(world);
+    register_if_missing<physics::AABBCollider>(world);
+    register_if_missing<physics::PhysicsBody>(world);
+    register_if_missing<physics::Scriptable>(world);
     _world = &world;
 }
 
@@ -178,6 +183,35 @@ std::size_t Entities::flush_destroyed() {
         }
     }
     return destroyed;
+}
+
+void Entities::collide(core::Entity first, core::Entity second) {
+    if (!is_active(first) || !is_active(second)) {
+        return;
+    }
+    if (wants_collision(first, second)) {
+        invoke(first, "on_collide", _records.at(second.id()).handle);
+    }
+    if (wants_collision(second, first)) {
+        invoke(second, "on_collide", _records.at(first.id()).handle);
+    }
+}
+
+bool Entities::is_active(core::Entity entity) const {
+    const auto found = _records.find(entity.id());
+    return found != _records.end() && !found->second.doomed && _world != nullptr &&
+           _world->alive(entity);
+}
+
+bool Entities::wants_collision(core::Entity entity, core::Entity other) const {
+    if (!_records.contains(entity.id()) || !_records.contains(other.id()) ||
+        !_world->alive(entity) || !_world->alive(other) || !_world->has<CollisionFilter>(entity) ||
+        !_world->has<core::Tags>(other)) {
+        return false;
+    }
+    const core::Tags& tags = _world->get<core::Tags>(other);
+    return std::ranges::any_of(_world->get<CollisionFilter>(entity).tags.labels(),
+                               [&](const std::string& label) { return tags.has(label); });
 }
 
 template <typename... Args>

@@ -482,6 +482,16 @@ void ScriptRuntime::update(float dt) noexcept {
     }
 }
 
+void ScriptRuntime::collide(core::Entity first, core::Entity second) noexcept {
+    try {
+        _impl->entities.collide(first, second);
+    } catch (const std::exception& exception) {
+        log::error("lua: on_collide: {}", exception.what());
+    } catch (...) {
+        log::error("lua: on_collide: unknown error");
+    }
+}
+
 std::size_t ScriptRuntime::flush_destroyed() noexcept {
     try {
         return _impl->entities.flush_destroyed();

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <concepts>
 #include <cstdint>
 #include <format>
@@ -13,6 +14,7 @@
 #include "Declarations.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
+#include "engine/physics/Components.hpp"
 
 namespace engine::script {
 
@@ -138,13 +140,13 @@ sol::object read_tags(sol::this_state state, core::EntityManager& world, core::E
     return labels;
 }
 
-core::Tags tags_from_table(sol::this_state state, const sol::table& table) {
+core::Tags tags_from_table(sol::this_state state, std::string_view field, const sol::table& table) {
     core::Tags tags;
     for (std::size_t index = 1; index <= table.size(); ++index) {
         const auto label = table.raw_get<sol::object>(index);
         if (label.get_type() != sol::type::string) {
-            throw std::runtime_error(std::format("{}entity field 'tags' must only hold strings",
-                                                 caller_location(state)));
+            throw std::runtime_error(std::format("{}entity field '{}' must only hold strings",
+                                                 caller_location(state), field));
         }
         tags.add(label.as<std::string>());
     }
@@ -154,7 +156,65 @@ core::Tags tags_from_table(sol::this_state state, const sol::table& table) {
 void write_tags(sol::this_state state, core::EntityManager& world, core::Entity entity,
                 const sol::object& value) {
     require_type(state, "tags", value, sol::type::table);
-    world.add(entity, tags_from_table(state, value.as<sol::table>()));
+    world.add(entity, tags_from_table(state, "tags", value.as<sol::table>()));
+}
+
+sol::object read_collides_with(sol::this_state state, core::EntityManager& world,
+                               core::Entity entity) {
+    sol::state_view lua(state);
+    sol::table labels = lua.create_table();
+    if (world.has<CollisionFilter>(entity)) {
+        for (const std::string& label : world.get<CollisionFilter>(entity).tags.labels()) {
+            labels.add(label);
+        }
+    }
+    return labels;
+}
+
+void write_collides_with(sol::this_state state, core::EntityManager& world, core::Entity entity,
+                         const sol::object& value) {
+    require_type(state, "collides_with", value, sol::type::table);
+    world.add(entity, CollisionFilter{
+                          .tags = tags_from_table(state, "collides_with", value.as<sol::table>())});
+}
+
+sol::object read_hitbox(sol::this_state state, core::EntityManager& world, core::Entity entity) {
+    if (!world.has<physics::AABBCollider>(entity)) {
+        return sol::make_object(state, sol::lua_nil);
+    }
+    const core::Vec2 size = world.get<physics::AABBCollider>(entity).size;
+    sol::state_view lua(state);
+    return lua.create_table_with("w", size.x, "h", size.y);
+}
+
+float hitbox_side(sol::this_state state, const sol::table& table, std::string_view name) {
+    const auto value = table.raw_get<sol::object>(name);
+    if (value.get_type() != sol::type::number) {
+        throw std::runtime_error(std::format("{}entity field 'hitbox' needs a number '{}'",
+                                             caller_location(state), name));
+    }
+    const double side = value.as<double>();
+    if (!std::isfinite(side) || side <= 0.0) {
+        throw std::runtime_error(std::format("{}entity field 'hitbox': '{}' must be positive",
+                                             caller_location(state), name));
+    }
+    return static_cast<float>(side);
+}
+
+void write_hitbox(sol::this_state state, core::EntityManager& world, core::Entity entity,
+                  const sol::object& value) {
+    require_type(state, "hitbox", value, sol::type::table);
+    const auto table = value.as<sol::table>();
+    const core::Vec2 size{hitbox_side(state, table, "w"), hitbox_side(state, table, "h")};
+    world.add(entity, physics::AABBCollider{.offset = size / 2.0F, .size = size});
+    if (!world.has<physics::PhysicsBody>(entity)) {
+        world.add(entity, physics::PhysicsBody{.type = physics::PhysicsBody::Type::Dynamic,
+                                               .resolve_collisions = false,
+                                               .affected_by_gravity = false});
+    }
+    if (!world.has<physics::Scriptable>(entity)) {
+        world.add(entity, physics::Scriptable{});
+    }
 }
 
 constexpr std::array fields{
@@ -165,6 +225,9 @@ constexpr std::array fields{
     NativeField{.name = "sprite", .read = &read_sprite, .write = &write_sprite},
     NativeField{.name = "color", .read = &read_color, .write = &write_color},
     NativeField{.name = "tags", .read = &read_tags, .write = &write_tags},
+    NativeField{.name = "hitbox", .read = &read_hitbox, .write = &write_hitbox},
+    NativeField{
+        .name = "collides_with", .read = &read_collides_with, .write = &write_collides_with},
 };
 
 } // namespace

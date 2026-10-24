@@ -270,6 +270,24 @@ public:
     void update(float dt) noexcept;
 
     /**
+     * @brief Reports that the hitboxes of two entities overlap.
+     *
+     * Each entity whose `collides_with` list holds one of the other's tags gets its
+     * `on_collide(self, other)` callback called, @p first before @p second. Both callbacks run
+     * even if the first one destroys either entity. Nothing happens if either entity is unknown,
+     * dead or already marked with `self:destroy()` when the call starts, so an entity destroyed
+     * by a collision gets no other collision in the same tick. Setting `hitbox = { w = .., h = ..
+     * }` gives an entity an axis-aligned collider anchored at its top-left `x`, `y`; the host
+     * detects the overlaps, typically with engine::physics::PhysicsSystem, and calls this function
+     * for each of them. An error raised by a callback is logged.
+     *
+     * @param first Entity spawned by this runtime.
+     * @param second Another entity spawned by this runtime.
+     * @note Never throws.
+     */
+    void collide(core::Entity first, core::Entity second) noexcept;
+
+    /**
      * @brief Removes every entity marked with `self:destroy()`.
      *
      * For each marked entity, calls its `on_destroy(self)` callback, forgets its script data and
