@@ -35,9 +35,11 @@ Status: ✅ available, 🔜 planned for the next releases.
 
 | Measure | Status | Details |
 |---|---|---|
-| No information conveyed only by sound | ✅ | The game currently has no sound at all: every event (enemy arrival, hit, game over) is visible. |
-| Separate music and effects volumes | 🔜 | Part of the audio interface (issues #118, #119). |
-| Visual cues for important sounds | 🔜 | When sounds land, each gameplay sound keeps a visual counterpart (flash on hit, explosion sprite), as in *Fortnite*'s sound visualisation. |
+| No information conveyed only by sound | ✅ | Every sound has a visual counterpart: a shot spawns a missile, an explosion removes a ship or a Bydo. The game is fully playable muted. |
+| Separate music and effects volumes | ✅ | `--music-volume` and `--effects-volume` (`0`–`100`) on the client; the audio interface keeps master, music and effects volumes apart. |
+| Mute at any time | ✅ | `M` mutes and unmutes every sound; `--mute` starts muted. |
+| Stronger visual cues for important sounds | 🔜 | A flash on hit and an explosion sprite, as in *Fortnite*'s sound visualisation. |
+| In-game volume settings | 🔜 | A settings screen instead of command-line options. |
 
 ## Mental and cognitive disabilities
 

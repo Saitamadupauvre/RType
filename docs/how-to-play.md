@@ -11,9 +11,22 @@ many as you can, together with up to three other players.
 |---|---|
 | Move up / down / left / right | Arrow keys, or `Z` / `S` / `Q` / `D` |
 | Fire | `Space`, hold it to keep firing (4 missiles per second) |
+| Mute / unmute every sound | `M` |
 | Quit | Close the window |
 
 Both key sets work at the same time, so you can play with either hand.
+
+## Sound
+
+A looping music plays during the game; each shot and each explosion has its
+own sound. Every sound has a visual counterpart (a missile, a ship or a Bydo
+disappearing), so the game can be played without sound. Volumes are set when
+starting the client:
+
+```sh
+r-type_client 127.0.0.1 4242 --music-volume 30 --effects-volume 80
+r-type_client 127.0.0.1 4242 --mute
+```
 
 ## Rules
 

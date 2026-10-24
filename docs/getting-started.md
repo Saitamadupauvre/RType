@@ -81,9 +81,11 @@ bin/
 ├── libengine-network.so
 ├── libengine-physics.so
 ├── libengine-script.so
+├── libengine-audio.so
 ├── plugins/graphics-raylib.so
+├── plugins/audio-raylib.so
 ├── scripts/                 the Lua game
-└── assets/                  sprites
+└── assets/                  sprites, sounds, music
 ```
 
 ## 3. Launch
@@ -100,6 +102,8 @@ Start the server, then one client per player:
 | `r-type_server <port>` | Listens on UDP `<port>` for up to 4 players |
 | `r-type_server <port> --max-players 2` | Refuses a third player |
 | `r-type_client <server-ip> <port>` | Opens a 1280 × 720 window and joins the server |
+| `r-type_client <server-ip> <port> --music-volume 30 --effects-volume 80` | Same, with quieter sounds (`0`–`100`) |
+| `r-type_client <server-ip> <port> --mute` | Same, muted (`M` toggles it in game) |
 | `--help` on either | Prints the usage |
 
 Playing over a network: start the server on one machine, open its UDP port in

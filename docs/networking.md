@@ -118,12 +118,16 @@ Each tick, `send_snapshot(registry)` builds snapshots from every entity with
 `Replicated` and `Position` (plus `Velocity` and `Sprite` colour when present),
 split into packets of at most 62 entities that share the same server tick, and
 queues them for every session. Game events published on the bus during the
-tick (`EntitySpawned`, `EntityDestroyed`, `ShotFired`, `SoundPlayed`) are sent
+tick (`EntitySpawned`, `EntityDestroyed`, `ShotFired`, `SoundPlayed`, `MusicChanged`) are sent
 before the snapshot, in order, to the sessions connected when they happened.
 
 `ServerApp` decides what is replicated: every scripted entity with a sprite or
 a colour gets `Replicated { type_id, owner }`; the type table is built from
-the Lua declarations and sent in `connect_accept`.
+the Lua declarations and sent in `connect_accept`, with the sound and music
+tables built from `sounds { ... }` / `musics { ... }`. After each tick it turns
+the scripts' `play` / `music` requests into `SoundPlayed` / `MusicChanged`.
+The server remembers the last music so `connect_accept` gives it to players
+joining later; the client publishes it as a `MusicChanged` on accept.
 
 ## Client side
 

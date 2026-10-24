@@ -143,6 +143,37 @@ Every number is in `game/scripts/lib/config.lua`:
 | Longer pause after game over | `game.restart_delay` |
 | Other player colours | `ship.colors` (one per slot) |
 
+## Tutorial: add a sound
+
+**1. Add the file** to `assets/sounds/` (effects) or `assets/music/`
+(musics), with a plain name: letters, digits, `_`, `-`, `.`. Credit it in
+`assets/CREDITS.md`.
+
+**2. Declare it** in `main.lua`, next to the other ones:
+
+```lua
+sounds { "laser_shoot.wav", "explosion.wav", "power_up.wav" }
+musics { "bit_space.mp3" }
+```
+
+**3. Play it** from any script. The server sends it to every client, which
+plays the file of the same name:
+
+```lua
+function on_hit(self, other)
+    if other:has_tag("power_up") then
+        play("power_up.wav", self)
+    end
+end
+```
+
+`music("bit_space.mp3")` loops a music and `music(nil)` stops it. Playing an
+undeclared name is an error, logged with its file and line.
+
+**4. Declare it in the test fixture too**: its `main.lua` is not synced (see
+[Tests](#tests)), so add the name to the `sounds { ... }` of
+`tests/fixtures/game/server/game/main.lua`.
+
 ## Rules
 
 ### Identify by tags, not by type names
@@ -190,7 +221,6 @@ engine counterpart exists:
 | `find_all`, `count` | `lib/roster.lua` groups, joined in `on_spawn`, left in `on_destroy` | `find_all("enemy")` |
 | Running Lua `system` declarations | Entities without a sprite: `game`, `bydo_spawner`, `collisions` | `system "waves"` |
 | `after`, `every`, `random` | Time counters in `update`, `math.random` | `every(1.5, ...)`, `random(...)` |
-| `play`, `music` | No sound | Issues #118, #119 |
 | `behavior` coroutines, `wait` | Counters in `update` | Sequences written top to bottom |
 
 The target style (velocity, native collisions, systems, coroutines) is

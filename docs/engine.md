@@ -14,6 +14,7 @@ The [architecture](architecture.md) page shows how they fit together.
 | network | `engine::network` | core | POSIX sockets |
 | physics | `engine::physics` | core | — |
 | graphics | `engine::graphics` | core | — (backends are [plugins](plugins.md)) |
+| audio | `engine::audio` | core | — (backends are [plugins](plugins.md)) |
 
 ### core
 
@@ -47,7 +48,10 @@ Component types are identified by stable names registered in a `.cpp` of
   through protected calls: an error is logged with file and line and the game
   continues;
 - tracks players (`players()`, `find_player()`, `player.slot`) and routes each
-  player's input to the entities they own.
+  player's input to the entities they own;
+- registers the sounds and musics declared with `sounds { ... }` and
+  `musics { ... }`, and queues `play(...)` / `music(...)` requests for the
+  host (`sound_names()`, `music_names()`, `take_audio_commands()`).
 
 The Lua API is specified in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
 
@@ -72,6 +76,13 @@ Backend-independent interfaces (`IRenderer`, `IInput`, `IGraphicsBackend`),
 engine types (`Color`, `Rect`, `SpriteDraw`, `Key`...) and
 `load_graphics_plugin()`, which loads a backend at runtime. See
 [Plugins](plugins.md).
+
+### audio
+
+Backend-independent `IAudio` interface (sound effects, streamed music, master,
+music and effects volumes), `SoundId` / `MusicId`, `NullAudio` (a silent
+backend) and `load_audio_plugin()`, which loads a backend at runtime. See
+[Plugins](plugins.md#audio-raylib).
 
 ## The contract
 

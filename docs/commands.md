@@ -27,7 +27,7 @@ cmake --build --preset ninja-debug --target r-type_server   # one target
 ```
 
 Useful targets: `r-type_server`, `r-type_client`, `r-type_sandbox`,
-`graphics-raylib`, `engine-<module>`, `engine_<module>_tests`, `docs`
+`graphics-raylib`, `audio-raylib`, `engine-<module>`, `engine_<module>_tests`, `docs`
 (Doxygen, if installed), `format`, `format-check`.
 
 CMake options:
@@ -43,6 +43,7 @@ CMake options:
 ```sh
 ./build/ninja-debug/bin/r-type_server 4242
 ./build/ninja-debug/bin/r-type_client 127.0.0.1 4242
+./build/ninja-debug/bin/r-type_client 127.0.0.1 4242 --music-volume 30 --mute
 ./build/ninja-debug/bin/r-type_sandbox           # tries the graphics plugin alone
 ```
 

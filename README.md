@@ -37,11 +37,13 @@ Epitech *Advanced C++* project (B-CPP-500).
   dot.
 - Scrolling, timer-based starfield, Bydos spawning at random heights on the
   right, missiles, collisions, game over and automatic restart.
+- Looping music, shot and explosion sounds, with separate music and effects
+  volumes and a mute key.
 - A crashed or disconnected client is dropped after 5 seconds and the other
   players are notified; malformed packets are dropped and logged.
 - Engine split into shared libraries (`core`, `script`, `network`,
-  `physics`, `graphics`), with the Raylib backend loaded at runtime as a
-  plugin.
+  `physics`, `graphics`, `audio`), with the Raylib graphics and audio backends
+  loaded at runtime as plugins.
 - Gameplay written in sandboxed Lua 5.4 scripts.
 
 ## Supported platforms
@@ -153,7 +155,7 @@ get a ship immediately.
 
 ```
 r-type_server [-h] [-p <1..4>] <port>
-r-type_client [-h] <server-ip> <port>
+r-type_client [-h] [--music-volume <0..100>] [--effects-volume <0..100>] [--mute] <server-ip> <port>
 ```
 
 | Executable | Argument | Meaning |
@@ -162,6 +164,9 @@ r-type_client [-h] <server-ip> <port>
 | `r-type_server` | `-p`, `--max-players` | Maximum connected players, `1`–`4`, default `4` |
 | `r-type_client` | `server-ip` | IPv4 address of the server, e.g. `127.0.0.1` |
 | `r-type_client` | `port` | UDP port of the server, `1`–`65535` |
+| `r-type_client` | `--music-volume` | Music volume, `0`–`100`, default `100` |
+| `r-type_client` | `--effects-volume` | Sound effects volume, `0`–`100`, default `100` |
+| `r-type_client` | `--mute` | Start muted (`M` toggles it in game) |
 | both | `-h`, `--help` | Print the usage and exit with code `0` |
 
 ### Exit codes and errors
@@ -171,6 +176,7 @@ r-type_client [-h] <server-ip> <port>
 | Missing or invalid argument | Prints the error and the usage, exits with `84` |
 | Server cannot listen on the port (already in use...) | Exits with `84` |
 | Client cannot load `plugins/graphics-raylib` or open the window | Exits with `84` |
+| Client cannot load `plugins/audio-raylib` or finds no audio device | Prints a warning and plays without sound |
 | Server full (`--max-players` reached) | The client is refused and stays on an empty screen; close it |
 | Server stops or stops answering | The client stops receiving updates after 5 seconds; close it |
 | `Ctrl+C` / SIGTERM on the server | Notifies every client, exits with `0` |
@@ -185,6 +191,7 @@ a single executable out of `bin/`: move the whole folder.
 |---|---|
 | Move | Arrow keys, or `Z` `Q` `S` `D` |
 | Fire | `Space` (hold to keep firing) |
+| Mute / unmute | `M` |
 | Quit | Close the window |
 
 - Shoot the Bydos coming from the right. A Bydo touching your ship destroys
@@ -229,12 +236,12 @@ clang-tidy in one go. Every command is described in
 ## Repository layout
 
 ```
-engine/          C++ engine: one shared library per module (core, script, network, physics, graphics)
-plugins/         runtime plugins (graphics-raylib: window, rendering, input)
+engine/          C++ engine: one shared library per module (core, script, network, physics, graphics, audio)
+plugins/         runtime plugins (graphics-raylib: window, rendering, input; audio-raylib: sound and music)
 game/server/     r-type_server entry point
 game/client/     r-type_client entry point
 game/scripts/    the game itself, in Lua (main.lua is the entry point)
-assets/          sprites
+assets/          sprites, sounds, music (credits in assets/CREDITS.md)
 tests/           GoogleTest suites, mirroring engine/, game/ and plugins/
 docs/            documentation (MkDocs sources)
 ```
@@ -286,3 +293,5 @@ a green CI.
 
 Released under the [MIT License](LICENSE). R-Type is a trademark of its
 respective owners; the sprites are used for educational purposes only.
+The music is by Beam Theory (OGA-BY 3.0); every asset is credited in
+[assets/CREDITS.md](assets/CREDITS.md).

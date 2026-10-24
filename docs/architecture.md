@@ -36,9 +36,11 @@ flowchart TB
         NET["engine-network<br/>UDP sockets, protocol, threads,<br/>sessions, snapshots, stats"]
         PHYS["engine-physics<br/>bodies, colliders, collisions"]
         GFX["engine-graphics<br/>IRenderer, IInput,<br/>plugin loader"]
+        AUD["engine-audio<br/>IAudio, NullAudio,<br/>plugin loader"]
     end
     subgraph Plugins["Plugins (plugins/), loaded at runtime"]
         RAY["graphics-raylib<br/>window, 2D rendering, input"]
+        RAU["audio-raylib<br/>sound effects, music"]
     end
     LUA -. loaded by .-> SCRIPT
     SRV --> SCRIPT
@@ -46,12 +48,15 @@ flowchart TB
     SRV --> CORE
     CLI --> NET
     CLI --> GFX
+    CLI --> AUD
     CLI --> CORE
     SCRIPT --> CORE
     NET --> CORE
     PHYS --> CORE
     GFX --> CORE
     GFX -. dlopen .-> RAY
+    AUD --> CORE
+    AUD -. dlopen .-> RAU
 ```
 
 | Layer | Knows about | Never knows about |
@@ -158,9 +163,9 @@ The client never runs game rules: it draws what the server sent.
 | Public engine API | `engine/include/engine/<module>/` |
 | Engine implementation | `engine/src/<module>/` |
 | CMake helpers (`engine_add_module`, `engine_add_plugin`) | `engine/cmake/EngineModule.cmake` |
-| Raylib backend | `plugins/graphics-raylib/src/` |
+| Raylib backends | `plugins/graphics-raylib/src/`, `plugins/audio-raylib/src/` |
 | Server wiring | `game/server/` (`main.cpp`, `ServerApp`, `Cli`) |
-| Client wiring | `game/client/` (`main.cpp`, `SnapshotView`, `Starfield`, `Controls`, `Cli`) |
+| Client wiring | `game/client/` (`main.cpp`, `SnapshotView`, `Starfield`, `Controls`, `AudioPlayer`, `Cli`) |
 | Input encoding shared by both | `game/common/ActionCodec` |
 | Game rules | `game/scripts/` |
 | Tests | `tests/engine/<module>/`, `tests/game/<target>/`, `tests/plugins/<name>/` |

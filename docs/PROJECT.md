@@ -317,20 +317,9 @@ class IInput {   // raw keys; the engine's InputMap turns them into actions
     virtual bool is_mouse_released(MouseButton) const = 0;
 };
 
-class IAudio {   // planned (issue #118): separate music / effects volumes
-    virtual SoundId load_sound(const std::string& path) = 0;
-    virtual void play_sound(SoundId, float volume = 1.f, float pitch = 1.f) = 0;
-    virtual MusicId load_music(const std::string& path) = 0;
-    virtual void play_music(MusicId, bool loop = true) = 0;
-    virtual void set_music_volume(float) = 0;
-    virtual void set_effects_volume(float) = 0;
-    // ...
-};
-
 class IGraphicsBackend {   // what a plugin provides
     virtual IRenderer& renderer() = 0;
     virtual IInput& input() = 0;
-    virtual IAudio& audio() = 0;   // planned, with IAudio
 };
 ```
 
@@ -352,6 +341,35 @@ The loader refuses a plugin built for another API version, and the backend is al
 - Timing comes from the engine clock, not from the backend.
 - The client draws in virtual units; the backend handles scaling and letterboxing.
 
+### 9.4 Audio plugin
+
+Audio is a separate module (`engine-audio`) with its own plugin, so the sound library can change without touching graphics. Today `audio-raylib` uses Raylib's audio; another library (miniaudio, OpenAL, SDL_mixer...) only needs a new plugin.
+
+```cpp
+class IAudio {   // engine/include/engine/audio/IAudio.hpp
+    virtual bool open() = 0;                 // false: no device, the backend stays silent
+    virtual void close() = 0;
+    virtual bool is_open() const = 0;
+    virtual void update() = 0;               // every frame: feeds the music stream
+    virtual SoundId load_sound(const std::filesystem::path&) = 0;
+    virtual void unload_sound(SoundId) = 0;
+    virtual void play_sound(SoundId, float volume, float pitch) = 0;   // effects overlap
+    virtual MusicId load_music(const std::filesystem::path&) = 0;
+    virtual void unload_music(MusicId) = 0;
+    virtual void play_music(MusicId, bool loop) = 0;                    // one music at a time
+    virtual void stop_music() = 0;
+    virtual void set_master_volume(float) = 0;
+    virtual void set_music_volume(float) = 0;
+    virtual void set_effects_volume(float) = 0;
+};
+```
+
+- Volume heard = call volume × effects (or music) volume × master volume, each clamped to [0, 1].
+- A failed load returns the default id; playing it, or any unknown id, does nothing.
+- The plugin exports `engine_audio_api_version`, `engine_audio_create` and `engine_audio_destroy`; `load_audio_plugin()` checks them like the graphics loader. `engine_audio_create` must not open the device.
+- `NullAudio` (in `engine-audio`) plays nothing: the client uses it when the plugin cannot be loaded.
+- Main thread only, like graphics.
+
 ---
 
 ## 10. Lua scripting API
@@ -369,7 +387,8 @@ This section is the specification of the Lua API. Not everything is implemented 
 | `on_hit` | Called by the game's Lua collision pass, not by the engine yet |
 | Native movement from `vx` / `vy` in the server tick | Not yet: scripts move entities by writing `x` / `y` |
 | `hitbox` as a native field, native collisions | Not yet (`engine-physics` exists, not wired) |
-| `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `play`, `music`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
+| `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
+| `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
 
 [Writing the game](writing-the-game.md) shows how the current game works around what is missing.
 
@@ -433,7 +452,7 @@ end
 
 function explode(self)
     spawn("explosion", { x = self.x, y = self.y })
-    play("explosion.wav")
+    play("explosion.wav", self)
     self:destroy()
 end
 ```
@@ -526,14 +545,24 @@ every(0.5, function() ... end)   -- run every 0.5 s (returns a handle to cancel 
 wait(1.5)                        -- only inside a coroutine
 
 -- sound (replicated to clients)
-play("shot.wav")
-music("stage1.ogg")
+sounds { "shot.wav", "explosion.wav" }   -- declare, while the scripts load
+musics { "stage1.ogg" }
+play("shot.wav")                 -- play a declared sound
+play("explosion.wav", self)      -- with the entity that makes it
+music("stage1.ogg")              -- loop a declared music, replacing the current one
+music(nil)                       -- stop the music
 
 -- utilities
 random(1, 10)
 world.width, world.height        -- 1920, 1080
 log("message")
 ```
+
+**Sound rules.**
+
+- `sounds` and `musics` take a list of file names and can only be called while the scripts load (top level of any file, or `on_start`). A name is 1 to 63 letters, digits, `_`, `-` or `.`, not starting with `.`. A bad or already declared name raises an error and declares none of the names of that call. R-Type clients look for sounds in `assets/sounds/` and musics in `assets/music/`.
+- `play` and `music` with an undeclared name, or with arguments of the wrong type, raise an error. Nothing is played on the server: the requests are queued, and after each tick the server sends them to every client (`sound` and `music` events, see the [protocol](protocol.md)). At most 64 requests are kept per tick.
+- The current music is also sent to players who join later.
 
 ### 10.7 Systems
 
@@ -660,7 +689,8 @@ end
 
 - Scripts are written once; the developer does not write network code.
 - All logic (`update`, `on_hit`, `behavior`, systems) runs **on the server only**.
-- Clients load the same declarations only to know how each entity type looks (sprite, sounds).
+- Clients load the same declarations only to know how each entity type looks (sprite).
+- `play` and `music` are sent to clients as events; clients receive the declared names in `connect_accept`.
 - Native fields are replicated automatically. A free field is replicated only when marked:
 
 ```lua
@@ -686,7 +716,7 @@ Developers must not use these names for their own fields or methods; the engine 
 
 - Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
 - Callbacks: `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
 
 ### 10.13 Error handling and sandbox
 
@@ -792,7 +822,7 @@ Part 1 status:
 | Lua runtime: declarations, entities, players, sandbox | Done |
 | Player movement and shooting, Bydo spawning, collisions, game over | Done (in Lua) |
 | Up to 4 players, distinguishable, crash notification | Done |
-| Sound | To do (#118, #119) |
+| Sound: audio plugin, Lua `play` / `music`, replication, volumes | Done |
 | Enemy missiles | To do |
 | Accessibility settings | To do, see [Accessibility](accessibility.md) |
 | Documentation | Done |
