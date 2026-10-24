@@ -1,35 +1,11 @@
-# Contributing to RType
+# Contributing to R-Type
 
-Rules for code, tests and architecture are in [AGENTS.md](AGENTS.md).
+The contribution guide is [docs/contributing.md](docs/contributing.md), and
+the full code rules are in [AGENTS.md](AGENTS.md).
 
-## Workflow
+In short:
 
-1. Open (or pick) an issue, then work on a branch named after it.
-2. Open a pull request that says `Closes #<issue>`; CI must pass before merging.
-3. Pull requests target `dev`; `dev` is merged into `main` for releases.
-
-## Build and test
-
-Set `VCPKG_ROOT` first (see the README).
-
-```sh
-cmake --preset debug
-cmake --build --preset debug
-ctest --preset debug
-```
-
-CI runs `cmake --workflow --preset ci`: run it locally before pushing.
-
-## Style
-
-Code is formatted with clang-format (`.clang-format`): run the `format` target
-(`cmake --build --preset debug --target format`) before committing.
-
-Static analysis uses clang-tidy (`.clang-tidy`); CI treats every warning as an
-error (`cmake --workflow --preset tidy`). `NOLINT` markers are comments, which
-the code rules forbid: fix the code, or disable the check project-wide in
-`.clang-tidy` and document why below.
-
-| Disabled check | Reason |
-|---|---|
-| `clang-analyzer-optin.core.EnumCastOutOfRange` | Decoders turn untrusted bytes into enums and must reject out-of-range values; their tests have to cast such values (e.g. `static_cast<DisconnectReason>(9)`) to prove it. |
+1. One issue → one branch from `dev` → one pull request into `dev` with
+   `Closes #<issue>`.
+2. Every change comes with GoogleTest tests and updated documentation.
+3. Run `./fred.sh all` before pushing; CI must be green before merging.
