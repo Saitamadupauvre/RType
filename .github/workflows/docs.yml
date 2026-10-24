@@ -1,5 +1,5 @@
 # Managed by project-bootstrap [336dc847f11dbb7c]: edits here are reported by `status`.
-# Builds the Doxygen HTML on every pull request; publishes it to GitHub Pages from main.
+# Builds the MkDocs site and the Doxygen HTML on every pull request; publishes them to GitHub Pages from main.
 # Pages must use "GitHub Actions" as its source (`pb github settings` sets it).
 name: Docs
 
@@ -25,17 +25,27 @@ jobs:
 
       - uses: ./.github/actions/setup-vcpkg
 
-      - name: Install Doxygen
-        run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
 
-      - name: Generate
+      - name: Install documentation tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y doxygen graphviz
+          pip install "mkdocs==1.6.1" "mkdocs-material==9.7.7"
+
+      - name: Build the website
+        run: mkdocs build --strict
+
+      - name: Generate the API reference
         run: |
           cmake --preset release
           cmake --build --preset release --target docs
+          cp -r build/release/docs/html site/api
 
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: build/release/docs/html
+          path: site
 
   deploy:
     name: Deploy to GitHub Pages
