@@ -1,8 +1,8 @@
 # Plugins
 
 A plugin is a backend loaded **at runtime** with `dlopen` / `LoadLibrary`,
-never linked. The first one is `graphics-raylib`: window, 2D rendering, input
-and audio for the client. The server never loads it, so it runs without a
+never linked. The first one is `graphics-raylib`: window, 2D rendering and
+input for the client (audio is planned, issue #118). The server never loads it, so it runs without a
 display.
 
 Plugins live in `plugins/<name>/` and are created with the `engine_add_plugin`
@@ -13,7 +13,7 @@ CMake helper from `engine/cmake/EngineModule.cmake`.
 The engine and a plugin agree on two things only:
 
 1. **C++ interfaces defined by the engine** in
-   `engine/include/engine/graphics/` (`IRenderer`, `IInput`, `IAudio`,
+   `engine/include/engine/graphics/` (`IRenderer`, `IInput`,
    `IGraphicsBackend`). They use engine types (`Vec2`, `Rect`, `Color`...),
    never backend types.
 2. **Three C functions exported by the plugin**, without C++ name mangling:
@@ -72,6 +72,20 @@ engine_add_plugin(graphics-raylib
 | RPATH `$ORIGIN/..` | The plugin finds `libengine-core.so` in `bin/`. |
 | Links `engine::core` | Engine types available to the plugin. |
 | Hidden visibility | Only the three C functions are exported. |
+
+## graphics-raylib
+
+| File | Role |
+|---|---|
+| `src/Plugin.cpp` | The three exported C functions |
+| `src/RaylibBackend.hpp` | `IGraphicsBackend`: owns the renderer and the input |
+| `src/RaylibRenderer.*` | Window, textures (a magenta checkerboard replaces a missing file), drawing in 1920 × 1080 virtual units |
+| `src/Letterbox.*` | Scales the virtual screen to the window with black bars (static library, tested without Raylib) |
+| `src/RaylibInput.*`, `src/KeyMap.*` | Engine `Key` ↔ Raylib key codes (tested without Raylib) |
+| `src/TextureTable.hpp` | Texture ids, placeholder for missing files |
+
+The window is resizable; `Esc` does not close it (`SetExitKey(KEY_NULL)`), so
+the key stays free for the game.
 
 ## Rules
 

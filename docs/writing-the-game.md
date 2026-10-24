@@ -1,8 +1,8 @@
 # Writing the game
 
-How R-Type gameplay should be coded on top of the engine. The full Lua API is in
-[PROJECT.md §10](PROJECT.md#10-lua-scripting-api); this page explains **where
-each piece of logic goes and why**.
+How R-Type gameplay is coded on top of the engine, with tutorials that work
+with the engine as it is today. The full Lua API, including what is planned,
+is in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
 
 ## The mental model
 
@@ -12,228 +12,210 @@ The engine is an ECS driven by Lua scripts.
 |---|---|---|
 | **Entity** | An id. No data, no logic. | `engine::core::EntityManager` |
 | **Component** | Plain data attached to an id: `Position`, `Velocity`, `Sprite`, `Tags`... | C++ component pools |
-| **Native system** | C++ loop over every entity with given components: movement, collisions, rendering, replication | `engine/` |
+| **Native system** | C++ loop over every entity with given components | `engine/` |
 | **Entity script** | Lua callbacks of one entity type (`update`, `on_hit`...) | `game/scripts/` |
 | **Lua system** | Lua logic spanning several entity types (waves, score) | `game/scripts/` |
 
-An entity's Lua `update(self, dt)` is **not** a system. It is the behaviour of
-one entity type, like a Unity `MonoBehaviour`. The system is the C++ loop that
-calls it (`ScriptRuntime::update`).
+Native fields (`self.x`, `self.y`, `self.vx`, `self.vy`, `self.sprite`,
+`self.color`, `self.tags`) are not stored in Lua: reading or writing them goes
+straight to the C++ components. Every other field (`speed`, `health`,
+`hitbox`...) is a free field stored in the entity's Lua table.
 
-Native fields (`self.x`, `self.vx`, `self.sprite`, `self.color`, `self.tags`)
-are not stored in Lua: reading or writing them goes straight to the C++
-components. Lua **describes intent by editing components**; native systems do
-the heavy work.
+All scripts run **on the server only**. The client draws the replicated
+entities and never runs Lua.
 
 ## One tick
 
+What the server does every 1/60 s today:
+
 ```
-1. inputs        → self.input of player entities
-2. Lua systems   → system "waves", "score"...
-3. entity update → update(self, dt), behavior coroutines, after/every timers
-4. movement      → C++: position += velocity * dt
-5. collisions    → C++: overlap test, then on_hit(self, other)
-6. destruction   → on_destroy(self), entity removed
-7. snapshot      → sent to clients (server)
-8. render        → C++: every Position + Sprite (client)
+1. inputs          → self.input of the entities each player owns
+2. entity update   → update(self, dt) of every live entity
+3. destruction     → on_destroy(self) of entities marked with destroy(), then removal
+4. snapshot        → every entity with a sprite or a colour is sent to clients
 ```
 
-Gameplay runs at a fixed 60 Hz step, never per frame: always multiply by `dt`.
+Always multiply by `dt`: gameplay runs at a fixed step, never per frame.
 
 ## Where does this logic go?
 
 Ask in order:
 
 1. **Would it make sense in a platformer or any other game?**
-   → C++ native system in `engine/`, exposed to Lua through a field or function.
-   Examples: movement, collisions, rendering, sound, timers.
+   → C++ in `engine/`, exposed to Lua. Examples: movement, collisions, sound,
+   timers.
 2. **Does it concern a single entity type?**
    → That entity's file (`update`, `on_hit`, custom methods).
-   Examples: how the player moves, how a Bydo zigzags, how the boss attacks.
+   Examples: how the ship moves, how a Bydo flies.
 3. **Does it span several entity types?**
-   → A Lua `system`.
-   Examples: spawning waves, score, respawning the player.
+   → A coordinating entity today, a Lua `system` once systems run (see
+   [Current state](#current-state)). Examples: spawning waves, collisions,
+   rounds.
 
 Never put gameplay in `game/client` or `game/server` C++: those files only wire
 engine modules together.
 
-## Rules
+## Tutorial: add a new enemy
 
-### Move with velocity, not position
+Goal: a "zigzag" Bydo that flies left along a sine wave and takes two hits.
+
+**1. Add its sprite.** The client draws an entity with
+`assets/sprites/<type>.png`, so name the file after the type:
+`assets/sprites/zigzag.png`. Without the file, the client draws the
+placeholder.
+
+**2. Add its tunables** to `game/scripts/lib/config.lua`:
 
 ```lua
-function update(self, dt)
-    self.vx = self.input:axis("move_x") * self.speed
-    self.vy = self.input:axis("move_y") * self.speed
-end
+zigzag = { hitbox = { w = 64, h = 64 }, speed = 250, amplitude = 120, frequency = 3, health = 2 },
 ```
 
-Set `vx` / `vy` and let the native movement system integrate them. Write
-`self.x` / `self.y` directly only for teleports or non-linear paths (sine waves).
-
-### Let the engine detect collisions
-
-Give the entity a `hitbox` and `tags`, react in `on_hit`. Never loop over other
-entities in Lua to test overlaps.
+**3. Declare it** in `game/scripts/enemies/zigzag.lua`:
 
 ```lua
-entity "bydo"
+local config = require("config")
+local roster = require("roster")
 
-sprite = "bydo.png"
-hitbox = { w = 32, h = 32 }
+entity "zigzag"
+
 tags   = { "enemy" }
-health = 1
+sprite = "sprites/zigzag.png"
+speed  = config.zigzag.speed
+hitbox = config.zigzag.hitbox
+health = config.zigzag.health
+
+function on_spawn(self)
+    self.base_y = self.y
+    roster.add(self, "enemies")
+end
+
+function on_destroy(self)
+    roster.remove(self)
+end
 
 function on_hit(self, other)
-    if other:has_tag("player_missile") then
-        self:damage(1)
+    if not other:has_tag("missile") then
+        return
+    end
+    self.health = self.health - 1
+    if self.health <= 0 then
+        roster.destroy(self)
+    end
+end
+
+function update(self, dt)
+    local zigzag = config.zigzag
+    self.x = self.x - self.speed * dt
+    self.y = self.base_y + math.sin(self.age * zigzag.frequency) * zigzag.amplitude
+    if self.x <= -self.hitbox.w then
+        roster.destroy(self)
     end
 end
 ```
+
+Joining the `enemies` group is all it takes for `systems/collisions.lua` to
+test it against missiles and ships.
+
+**4. Spawn it.** In `enemies/spawner.lua`, spawn a zigzag instead of a Bydo
+from time to time:
+
+```lua
+local kind = math.random() < 0.25 and "zigzag" or "bydo"
+spawn(kind, { x = config.world.width, y = math.random(0, config.world.height - config.bydo.hitbox.h) })
+```
+
+**5. Run it.** Rebuild (the build copies `scripts/` and `assets/` next to the
+executables) and restart the server. No C++ change, no new network message:
+the new type is added to the type table sent at connection.
+
+**6. Keep the test fixture in sync** (see [Tests](#tests)).
+
+## Tutorial: tune the game
+
+Every number is in `game/scripts/lib/config.lua`:
+
+| Want | Change |
+|---|---|
+| Faster ships | `ship.speed` |
+| Shoot more often | `ship.fire_cooldown` (seconds between missiles) |
+| More enemies | `bydo.spawn_interval` (seconds between spawns) |
+| Faster enemies | `bydo.speed` |
+| Longer pause after game over | `game.restart_delay` |
+| Other player colours | `ship.colors` (one per slot) |
+
+## Rules
 
 ### Identify by tags, not by type names
 
 `other:has_tag("enemy")` keeps working when new enemy types are added;
 `other.type == "bydo"` does not.
 
-### Destroy with `self:destroy()`
+### Destroy through the roster
 
-Destruction is deferred to the end of the tick. Cleanup and side effects
-(explosions, score, drops) go in `on_destroy` or in a Lua system listening to
+Use `roster.destroy(entity)`: it removes the entity from its groups at once,
+so it is never hit twice in the same tick, then calls `entity:destroy()`.
+Destruction itself is deferred to the end of the tick; side effects go in
 `on_destroy`.
 
 ### Read input as actions
 
-Use `self.input:axis("move_x")` and `self.input:pressed("fire")`. Never refer
-to keys: bindings belong to the client.
+Use `self.input:axis("move_x")`, `self.input:axis("move_y")` and
+`self.input:pressed("fire")`. Never refer to keys: bindings belong to the
+client.
 
-### Keep data in fields
+### Keep data in config and fields
 
-Tunable values (`speed`, `health`, `points`, `fire_rate`) are free fields at
-the top of the file, overridable at spawn time:
-
-```lua
-spawn("bydo", { x = world.width + 50, y = 300, speed = 250 })
-```
-
-### Use coroutines for sequences
-
-Multi-step patterns (boss phases, scripted movements) go in `behavior` with
-`wait()`, instead of state machines with timers in `update`.
-
-### Server owns the logic
-
-All callbacks run on the server only. The client only draws replicated
-entities. Mark a free field `synced(...)` only when clients must display it.
-
-## File layout
-
-```
-game/scripts/
-├── main.lua              on_start(): spawn the first entities
-├── player/
-│   ├── player.lua        entity "player"
-│   └── missile.lua       entity "player_missile"
-├── enemies/
-│   ├── bydo.lua
-│   └── boss.lua
-├── stages/
-│   └── stage1.lua        system "stage1_waves"
-├── systems/
-│   └── score.lua         system "score"
-└── lib/                  helpers reached with require()
-```
-
-One declaration per file by default. Small related declarations (a weapon and
-its projectile) may share a file with the table form.
-
-## Example: player that shoots
+Tunable values come from `lib/config.lua` and are copied into free fields at
+the top of the entity file, so they can be overridden at spawn time:
 
 ```lua
-entity "player"
-
-sprite    = "ship.png"
-hitbox    = { w = 32, h = 16 }
-tags      = { "player" }
-speed     = 400
-fire_rate = 0.2
-cooldown  = 0
-
-function update(self, dt)
-    self.vx = self.input:axis("move_x") * self.speed
-    self.vy = self.input:axis("move_y") * self.speed
-
-    self.cooldown = self.cooldown - dt
-    if self.input:pressed("fire") and self.cooldown <= 0 then
-        self.cooldown = self.fire_rate
-        spawn("player_missile", { x = self.x + 32, y = self.y })
-    end
-end
-
-function on_hit(self, other)
-    if other:has_tag("enemy") then
-        self:destroy()
-    end
-end
+spawn("bydo", { x = 1920, y = 300, speed = 450 })
 ```
 
-```lua
-entity "player_missile"
+### Use `self:method()`
 
-sprite = "missile.png"
-hitbox = { w = 16, h = 4 }
-tags   = { "player_missile" }
-vx     = 900
+Methods are called with a colon: `self:shoot(input, dt)`, never
+`self.shoot(...)`.
 
-function update(self, dt)
-    if self.x > world.width then
-        self:destroy()
-    end
-end
+## Current state
 
-function on_hit(self, other)
-    if other:has_tag("enemy") then
-        self:destroy()
-    end
-end
+Some engine features of the target design are not wired into the server tick
+yet. Until they land, the game uses Lua stand-ins. Each one goes away once its
+engine counterpart exists:
+
+| Missing in the engine | Stand-in today | Once it lands |
+|---|---|---|
+| Native movement in the server tick | `update` writes `self.x` / `self.y` | Set `vx` / `vy` and let C++ integrate |
+| Native collisions (`engine-physics` exists but is not in the tick) | `systems/collisions.lua` tests every pair with `lib/aabb.lua` and calls `on_hit` on both | Declare `hitbox`, react in `on_hit`, delete both files |
+| `find_all`, `count` | `lib/roster.lua` groups, joined in `on_spawn`, left in `on_destroy` | `find_all("enemy")` |
+| Running Lua `system` declarations | Entities without a sprite: `game`, `bydo_spawner`, `collisions` | `system "waves"` |
+| `after`, `every`, `random` | Time counters in `update`, `math.random` | `every(1.5, ...)`, `random(...)` |
+| `play`, `music` | No sound | Issues #118, #119 |
+| `behavior` coroutines, `wait` | Counters in `update` | Sequences written top to bottom |
+
+The target style (velocity, native collisions, systems, coroutines) is
+described in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
+
+## Tests
+
+Tests load a copy of the scripts from `tests/fixtures/game/server/game/`,
+identical except for an empty `on_start` in `main.lua`, so each test spawns
+only what it checks. Re-sync it after editing a script:
+
+```sh
+rsync -a --delete --exclude /main.lua game/scripts/ tests/fixtures/game/server/game/
 ```
+
+Then add a test in `tests/game/server/` that spawns your entity and checks its
+behaviour, like `BydoTest.cpp` or `ShipTest.cpp`.
 
 ## Anti-patterns
 
 | Don't | Do |
 |---|---|
-| `self.x = self.x + speed * dt` | `self.vx = speed` |
-| AABB test against `find_all(...)` in `update` | `hitbox` + `on_hit` |
 | `if other.type == "bydo"` | `if other:has_tag("enemy")` |
-| Gameplay code in `game/client/main.cpp` | Lua entity or system |
+| `entity:destroy()` on something in a roster group | `roster.destroy(entity)` |
+| Gameplay code in `game/client/` or `game/server/` | A Lua entity |
 | Checking keys in Lua | `self.input` actions |
-| Timer counters for scripted sequences | `behavior` + `wait()` |
-| Logic depending on frame rate | Use `dt` from the fixed step |
-
-## Current state
-
-Not every native system exists yet. Until they land, the multiplayer game in
-`game/scripts/` uses Lua stand-ins. Each one goes away once its engine
-counterpart is wired into the tick:
-
-| Missing in the engine | Stand-in | Once it lands |
-|---|---|---|
-| Native movement in the server tick (#76) | `update` writes `self.x` / `self.y` | Set `vx` / `vy` instead |
-| Native collisions | `systems/collisions.lua` tests every `hitbox` pair with `lib/aabb.lua` and calls `on_hit` on both entities | Delete both files: entities already declare `hitbox` and react in `on_hit` |
-| `find_all` | `lib/roster.lua`: entities join a group in `on_spawn` and leave it in `on_destroy`; `roster.destroy(e)` leaves at once, so a doomed entity is never hit twice in one tick | Delete it and use `find_all` with tags |
-| Lua `system` declarations | Entities without a sprite: `game`, `bydo_spawner`, `collisions` | Declare them as `system "..."` |
-| `every`, `random` | Time counters in `update`, `math.random` | `every(interval, ...)`, `random(...)` |
-
-The game runs on the server. `main.lua` spawns the `game` entity and forwards
-`on_player_joined` / `on_player_left` to it: `game` spawns a ship owned by each
-player, so each ship reads the input of its own player, and restarts on a timer
-after a game over. The client draws an entity with `sprites/<type>.png`, so
-the sprite of a replicated entity type must be named after the type.
-
-Tests load a copy of the scripts from `tests/fixtures/game/server/game/`,
-identical except for an empty `on_start` in `main.lua`, so each test spawns only
-what it checks. Re-sync it after editing a script:
-
-```sh
-rsync -a --delete --exclude /main.lua game/scripts/ tests/fixtures/game/server/game/
-```
+| Magic numbers in entity files | A value in `lib/config.lua` |
+| Logic depending on frame rate | Multiply by `dt` |

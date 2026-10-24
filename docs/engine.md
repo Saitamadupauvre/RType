@@ -3,6 +3,75 @@
 The engine lives in `engine/` and is split into modules. Each module is a
 shared library (`libengine-<name>.so` / `engine-<name>.dll`) created with the
 `engine_add_module` CMake helper from `engine/cmake/EngineModule.cmake`.
+The [architecture](architecture.md) page shows how they fit together.
+
+## Modules
+
+| Module | Target | Depends on | Third-party (private) |
+|---|---|---|---|
+| core | `engine::core` | — | `dl` |
+| script | `engine::script` | core | Lua 5.4, sol2 |
+| network | `engine::network` | core | POSIX sockets |
+| physics | `engine::physics` | core | — |
+| graphics | `engine::graphics` | core | — (backends are [plugins](plugins.md)) |
+
+### core
+
+The foundation every other module builds on.
+
+| Area | Headers | What it gives |
+|---|---|---|
+| Entities | `Entity.hpp`, `EntityPool.hpp` | 32-bit ids with a generation counter: a recycled id never matches a destroyed entity |
+| Components | `ComponentPool.hpp`, `ComponentTypeId.hpp`, `EntityManager.hpp`, `ComponentQuery.hpp` | Sparse-set pools, `spawn`/`kill`/`add`/`get`/`has`, `query<A, B>().each(...)` |
+| Common components | `Components.hpp`, `ComponentPhysics.hpp` | `Position`, `Velocity`, `Sprite` (path + colour), `Tags` |
+| Systems | `SystemScheduler.hpp` | Named systems run by ascending order; one that throws is disabled and logged, the others keep running |
+| Events | `event/EventBus.hpp` | Typed publish/subscribe; a `Subscription` unsubscribes when destroyed |
+| Time | `time/IClock.hpp`, `SteadyClock.hpp`, `ManualClock.hpp`, `FixedStepLoop.hpp` | Fixed-step loop (60 Hz by default) over an injectable clock, so tests control time |
+| Logging | `log/Log.hpp`, `log/Sink.hpp`, `log/MemorySink.hpp` | `log::debug/info/warn/error` with `std::format` syntax; `MemorySink` captures logs in tests |
+| Plugins | `DynamicLibrary.hpp` | RAII wrapper over `dlopen` / `LoadLibrary` |
+
+Component types are identified by stable names registered in a `.cpp` of
+`engine-core`, so ids are identical in every shared library.
+
+### script
+
+`ScriptRuntime` embeds a sandboxed Lua 5.4 state (through sol2):
+
+- loads every `.lua` file of a folder recursively, registers `entity` and
+  `system` declarations, rejects duplicates and reserved names;
+- opens only `base`, `math`, `string`, `table`, `coroutine`; removes `dofile`,
+  `loadfile` and bytecode loading; `require` only reaches `lib/`;
+- spawns scripted entities, maps native fields (`x`, `y`, `vx`, `vy`,
+  `sprite`, `color`, `tags`) to C++ components and keeps free fields in Lua;
+- calls `update`, `on_spawn`, `on_destroy` and the `main.lua` callbacks
+  through protected calls: an error is logged with file and line and the game
+  continues;
+- tracks players (`players()`, `find_player()`, `player.slot`) and routes each
+  player's input to the entities they own.
+
+The Lua API is specified in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
+
+### network
+
+UDP transport, binary protocol, network threads, sessions, snapshots and
+statistics behind two classes, `NetworkServer` and `NetworkClient`. See
+[Networking internals](networking.md) and the [protocol](protocol.md).
+
+### physics
+
+`PhysicsSystem` integrates forces, acceleration and velocity of entities with
+a `PhysicsBody` (static or dynamic, mass, gravity, collision layer and mask),
+detects overlaps between `AABBCollider` and `CircleCollider` shapes, resolves
+them and publishes collision events on the event bus. R-Type does not use it
+yet: its collisions are still done in Lua (see
+[Writing the game](writing-the-game.md#current-state)).
+
+### graphics
+
+Backend-independent interfaces (`IRenderer`, `IInput`, `IGraphicsBackend`),
+engine types (`Color`, `Rect`, `SpriteDraw`, `Key`...) and
+`load_graphics_plugin()`, which loads a backend at runtime. See
+[Plugins](plugins.md).
 
 ## The contract
 
@@ -70,9 +139,9 @@ namespace engine::script {
 
 ENGINE_SCRIPT_EXPORT void load_game(std::string_view folder);
 
-class ENGINE_SCRIPT_EXPORT LuaRuntime {
+class ENGINE_SCRIPT_EXPORT ScriptRuntime {
 public:
-    void tick(float dt);
+    void update(float dt);
 };
 
 void internal_helper();
@@ -80,7 +149,7 @@ void internal_helper();
 } // namespace engine::script
 ```
 
-`load_game` and `LuaRuntime` are visible outside the library; `internal_helper`
+`load_game` and `ScriptRuntime` are visible outside the library; `internal_helper`
 is not. Because symbols are hidden on every platform, forgetting the macro
 fails on Linux as well.
 
