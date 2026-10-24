@@ -9,6 +9,7 @@
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
+#include "engine/script/AudioCommand.hpp"
 #include "engine/script/InputState.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
@@ -142,4 +143,20 @@ TEST_F(ShipTest, HoldingFireShootsOncePerCooldown) {
     EXPECT_EQ(missiles(), 1U);
     _runtime.update(half_cooldown);
     EXPECT_EQ(missiles(), 2U);
+}
+
+TEST_F(ShipTest, ShootingPlaysTheLaserSoundFromTheShip) {
+    hold_fire();
+    _runtime.update(half_cooldown);
+
+    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                  {.kind = engine::script::AudioCommandKind::Sound,
+                                                   .name = "laser_shoot.wav",
+                                                   .source = _ship}}));
+}
+
+TEST_F(ShipTest, NotShootingPlaysNoSound) {
+    _runtime.update(1.F);
+
+    EXPECT_TRUE(_runtime.take_audio_commands().empty());
 }

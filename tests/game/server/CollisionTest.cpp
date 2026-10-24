@@ -13,6 +13,7 @@
 #include "engine/core/Vec2.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/script/AudioCommand.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
 namespace logger = engine::core::log;
@@ -135,4 +136,26 @@ TEST_F(CollisionTest, DestroyedEntitiesNeverBreakTheNextTicks) {
         tick();
     }
     EXPECT_FALSE(logged_error());
+}
+
+TEST_F(CollisionTest, DestroyedBydoPlaysAnExplosion) {
+    spawn("missile", {1000.F, 300.F});
+    const Entity bydo = spawn("bydo", {1000.F, 290.F});
+    tick();
+
+    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                  {.kind = engine::script::AudioCommandKind::Sound,
+                                                   .name = "explosion.wav",
+                                                   .source = bydo}}));
+}
+
+TEST_F(CollisionTest, DestroyedShipPlaysAnExplosion) {
+    const Entity ship = tagged("ship").front();
+    spawn("bydo", {ship_start.x + 10.F, ship_start.y + 10.F});
+    tick();
+
+    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                  {.kind = engine::script::AudioCommandKind::Sound,
+                                                   .name = "explosion.wav",
+                                                   .source = ship}}));
 }
