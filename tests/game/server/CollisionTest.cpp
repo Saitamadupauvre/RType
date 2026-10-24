@@ -163,3 +163,29 @@ TEST_F(CollisionTest, DestroyedShipPlaysAnExplosion) {
                                                    .name = "explosion.wav",
                                                    .source = ship}}));
 }
+
+TEST_F(CollisionTest, BydoShotHittingTheShipDestroysBothWithAnExplosion) {
+    const Entity ship = tagged("ship").front();
+    const Entity shot = spawn("bydo_shot", {ship_start.x + 10.F, ship_start.y + 5.F});
+    tick();
+
+    EXPECT_FALSE(_world.alive(ship));
+    EXPECT_FALSE(_world.alive(shot));
+    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                  {.kind = engine::script::AudioCommandKind::Sound,
+                                                   .name = "explosion.wav",
+                                                   .source = ship}}));
+}
+
+TEST_F(CollisionTest, BydoShotsIgnoreBydosAndMissiles) {
+    const Entity shot_on_bydo = spawn("bydo_shot", {1000.F, 300.F});
+    const Entity bydo = spawn("bydo", {990.F, 290.F});
+    const Entity shot_on_missile = spawn("bydo_shot", {1500.F, 700.F});
+    const Entity missile = spawn("missile", {1490.F, 705.F});
+    tick();
+
+    EXPECT_TRUE(_world.alive(shot_on_bydo));
+    EXPECT_TRUE(_world.alive(bydo));
+    EXPECT_TRUE(_world.alive(shot_on_missile));
+    EXPECT_TRUE(_world.alive(missile));
+}
