@@ -10,6 +10,9 @@ namespace rtype::client {
 struct ClientConfig {
     std::string host;
     std::uint16_t port;
+    unsigned int music_volume{100};
+    unsigned int effects_volume{100};
+    bool muted{false};
 
     bool operator==(const ClientConfig&) const = default;
 };

@@ -47,12 +47,18 @@ target_link_libraries(r-type_client_draw PUBLIC engine::core engine::graphics en
 target_include_directories(r-type_client_draw PUBLIC client)
 rtype_set_warnings(r-type_client_draw)
 
+add_library(r-type_client_audio STATIC client/AudioPlayer.cpp)
+target_link_libraries(r-type_client_audio PUBLIC engine::core engine::audio engine::network)
+target_include_directories(r-type_client_audio PUBLIC client)
+rtype_set_warnings(r-type_client_audio)
+
 add_executable(r-type_client client/main.cpp)
-target_link_libraries(r-type_client PRIVATE r-type_client_cli r-type_client_controls r-type_client_draw r-type_common engine::core engine::network engine::graphics)
+target_link_libraries(r-type_client PRIVATE r-type_client_cli r-type_client_controls r-type_client_draw r-type_client_audio r-type_common engine::core engine::network engine::graphics engine::audio)
 target_compile_definitions(r-type_client PRIVATE
     GRAPHICS_PLUGIN_FILE="$<TARGET_FILE_NAME:graphics-raylib>"
+    AUDIO_PLUGIN_FILE="$<TARGET_FILE_NAME:audio-raylib>"
 )
-add_dependencies(r-type_client graphics-raylib r-type_assets)
+add_dependencies(r-type_client graphics-raylib audio-raylib r-type_assets)
 rtype_set_warnings(r-type_client)
 
 option(RTYPE_BUILD_SANDBOX "Build the r-type_sandbox executable" ON)
