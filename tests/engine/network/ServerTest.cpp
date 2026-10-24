@@ -29,6 +29,7 @@ using engine::core::EntityManager;
 using engine::core::Position;
 using engine::core::event::EventBus;
 using engine::core::time::SteadyClock;
+using engine::network::AudioName;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
 using engine::network::DestroyEvent;
@@ -40,6 +41,8 @@ using engine::network::EventPayload;
 using engine::network::InputPayload;
 using engine::network::max_datagram_size;
 using engine::network::Message;
+using engine::network::MusicChanged;
+using engine::network::MusicEvent;
 using engine::network::NetworkServer;
 using engine::network::PlayerJoined;
 using engine::network::ProtocolHandler;
@@ -193,6 +196,64 @@ TEST_F(NetworkServerTest, StartRejectsAnInvalidTypeTable) {
     EXPECT_EQ(ec, std::errc::invalid_argument);
     EXPECT_FALSE(unnamed.start(ec));
     EXPECT_EQ(ec, std::errc::invalid_argument);
+}
+
+TEST_F(NetworkServerTest, StartRejectsInvalidSoundOrMusicTables) {
+    NetworkServer duplicated_sound(clock, bus,
+                                   ServerOptions{.port = 0,
+                                                 .max_players = 1,
+                                                 .sounds = {AudioName{.id = 1, .name = "a.wav"},
+                                                            AudioName{.id = 2, .name = "a.wav"}}});
+    NetworkServer reserved_music(
+        clock, bus,
+        ServerOptions{.port = 0,
+                      .max_players = 1,
+                      .musics = {AudioName{.id = engine::network::no_music, .name = "a.ogg"}}});
+    std::error_code ec;
+
+    EXPECT_FALSE(duplicated_sound.start(ec));
+    EXPECT_EQ(ec, std::errc::invalid_argument);
+    EXPECT_FALSE(reserved_music.start(ec));
+    EXPECT_EQ(ec, std::errc::invalid_argument);
+}
+
+TEST_F(NetworkServerTest, SendsAudioTablesAndTheCurrentMusicToPlayersJoiningLater) {
+    NetworkServer audio(clock, bus,
+                        ServerOptions{.port = 0,
+                                      .max_players = 1,
+                                      .sounds = {AudioName{.id = 1, .name = "shot.wav"}},
+                                      .musics = {AudioName{.id = 2, .name = "stage.ogg"}}});
+    std::error_code ec;
+    ASSERT_TRUE(audio.start(ec)) << ec.message();
+    bus.publish(MusicChanged{.music_id = 2});
+    auto peer = bound_peer();
+
+    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, audio.port());
+    ASSERT_TRUE(receive_until(audio, [&audio] { return audio.player_count() == 1; }));
+    const auto accept = receive_from_server(peer);
+
+    ASSERT_TRUE(accept.has_value());
+    const auto& payload = std::get<ConnectAcceptPayload>(accept->message);
+    EXPECT_EQ(payload.sounds, (std::vector<TypeEntry>{{.type_id = 1, .name = "shot.wav"}}));
+    EXPECT_EQ(payload.musics, (std::vector<TypeEntry>{{.type_id = 2, .name = "stage.ogg"}}));
+    EXPECT_EQ(payload.current_music, 2);
+}
+
+TEST_F(NetworkServerTest, SendsMusicChangesToPlayers) {
+    start();
+    auto peer = bound_peer();
+    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, server.port());
+    ASSERT_TRUE(receive_until(server, [this] { return server.player_count() == 1; }));
+    ASSERT_TRUE(receive_from_server(peer).has_value());
+    EntityManager registry;
+
+    bus.publish(MusicChanged{.music_id = engine::network::no_music});
+    server.send_snapshot(registry);
+
+    const auto event = receive_from_server(peer);
+    ASSERT_TRUE(event.has_value());
+    EXPECT_EQ(event->message,
+              Message{EventPayload{MusicEvent{.music_id = engine::network::no_music}}});
 }
 
 TEST_F(NetworkServerTest, SendsItsTypeTableAndPublishedEventsToPlayers) {

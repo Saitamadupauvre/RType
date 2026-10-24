@@ -36,6 +36,7 @@ using engine::core::Velocity;
 using engine::core::event::EventBus;
 using engine::core::time::ManualClock;
 using engine::core::time::SteadyClock;
+using engine::network::AudioName;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectionState;
 using engine::network::ConnectRequestPayload;
@@ -47,6 +48,7 @@ using engine::network::EntitySpawned;
 using engine::network::HeartbeatPayload;
 using engine::network::max_datagram_size;
 using engine::network::Message;
+using engine::network::MusicChanged;
 using engine::network::NetworkClient;
 using engine::network::NetworkServer;
 using engine::network::PlayerLeft;
@@ -176,6 +178,8 @@ TEST_F(NetworkClientTest, IsDisconnectedAndInertBeforeConnecting) {
     EXPECT_FALSE(client.server_tick().has_value());
     EXPECT_TRUE(client.entities().empty());
     EXPECT_TRUE(client.types().empty());
+    EXPECT_TRUE(client.sounds().empty());
+    EXPECT_TRUE(client.musics().empty());
     EXPECT_TRUE(reasons.empty());
 }
 
@@ -301,6 +305,68 @@ TEST_F(NetworkClientTest, PublishesGameEventsInTheOrderTheServerPublishedThem) {
     wait_for_client([&received] { return received.size() == 4; });
     EXPECT_EQ(received, (std::vector<std::string>{"spawn 4 type 2 at 10,-4", "sound 7", "shot 5",
                                                   "destroy 4"}));
+}
+
+TEST_F(NetworkClientTest, ReceivesAudioTablesAndTheMusicAlreadyPlaying) {
+    NetworkServer audio(clock, server_bus,
+                        ServerOptions{.port = 0,
+                                      .max_players = 1,
+                                      .sounds = {AudioName{.id = 1, .name = "shot.wav"},
+                                                 AudioName{.id = 2, .name = "boom.wav"}},
+                                      .musics = {AudioName{.id = 3, .name = "stage.ogg"}}});
+    std::error_code ec;
+    ASSERT_TRUE(audio.start(ec)) << ec.message();
+    server_bus.publish(MusicChanged{.music_id = 3});
+    std::vector<std::uint16_t> musics;
+    client_bus.subscribe<MusicChanged>(
+        [&musics](const MusicChanged& event) { musics.push_back(event.music_id); });
+
+    ASSERT_TRUE(client.connect("127.0.0.1", audio.port(), ec)) << ec.message();
+    ASSERT_TRUE(wait_until(
+        [&] {
+            audio.receive();
+            client.update();
+        },
+        [&] { return client.state() != ConnectionState::connecting; }));
+
+    ASSERT_EQ(client.state(), ConnectionState::connected);
+    const auto sounds = client.sounds();
+    ASSERT_EQ(sounds.size(), 2U);
+    EXPECT_EQ(sounds[0].id, 1);
+    EXPECT_EQ(sounds[0].name, "shot.wav");
+    EXPECT_EQ(sounds[1].name, "boom.wav");
+    const auto tracks = client.musics();
+    ASSERT_EQ(tracks.size(), 1U);
+    EXPECT_EQ(tracks[0].id, 3);
+    EXPECT_EQ(tracks[0].name, "stage.ogg");
+    EXPECT_EQ(musics, (std::vector<std::uint16_t>{3}));
+}
+
+TEST_F(NetworkClientTest, PublishesNoMusicOnAcceptWhenTheServerPlaysNone) {
+    std::vector<std::uint16_t> musics;
+    client_bus.subscribe<MusicChanged>(
+        [&musics](const MusicChanged& event) { musics.push_back(event.music_id); });
+    start_server();
+
+    connect(client);
+
+    EXPECT_EQ(client.state(), ConnectionState::connected);
+    EXPECT_TRUE(musics.empty());
+}
+
+TEST_F(NetworkClientTest, PublishesMusicChangesFromTheServer) {
+    std::vector<std::uint16_t> musics;
+    client_bus.subscribe<MusicChanged>(
+        [&musics](const MusicChanged& event) { musics.push_back(event.music_id); });
+    EntityManager registry;
+    start_server();
+    connect(client);
+
+    server_bus.publish(MusicChanged{.music_id = engine::network::no_music});
+    server.send_snapshot(registry);
+
+    wait_for_client([&musics] { return !musics.empty(); });
+    EXPECT_EQ(musics, (std::vector<std::uint16_t>{engine::network::no_music}));
 }
 
 TEST_F(NetworkClientTest, PublishesPlayerLeftWhenAnotherPlayerLeaves) {
