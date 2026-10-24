@@ -107,7 +107,8 @@ ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig
                                               .max_players = config.max_players,
                                               .types = _types,
                                               .sounds = _sounds,
-                                              .musics = _musics}) {
+                                              .musics = _musics}),
+      _collisions(registry_, events_, _runtime) {
     register_if_missing<engine::network::Replicated>(registry_);
     register_if_missing<engine::core::Position>(registry_);
     register_if_missing<engine::core::Velocity>(registry_);
@@ -134,6 +135,7 @@ void ServerApp::tick(engine::core::time::Duration step) {
     network_.receive();
     apply_inputs(network_.inputs());
     _runtime.update(dt);
+    _collisions.step(dt);
     _runtime.flush_destroyed();
     systems_.run(registry_, dt);
     replicate();

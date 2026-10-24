@@ -22,8 +22,8 @@ target_link_libraries(r-type_common PUBLIC engine::script)
 target_include_directories(r-type_common PUBLIC common)
 rtype_set_warnings(r-type_common)
 
-add_library(r-type_server_app STATIC server/ServerApp.cpp)
-target_link_libraries(r-type_server_app PUBLIC r-type_server_cli r-type_common engine::core engine::network engine::script)
+add_library(r-type_server_app STATIC server/Collisions.cpp server/ServerApp.cpp)
+target_link_libraries(r-type_server_app PUBLIC r-type_server_cli r-type_common engine::core engine::network engine::physics engine::script)
 target_include_directories(r-type_server_app PUBLIC server)
 rtype_set_warnings(r-type_server_app)
 
