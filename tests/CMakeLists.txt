@@ -110,6 +110,9 @@ function(game_add_test name)
 
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
+    target_compile_definitions(${target} PRIVATE
+        RTYPE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+    )
     rtype_set_warnings(${target})
     set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "game.${name}.")
@@ -150,3 +153,7 @@ endfunction()
 
 game_add_runtime_data_test(scripts ${PROJECT_SOURCE_DIR}/game/scripts)
 game_add_runtime_data_test(assets ${PROJECT_SOURCE_DIR}/assets)
+    game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp game/client/ShipTest.cpp
+    game/client/MissileTest.cpp game/client/BydoTest.cpp game/client/SpawnerTest.cpp
+    game/client/CollisionTest.cpp game/client/GameFlowTest.cpp
+    LINKS r-type_client_cli r-type_client_controls r-type_client_draw engine::script)
