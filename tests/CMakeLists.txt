@@ -110,6 +110,9 @@ function(game_add_test name)
 
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
+    target_compile_definitions(${target} PRIVATE
+        RTYPE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+    )
     rtype_set_warnings(${target})
     set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "game.${name}.")
@@ -135,9 +138,8 @@ plugin_add_test(graphics-raylib
 
 game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
     LINKS r-type_server_cli r-type_server_app)
-game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
-
-game_add_test(server SOURCES game/server/CliTest.cpp LINKS r-type_server_cli)
 game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
-    game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp
-    LINKS r-type_client_cli r-type_client_controls r-type_client_draw)
+    game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp game/client/ShipTest.cpp
+    game/client/MissileTest.cpp game/client/BydoTest.cpp game/client/SpawnerTest.cpp
+    game/client/CollisionTest.cpp game/client/GameFlowTest.cpp
+    LINKS r-type_client_cli r-type_client_controls r-type_client_draw engine::script)
