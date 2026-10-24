@@ -47,13 +47,14 @@ In Part 1 each `main` assembles the engine modules explicitly: reading it
 shows the whole tick (server) or frame (client). In Part 2 they become thin
 entry points over generic `ServerApp` / `ClientApp` classes from the engine.
 
-## Multiplayer demo
+## Multiplayer
 
-`main.lua` gives every connected player a square in the colour of its slot
-(`on_player_joined`) and removes it when the player leaves
-(`on_player_left`). Arrow keys (or `ZQSD`) move it; every client sees every
-square and outlines its own. The server runs the Lua game; the client only
-sends inputs and draws the snapshot.
+The server runs the Lua game; the client only sends inputs and draws the
+snapshot. The first player to join starts the game, players joining later get
+a ship at once, each on its own row and tinted with the colour of its slot.
+Arrow keys (or `ZQSD`) move the ship, `Space` fires. The game is over once
+every ship is destroyed and restarts after 3 seconds with a ship for every
+connected player; with nobody left, it waits for the next one.
 
 ```sh
 cmake --build --preset ninja-debug
@@ -63,14 +64,20 @@ cd build/ninja-debug/bin
 ./r-type_client 127.0.0.1 4242
 ```
 
-- Move one square: the other window shows the same position.
-- Close one client: its square disappears from the other window.
+- Move one ship: the other window shows the same position.
+- Close one client: its ship disappears from the other window.
 
 `ServerApp` holds no game rule: it forwards joins, leaves and inputs to the
-script runtime and replicates every scripted entity with its declared type,
-owner and colour. It is the generic server of Part 2. The client drawing
-lives in `game/client/TemporaryNetworkView.*` until the snapshot display
-(#23) and the client loop (#24) replace it.
+script runtime and replicates every scripted entity that has a `sprite` or a
+`color`, with its declared type, owner and colour. Entities without either
+(`game`, `collisions`, `bydo_spawner`) stay on the server. It is the generic
+server of Part 2.
+
+The client (`game/client/SnapshotView.*`) draws each replicated entity with
+`assets/sprites/<type>.png`, where `<type>` is the name the server sent in its
+type table, tinted with the replicated colour; an unknown type is drawn as a
+square of that colour. A dot above an entity marks the ones the local player
+owns.
 
 ## Scripts
 
