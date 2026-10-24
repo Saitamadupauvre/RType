@@ -41,8 +41,8 @@ bool has_unique_types(const ConnectAcceptPayload& payload) {
 } // namespace
 
 bool is_valid(const InputPayload& payload) noexcept {
-    return (payload.action_flags & ~known_action_flags) == 0 && is_unit_axis(payload.move_x) &&
-           is_unit_axis(payload.move_y);
+    return (payload.action_flags | known_action_flags) == known_action_flags &&
+           is_unit_axis(payload.move_x) && is_unit_axis(payload.move_y);
 }
 
 bool is_valid(const SnapshotPayload& payload) noexcept {
