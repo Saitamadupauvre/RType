@@ -12,6 +12,7 @@
 #include "engine/core/SystemScheduler.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
+#include "engine/network/Audio.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
 #include "engine/script/ScriptRuntime.hpp"
@@ -30,6 +31,7 @@ public:
 
     void apply_inputs(const std::vector<engine::network::PlayerInput>& inputs);
     void replicate();
+    void publish_audio();
 
     [[nodiscard]] engine::core::EntityManager& registry() noexcept { return registry_; }
     [[nodiscard]] engine::core::SystemScheduler& systems() noexcept { return systems_; }
@@ -38,6 +40,12 @@ public:
     [[nodiscard]] engine::script::ScriptRuntime& script() noexcept { return _runtime; }
     [[nodiscard]] const std::vector<engine::network::ReplicatedType>& types() const noexcept {
         return _types;
+    }
+    [[nodiscard]] const std::vector<engine::network::AudioName>& sounds() const noexcept {
+        return _sounds;
+    }
+    [[nodiscard]] const std::vector<engine::network::AudioName>& musics() const noexcept {
+        return _musics;
     }
 
 private:
@@ -48,6 +56,10 @@ private:
     engine::script::ScriptRuntime _runtime;
     std::vector<engine::network::ReplicatedType> _types;
     std::unordered_map<std::string, std::uint16_t> _type_ids;
+    std::vector<engine::network::AudioName> _sounds;
+    std::vector<engine::network::AudioName> _musics;
+    std::unordered_map<std::string, std::uint16_t> _sound_ids;
+    std::unordered_map<std::string, std::uint16_t> _music_ids;
     engine::network::NetworkServer network_;
 };
 

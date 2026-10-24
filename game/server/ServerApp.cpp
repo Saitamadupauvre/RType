@@ -61,6 +61,32 @@ index_types(const std::vector<engine::network::ReplicatedType>& types) {
     return ids;
 }
 
+std::vector<engine::network::AudioName> audio_table(std::vector<std::string> names) {
+    std::vector<engine::network::AudioName> table;
+    for (std::string& name : names) {
+        if (table.size() + 1 >= engine::network::no_music) {
+            engine::core::log::warn("server: too many sounds or musics, '{}' is ignored", name);
+            continue;
+        }
+        const auto id = static_cast<std::uint16_t>(table.size() + 1);
+        table.push_back({.id = id, .name = std::move(name)});
+    }
+    return table;
+}
+
+std::unordered_map<std::string, std::uint16_t>
+index_audio(const std::vector<engine::network::AudioName>& table) {
+    std::unordered_map<std::string, std::uint16_t> ids;
+    for (const auto& entry : table) {
+        ids.emplace(entry.name, entry.id);
+    }
+    return ids;
+}
+
+std::uint32_t wire_source(std::optional<engine::core::Entity> source) {
+    return source ? source->index() : engine::network::no_source_entity;
+}
+
 std::uint8_t wire_owner(std::optional<std::uint32_t> owner) {
     if (!owner || *owner > std::numeric_limits<std::uint8_t>::max()) {
         return 0;
@@ -73,10 +99,15 @@ std::uint8_t wire_owner(std::optional<std::uint32_t> owner) {
 ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig& config,
                      const std::filesystem::path& scripts)
     : clock_(clock), _types(load_game(_runtime, registry_, scripts)),
-      _type_ids(index_types(_types)),
+      _type_ids(index_types(_types)), _sounds(audio_table(_runtime.sound_names())),
+      _musics(audio_table(_runtime.music_names())), _sound_ids(index_audio(_sounds)),
+      _music_ids(index_audio(_musics)),
       network_(clock, events_,
-               engine::network::ServerOptions{
-                   .port = config.port, .max_players = config.max_players, .types = _types}) {
+               engine::network::ServerOptions{.port = config.port,
+                                              .max_players = config.max_players,
+                                              .types = _types,
+                                              .sounds = _sounds,
+                                              .musics = _musics}) {
     register_if_missing<engine::network::Replicated>(registry_);
     register_if_missing<engine::core::Position>(registry_);
     register_if_missing<engine::core::Velocity>(registry_);
@@ -106,7 +137,29 @@ void ServerApp::tick(engine::core::time::Duration step) {
     _runtime.flush_destroyed();
     systems_.run(registry_, dt);
     replicate();
+    publish_audio();
     network_.send_snapshot(registry_);
+}
+
+void ServerApp::publish_audio() {
+    for (const auto& command : _runtime.take_audio_commands()) {
+        if (command.kind == engine::script::AudioCommandKind::StopMusic) {
+            events_.publish(engine::network::MusicChanged{.music_id = engine::network::no_music});
+            continue;
+        }
+        const bool is_sound = command.kind == engine::script::AudioCommandKind::Sound;
+        const auto& ids = is_sound ? _sound_ids : _music_ids;
+        const auto id = ids.find(command.name);
+        if (id == ids.end()) {
+            continue;
+        }
+        if (is_sound) {
+            events_.publish(engine::network::SoundPlayed{
+                .source_entity_id = wire_source(command.source), .sound_id = id->second});
+        } else {
+            events_.publish(engine::network::MusicChanged{.music_id = id->second});
+        }
+    }
 }
 
 void ServerApp::apply_inputs(const std::vector<engine::network::PlayerInput>& inputs) {
