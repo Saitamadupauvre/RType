@@ -18,6 +18,7 @@ end
 
 function on_hit(self, other)
     if other:has_tag("missile") then
+        play("explosion.wav", self)
         roster.destroy(self)
     end
 end

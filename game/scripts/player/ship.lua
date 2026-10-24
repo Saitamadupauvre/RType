@@ -23,6 +23,7 @@ end
 
 function on_hit(self, other)
     if other:has_tag("enemy") then
+        play("explosion.wav", self)
         roster.destroy(self)
     end
 end
@@ -42,6 +43,7 @@ function shoot(self, input, dt)
         x = self.x + self.hitbox.w,
         y = self.y + (self.hitbox.h - config.missile.hitbox.h) / 2,
     })
+    play("laser_shoot.wav", self)
     self.cooldown = config.ship.fire_cooldown
 end
 
