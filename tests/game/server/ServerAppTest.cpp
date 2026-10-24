@@ -6,10 +6,12 @@
 
 #include "ServerApp.hpp"
 #include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/SystemScheduler.hpp"
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/network/Replicated.hpp"
 
 using engine::core::EntityManager;
+using engine::core::SystemPhase;
 using engine::core::time::Duration;
 using engine::core::time::ManualClock;
 using rtype::server::ServerApp;
@@ -34,7 +36,8 @@ TEST(ServerApp, TickRunsSystemsWithTheFixedStep) {
     const ManualClock clock;
     ServerApp app(clock, ServerConfig{.port = 4242, .max_players = 4});
     std::vector<float> steps;
-    app.systems().add("record", 0, [&steps](EntityManager&, float dt) { steps.push_back(dt); });
+    app.systems().add("record", SystemPhase::Input,
+                      [&steps](EntityManager&, float dt) { steps.push_back(dt); });
 
     app.tick(tick_step);
 
@@ -46,7 +49,7 @@ TEST(ServerApp, RunTicksAtFixedRateUntilAskedToStop) {
     ManualClock clock;
     ServerApp app(clock, ServerConfig{.port = 4242, .max_players = 4});
     int ticks = 0;
-    app.systems().add("count", 0, [&ticks](EntityManager&, float) { ++ticks; });
+    app.systems().add("count", SystemPhase::Input, [&ticks](EntityManager&, float) { ++ticks; });
     int checks = 0;
 
     app.run([&] {

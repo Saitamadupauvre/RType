@@ -24,14 +24,24 @@ struct SystemHandle {
     std::uint64_t id{0};
 };
 
+/** @brief Defines the fixed order in which server tick systems run. */
+enum class SystemPhase : std::uint8_t {
+    Input,
+    Script,
+    Callbacks,
+    Movement,
+    Collision,
+    Destroy,
+    Replicate
+};
+
 /** @brief Function called once per tick with the entity manager and the fixed time step. */
 using SystemFunction = std::function<void(EntityManager&, float)>;
 
 /**
- * @brief Runs systems over an entity manager, always in the same order.
+ * @brief Runs systems over an entity manager in the fixed server tick phase order.
  *
- * Systems run by ascending order value. Systems with the same order value run in the order they
- * were added.
+ * Systems in the same phase run in the order they were added. Empty phases are skipped.
  *
  * @note Not thread safe.
  */
@@ -41,13 +51,13 @@ public:
      * @brief Adds a system.
      *
      * @param name Unique name of the system.
-     * @param order Position in the tick: lower values run first.
+     * @param phase Phase in the fixed server tick order.
      * @param function Called on every run.
      * @return A handle identifying the system.
      * @throws SystemAlreadyRegistered If a system with this name already exists.
      * @throws std::logic_error If called while run is executing.
      */
-    SystemHandle add(std::string name, int order, SystemFunction function);
+    SystemHandle add(std::string name, SystemPhase phase, SystemFunction function);
 
     /**
      * @brief Removes a system and frees its name.
@@ -76,7 +86,7 @@ private:
     struct System {
         SystemHandle handle;
         std::string name;
-        int order;
+        SystemPhase phase;
         SystemFunction function;
         bool enabled{true};
         bool removed{false};

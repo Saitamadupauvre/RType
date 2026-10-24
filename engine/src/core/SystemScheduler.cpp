@@ -11,7 +11,7 @@ namespace engine::core {
 SystemAlreadyRegistered::SystemAlreadyRegistered(std::string_view name)
     : std::logic_error("system already registered: " + std::string(name)) {}
 
-SystemHandle SystemScheduler::add(std::string name, int order, SystemFunction function) {
+SystemHandle SystemScheduler::add(std::string name, SystemPhase phase, SystemFunction function) {
     if (_running) {
         throw std::logic_error("cannot add a system while the scheduler is running");
     }
@@ -21,10 +21,10 @@ SystemHandle SystemScheduler::add(std::string name, int order, SystemFunction fu
     }
 
     const SystemHandle handle{_next_id++};
-    const auto position = std::ranges::upper_bound(_systems, order, {}, &System::order);
+    const auto position = std::ranges::upper_bound(_systems, phase, {}, &System::phase);
     _systems.insert(position, System{.handle = handle,
                                      .name = std::move(name),
-                                     .order = order,
+                                     .phase = phase,
                                      .function = std::move(function)});
     return handle;
 }
