@@ -141,7 +141,21 @@ game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.c
     LINKS r-type_server_cli r-type_server_app)
 game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
     game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp
-    game/client/TemporaryNetworkViewTest.cpp
+    game/client/TemporaryNetworkViewTest.cpp game/client/ShipTest.cpp
+    game/client/MissileTest.cpp game/client/BydoTest.cpp game/client/SpawnerTest.cpp
+    game/client/CollisionTest.cpp game/client/GameFlowTest.cpp
     LINKS r-type_client_cli r-type_client_controls r-type_client_draw
-    r-type_client_temporary_network)
+    r-type_client_temporary_network engine::script)
 game_add_test(common SOURCES game/common/ActionCodecTest.cpp LINKS r-type_common)
+
+function(game_add_runtime_data_test folder source)
+    add_test(NAME game.runtime_data.${folder}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE=${source}
+            -DCOPY=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${folder}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/game/RuntimeDataTest.cmake
+    )
+endfunction()
+
+game_add_runtime_data_test(scripts ${PROJECT_SOURCE_DIR}/game/scripts)
+game_add_runtime_data_test(assets ${PROJECT_SOURCE_DIR}/assets)
