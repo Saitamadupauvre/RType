@@ -38,7 +38,7 @@ function finish(self)
 end
 
 function clear(self)
-    for _, group in ipairs({ "missiles", "enemies" }) do
+    for _, group in ipairs({ "missiles", "enemies", "enemy_shots" }) do
         for _, member in ipairs(roster.list(group)) do
             roster.destroy(member)
         end

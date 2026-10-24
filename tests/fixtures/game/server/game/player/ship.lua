@@ -7,7 +7,7 @@ tags          = { "player", "ship" }
 sprite        = "sprites/ship.png"
 speed         = config.ship.speed
 hitbox        = config.ship.hitbox
-collides_with = { "enemy" }
+collides_with = { "enemy", "enemy_shot" }
 cooldown      = 0
 
 local function clamp(value, low, high)
