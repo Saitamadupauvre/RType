@@ -27,6 +27,7 @@ engine_add_module(core
 
 engine_add_module(script
     SOURCES
+        src/script/Audio.cpp
         src/script/Declarations.cpp
         src/script/Entities.cpp
         src/script/ModuleLoader.cpp

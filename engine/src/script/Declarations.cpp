@@ -14,9 +14,9 @@ namespace {
 
 namespace log = engine::core::log;
 
-constexpr std::array<std::string_view, 18> reserved_globals{
-    "entity", "system", "query", "spawn",  "find_all", "find_first",
-    "count",  "after",  "every", "wait",   "play",     "music",
+constexpr std::array<std::string_view, 20> reserved_globals{
+    "entity", "system", "query", "spawn",  "find_all", "find_first",  "count",
+    "after",  "every",  "wait",  "play",   "music",    "sounds",      "musics",
     "random", "world",  "log",   "synced", "players",  "find_player",
 };
 
