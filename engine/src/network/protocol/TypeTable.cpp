@@ -54,6 +54,8 @@ void TypeTable::assign(const ConnectAcceptPayload& accept) {
         type_ids.insert(entry.type_id);
     }
     entries_ = accept.types;
+    _sounds = accept.sounds;
+    _musics = accept.musics;
 }
 
 bool TypeTable::is_known(std::uint16_t type_id) const noexcept {

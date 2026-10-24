@@ -10,6 +10,7 @@
 #include "engine/core/Components.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
+#include "engine/network/Audio.hpp"
 #include "engine/network/Export.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Stats.hpp"
@@ -64,8 +65,9 @@ struct ENGINE_NETWORK_EXPORT EntitySnapshot {
  * 1. update(): handles every packet received since the last call, resends the connect request
  *    or a heartbeat when due, and ends the connection when the server stays silent for longer
  *    than the timeout. Game events from the server (`EntitySpawned`, `EntityDestroyed`,
- *    `ShotFired`, `SoundPlayed`, `PlayerLeft`) are published on the event bus during this call,
- *    in the order received.
+ *    `ShotFired`, `SoundPlayed`, `MusicChanged`, `PlayerLeft`) are published on the event bus
+ *    during this call, in the order received. When the connection is accepted while the server
+ *    plays a music, `MusicChanged` is published with it.
  * 2. send_input(): sends the current input of the local player while connected.
  * 3. entities(): the newest world received from the server, for the game to draw.
  *
@@ -147,6 +149,19 @@ public:
      * ends.
      */
     [[nodiscard]] std::vector<ReplicatedType> types() const;
+
+    /**
+     * @return The sound table the server sent in `connect_accept`, to name the
+     * `SoundPlayed::sound_id` of each sound; empty until accepted. Kept after the connection ends.
+     */
+    [[nodiscard]] std::vector<AudioName> sounds() const;
+
+    /**
+     * @return The music table the server sent in `connect_accept`, to name the
+     * `MusicChanged::music_id` of each music; empty until accepted. Kept after the connection
+     * ends.
+     */
+    [[nodiscard]] std::vector<AudioName> musics() const;
 
     /**
      * @return The server tick of the newest snapshot received, if any.

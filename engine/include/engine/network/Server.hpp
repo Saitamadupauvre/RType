@@ -9,6 +9,7 @@
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
+#include "engine/network/Audio.hpp"
 #include "engine/network/Export.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Stats.hpp"
@@ -26,6 +27,11 @@ struct ENGINE_NETWORK_EXPORT ServerOptions {
     /** @brief Type table sent to every client in `connect_accept`: every `Replicated::type_id`
      * and `EntitySpawned::type_id` the game uses. */
     std::vector<ReplicatedType> types = {};
+    /** @brief Sound table sent in `connect_accept`: every `SoundPlayed::sound_id` the game uses. */
+    std::vector<AudioName> sounds = {};
+    /** @brief Music table sent in `connect_accept`: every `MusicChanged::music_id` the game uses.
+     */
+    std::vector<AudioName> musics = {};
 };
 
 /**
@@ -53,9 +59,9 @@ struct ENGINE_NETWORK_EXPORT PlayerInput {
  *    disconnections, inputs) and removes players silent for longer than the session timeout.
  *    `PlayerJoined` and `PlayerLeft` are published on the event bus during this call.
  * 2. inputs(): the latest input of each connected player, for the game to apply.
- * 3. During the tick, the game publishes `EntitySpawned`, `EntityDestroyed`, `ShotFired` and
- *    `SoundPlayed` on the event bus. Each one is queued for the players connected at that
- *    moment.
+ * 3. During the tick, the game publishes `EntitySpawned`, `EntityDestroyed`, `ShotFired`,
+ *    `SoundPlayed` and `MusicChanged` on the event bus. Each one is queued for the players
+ *    connected at that moment.
  * 4. send_snapshot(): sends the queued events in the order published, then every entity with
  *    `Replicated` and `Position`, to every player.
  *
@@ -78,9 +84,10 @@ public:
     /**
      * @brief Binds the UDP port and starts the network threads.
      *
-     * @param ec Set to `std::errc::invalid_argument` when `ServerOptions::types` has a
-     * duplicate id or name, or a name that is empty or longer than 63 bytes; set when the port
-     * cannot be bound (for example already in use); cleared otherwise.
+     * @param ec Set to `std::errc::invalid_argument` when `ServerOptions::types`, `sounds` or
+     * `musics` has a duplicate id or name, or a name that is empty or longer than 63 bytes, when
+     * `musics` uses the id `no_music`, or when the tables do not fit in one packet; set when the
+     * port cannot be bound (for example already in use); cleared otherwise.
      * @return `true` when the server is listening.
      */
     bool start(std::error_code& ec);

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "EventReader.hpp"
 #include "bytes/ByteReader.hpp"
@@ -29,6 +30,23 @@ std::optional<TypeEntry> read_type_entry(ByteReader& reader) {
         return std::nullopt;
     }
     return TypeEntry{.type_id = *type_id, .name = std::string(name->begin(), name->end())};
+}
+
+std::optional<std::vector<TypeEntry>> read_type_table(ByteReader& reader) {
+    const auto count = reader.read_u16();
+    if (!count || !can_hold_type_entries(reader, *count)) {
+        return std::nullopt;
+    }
+    std::vector<TypeEntry> entries;
+    entries.reserve(*count);
+    for (std::size_t index = 0; index < *count; ++index) {
+        auto entry = read_type_entry(reader);
+        if (!entry) {
+            return std::nullopt;
+        }
+        entries.push_back(std::move(*entry));
+    }
+    return entries;
 }
 
 bool has_exact_entity_records(const ByteReader& reader, std::size_t count) noexcept {
@@ -80,25 +98,25 @@ std::optional<ConnectAcceptPayload> decode_connect_accept(std::span<const std::u
     ByteReader reader(payload);
     const auto client_nonce = reader.read_u32();
     const auto player_entity_id = reader.read_u32();
-    const auto count = reader.read_u16();
-    if (!client_nonce || !player_entity_id || !count || !can_hold_type_entries(reader, *count)) {
+    if (!client_nonce || !player_entity_id) {
+        return std::nullopt;
+    }
+    auto types = read_type_table(reader);
+    auto sounds = types ? read_type_table(reader) : std::nullopt;
+    auto musics = sounds ? read_type_table(reader) : std::nullopt;
+    const auto current_music = musics ? reader.read_u16() : std::nullopt;
+    if (!current_music) {
         return std::nullopt;
     }
 
     ConnectAcceptPayload accept{
         .client_nonce = *client_nonce,
         .player_entity_id = *player_entity_id,
-        .types = {},
+        .types = std::move(*types),
+        .sounds = std::move(*sounds),
+        .musics = std::move(*musics),
+        .current_music = *current_music,
     };
-    accept.types.reserve(*count);
-    for (std::size_t index = 0; index < *count; ++index) {
-        auto entry = read_type_entry(reader);
-        if (!entry) {
-            return std::nullopt;
-        }
-        accept.types.push_back(std::move(*entry));
-    }
-
     if (!reader.at_end() || !is_valid(accept)) {
         return std::nullopt;
     }

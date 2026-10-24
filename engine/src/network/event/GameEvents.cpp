@@ -33,6 +33,10 @@ void publish(core::event::EventBus& events, const PlayerLeftEvent& event) {
     events.publish(PlayerLeft{.player_id = event.player_entity_id});
 }
 
+void publish(core::event::EventBus& events, const MusicEvent& event) {
+    events.publish(MusicChanged{.music_id = event.music_id});
+}
+
 } // namespace
 
 EventPayload to_payload(const EntitySpawned& event) noexcept {
@@ -53,6 +57,10 @@ EventPayload to_payload(const ShotFired& event) noexcept {
 
 EventPayload to_payload(const SoundPlayed& event) noexcept {
     return SoundEvent{.source_entity_id = event.source_entity_id, .sound_id = event.sound_id};
+}
+
+EventPayload to_payload(const MusicChanged& event) noexcept {
+    return MusicEvent{.music_id = event.music_id};
 }
 
 void publish_received(core::event::EventBus& events, const EventPayload& event) {
