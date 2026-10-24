@@ -309,11 +309,14 @@ std::optional<std::string> Entities::type_of(core::Entity entity) const {
 
 std::optional<std::uint32_t> Entities::owner_of(core::Entity entity) const {
     const auto found = _records.find(entity.id());
-    if (found == _records.end() || !found->second.owner ||
-        !_players.contains(*found->second.owner)) {
+    if (found == _records.end()) {
         return std::nullopt;
     }
-    return found->second.owner;
+    const std::optional<std::uint32_t>& owner = found->second.owner;
+    if (owner.has_value() && _players.contains(owner.value())) {
+        return owner;
+    }
+    return std::nullopt;
 }
 
 sol::object Entities::handle_of(core::Entity entity) const {
