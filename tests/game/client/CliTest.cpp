@@ -84,3 +84,33 @@ TEST(ClientCli, RejectsExtraArgument) { expect_rejected(args({"127.0.0.1", "4242
 TEST(ClientCli, RejectsUnknownFlag) { expect_rejected(args({"127.0.0.1", "4242", "--verbose"})); }
 
 TEST(ClientCli, RejectsEmptyArgumentList) { expect_rejected({}); }
+
+TEST(ClientCli, AudioDefaultsToFullVolumeUnmuted) {
+    const auto result = parse_cli(args({"127.0.0.1", "4242"}));
+
+    ASSERT_TRUE(result.config.has_value());
+    EXPECT_EQ(result.config->music_volume, 100U);
+    EXPECT_EQ(result.config->effects_volume, 100U);
+    EXPECT_FALSE(result.config->muted);
+}
+
+TEST(ClientCli, AcceptsVolumesAndMute) {
+    const auto result = parse_cli(
+        args({"127.0.0.1", "4242", "--music-volume", "30", "--effects-volume", "0", "--mute"}));
+
+    EXPECT_EQ(result.config, (ClientConfig{.host = "127.0.0.1",
+                                           .port = 4242,
+                                           .music_volume = 30,
+                                           .effects_volume = 0,
+                                           .muted = true}));
+}
+
+TEST(ClientCli, RejectsVolumeAboveOneHundred) {
+    expect_rejected(args({"127.0.0.1", "4242", "--music-volume", "101"}));
+    expect_rejected(args({"127.0.0.1", "4242", "--effects-volume", "500"}));
+}
+
+TEST(ClientCli, RejectsNonNumericVolume) {
+    expect_rejected(args({"127.0.0.1", "4242", "--music-volume", "loud"}));
+    expect_rejected(args({"127.0.0.1", "4242", "--effects-volume", "-1"}));
+}
