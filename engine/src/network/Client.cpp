@@ -164,6 +164,18 @@ std::uint32_t NetworkClient::player_id() const {
     return connection ? connection->player_id() : 0;
 }
 
+std::vector<ReplicatedType> NetworkClient::types() const {
+    std::vector<ReplicatedType> types;
+    const auto& connection = impl_->connection;
+    if (!connection.has_value()) {
+        return types;
+    }
+    for (const auto& entry : connection.value().type_table().entries()) {
+        types.push_back({.type_id = entry.type_id, .name = entry.name});
+    }
+    return types;
+}
+
 std::optional<std::uint32_t> NetworkClient::server_tick() const {
     return impl_->snapshots.server_tick();
 }

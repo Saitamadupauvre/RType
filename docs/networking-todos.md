@@ -256,6 +256,8 @@ in `engine/src/network/session/`, tests in `tests/engine/network/session/`.
   `connect(ip, port, ec)` (binds a free local port), `update()`,
   `send_input(flags, x, y)`, `disconnect()`, `state()`, `player_id()`,
   `server_tick()`, `entities()` (public `EntitySnapshot`, world units).
+- [x] `NetworkClient::types()`: the type table of `connect_accept`, so the
+  game can name the `type_id` of each `EntitySnapshot`.
 - [x] `ConnectionState` and `DisconnectReason` moved to public headers.
 - [x] The client ends the connection on any `disconnect` from the server, or
   after 5 s without a packet from it (`ClientConnectionConfig::server_timeout`).

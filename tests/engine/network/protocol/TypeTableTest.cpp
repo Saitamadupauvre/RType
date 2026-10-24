@@ -77,6 +77,14 @@ TEST_F(TypeTable, KnowsTypesFromConnectAccept) {
     EXPECT_FALSE(table.is_known(unknown_type));
 }
 
+TEST_F(TypeTable, KeepsTheNamesFromConnectAccept) {
+    EXPECT_TRUE(table.entries().empty());
+
+    table.assign(sample_accept());
+
+    EXPECT_EQ(table.entries(), sample_accept().types);
+}
+
 TEST_F(TypeTable, AssignReplacesPreviousTable) {
     table.assign(sample_accept());
 
@@ -84,6 +92,8 @@ TEST_F(TypeTable, AssignReplacesPreviousTable) {
 
     EXPECT_TRUE(table.is_known(unknown_type));
     EXPECT_FALSE(table.is_known(player_type));
+    ASSERT_EQ(table.entries().size(), 1U);
+    EXPECT_EQ(table.entries().front().name, "boss");
 }
 
 TEST_F(TypeTable, AdmitsSnapshotWithKnownTypes) {

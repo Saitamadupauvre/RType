@@ -175,6 +175,7 @@ TEST_F(NetworkClientTest, IsDisconnectedAndInertBeforeConnecting) {
     EXPECT_EQ(client.player_id(), 0U);
     EXPECT_FALSE(client.server_tick().has_value());
     EXPECT_TRUE(client.entities().empty());
+    EXPECT_TRUE(client.types().empty());
     EXPECT_TRUE(reasons.empty());
 }
 
@@ -210,6 +211,12 @@ TEST_F(NetworkClientTest, ReceivesTheWorldAndSendsInputs) {
     connect(client);
     ASSERT_EQ(client.state(), ConnectionState::connected);
     EXPECT_EQ(client.player_id(), 1U);
+    const auto types = client.types();
+    ASSERT_EQ(types.size(), 2U);
+    EXPECT_EQ(types[0].type_id, 1);
+    EXPECT_EQ(types[0].name, "player");
+    EXPECT_EQ(types[1].type_id, 2);
+    EXPECT_EQ(types[1].name, "enemy");
 
     client.send_input(1, -1, 1);
     ASSERT_TRUE(wait_until(

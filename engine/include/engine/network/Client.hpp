@@ -11,6 +11,7 @@
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Export.hpp"
+#include "engine/network/Replicated.hpp"
 #include "engine/network/Stats.hpp"
 
 namespace engine::network {
@@ -139,6 +140,13 @@ public:
      * @return The player id given by the server, or `0` until accepted.
      */
     [[nodiscard]] std::uint32_t player_id() const;
+
+    /**
+     * @return The type table the server sent in `connect_accept`, to name the
+     * `EntitySnapshot::type_id` of each entity; empty until accepted. Kept after the connection
+     * ends.
+     */
+    [[nodiscard]] std::vector<ReplicatedType> types() const;
 
     /**
      * @return The server tick of the newest snapshot received, if any.
