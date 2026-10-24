@@ -45,6 +45,8 @@ TEST(GameEvents, OtherEventsKeepTheirIds) {
               (EventPayload{FireEvent{.source_entity_id = 1, .projectile_entity_id = 2}}));
     EXPECT_EQ((to_payload(SoundPlayed{.source_entity_id = 1, .sound_id = 5})),
               (EventPayload{SoundEvent{.source_entity_id = 1, .sound_id = 5}}));
+    EXPECT_EQ(to_payload(engine::network::MusicChanged{.music_id = 3}),
+              (EventPayload{engine::network::MusicEvent{.music_id = 3}}));
 }
 
 TEST(GameEvents, PublishesEachReceivedEventAsItsGameEvent) {
@@ -61,12 +63,16 @@ TEST(GameEvents, PublishesEachReceivedEventAsItsGameEvent) {
         [&](const ShotFired& event) { projectiles.push_back(event.projectile_entity_id); });
     bus.subscribe<SoundPlayed>([&](const SoundPlayed& event) { sounds.push_back(event.sound_id); });
     bus.subscribe<PlayerLeft>([&](const PlayerLeft& event) { left.push_back(event.player_id); });
+    std::vector<std::uint16_t> musics;
+    bus.subscribe<engine::network::MusicChanged>(
+        [&](const engine::network::MusicChanged& event) { musics.push_back(event.music_id); });
 
     publish_received(bus, SpawnEvent{.entity_id = 3, .type_id = 2, .x = -5, .y = 7});
     publish_received(bus, DestroyEvent{.entity_id = 4});
     publish_received(bus, FireEvent{.source_entity_id = 1, .projectile_entity_id = 6});
     publish_received(bus, SoundEvent{.source_entity_id = 1, .sound_id = 8});
     publish_received(bus, PlayerLeftEvent{.player_entity_id = 2});
+    publish_received(bus, engine::network::MusicEvent{.music_id = 9});
 
     ASSERT_EQ(spawned.size(), 1U);
     EXPECT_EQ(spawned.front().entity_id, 3U);
@@ -77,4 +83,5 @@ TEST(GameEvents, PublishesEachReceivedEventAsItsGameEvent) {
     EXPECT_EQ(projectiles, (std::vector<std::uint32_t>{6}));
     EXPECT_EQ(sounds, (std::vector<std::uint16_t>{8}));
     EXPECT_EQ(left, (std::vector<std::uint32_t>{2}));
+    EXPECT_EQ(musics, (std::vector<std::uint16_t>{9}));
 }

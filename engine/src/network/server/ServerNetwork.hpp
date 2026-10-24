@@ -24,6 +24,7 @@ public:
 
     [[nodiscard]] std::vector<Outbound> receive(const std::vector<Inbound>& inbound);
     void queue_event(const EventPayload& event);
+    void set_current_music(std::uint16_t music_id) { sessions_.set_current_music(music_id); }
     [[nodiscard]] std::vector<Outbound> snapshot(core::EntityManager& registry);
     [[nodiscard]] std::vector<Outbound> shutdown();
 

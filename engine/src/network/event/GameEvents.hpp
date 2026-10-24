@@ -12,6 +12,7 @@ namespace engine::network {
 [[nodiscard]] ENGINE_NETWORK_EXPORT EventPayload to_payload(const EntityDestroyed& event) noexcept;
 [[nodiscard]] ENGINE_NETWORK_EXPORT EventPayload to_payload(const ShotFired& event) noexcept;
 [[nodiscard]] ENGINE_NETWORK_EXPORT EventPayload to_payload(const SoundPlayed& event) noexcept;
+[[nodiscard]] ENGINE_NETWORK_EXPORT EventPayload to_payload(const MusicChanged& event) noexcept;
 
 ENGINE_NETWORK_EXPORT void publish_received(core::event::EventBus& events,
                                             const EventPayload& event);

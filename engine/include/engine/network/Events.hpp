@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "engine/network/Audio.hpp"
 #include "engine/network/Export.hpp"
 
 namespace engine::network {
@@ -70,11 +71,28 @@ struct ENGINE_NETWORK_EXPORT ShotFired {
 };
 
 /**
- * @brief An entity played a sound, e.g. from the Lua `play(...)` function.
+ * @brief A sound was played, e.g. from the Lua `play(...)` function.
+ *
+ * `sound_id` must be in the server's sound table. `source_entity_id` is `no_source_entity`
+ * when no entity played it.
  */
 struct ENGINE_NETWORK_EXPORT SoundPlayed {
     std::uint32_t source_entity_id;
     std::uint16_t sound_id;
+};
+
+/**
+ * @brief The music changed, e.g. from the Lua `music(...)` function.
+ *
+ * `music_id` must be in the server's music table, or be `no_music` to stop the music. The music
+ * loops until the next change.
+ *
+ * On the server it also becomes the current music sent in `connect_accept`, so players who join
+ * later hear it. On the client it is published as well when the connection is accepted and the
+ * server is playing a music.
+ */
+struct ENGINE_NETWORK_EXPORT MusicChanged {
+    std::uint16_t music_id;
 };
 
 /** @} */

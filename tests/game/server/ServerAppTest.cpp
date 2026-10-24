@@ -241,3 +241,106 @@ TEST(ServerApp, MissingScriptsGiveAnEmptyGame) {
     EXPECT_TRUE(app.types().empty());
     EXPECT_TRUE(owned_by(app, 1).empty());
 }
+
+namespace {
+
+const std::filesystem::path audio_scripts =
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "audio";
+
+struct HeardAudio {
+    std::vector<engine::network::SoundPlayed> sounds;
+    std::vector<std::uint16_t> musics;
+};
+
+HeardAudio listen(ServerApp& app) {
+    HeardAudio heard;
+    const auto sound = app.events().subscribe<engine::network::SoundPlayed>(
+        [&heard](const engine::network::SoundPlayed& event) { heard.sounds.push_back(event); });
+    const auto music = app.events().subscribe<engine::network::MusicChanged>(
+        [&heard](const engine::network::MusicChanged& event) {
+            heard.musics.push_back(event.music_id);
+        });
+    app.tick(tick_step);
+    app.events().unsubscribe(sound);
+    app.events().unsubscribe(music);
+    return heard;
+}
+
+} // namespace
+
+TEST(ServerApp, AudioTablesListDeclaredNamesInOrder) {
+    const ManualClock clock;
+    const ServerApp app(clock, config, audio_scripts);
+
+    ASSERT_EQ(app.sounds().size(), 2U);
+    EXPECT_EQ(app.sounds()[0].name, "boom.wav");
+    EXPECT_EQ(app.sounds()[0].id, 1U);
+    EXPECT_EQ(app.sounds()[1].name, "shot.wav");
+    EXPECT_EQ(app.sounds()[1].id, 2U);
+    ASSERT_EQ(app.musics().size(), 1U);
+    EXPECT_EQ(app.musics()[0].name, "stage.ogg");
+    EXPECT_EQ(app.musics()[0].id, 1U);
+}
+
+TEST(ServerApp, ScriptsWithoutAudioHaveEmptyAudioTables) {
+    const ManualClock clock;
+    const ServerApp app(clock, config, players_scripts);
+
+    EXPECT_TRUE(app.sounds().empty());
+    EXPECT_TRUE(app.musics().empty());
+}
+
+TEST(ServerApp, TickPublishesTheMusicStartedByOnStart) {
+    const ManualClock clock;
+    ServerApp app(clock, config, audio_scripts);
+
+    const auto heard = listen(app);
+
+    EXPECT_TRUE(heard.sounds.empty());
+    EXPECT_EQ(heard.musics, (std::vector<std::uint16_t>{1}));
+    EXPECT_TRUE(listen(app).musics.empty());
+}
+
+TEST(ServerApp, TickPublishesQueuedSoundsAndMusicStops) {
+    const ManualClock clock;
+    ServerApp app(clock, config, audio_scripts);
+    app.tick(tick_step);
+    ASSERT_TRUE(app.script().run_string(R"(play("boom.wav") music(nil))", "test"));
+
+    const auto heard = listen(app);
+
+    ASSERT_EQ(heard.sounds.size(), 1U);
+    EXPECT_EQ(heard.sounds[0].sound_id, 1U);
+    EXPECT_EQ(heard.sounds[0].source_entity_id, engine::network::no_source_entity);
+    EXPECT_EQ(heard.musics, (std::vector<std::uint16_t>{engine::network::no_music}));
+}
+
+TEST(ServerApp, SoundPlayedByAnEntityCarriesItsIndex) {
+    const ManualClock clock;
+    ServerApp app(clock, config, audio_scripts);
+    const auto speaker = app.script().spawn("speaker");
+    ASSERT_TRUE(speaker.has_value());
+    ASSERT_TRUE(app.script().call(*speaker, "speak"));
+
+    const auto heard = listen(app);
+
+    ASSERT_EQ(heard.sounds.size(), 1U);
+    EXPECT_EQ(heard.sounds[0].sound_id, 2U);
+    EXPECT_EQ(heard.sounds[0].source_entity_id, speaker->index());
+}
+
+TEST(ServerApp, TickDestroysEntitiesWhoseHitboxesOverlap) {
+    const ManualClock clock;
+    ServerApp app(clock, config,
+                  std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game");
+    const auto missile = app.script().spawn("missile", engine::core::Vec2{1000.F, 300.F});
+    const auto bydo = app.script().spawn("bydo", engine::core::Vec2{1000.F, 290.F});
+    const auto far_bydo = app.script().spawn("bydo", engine::core::Vec2{1000.F, 800.F});
+    ASSERT_TRUE(missile && bydo && far_bydo);
+
+    app.tick(tick_step);
+
+    EXPECT_FALSE(app.registry().alive(*missile));
+    EXPECT_FALSE(app.registry().alive(*bydo));
+    EXPECT_TRUE(app.registry().alive(*far_bydo));
+}

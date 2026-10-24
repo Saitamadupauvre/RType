@@ -37,6 +37,8 @@ engine_add_test(script SOURCES
     engine/script/EntityHandleTest.cpp
     engine/script/TickTest.cpp
     engine/script/PlayersTest.cpp
+    engine/script/AudioTest.cpp
+    engine/script/CollisionsTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
@@ -75,6 +77,10 @@ engine_add_test(graphics SOURCES
     engine/graphics/TypesTest.cpp
     engine/graphics/PluginLoaderTest.cpp
 )
+engine_add_test(audio SOURCES
+    engine/audio/NullAudioTest.cpp
+    engine/audio/PluginLoaderTest.cpp
+)
 
 function(engine_add_test_library name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
@@ -104,6 +110,19 @@ engine_test_use_library(engine_graphics_tests WRONG_VERSION_PLUGIN_PATH test-plu
 engine_test_use_library(engine_graphics_tests MISSING_CREATE_PLUGIN_PATH test-plugin-missingcreate)
 engine_test_use_library(engine_graphics_tests NULL_BACKEND_PLUGIN_PATH test-plugin-nullbackend)
 engine_test_use_library(engine_graphics_tests RAYLIB_PLUGIN_PATH graphics-raylib)
+
+foreach(plugin IN ITEMS Valid WrongVersion MissingCreate NullBackend)
+    string(TOLOWER "${plugin}" lower)
+    engine_add_test_library(test-audio-plugin-${lower}
+        SOURCES engine/audio/fixtures/${plugin}Plugin.cpp
+        LINKS engine::audio
+    )
+endforeach()
+engine_test_use_library(engine_audio_tests VALID_PLUGIN_PATH test-audio-plugin-valid)
+engine_test_use_library(engine_audio_tests WRONG_VERSION_PLUGIN_PATH test-audio-plugin-wrongversion)
+engine_test_use_library(engine_audio_tests MISSING_CREATE_PLUGIN_PATH test-audio-plugin-missingcreate)
+engine_test_use_library(engine_audio_tests NULL_BACKEND_PLUGIN_PATH test-audio-plugin-nullbackend)
+engine_test_use_library(engine_audio_tests RAYLIB_PLUGIN_PATH audio-raylib)
 
 function(game_add_test name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
@@ -137,14 +156,22 @@ plugin_add_test(graphics-raylib
     LINKS graphics-raylib-letterbox graphics-raylib-keymap graphics-raylib-textures
 )
 
+plugin_add_test(audio-raylib
+    SOURCES
+        plugins/audio-raylib/AudioMixerTest.cpp
+        plugins/audio-raylib/HandleTableTest.cpp
+    LINKS audio-raylib-mixer
+)
+
 game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
     game/server/ShipTest.cpp game/server/MissileTest.cpp game/server/BydoTest.cpp
-    game/server/SpawnerTest.cpp game/server/CollisionTest.cpp game/server/GameFlowTest.cpp
+    game/server/BydoShotTest.cpp game/server/SpawnerTest.cpp game/server/CollisionTest.cpp
+    game/server/GameFlowTest.cpp
     LINKS r-type_server_cli r-type_server_app)
 game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
     game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp
-    game/client/SnapshotViewTest.cpp
-    LINKS r-type_client_cli r-type_client_controls r-type_client_draw)
+    game/client/SnapshotViewTest.cpp game/client/AudioPlayerTest.cpp
+    LINKS r-type_client_cli r-type_client_controls r-type_client_draw r-type_client_audio)
 game_add_test(common SOURCES game/common/ActionCodecTest.cpp LINKS r-type_common)
 
 function(game_add_runtime_data_test folder source)

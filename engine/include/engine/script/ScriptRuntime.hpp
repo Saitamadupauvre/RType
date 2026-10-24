@@ -12,6 +12,7 @@
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
+#include "engine/script/AudioCommand.hpp"
 #include "engine/script/Declaration.hpp"
 #include "engine/script/Export.hpp"
 #include "engine/script/InputState.hpp"
@@ -208,6 +209,38 @@ public:
     [[nodiscard]] std::vector<std::string> entity_types() const;
 
     /**
+     * @brief Lists the sound effects declared with `sounds { ... }`, in ascending order.
+     *
+     * Scripts declare sounds while load_scripts() runs, for example in `main.lua`:
+     * `sounds { "shot.wav", "explosion.wav" }`. A name is a file name of 1 to 63 letters, digits,
+     * `_`, `-` or `.`, not starting with `.`; the host decides which folder it lives in. A call
+     * with an invalid or already declared name raises a Lua error and declares none of its names.
+     * The order is stable for a given set of scripts.
+     */
+    [[nodiscard]] std::vector<std::string> sound_names() const;
+
+    /**
+     * @brief Lists the music tracks declared with `musics { ... }`, in ascending order.
+     *
+     * Same rules as sound_names().
+     */
+    [[nodiscard]] std::vector<std::string> music_names() const;
+
+    /**
+     * @brief Returns the audio requests queued by scripts since the last call, in call order,
+     * and empties the queue.
+     *
+     * Scripts queue them with `play(name)`, `play(name, entity)`, `music(name)` and
+     * `music(nil)`. The runtime plays nothing itself: the host plays the commands or sends them
+     * to clients, typically once per tick. An undeclared name or an argument of the wrong type
+     * raises a Lua error, logged by the protected call that runs the script. At most
+     * 64 commands are kept between two calls; later ones are dropped and logged once.
+     *
+     * @note Never throws.
+     */
+    [[nodiscard]] std::vector<AudioCommand> take_audio_commands() noexcept;
+
+    /**
      * @brief Returns the declared type of an entity spawned by this runtime.
      *
      * @return The type name, or std::nullopt for entities this runtime did not spawn or already
@@ -235,6 +268,24 @@ public:
      * @note Never throws.
      */
     void update(float dt) noexcept;
+
+    /**
+     * @brief Reports that the hitboxes of two entities overlap.
+     *
+     * Each entity whose `collides_with` list holds one of the other's tags gets its
+     * `on_collide(self, other)` callback called, @p first before @p second. Both callbacks run
+     * even if the first one destroys either entity. Nothing happens if either entity is unknown,
+     * dead or already marked with `self:destroy()` when the call starts, so an entity destroyed
+     * by a collision gets no other collision in the same tick. Setting `hitbox = { w = .., h = ..
+     * }` gives an entity an axis-aligned collider anchored at its top-left `x`, `y`; the host
+     * detects the overlaps, typically with engine::physics::PhysicsSystem, and calls this function
+     * for each of them. An error raised by a callback is logged.
+     *
+     * @param first Entity spawned by this runtime.
+     * @param second Another entity spawned by this runtime.
+     * @note Never throws.
+     */
+    void collide(core::Entity first, core::Entity second) noexcept;
 
     /**
      * @brief Removes every entity marked with `self:destroy()`.

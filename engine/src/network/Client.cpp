@@ -63,11 +63,16 @@ struct NetworkClient::ImplNet {
     }
 
     void handle(ClientConnection& live, const Inbound& inbound) {
+        const bool was_connected = live.state() == ConnectionState::connected;
         if (!live.handle(inbound) || live.state() != ConnectionState::connected) {
             return;
         }
         const auto& message = inbound.message.message;
-        if (const auto* snapshot = std::get_if<SnapshotPayload>(&message)) {
+        if (const auto* accept = std::get_if<ConnectAcceptPayload>(&message)) {
+            if (!was_connected && accept->current_music != no_music) {
+                events.get().publish(MusicChanged{.music_id = accept->current_music});
+            }
+        } else if (const auto* snapshot = std::get_if<SnapshotPayload>(&message)) {
             snapshots.receive(*snapshot);
         } else if (const auto* event = std::get_if<EventPayload>(&message)) {
             publish_received(events, *event);
@@ -174,6 +179,26 @@ std::vector<ReplicatedType> NetworkClient::types() const {
         types.push_back({.type_id = entry.type_id, .name = entry.name});
     }
     return types;
+}
+
+std::vector<AudioName> NetworkClient::sounds() const {
+    std::vector<AudioName> sounds;
+    if (const auto& connection = impl_->connection) {
+        for (const auto& entry : connection->type_table().sounds()) {
+            sounds.push_back({.id = entry.type_id, .name = entry.name});
+        }
+    }
+    return sounds;
+}
+
+std::vector<AudioName> NetworkClient::musics() const {
+    std::vector<AudioName> musics;
+    if (const auto& connection = impl_->connection) {
+        for (const auto& entry : connection->type_table().musics()) {
+            musics.push_back({.id = entry.type_id, .name = entry.name});
+        }
+    }
+    return musics;
 }
 
 std::optional<std::uint32_t> NetworkClient::server_tick() const {

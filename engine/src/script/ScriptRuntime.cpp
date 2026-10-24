@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "Audio.hpp"
 #include "Declarations.hpp"
 #include "Entities.hpp"
 #include "ModuleLoader.hpp"
@@ -38,12 +39,14 @@ struct ScriptRuntime::Impl {
     std::map<std::string, Declaration, std::less<>> declarations;
     std::shared_ptr<PendingFile> current_file;
     std::optional<ModuleLoader> modules;
+    Audio audio;
 
     sol::object declare(sol::this_state state, DeclarationKind kind, const std::string& name);
     sol::object require(sol::this_state state, const std::string& name);
     sol::object spawn(sol::this_state state, const std::string& type,
                       const sol::optional<sol::table>& overrides);
     bool load_scripts(const fs::path& root);
+    bool load_all(const fs::path& root, const std::vector<fs::path>& files);
     bool load_declaration_file(const fs::path& root, const fs::path& relative,
                                const sol::environment& environment);
     bool register_declarations(std::vector<Declaration> batch);
@@ -112,6 +115,13 @@ bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
         return false;
     }
     modules.emplace(root);
+    audio.allow_declarations(true);
+    const bool loaded = load_all(root, files);
+    audio.allow_declarations(false);
+    return loaded;
+}
+
+bool ScriptRuntime::Impl::load_all(const fs::path& root, const std::vector<fs::path>& files) {
     bool success = true;
     bool found_entry_point = false;
     std::optional<sol::environment> entry;
@@ -310,6 +320,19 @@ ScriptRuntime::ScriptRuntime() : _impl(std::make_unique<Impl>()) {
     _impl->lua.set_function("require", [impl](sol::this_state state, const std::string& name) {
         return impl->require(state, name);
     });
+    _impl->lua.set_function("sounds", [impl](sol::this_state state, const sol::object& names) {
+        impl->audio.declare_sounds(state, names);
+    });
+    _impl->lua.set_function("musics", [impl](sol::this_state state, const sol::object& names) {
+        impl->audio.declare_musics(state, names);
+    });
+    _impl->lua.set_function(
+        "play", [impl](sol::this_state state, const sol::object& name, const sol::object& source) {
+            impl->audio.play(state, name, source);
+        });
+    _impl->lua.set_function("music", [impl](sol::this_state state, const sol::object& name) {
+        impl->audio.music(state, name);
+    });
 }
 
 ScriptRuntime::~ScriptRuntime() = default;
@@ -433,6 +456,14 @@ std::vector<std::string> ScriptRuntime::entity_types() const {
     return types;
 }
 
+std::vector<std::string> ScriptRuntime::sound_names() const { return _impl->audio.sound_names(); }
+
+std::vector<std::string> ScriptRuntime::music_names() const { return _impl->audio.music_names(); }
+
+std::vector<AudioCommand> ScriptRuntime::take_audio_commands() noexcept {
+    return _impl->audio.take_commands();
+}
+
 std::optional<std::string> ScriptRuntime::entity_type(core::Entity entity) const {
     return _impl->entities.type_of(entity);
 }
@@ -448,6 +479,16 @@ void ScriptRuntime::update(float dt) noexcept {
         log::error("lua: update: {}", exception.what());
     } catch (...) {
         log::error("lua: update: unknown error");
+    }
+}
+
+void ScriptRuntime::collide(core::Entity first, core::Entity second) noexcept {
+    try {
+        _impl->entities.collide(first, second);
+    } catch (const std::exception& exception) {
+        log::error("lua: on_collide: {}", exception.what());
+    } catch (...) {
+        log::error("lua: on_collide: unknown error");
     }
 }
 

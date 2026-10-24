@@ -3,6 +3,8 @@
 > Networked multiplayer shoot'em up built on our own C++ game engine, with gameplay written in Lua.
 > Target track for Part 2: **Track 1 — Advanced Game Engine**.
 
+This page is the reference for the vision, the architecture decisions and the Lua API. It describes the **target design**; where the implementation is not there yet, the section says so. For the current state of the code, start with [Architecture](architecture.md).
+
 ---
 
 ## Table of contents
@@ -55,6 +57,8 @@ A playable, networked R-Type prototype:
 - Engine split into decoupled subsystems (rendering, networking, logic), built as shared libraries, with the graphics backend loaded as a runtime plugin.
 - Gameplay written in Lua on top of the engine.
 
+Progress is tracked in the [roadmap](#15-roadmap).
+
 ### Part 2 — Advanced Game Engine (week 6)
 
 See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as a standalone project, generic runtime, tooling (level editor, developer console, hot reload), and a second game.
@@ -65,7 +69,7 @@ See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as
 - Dependencies handled only by a package manager; no library sources copied into the repository.
 - Git workflow: branches, pull requests, reviews, issues, tags.
 - Documentation in English, published online.
-- Accessibility solutions (motor, visual, auditory, cognitive).
+- Accessibility solutions (motor, visual, auditory, cognitive), see [Accessibility](accessibility.md).
 
 ---
 
@@ -75,14 +79,17 @@ See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as
 |---|---|---|
 | Language | C++20 | Required by the subject; concepts, designated initializers, `std::span`. |
 | Build system | CMake | Standard, cross-platform, integrates with package managers. |
-| Package manager | vcpkg (manifest mode) — *to confirm* | All our dependencies are ports; binary caching for CI; copies DLLs automatically on Windows. |
+| Package manager | vcpkg (manifest mode) | All our dependencies are ports; binary caching for CI; copies DLLs automatically on Windows. |
 | Windowing / 2D rendering / input / audio | Raylib | One small library for all four; simple API. Isolated in a plugin. |
 | Networking | POSIX sockets, wrapped in `engine-network` | No extra dependency; a small thread-safe UDP socket wrapper is all the protocol needs. |
 | Scripting | Lua 5.4 + sol2 | Lightweight, designed to be embedded, industry standard for game scripting; sol2 gives a modern C++ binding. |
 | Tests | GoogleTest | Decided. |
-| Logging | spdlog | Levels, timestamps, per-module loggers. |
-| Documentation | MkDocs (or equivalent) | Markdown in the repository, published online. |
-| Formatting / CI | Already set up by the team | clang-format, Linux + macOS builds. |
+| Command line | clap (our own library, vcpkg overlay port) | Typed arguments with ranges, generated help. |
+| Logging | Own logger in `engine-core` | Levels, `std::format` syntax, capturable in tests; no dependency. |
+| Documentation | MkDocs Material + Doxygen | Markdown in the repository, published online with search; API reference from the public headers. |
+| Formatting / CI | clang-format, clang-tidy, GitHub Actions | Linux GCC/Clang and macOS builds, sanitizers, static analysis. |
+
+Every choice is compared with its alternatives in the [comparative study](comparative-study.md).
 
 Linux system packages required by Raylib (X11, OpenGL, ALSA development headers) are low-level system dependencies and are listed in the README.
 
@@ -95,16 +102,18 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
 ```
             ┌───────────────────────── Engine (C++) ─────────────────────────┐
             │                                                                │
-            │  engine-core     ECS, game loop, time, events, resources,      │
-            │                  logging, input actions, plugin loader         │
+            │  engine-core     ECS, scheduler, events, time, fixed-step loop,│
+            │                  logging, dynamic library loader               │
             │  engine-script   Lua runtime (sol2), entity/system loading     │
-            │  engine-network  UDP sockets, protocol, replication            │
+            │  engine-network  UDP sockets, protocol, threads, replication   │
+            │  engine-physics  bodies, colliders, collision resolution       │
+            │  engine-graphics renderer/input interfaces, plugin loader      │
             │                                                                │
-            │  plugins/graphics-raylib   window, 2D rendering, input, audio  │
+            │  plugins/graphics-raylib   window, 2D rendering, input         │
             │                            (loaded at runtime, client only)    │
             └────────────────────────────────────────────────────────────────┘
                         │                                      │
-             core + script + network            core + script + network
+             core + script + network            core + network + graphics
                         │                       + graphics plugin
                         ▼                                      ▼
                  r-type_server                          r-type_client
@@ -141,17 +150,22 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
 ```
 r-type/
 ├── engine/
-│   ├── include/engine/     public headers (core, graphics interfaces, platform, script, network)
+│   ├── cmake/              engine_add_module / engine_add_plugin
+│   ├── include/engine/     public headers (core, graphics, network, physics, script)
 │   └── src/                implementation
 ├── plugins/
 │   └── graphics-raylib/    the only code that includes raylib.h
 ├── game/
-│   ├── server/main.cpp     → r-type_server
-│   ├── client/main.cpp     → r-type_client
+│   ├── server/             → r-type_server (Cli, ServerApp, main.cpp)
+│   ├── client/             → r-type_client (Cli, Controls, SnapshotView, Starfield, main.cpp)
+│   ├── common/             input encoding shared by both
+│   ├── sandbox/            → r-type_sandbox
 │   └── scripts/            Lua game code (free layout, see §10)
-├── assets/                 sprites, sounds, music
-├── tests/                  GoogleTest suites
+├── assets/                 sprites
+├── ports/                  vcpkg overlay ports (clap)
+├── tests/                  GoogleTest suites mirroring engine/, game/, plugins/
 ├── docs/                   MkDocs sources
+├── mkdocs.yml
 ├── vcpkg.json
 └── CMakeLists.txt
 ```
@@ -163,10 +177,14 @@ bin/
 ├── r-type_server
 ├── r-type_client
 ├── libengine-core.so
-├── libengine-script.so
+├── libengine-graphics.so
 ├── libengine-network.so
-└── plugins/
-    └── graphics-raylib.so
+├── libengine-physics.so
+├── libengine-script.so
+├── plugins/
+│   └── graphics-raylib.so
+├── scripts/
+└── assets/
 ```
 
 Executables locate their libraries, plugins, scripts and assets **relative to their own location** (RPATH `$ORIGIN` on Linux, same folder on Windows), never relative to the current working directory, so the game still works once installed.
@@ -175,56 +193,46 @@ Executables locate their libraries, plugins, scripts and assets **relative to th
 
 ## 6. Executables
 
-In Part 1, each executable has a short, explicit `main` that assembles engine modules. Nothing is hidden: reading the `main` shows the whole frame or tick.
+In Part 1, each executable has a short, explicit `main` that assembles engine modules. Nothing is hidden: reading it shows the whole tick or frame. Simplified from the real code:
 
 ```cpp
-// game/server/main.cpp (simplified)
-int main(int argc, char** argv)
+// game/server/ServerApp.cpp: one tick, run at 60 Hz by a FixedStepLoop
+void ServerApp::tick(Duration step)
 {
-    engine::World world;
-    engine::LuaRuntime lua(world);
-    engine::network::NetworkServer net(clock, events, {.port = port, .max_players = max_players});
-    net.start(ec);                   // binds the port, runs its own receive and send threads
+    network_.receive();                    // sessions, timeouts, latest input of each player
+    apply_inputs(network_.inputs());       // to the Lua entities each player owns
+    _runtime.update(dt);                   // every entity's update(self, dt)
+    _runtime.flush_destroyed();            // on_destroy, then removal
+    systems_.run(registry_, dt);           // native systems
+    replicate();                           // mark scripted entities with a sprite or colour
+    network_.send_snapshot(registry_);     // queued for the send thread
+}
+```
 
-    lua.load_game("scripts");
-
-    engine::core::time::FixedStepLoop loop(clock);   // 60 Hz
-    loop.run_frame([&](auto step) {
-        net.receive();               // sessions, timeouts, latest input of each player
-        apply(net.inputs(), world);
-        lua.tick(step);              // systems, entity updates, coroutines
-        engine::physics::step(world, step);
-        net.send_snapshot(world);    // queues it for the send thread
+```cpp
+// game/client/main.cpp
+auto plugin = engine::graphics::load_graphics_plugin(executable_dir / "plugins" / GRAPHICS_PLUGIN_FILE);
+engine::network::NetworkClient network(clock, events);
+network.connect(host, port, ec);                       // exit 84 on failure
+renderer.open({.width = 1280, .height = 720, .title = "R-Type"});
+while (!renderer.should_close()) {
+    network.update();                                  // snapshots, retries, heartbeats, server timeout
+    loop.run_frame([&](Duration step) {                // fixed 60 Hz
+        starfield.update(step);
+        network.send_input(pack_input(read_controls(input)));
     });
+    starfield.draw(renderer);
+    view.draw(network.entities(), network.types(), network.player_id());
 }
+network.disconnect();
 ```
 
-```cpp
-// game/client/main.cpp (simplified)
-int main(int argc, char** argv)
-{
-    engine::graphics::GraphicsPlugin gfx("plugins/graphics-raylib");
-    engine::World world;
-    engine::LuaRuntime lua(world);
-    engine::network::NetworkClient net(clock, events);
-    net.connect(argv[1], parse_port(argc, argv), ec);   // exit 84 on ec
-
-    lua.load_game("scripts");   // only to know how each entity type looks
-
-    gfx->renderer().open({ .width = 1280, .height = 720, .title = "R-Type" });
-    while (!gfx->renderer().should_close()) {
-        net.update();                // snapshots, retries, heartbeats, server timeout
-        net.send_input(input_map.read(gfx->input()));
-        render(net.entities(), gfx->renderer());
-    }
-    net.disconnect();
-}
-```
+The client does not run Lua: it draws each entity with `assets/sprites/<type>.png`, using the type names sent by the server.
 
 Usage:
 
 ```
-./r-type_server <port>
+./r-type_server <port> [--max-players <1-4>]
 ./r-type_client <server-ip> <port>
 ```
 
@@ -249,13 +257,13 @@ Usage:
 Waiting for players ──(start)──▶ Playing ──(all players dead)──▶ Game over ──▶ Waiting
 ```
 
-Details (lobby, join in progress, respawn rules, maximum 4 players) are listed in [Open decisions](#16-open-decisions).
+Implemented in `game/scripts/game.lua`: the first player to join starts the round, later players get a ship at once, and the round restarts 3 seconds after the last ship is destroyed. Threads, queues and failure handling are detailed in [Networking internals](networking.md).
 
 ---
 
 ## 8. Networking
 
-The protocol is designed and implemented by a dedicated team member and documented separately (RFC-style). This section only lists the constraints the rest of the engine relies on:
+The protocol is specified RFC-style in [protocol.md](protocol.md) and its implementation is described in [Networking internals](networking.md). This section only lists the constraints the rest of the engine relies on:
 
 - UDP for all gameplay traffic, binary encoding with a fixed endianness.
 - Common packet header (at least: magic number, protocol version, message type, sequence number, payload size).
@@ -264,7 +272,7 @@ The protocol is designed and implemented by a dedicated team member and document
 - Entity types are sent as numeric IDs; the table *type name → ID* is sent at connection time.
 - Every incoming packet is validated (size, type, bounds) before use.
 
-The engine replicates **native fields** automatically and any Lua field marked `synced(...)` (see §10.8).
+The engine replicates position, velocity, type, owner and colour of every replicated entity. Replicating Lua fields marked `synced(...)` is planned (see §10.10).
 
 ---
 
@@ -309,20 +317,9 @@ class IInput {   // raw keys; the engine's InputMap turns them into actions
     virtual bool is_mouse_released(MouseButton) const = 0;
 };
 
-class IAudio {   // separate music / effects volumes
-    virtual SoundId load_sound(const std::string& path) = 0;
-    virtual void play_sound(SoundId, float volume = 1.f, float pitch = 1.f) = 0;
-    virtual MusicId load_music(const std::string& path) = 0;
-    virtual void play_music(MusicId, bool loop = true) = 0;
-    virtual void set_music_volume(float) = 0;
-    virtual void set_effects_volume(float) = 0;
-    // ...
-};
-
 class IGraphicsBackend {   // what a plugin provides
     virtual IRenderer& renderer() = 0;
     virtual IInput& input() = 0;
-    virtual IAudio& audio() = 0;
 };
 ```
 
@@ -344,9 +341,55 @@ The loader refuses a plugin built for another API version, and the backend is al
 - Timing comes from the engine clock, not from the backend.
 - The client draws in virtual units; the backend handles scaling and letterboxing.
 
+### 9.4 Audio plugin
+
+Audio is a separate module (`engine-audio`) with its own plugin, so the sound library can change without touching graphics. Today `audio-raylib` uses Raylib's audio; another library (miniaudio, OpenAL, SDL_mixer...) only needs a new plugin.
+
+```cpp
+class IAudio {   // engine/include/engine/audio/IAudio.hpp
+    virtual bool open() = 0;                 // false: no device, the backend stays silent
+    virtual void close() = 0;
+    virtual bool is_open() const = 0;
+    virtual void update() = 0;               // every frame: feeds the music stream
+    virtual SoundId load_sound(const std::filesystem::path&) = 0;
+    virtual void unload_sound(SoundId) = 0;
+    virtual void play_sound(SoundId, float volume, float pitch) = 0;   // effects overlap
+    virtual MusicId load_music(const std::filesystem::path&) = 0;
+    virtual void unload_music(MusicId) = 0;
+    virtual void play_music(MusicId, bool loop) = 0;                    // one music at a time
+    virtual void stop_music() = 0;
+    virtual void set_master_volume(float) = 0;
+    virtual void set_music_volume(float) = 0;
+    virtual void set_effects_volume(float) = 0;
+};
+```
+
+- Volume heard = call volume × effects (or music) volume × master volume, each clamped to [0, 1].
+- A failed load returns the default id; playing it, or any unknown id, does nothing.
+- The plugin exports `engine_audio_api_version`, `engine_audio_create` and `engine_audio_destroy`; `load_audio_plugin()` checks them like the graphics loader. `engine_audio_create` must not open the device.
+- `NullAudio` (in `engine-audio`) plays nothing: the client uses it when the plugin cannot be loaded.
+- Main thread only, like graphics.
+
 ---
 
 ## 10. Lua scripting API
+
+This section is the specification of the Lua API. Not everything is implemented yet:
+
+| Feature | Status |
+|---|---|
+| `entity "name"` declarations (short and table forms), `require` from `lib/`, sandbox | Implemented |
+| `system "name"` declarations | Parsed and validated; systems do not run yet |
+| `spawn(type, overrides)`, `players()`, `find_player(id)` | Implemented |
+| `main.lua`: `on_start`, `on_player_joined`, `on_player_left` | Implemented |
+| Entity fields `x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`, `id`, `type`, `age`, `input`, `owner`; free fields | Implemented |
+| Entity methods `destroy()`, `has_tag()`; callbacks `on_spawn`, `update`, `on_collide`, `on_destroy` | Implemented |
+| Native collisions: `engine-physics` detects `hitbox` overlaps in the server tick and calls `on_collide` (see §10.5) | Implemented |
+| Native movement from `vx` / `vy` in the server tick | Not yet: scripts move entities by writing `x` / `y` |
+| `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
+| `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
+
+[Writing the game](writing-the-game.md) shows how the current game works around what is missing.
 
 ### 10.1 Principles
 
@@ -376,9 +419,10 @@ Since `spawn` is only used once the game has started, file order never matters.
 entity "bydo"
 
 -- native fields: handled by the C++ engine
-sprite = "bydo.png"
-hitbox = { w = 32, h = 32 }
-tags   = { "enemy" }
+sprite        = "bydo.png"
+hitbox        = { w = 32, h = 32 }
+tags          = { "enemy" }
+collides_with = { "player_missile" }
 
 -- free fields: invented by the developer
 health = 1
@@ -396,8 +440,8 @@ function update(self, dt)
     if self.x < -50 then self:destroy() end
 end
 
-function on_hit(self, other)
-    if other:has_tag("player_missile") then self:damage(1) end
+function on_collide(self, other)
+    self:damage(1)
 end
 
 -- custom methods: as many as needed
@@ -408,7 +452,7 @@ end
 
 function explode(self)
     spawn("explosion", { x = self.x, y = self.y })
-    play("explosion.wav")
+    play("explosion.wav", self)
     self:destroy()
 end
 ```
@@ -449,9 +493,9 @@ Both forms produce the same internal representation.
 
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
+| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
 | Free fields | `health`, `speed`, `points` | Lua table of the entity | Scripts only |
-| Callbacks | `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
+| Callbacks | `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
 
 Methods are not copied into each instance: they stay in the prefab table, so reloading a file updates every live entity.
@@ -475,6 +519,20 @@ self:move_to(x, y, duration)  -- inside a coroutine
 ```
 
 `sprite` is a path relative to `assets/`. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a square of that color (temporary, until the renderer API lands). It reads back as a new table.
+
+`hitbox = { w, h }` gives the entity a rectangular collider of positive size, anchored at its top-left `x`, `y` (the same corner the sprite is drawn from). `collides_with` is an array of tags: the entity's `on_collide(self, other)` is called on every tick its hitbox overlaps (strictly, touching edges do not count) the hitbox of an entity carrying one of those tags. Both read back as new tables, and both can change at any time, like `tags`. Collisions are one-sided: a missile with `collides_with = { "enemy" }` and an enemy with `collides_with = { "missile" }` each get their own call; an enemy without `collides_with` is never told. Both calls of a pair run even if the first destroys an entity, but an entity destroyed earlier in the tick gets no further collision. Detection runs in C++ (`engine-physics`) after every `update`, so it costs nothing in Lua.
+
+```lua
+entity "bydo_shot"
+
+tags          = { "enemy_shot" }
+hitbox        = { w = 24, h = 24 }
+collides_with = { "player" }
+
+function on_collide(self, other)
+    self:destroy()
+end
+```
 
 `self:destroy()` only marks the entity: it stays usable until the end of the tick, is skipped by later `update` calls, then `on_destroy(self)` runs and the entity is removed. Calling it twice has no extra effect. `on_spawn(self)` runs once the entity and its `spawn` overrides are in place.
 
@@ -501,14 +559,24 @@ every(0.5, function() ... end)   -- run every 0.5 s (returns a handle to cancel 
 wait(1.5)                        -- only inside a coroutine
 
 -- sound (replicated to clients)
-play("shot.wav")
-music("stage1.ogg")
+sounds { "shot.wav", "explosion.wav" }   -- declare, while the scripts load
+musics { "stage1.ogg" }
+play("shot.wav")                 -- play a declared sound
+play("explosion.wav", self)      -- with the entity that makes it
+music("stage1.ogg")              -- loop a declared music, replacing the current one
+music(nil)                       -- stop the music
 
 -- utilities
 random(1, 10)
 world.width, world.height        -- 1920, 1080
 log("message")
 ```
+
+**Sound rules.**
+
+- `sounds` and `musics` take a list of file names and can only be called while the scripts load (top level of any file, or `on_start`). A name is 1 to 63 letters, digits, `_`, `-` or `.`, not starting with `.`. A bad or already declared name raises an error and declares none of the names of that call. R-Type clients look for sounds in `assets/sounds/` and musics in `assets/music/`.
+- `play` and `music` with an undeclared name, or with arguments of the wrong type, raise an error. Nothing is played on the server: the requests are queued, and after each tick the server sends them to every client (`sound` and `music` events, see the [protocol](protocol.md)). At most 64 requests are kept per tick.
+- The current music is also sent to players who join later.
 
 ### 10.7 Systems
 
@@ -634,8 +702,9 @@ end
 ### 10.10 Networking from the script's point of view
 
 - Scripts are written once; the developer does not write network code.
-- All logic (`update`, `on_hit`, `behavior`, systems) runs **on the server only**.
-- Clients load the same declarations only to know how each entity type looks (sprite, sounds).
+- All logic (`update`, `on_collide`, `behavior`, systems) runs **on the server only**.
+- Clients load the same declarations only to know how each entity type looks (sprite).
+- `play` and `music` are sent to clients as events; clients receive the declared names in `connect_accept`.
 - Native fields are replicated automatically. A free field is replicated only when marked:
 
 ```lua
@@ -651,7 +720,7 @@ speed  = 150         -- server only
 2. Run Lua systems.
 3. Run entity `update` callbacks and resume coroutines; fire `after` / `every` timers.
 4. Native movement (`vx`, `vy`).
-5. Collisions → `on_hit` callbacks.
+5. Collisions (`engine-physics`) → `on_collide` callbacks.
 6. Destroy entities marked for destruction → `on_destroy` callbacks.
 7. Send snapshot to clients.
 
@@ -659,9 +728,9 @@ speed  = 150         -- server only
 
 Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
 
-- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
-- Callbacks: `on_spawn`, `update`, `on_hit`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
+- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
+- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
 
 ### 10.13 Error handling and sandbox
 
@@ -693,7 +762,7 @@ Developers must not use these names for their own fields or methods; the engine 
 - No global state in headers (no `static` variables in templates): registries and singletons live in a `.cpp` of `engine-core`, behind exported functions. Component identity uses stable names, not per-module counters.
 - Third-party headers are never included in public engine headers.
 - Resources are referenced by name (`"bydo.png"`); the resource manager loads and caches them.
-- Every technical choice is written down in `docs/decisions/` with its justification (feeds the comparative study).
+- Every technical choice is written down with its justification in the [comparative study](comparative-study.md).
 
 ---
 
@@ -708,7 +777,7 @@ Accessibility is designed in from Part 1, not added at the end.
 | Auditory | Separate music / effects volumes; visual cues for important sounds (incoming enemy, damage). |
 | Cognitive | Pause at any time; simple menus; adjustable difficulty; clear on-screen feedback. |
 
-Each measure is documented as it is implemented.
+What is implemented and what is planned, measure by measure, is in [Accessibility](accessibility.md).
 
 ---
 
@@ -719,8 +788,8 @@ Each measure is documented as it is implemented.
   2. ECS behaviour;
   3. Lua loading: duplicate names, scripts with errors, reserved names;
   4. plugin loading: missing library, missing symbol, wrong API version.
-- **CI:** Linux and macOS builds with cached dependencies (already set up).
-- **Packaging:** CPack produces archives/installers containing executables, engine libraries, the `plugins/` folder, scripts and assets.
+- **CI:** Linux (GCC, Clang) and macOS builds with cached dependencies, AddressSanitizer + UBSan, ThreadSanitizer, clang-tidy and a format check on every pull request.
+- **Packaging:** `cmake --install` produces a self-contained `bin/` folder with the executables, engine libraries, `plugins/`, scripts and assets. CPack archives on top of it are planned.
 
 ---
 
@@ -728,12 +797,19 @@ Each measure is documented as it is implemented.
 
 All documentation is in English and published online.
 
-- **README:** project description, dependencies, build and run instructions, quick start.
-- **Developer documentation:** architecture diagrams, modules, engine rules, how-to guides (create an entity, a system, a level).
-- **Lua API reference:** derived from §10.
-- **Protocol specification:** RFC-style, maintained by the protocol owner.
-- **Comparative study:** justification of each technology (C++20, CMake + vcpkg, Raylib, POSIX sockets, Lua 5.4 + sol2 vs alternatives such as LuaJIT or Python), including algorithms, data storage and security aspects.
-- **Accessibility report.**
+| Document | Where |
+|---|---|
+| README: description, dependencies, build, run, quick start | [README](https://github.com/Saitamadupauvre/RType#readme) |
+| Getting started and how to play | [getting-started.md](getting-started.md), [how-to-play.md](how-to-play.md) |
+| Architecture diagrams, modules, engine rules | [architecture.md](architecture.md), [engine.md](engine.md), [networking.md](networking.md), [plugins.md](plugins.md) |
+| How-to guides (add an enemy, tune the game) | [writing-the-game.md](writing-the-game.md) |
+| Lua API reference | §10 of this page |
+| Protocol specification (RFC-style) | [protocol.md](protocol.md) |
+| Comparative study (technologies, algorithms, storage, security) | [comparative-study.md](comparative-study.md) |
+| Accessibility report | [accessibility.md](accessibility.md) |
+| Contribution guide and commands | [contributing.md](contributing.md), [commands.md](commands.md) |
+
+The site is built with MkDocs from `docs/` and published to GitHub Pages on every push to `main`, with the Doxygen API reference under `/api/`.
 
 ---
 
@@ -749,6 +825,24 @@ All documentation is in English and published online.
 
 Internal milestones: end of week 1 — a square moving in sync on two clients; end of week 2 — scripted Bydos, shooting and collisions over the network.
 
+Part 1 status:
+
+| Goal | Status |
+|---|---|
+| ECS, fixed-timestep loop, event bus, scheduler | Done |
+| Graphics plugin: window, sprites, input, letterboxing | Done |
+| Starfield | Done |
+| Network: protocol, threads, sessions, timeouts, snapshots, statistics | Done |
+| Lua runtime: declarations, entities, players, sandbox | Done |
+| Player movement and shooting, Bydo spawning, game over | Done (in Lua) |
+| Collisions | Done (`engine-physics` in the server tick, `on_collide` in Lua) |
+| Up to 4 players, distinguishable, crash notification | Done |
+| Sound: audio plugin, Lua `play` / `music`, replication, volumes | Done |
+| Enemy missiles | Done |
+| Accessibility settings | To do, see [Accessibility](accessibility.md) |
+| Documentation | Done |
+| Tag `v1.0` | To do |
+
 ### Part 2 (weeks 4–6) — Advanced Game Engine
 
 1. **Modularity:** finer-grained libraries; more subsystems as runtime plugins.
@@ -763,11 +857,11 @@ Internal milestones: end of week 1 — a square moving in sync on two clients; e
 
 | Topic | Question | Proposal |
 |---|---|---|
-| Package manager | vcpkg or CPM? | vcpkg (manifest mode) |
-| Native fields | Final list | `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `tags`, `layer`, maybe `animation` |
+| Package manager | vcpkg or CPM? | **Decided:** vcpkg (manifest mode) |
+| Native fields | Final list | `x`, `y`, `vx`, `vy`, `sprite`, `hitbox`, `collides_with`, `tags`, maybe `animation` |
 | Naming | `update` or `on_update`; `after`/`every` or a `timer` object | `update`, `after`/`every` |
-| Destruction | Immediate or deferred? | Deferred to the end of the tick |
+| Destruction | Immediate or deferred? | **Decided:** deferred to the end of the tick |
 | Levels | System, or dedicated `level` declaration with a `behavior` coroutine | Dedicated declaration |
-| Game flow | Lobby / ready button, join in progress, respawn, more than 4 players | Minimal flow in Part 1 |
-| Tick / snapshot rates | Snapshot every tick or less often | 60 Hz tick; snapshot rate decided with the protocol owner |
+| Game flow | Lobby / ready button, join in progress, respawn, more than 4 players | **Decided for Part 1:** no lobby, join in progress, no respawn, restart after game over, 4 players maximum |
+| Tick / snapshot rates | Snapshot every tick or less often | **Decided for Part 1:** 60 Hz tick, one snapshot per tick |
 | Second game | Which one? | Choose early to validate abstractions |

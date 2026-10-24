@@ -388,3 +388,42 @@ TEST_F(ServerSessionsTest, ReportsTrafficOfEachPlayer) {
     EXPECT_EQ(stats[1].network.packets_lost, 2U);
     EXPECT_FALSE(stats[1].network.round_trip_time.has_value());
 }
+
+TEST(ServerSessionsAudio, AcceptCarriesSoundMusicTablesAndCurrentMusic) {
+    ManualClock clock;
+    EventBus bus;
+    ServerSessions sessions(clock, bus,
+                            ServerSessionsConfig{.max_players = 1,
+                                                 .sounds = {{.type_id = 1, .name = "shot.wav"}},
+                                                 .musics = {{.type_id = 4, .name = "stage.ogg"}}});
+
+    sessions.set_current_music(4);
+    const auto replies = sessions.handle(connect_from(client(5000)));
+
+    ASSERT_EQ(replies.size(), 1U);
+    const auto* accept = std::get_if<ConnectAcceptPayload>(&replies.front().message);
+    ASSERT_NE(accept, nullptr);
+    EXPECT_EQ(accept->sounds, (std::vector<TypeEntry>{{.type_id = 1, .name = "shot.wav"}}));
+    EXPECT_EQ(accept->musics, (std::vector<TypeEntry>{{.type_id = 4, .name = "stage.ogg"}}));
+    EXPECT_EQ(accept->current_music, 4);
+}
+
+TEST(ServerSessionsAudio, IgnoresAnUnknownCurrentMusic) {
+    ManualClock clock;
+    EventBus bus;
+    ServerSessions sessions(
+        clock, bus,
+        ServerSessionsConfig{.max_players = 1, .musics = {{.type_id = 4, .name = "stage.ogg"}}});
+
+    sessions.set_current_music(4);
+    sessions.set_current_music(9);
+    const auto playing = sessions.handle(connect_from(client(5000)));
+    sessions.set_current_music(engine::network::no_music);
+    const auto stopped = sessions.handle(connect_from(client(5000)));
+
+    ASSERT_EQ(playing.size(), 1U);
+    ASSERT_EQ(stopped.size(), 1U);
+    EXPECT_EQ(std::get<ConnectAcceptPayload>(playing.front().message).current_music, 4);
+    EXPECT_EQ(std::get<ConnectAcceptPayload>(stopped.front().message).current_music,
+              engine::network::no_music);
+}

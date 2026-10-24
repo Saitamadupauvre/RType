@@ -14,17 +14,17 @@ namespace {
 
 namespace log = engine::core::log;
 
-constexpr std::array<std::string_view, 18> reserved_globals{
-    "entity", "system", "query", "spawn",  "find_all", "find_first",
-    "count",  "after",  "every", "wait",   "play",     "music",
+constexpr std::array<std::string_view, 20> reserved_globals{
+    "entity", "system", "query", "spawn",  "find_all", "find_first",  "count",
+    "after",  "every",  "wait",  "play",   "music",    "sounds",      "musics",
     "random", "world",  "log",   "synced", "players",  "find_player",
 };
 
 constexpr std::array<std::string_view, 7> engine_owned_fields{"age",   "id",      "type",   "input",
                                                               "owner", "destroy", "has_tag"};
 
-constexpr std::array<std::string_view, 5> callbacks{"on_spawn", "update", "on_hit", "on_destroy",
-                                                    "behavior"};
+constexpr std::array<std::string_view, 5> callbacks{"on_spawn", "update", "on_collide",
+                                                    "on_destroy", "behavior"};
 
 template <std::size_t Size>
 bool contains(const std::array<std::string_view, Size>& names, std::string_view name) {

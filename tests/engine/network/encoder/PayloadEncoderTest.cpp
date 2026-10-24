@@ -112,6 +112,12 @@ TEST(EventPayload, EncodesSoundFieldsInOrder) {
               (std::vector<std::uint8_t>{0x04, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06}));
 }
 
+TEST(EventPayload, EncodesMusicFieldsInOrder) {
+    const EventPayload event = engine::network::MusicEvent{.music_id = 0x0506};
+
+    EXPECT_EQ(encoded(event), (std::vector<std::uint8_t>{0x06, 0x05, 0x06}));
+}
+
 TEST(EventPayload, EncodesPlayerLeftFieldsInOrder) {
     const EventPayload event = PlayerLeftEvent{.player_entity_id = 0x0102'0304};
 
@@ -163,10 +169,58 @@ TEST(SnapshotPayload, EncoderRejectsTooManyEntities) {
 TEST(ConnectAcceptPayload, EncodesFieldsInOrder) {
     const auto accept = accept_with({{.type_id = 0x0009, .name = "ab"}});
 
-    const std::vector<std::uint8_t> expected{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                                             0x00, 0x01, 0x00, 0x09, 0x02, 'a',  'b'};
+    const std::vector<std::uint8_t> expected{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                                             0x08, 0x00, 0x01, 0x00, 0x09, 0x02, 'a',
+                                             'b',  0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF};
 
     EXPECT_EQ(encode_payload(accept), expected);
+}
+
+TEST(ConnectAcceptPayload, EncodesSoundAndMusicTablesAfterTypes) {
+    auto accept = accept_with({});
+    accept.sounds = {{.type_id = 0x0001, .name = "s"}};
+    accept.musics = {{.type_id = 0x0002, .name = "m"}};
+    accept.current_music = 0x0002;
+
+    const std::vector<std::uint8_t> expected{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                                             0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x01, 's',
+                                             0x00, 0x01, 0x00, 0x02, 0x01, 'm',  0x00, 0x02};
+
+    EXPECT_EQ(encode_payload(accept), expected);
+}
+
+TEST(ConnectAcceptPayload, EncoderRejectsInvalidSoundOrMusicTables) {
+    auto duplicate_sound = accept_with({});
+    duplicate_sound.sounds = {{.type_id = 1, .name = "a.wav"}, {.type_id = 1, .name = "b.wav"}};
+    auto empty_music_name = accept_with({});
+    empty_music_name.musics = {{.type_id = 1, .name = ""}};
+    auto reserved_music_id = accept_with({});
+    reserved_music_id.musics = {{.type_id = engine::network::no_music, .name = "a.ogg"}};
+    auto unknown_current_music = accept_with({});
+    unknown_current_music.musics = {{.type_id = 1, .name = "a.ogg"}};
+    unknown_current_music.current_music = 2;
+
+    EXPECT_FALSE(encode_payload(duplicate_sound).has_value());
+    EXPECT_FALSE(encode_payload(empty_music_name).has_value());
+    EXPECT_FALSE(encode_payload(reserved_music_id).has_value());
+    EXPECT_FALSE(encode_payload(unknown_current_music).has_value());
+}
+
+TEST(ConnectAcceptPayload, SameNameMayAppearInDifferentTables) {
+    auto accept = accept_with({{.type_id = 1, .name = "boss"}});
+    accept.sounds = {{.type_id = 1, .name = "boss"}};
+    accept.musics = {{.type_id = 1, .name = "boss"}};
+
+    EXPECT_TRUE(encode_payload(accept).has_value());
+}
+
+TEST(ConnectAcceptPayload, EncoderRejectsTablesAboveMaximumPayloadSizeTogether) {
+    auto accept = accept_with(long_name_types(9));
+    accept.sounds = long_name_types(8);
+    EXPECT_TRUE(encode_payload(accept).has_value());
+
+    accept.musics = long_name_types(1);
+    EXPECT_FALSE(encode_payload(accept).has_value());
 }
 
 TEST(ConnectAcceptPayload, EncoderRejectsEmptyName) {

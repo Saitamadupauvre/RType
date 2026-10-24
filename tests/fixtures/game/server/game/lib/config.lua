@@ -14,6 +14,13 @@ return {
         },
     },
     missile = { hitbox = { w = 48, h = 24 }, speed = 1200 },
-    bydo = { hitbox = { w = 63, h = 72 }, speed = 300, spawn_interval = 1.5 },
+    bydo = {
+        hitbox = { w = 63, h = 72 },
+        speed = 300,
+        spawn_interval = 1.5,
+        first_shot_delay = 0.8,
+        fire_interval = 2.5,
+    },
+    bydo_shot = { hitbox = { w = 24, h = 24 }, speed = 700 },
     game = { restart_delay = 3 },
 }

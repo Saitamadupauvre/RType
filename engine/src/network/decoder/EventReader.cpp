@@ -53,6 +53,14 @@ std::optional<EventPayload> read_player_left(ByteReader& reader) noexcept {
     return PlayerLeftEvent{.player_entity_id = *player_entity_id};
 }
 
+std::optional<EventPayload> read_music(ByteReader& reader) noexcept {
+    const auto music_id = reader.read_u16();
+    if (!music_id) {
+        return std::nullopt;
+    }
+    return MusicEvent{.music_id = *music_id};
+}
+
 using EventReader = std::optional<EventPayload> (*)(ByteReader&) noexcept;
 
 struct EventReaderEntry {
@@ -66,6 +74,7 @@ constexpr std::array event_readers{
     EventReaderEntry{.type = EventType::fire, .read = read_fire},
     EventReaderEntry{.type = EventType::sound, .read = read_sound},
     EventReaderEntry{.type = EventType::player_left, .read = read_player_left},
+    EventReaderEntry{.type = EventType::music, .read = read_music},
 };
 
 } // namespace

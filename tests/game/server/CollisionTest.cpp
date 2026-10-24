@@ -11,9 +11,13 @@
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
+#include "engine/core/event/EventBus.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/script/AudioCommand.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+
+#include "Collisions.hpp"
 
 namespace logger = engine::core::log;
 using engine::core::Entity;
@@ -38,11 +42,12 @@ protected:
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
     EntityManager _world;
     ScriptRuntime _runtime;
+    engine::core::event::EventBus _events;
+    rtype::server::Collisions _collisions{_world, _events, _runtime};
 
     void SetUp() override {
         _runtime.attach_world(_world);
         ASSERT_TRUE(_runtime.load_scripts(game_scripts));
-        ASSERT_TRUE(_runtime.spawn("collisions").has_value());
         ASSERT_TRUE(_runtime.spawn("ship", ship_start).has_value());
     }
 
@@ -54,8 +59,9 @@ protected:
         return *entity;
     }
 
-    void tick() {
-        _runtime.update(short_tick);
+    void tick(float dt = short_tick) {
+        _runtime.update(dt);
+        _collisions.step(dt);
         _runtime.flush_destroyed();
     }
 
@@ -89,8 +95,7 @@ TEST_F(CollisionTest, MissileHittingABydoDestroysBoth) {
 TEST_F(CollisionTest, MissileTouchingABydoEdgeDoesNotHitIt) {
     const Entity missile = spawn("missile", {1000.F - missile_width, 300.F});
     const Entity bydo = spawn("bydo", {1000.F, 300.F});
-    _runtime.update(0.F);
-    _runtime.flush_destroyed();
+    tick(0.F);
     EXPECT_TRUE(_world.alive(missile));
     EXPECT_TRUE(_world.alive(bydo));
 }
@@ -135,4 +140,52 @@ TEST_F(CollisionTest, DestroyedEntitiesNeverBreakTheNextTicks) {
         tick();
     }
     EXPECT_FALSE(logged_error());
+}
+
+TEST_F(CollisionTest, DestroyedBydoPlaysAnExplosion) {
+    spawn("missile", {1000.F, 300.F});
+    const Entity bydo = spawn("bydo", {1000.F, 290.F});
+    tick();
+
+    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                  {.kind = engine::script::AudioCommandKind::Sound,
+                                                   .name = "explosion.wav",
+                                                   .source = bydo}}));
+}
+
+TEST_F(CollisionTest, DestroyedShipPlaysAnExplosion) {
+    const Entity ship = tagged("ship").front();
+    spawn("bydo", {ship_start.x + 10.F, ship_start.y + 10.F});
+    tick();
+
+    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                  {.kind = engine::script::AudioCommandKind::Sound,
+                                                   .name = "explosion.wav",
+                                                   .source = ship}}));
+}
+
+TEST_F(CollisionTest, BydoShotHittingTheShipDestroysBothWithAnExplosion) {
+    const Entity ship = tagged("ship").front();
+    const Entity shot = spawn("bydo_shot", {ship_start.x + 10.F, ship_start.y + 5.F});
+    tick();
+
+    EXPECT_FALSE(_world.alive(ship));
+    EXPECT_FALSE(_world.alive(shot));
+    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                  {.kind = engine::script::AudioCommandKind::Sound,
+                                                   .name = "explosion.wav",
+                                                   .source = ship}}));
+}
+
+TEST_F(CollisionTest, BydoShotsIgnoreBydosAndMissiles) {
+    const Entity shot_on_bydo = spawn("bydo_shot", {1000.F, 300.F});
+    const Entity bydo = spawn("bydo", {990.F, 290.F});
+    const Entity shot_on_missile = spawn("bydo_shot", {1500.F, 700.F});
+    const Entity missile = spawn("missile", {1490.F, 705.F});
+    tick();
+
+    EXPECT_TRUE(_world.alive(shot_on_bydo));
+    EXPECT_TRUE(_world.alive(bydo));
+    EXPECT_TRUE(_world.alive(shot_on_missile));
+    EXPECT_TRUE(_world.alive(missile));
 }

@@ -26,6 +26,9 @@ struct ConnectAcceptPayload {
     std::uint32_t client_nonce{};
     std::uint32_t player_entity_id{};
     std::vector<TypeEntry> types;
+    std::vector<TypeEntry> sounds{};
+    std::vector<TypeEntry> musics{};
+    std::uint16_t current_music{no_music};
 
     bool operator==(const ConnectAcceptPayload&) const = default;
 };
@@ -67,6 +70,7 @@ enum class EventType : std::uint8_t {
     fire = 3,
     sound = 4,
     player_left = 5,
+    music = 6,
 };
 
 struct SpawnEvent {
@@ -104,7 +108,14 @@ struct PlayerLeftEvent {
     bool operator==(const PlayerLeftEvent&) const = default;
 };
 
-using EventPayload = std::variant<SpawnEvent, DestroyEvent, FireEvent, SoundEvent, PlayerLeftEvent>;
+struct MusicEvent {
+    std::uint16_t music_id{};
+
+    bool operator==(const MusicEvent&) const = default;
+};
+
+using EventPayload =
+    std::variant<SpawnEvent, DestroyEvent, FireEvent, SoundEvent, PlayerLeftEvent, MusicEvent>;
 
 struct HeartbeatPayload {
     bool operator==(const HeartbeatPayload&) const = default;

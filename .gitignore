@@ -12,3 +12,4 @@ CMakeUserPresets.json
 compile_commands.json
 vcpkg_installed/
 .clangd
+/site/

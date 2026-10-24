@@ -11,8 +11,11 @@
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
+#include "engine/core/event/EventBus.hpp"
 #include "engine/script/InputState.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+
+#include "Collisions.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;
@@ -41,6 +44,8 @@ class GameFlowTest : public ::testing::Test {
 protected:
     EntityManager _world;
     ScriptRuntime _runtime;
+    engine::core::event::EventBus _events;
+    rtype::server::Collisions _collisions{_world, _events, _runtime};
 
     void SetUp() override {
         _runtime.attach_world(_world);
@@ -50,6 +55,7 @@ protected:
 
     void tick(float dt = frame) {
         _runtime.update(dt);
+        _collisions.step(dt);
         _runtime.flush_destroyed();
     }
 

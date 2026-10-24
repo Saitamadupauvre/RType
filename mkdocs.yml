@@ -1,0 +1,75 @@
+site_name: R-Type
+site_description: Networked R-Type remake on a reusable C++ game engine scripted in Lua
+docs_dir: docs
+site_dir: site
+repo_url: https://github.com/Saitamadupauvre/RType
+edit_uri: edit/dev/docs/
+strict: true
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+exclude_docs: |
+  subjects/
+
+nav:
+  - Home: index.md
+  - Players:
+      - Getting started: getting-started.md
+      - How to play: how-to-play.md
+      - Accessibility: accessibility.md
+  - Developers:
+      - Architecture: architecture.md
+      - Engine modules: engine.md
+      - Networking internals: networking.md
+      - Plugins: plugins.md
+      - Game: game.md
+      - Writing the game: writing-the-game.md
+      - Commands: commands.md
+      - Contributing: contributing.md
+  - Reference:
+      - Project overview and Lua API: PROJECT.md
+      - Protocol (RFC): protocol.md
+      - Comparative study: comparative-study.md

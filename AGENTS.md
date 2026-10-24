@@ -37,7 +37,7 @@ tests/engine/<module>/      tests of one engine module
 tests/game/<target>/        tests of one game target (server, client)
 tests/plugins/<name>/       tests of one plugin's backend-free code
 tests/fixtures/             test data: packets, Lua scripts...
-docs/                       documentation (English): engine.md, plugins.md, game.md
+docs/                       documentation (English, MkDocs sources; mkdocs.yml at the root)
 ```
 
 ## Tests

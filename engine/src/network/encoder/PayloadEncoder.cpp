@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "bytes/ByteWriter.hpp"
 #include "protocol/Validation.hpp"
@@ -16,6 +17,13 @@ void write_type_entry(ByteWriter& writer, const TypeEntry& entry) {
     writer.write_u8(static_cast<std::uint8_t>(entry.name.size()));
     for (const char character : entry.name) {
         writer.write_u8(static_cast<std::uint8_t>(character));
+    }
+}
+
+void write_type_table(ByteWriter& writer, const std::vector<TypeEntry>& entries) {
+    writer.write_u16(static_cast<std::uint16_t>(entries.size()));
+    for (const auto& entry : entries) {
+        write_type_entry(writer, entry);
     }
 }
 
@@ -67,6 +75,11 @@ void write_event(ByteWriter& writer, const PlayerLeftEvent& event) {
     writer.write_u32(event.player_entity_id);
 }
 
+void write_event(ByteWriter& writer, const MusicEvent& event) {
+    write_event_type(writer, EventType::music);
+    writer.write_u16(event.music_id);
+}
+
 } // namespace
 
 EncodedPayload encode_payload(const ConnectRequestPayload& payload) {
@@ -83,10 +96,10 @@ EncodedPayload encode_payload(const ConnectAcceptPayload& payload) {
     ByteWriter writer;
     writer.write_u32(payload.client_nonce);
     writer.write_u32(payload.player_entity_id);
-    writer.write_u16(static_cast<std::uint16_t>(payload.types.size()));
-    for (const auto& entry : payload.types) {
-        write_type_entry(writer, entry);
-    }
+    write_type_table(writer, payload.types);
+    write_type_table(writer, payload.sounds);
+    write_type_table(writer, payload.musics);
+    writer.write_u16(payload.current_music);
     return std::move(writer).take();
 }
 

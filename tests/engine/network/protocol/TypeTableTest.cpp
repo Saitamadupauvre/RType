@@ -153,3 +153,23 @@ TEST_F(TypeTable, AdmitsMessagesWithoutTypeIdsBeforeAccept) {
     EXPECT_TRUE(table.admits(sample_accept()));
     EXPECT_TRUE(sink->records().empty());
 }
+
+TEST_F(TypeTable, KeepsTheSoundAndMusicTablesOfTheAccept) {
+    auto accept = sample_accept();
+    accept.sounds = {{.type_id = 1, .name = "shot.wav"}};
+    accept.musics = {{.type_id = 2, .name = "stage.ogg"}};
+
+    table.assign(accept);
+
+    EXPECT_EQ(table.sounds(), accept.sounds);
+    EXPECT_EQ(table.musics(), accept.musics);
+}
+
+TEST_F(TypeTable, AdmitsMusicEventsOnlyAfterAccept) {
+    const Message music = EventPayload{engine::network::MusicEvent{.music_id = 2}};
+
+    expect_dropped_and_logged(music, "before connect_accept");
+    table.assign(sample_accept());
+
+    EXPECT_TRUE(table.admits(music));
+}

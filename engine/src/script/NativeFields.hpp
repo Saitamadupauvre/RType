@@ -5,10 +5,15 @@
 #include <string_view>
 
 #include "Sol.hpp"
+#include "engine/core/Components.hpp"
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 
 namespace engine::script {
+
+struct CollisionFilter {
+    core::Tags tags;
+};
 
 using FieldReader = sol::object (*)(sol::this_state state, core::EntityManager& world,
                                     core::Entity entity);

@@ -33,6 +33,8 @@ using payload_samples::snapshot_with;
 
 namespace {
 
+constexpr std::array<std::uint8_t, 6> empty_audio_tables{0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF};
+
 std::vector<std::uint8_t> raw_accept(std::uint16_t count, const std::vector<TypeEntry>& types) {
     std::vector<std::uint8_t> bytes{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     bytes.push_back(static_cast<std::uint8_t>(count >> 8U));
@@ -43,6 +45,7 @@ std::vector<std::uint8_t> raw_accept(std::uint16_t count, const std::vector<Type
         bytes.push_back(static_cast<std::uint8_t>(entry.name.size()));
         bytes.insert(bytes.end(), entry.name.begin(), entry.name.end());
     }
+    bytes.insert(bytes.end(), empty_audio_tables.begin(), empty_audio_tables.end());
     return bytes;
 }
 
@@ -181,7 +184,7 @@ TEST(EventPayload, DecoderRejectsEmptyPayload) {
 
 TEST(EventPayload, DecoderRejectsUnknownEventTypes) {
     for (unsigned int type = 0; type <= 255; ++type) {
-        if (type >= 1 && type <= 5) {
+        if (type >= 1 && type <= 6) {
             continue;
         }
         std::vector<std::uint8_t> payload(11, 0x00);
@@ -342,7 +345,7 @@ TEST(ConnectAcceptPayload, DecoderRejectsTruncatedPrefix) {
 
 TEST(ConnectAcceptPayload, DecoderRejectsNameRunningPastTheEnd) {
     auto bytes = raw_accept({{.type_id = 1, .name = "bydo"}});
-    bytes.pop_back();
+    bytes.resize(bytes.size() - empty_audio_tables.size() - 1);
 
     EXPECT_FALSE(decode_connect_accept(bytes).has_value());
 }
@@ -355,6 +358,50 @@ TEST(ConnectAcceptPayload, DecoderRejectsCountLargerThanEntries) {
 
 TEST(ConnectAcceptPayload, DecoderRejectsHugeCountInShortPayload) {
     EXPECT_FALSE(decode_connect_accept(raw_accept(0xFFFF, sample_types())).has_value());
+}
+
+TEST(ConnectAcceptPayload, DecodesTheRawLayoutOfAnEmptyAccept) {
+    const auto decoded = decode_connect_accept(raw_accept({}));
+
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded, accept_with({}));
+}
+
+TEST(ConnectAcceptPayload, RoundTripsSoundAndMusicTables) {
+    auto accept = accept_with(sample_types());
+    accept.sounds = {{.type_id = 1, .name = "shot.wav"}, {.type_id = 2, .name = "boom.wav"}};
+    accept.musics = {{.type_id = 1, .name = "stage1.ogg"}};
+    accept.current_music = 1;
+
+    EXPECT_EQ(decode_connect_accept(encoded(accept)), accept);
+}
+
+TEST(ConnectAcceptPayload, DecoderRejectsMissingAudioTables) {
+    auto bytes = raw_accept(sample_types());
+    bytes.resize(bytes.size() - empty_audio_tables.size());
+
+    EXPECT_FALSE(decode_connect_accept(bytes).has_value());
+}
+
+TEST(ConnectAcceptPayload, DecoderRejectsTruncatedAudioTables) {
+    auto accept = accept_with({});
+    accept.sounds = {{.type_id = 1, .name = "shot.wav"}};
+    accept.musics = {{.type_id = 1, .name = "stage1.ogg"}};
+    const auto bytes = encoded(accept);
+
+    for (std::size_t size = 0; size < bytes.size(); ++size) {
+        const std::span<const std::uint8_t> truncated(bytes.data(), size);
+
+        EXPECT_FALSE(decode_connect_accept(truncated).has_value()) << "size " << size;
+    }
+}
+
+TEST(ConnectAcceptPayload, DecoderRejectsACurrentMusicMissingFromTheTable) {
+    auto bytes = raw_accept({});
+    bytes.back() = 0x01;
+    bytes[bytes.size() - 2] = 0x00;
+
+    EXPECT_FALSE(decode_connect_accept(bytes).has_value());
 }
 
 TEST(ConnectAcceptPayload, DecoderRejectsTrailingBytes) {

@@ -23,6 +23,9 @@ struct ServerSessionsConfig {
     std::size_t max_players{};
     core::time::Duration timeout = std::chrono::seconds(5);
     std::vector<TypeEntry> types{};
+    std::vector<TypeEntry> sounds{};
+    std::vector<TypeEntry> musics{};
+    std::uint16_t current_music{no_music};
 };
 
 struct Session {
@@ -44,6 +47,7 @@ public:
     [[nodiscard]] std::vector<Outbound> drop_timed_out();
     [[nodiscard]] std::vector<Outbound> broadcast(const Message& message);
     [[nodiscard]] std::vector<Outbound> close_all(DisconnectReason reason);
+    void set_current_music(std::uint16_t music_id);
 
     [[nodiscard]] const std::vector<Session>& sessions() const noexcept { return sessions_; }
     [[nodiscard]] std::vector<PlayerStats> stats() const;

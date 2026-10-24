@@ -25,8 +25,16 @@ engine_add_module(core
     PRIVATE_DEPENDS ${CMAKE_DL_LIBS}
 )
 
+engine_add_module(physics
+    SOURCES
+        src/physics/PhysicsSystem.cpp
+        src/physics/Collisions.cpp
+    DEPENDS engine::core
+)
+
 engine_add_module(script
     SOURCES
+        src/script/Audio.cpp
         src/script/Declarations.cpp
         src/script/Entities.cpp
         src/script/ModuleLoader.cpp
@@ -35,7 +43,7 @@ engine_add_module(script
         src/script/ScriptFiles.cpp
         src/script/ScriptRuntime.cpp
     DEPENDS engine::core
-    PRIVATE_DEPENDS sol2::sol2 engine_lua
+    PRIVATE_DEPENDS engine::physics sol2::sol2 engine_lua
 )
 
 engine_add_module(network
@@ -64,16 +72,17 @@ engine_add_module(network
 )
 target_include_directories(engine-network PRIVATE src/network)
 
-engine_add_module(physics
-    SOURCES
-        src/physics/PhysicsSystem.cpp
-        src/physics/Collisions.cpp
-    DEPENDS engine::core
-)
-
 engine_add_module(graphics
     SOURCES
         src/graphics/Interfaces.cpp
         src/graphics/PluginLoader.cpp
+    DEPENDS engine::core
+)
+
+engine_add_module(audio
+    SOURCES
+        src/audio/Interfaces.cpp
+        src/audio/NullAudio.cpp
+        src/audio/PluginLoader.cpp
     DEPENDS engine::core
 )

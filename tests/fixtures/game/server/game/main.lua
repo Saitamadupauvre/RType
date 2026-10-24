@@ -1,5 +1,8 @@
 local roster = require("roster")
 
+sounds { "laser_shoot.wav", "explosion.wav" }
+musics { "bit_space.mp3" }
+
 local function game()
     return roster.list("game")[1]
 end
