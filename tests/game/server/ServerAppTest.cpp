@@ -328,3 +328,19 @@ TEST(ServerApp, SoundPlayedByAnEntityCarriesItsIndex) {
     EXPECT_EQ(heard.sounds[0].sound_id, 2U);
     EXPECT_EQ(heard.sounds[0].source_entity_id, speaker->index());
 }
+
+TEST(ServerApp, TickDestroysEntitiesWhoseHitboxesOverlap) {
+    const ManualClock clock;
+    ServerApp app(clock, config,
+                  std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game");
+    const auto missile = app.script().spawn("missile", engine::core::Vec2{1000.F, 300.F});
+    const auto bydo = app.script().spawn("bydo", engine::core::Vec2{1000.F, 290.F});
+    const auto far_bydo = app.script().spawn("bydo", engine::core::Vec2{1000.F, 800.F});
+    ASSERT_TRUE(missile && bydo && far_bydo);
+
+    app.tick(tick_step);
+
+    EXPECT_FALSE(app.registry().alive(*missile));
+    EXPECT_FALSE(app.registry().alive(*bydo));
+    EXPECT_TRUE(app.registry().alive(*far_bydo));
+}

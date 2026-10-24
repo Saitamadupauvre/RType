@@ -11,10 +11,13 @@
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
+#include "engine/core/event/EventBus.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/script/AudioCommand.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+
+#include "Collisions.hpp"
 
 namespace logger = engine::core::log;
 using engine::core::Entity;
@@ -39,11 +42,12 @@ protected:
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
     EntityManager _world;
     ScriptRuntime _runtime;
+    engine::core::event::EventBus _events;
+    rtype::server::Collisions _collisions{_world, _events, _runtime};
 
     void SetUp() override {
         _runtime.attach_world(_world);
         ASSERT_TRUE(_runtime.load_scripts(game_scripts));
-        ASSERT_TRUE(_runtime.spawn("collisions").has_value());
         ASSERT_TRUE(_runtime.spawn("ship", ship_start).has_value());
     }
 
@@ -55,8 +59,9 @@ protected:
         return *entity;
     }
 
-    void tick() {
-        _runtime.update(short_tick);
+    void tick(float dt = short_tick) {
+        _runtime.update(dt);
+        _collisions.step(dt);
         _runtime.flush_destroyed();
     }
 
@@ -90,8 +95,7 @@ TEST_F(CollisionTest, MissileHittingABydoDestroysBoth) {
 TEST_F(CollisionTest, MissileTouchingABydoEdgeDoesNotHitIt) {
     const Entity missile = spawn("missile", {1000.F - missile_width, 300.F});
     const Entity bydo = spawn("bydo", {1000.F, 300.F});
-    _runtime.update(0.F);
-    _runtime.flush_destroyed();
+    tick(0.F);
     EXPECT_TRUE(_world.alive(missile));
     EXPECT_TRUE(_world.alive(bydo));
 }
