@@ -139,6 +139,20 @@ plugin_add_test(graphics-raylib
 game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
     LINKS r-type_server_cli r-type_server_app)
 game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
+    game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp
+    LINKS r-type_client_cli r-type_client_controls r-type_client_draw)
+
+function(game_add_runtime_data_test folder source)
+    add_test(NAME game.runtime_data.${folder}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE=${source}
+            -DCOPY=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${folder}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/game/RuntimeDataTest.cmake
+    )
+endfunction()
+
+game_add_runtime_data_test(scripts ${PROJECT_SOURCE_DIR}/game/scripts)
+game_add_runtime_data_test(assets ${PROJECT_SOURCE_DIR}/assets)
     game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp game/client/ShipTest.cpp
     game/client/MissileTest.cpp game/client/BydoTest.cpp game/client/SpawnerTest.cpp
     game/client/CollisionTest.cpp game/client/GameFlowTest.cpp
