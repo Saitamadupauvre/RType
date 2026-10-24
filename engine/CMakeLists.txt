@@ -77,3 +77,11 @@ engine_add_module(graphics
         src/graphics/PluginLoader.cpp
     DEPENDS engine::core
 )
+
+engine_add_module(audio
+    SOURCES
+        src/audio/Interfaces.cpp
+        src/audio/NullAudio.cpp
+        src/audio/PluginLoader.cpp
+    DEPENDS engine::core
+)
