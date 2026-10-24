@@ -3,10 +3,11 @@ local roster = require("roster")
 
 entity "bydo"
 
-tags   = { "enemy" }
-sprite = "sprites/bydo.png"
-speed  = config.bydo.speed
-hitbox = config.bydo.hitbox
+tags          = { "enemy" }
+sprite        = "sprites/bydo.png"
+speed         = config.bydo.speed
+hitbox        = config.bydo.hitbox
+collides_with = { "missile" }
 
 function on_spawn(self)
     roster.add(self, "enemies")
@@ -16,11 +17,9 @@ function on_destroy(self)
     roster.remove(self)
 end
 
-function on_hit(self, other)
-    if other:has_tag("missile") then
-        play("explosion.wav", self)
-        roster.destroy(self)
-    end
+function on_collide(self, other)
+    play("explosion.wav", self)
+    roster.destroy(self)
 end
 
 function update(self, dt)

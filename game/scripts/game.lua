@@ -8,7 +8,6 @@ countdown = 0
 
 function on_spawn(self)
     roster.add(self, "game")
-    spawn("collisions")
 end
 
 function spawn_ship(self, player)
