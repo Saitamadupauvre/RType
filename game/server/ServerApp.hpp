@@ -1,36 +1,53 @@
 #pragma once
 
+#include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "Cli.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/SystemScheduler.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
+#include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
+#include "engine/script/ScriptRuntime.hpp"
 
 namespace rtype::server {
 
 class ServerApp {
 public:
-    ServerApp(const engine::core::time::IClock& clock, const ServerConfig& config);
+    ServerApp(const engine::core::time::IClock& clock, const ServerConfig& config,
+              const std::filesystem::path& scripts = {});
 
     bool start(std::string& error);
     void tick(engine::core::time::Duration step);
     void run(const std::function<bool()>& should_stop);
     void stop();
 
+    void apply_inputs(const std::vector<engine::network::PlayerInput>& inputs);
+    void replicate();
+
     [[nodiscard]] engine::core::EntityManager& registry() noexcept { return registry_; }
     [[nodiscard]] engine::core::SystemScheduler& systems() noexcept { return systems_; }
     [[nodiscard]] engine::core::event::EventBus& events() noexcept { return events_; }
     [[nodiscard]] engine::network::NetworkServer& network() noexcept { return network_; }
+    [[nodiscard]] engine::script::ScriptRuntime& script() noexcept { return _runtime; }
+    [[nodiscard]] const std::vector<engine::network::ReplicatedType>& types() const noexcept {
+        return _types;
+    }
 
 private:
     std::reference_wrapper<const engine::core::time::IClock> clock_;
     engine::core::event::EventBus events_;
     engine::core::EntityManager registry_;
     engine::core::SystemScheduler systems_;
+    engine::script::ScriptRuntime _runtime;
+    std::vector<engine::network::ReplicatedType> _types;
+    std::unordered_map<std::string, std::uint16_t> _type_ids;
     engine::network::NetworkServer network_;
 };
 

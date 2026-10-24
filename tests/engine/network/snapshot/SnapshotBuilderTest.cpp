@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/network/Replicated.hpp"
 
@@ -114,6 +115,39 @@ TEST(SnapshotBuilder, WorksWhenVelocityIsNotRegistered) {
     EXPECT_EQ(find_state(snapshots.front().entities, entity)->vx, 0);
 }
 
+TEST(SnapshotBuilder, SendsOwnerAndSpriteColor) {
+    auto registry = registry_with_components();
+    registry.register_component<engine::core::Sprite>();
+    const auto entity = registry.spawn();
+    registry.add(entity, Replicated{.type_id = 1, .owner = 2});
+    registry.add(entity, Position{0.0F, 0.0F});
+    registry.add(entity,
+                 engine::core::Sprite{.path = {}, .color = {.r = 1, .g = 2, .b = 3, .a = 4}});
+
+    const auto snapshots = build_snapshots(registry, sample_tick);
+
+    const auto* state = find_state(snapshots.front().entities, entity);
+    ASSERT_NE(state, nullptr);
+    EXPECT_EQ(state->owner, 2U);
+    EXPECT_EQ(state->r, 1U);
+    EXPECT_EQ(state->g, 2U);
+    EXPECT_EQ(state->b, 3U);
+    EXPECT_EQ(state->a, 4U);
+}
+
+TEST(SnapshotBuilder, EntityWithoutSpriteIsOpaqueWhite) {
+    auto registry = registry_with_components();
+    const auto entity = spawn_replicated(registry, 0.0F, 0.0F);
+
+    const auto snapshots = build_snapshots(registry, sample_tick);
+
+    const auto* state = find_state(snapshots.front().entities, entity);
+    ASSERT_NE(state, nullptr);
+    EXPECT_EQ(state->owner, 0U);
+    EXPECT_EQ(state->r, 255U);
+    EXPECT_EQ(state->a, 255U);
+}
+
 TEST(SnapshotBuilder, SplitsLargeWorldIntoPacketsUnderTheSizeLimit) {
     auto registry = registry_with_components();
     constexpr std::size_t entity_count = 200;
@@ -123,7 +157,7 @@ TEST(SnapshotBuilder, SplitsLargeWorldIntoPacketsUnderTheSizeLimit) {
 
     const auto snapshots = build_snapshots(registry, sample_tick);
 
-    ASSERT_EQ(snapshots.size(), 3U);
+    ASSERT_EQ(snapshots.size(), 4U);
     std::set<std::uint32_t> ids;
     for (const auto& snapshot : snapshots) {
         EXPECT_EQ(snapshot.server_tick, sample_tick);

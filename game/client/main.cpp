@@ -2,44 +2,26 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <system_error>
 
+#include "ActionCodec.hpp"
 #include "Cli.hpp"
 #include "Controls.hpp"
+#include "SnapshotView.hpp"
 #include "Starfield.hpp"
-#include "WorldDraw.hpp"
-#include "engine/core/Components.hpp"
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/core/time/SteadyClock.hpp"
 #include "engine/graphics/PluginLoader.hpp"
 #include "engine/graphics/Types.hpp"
-#include "engine/script/ScriptRuntime.hpp"
+#include "engine/network/Client.hpp"
 
 namespace {
 
 namespace fs = std::filesystem;
-using engine::core::Entity;
-using engine::core::EntityManager;
-using engine::core::Tags;
 
 constexpr engine::graphics::Color background{.r = 0, .g = 0, .b = 0, .a = 255};
 constexpr std::uint32_t starfield_seed = 1987;
-
-void give_controls_to_players(EntityManager& world, engine::script::ScriptRuntime& runtime,
-                              const engine::script::InputState& controls) {
-    world.query<Tags>().each([&](Entity entity, const Tags& tags) {
-        if (tags.has("player")) {
-            runtime.set_input(entity, controls);
-        }
-    });
-}
-
-void tick(EntityManager& world, engine::script::ScriptRuntime& runtime,
-          const engine::script::InputState& controls, float dt) {
-    give_controls_to_players(world, runtime, controls);
-    runtime.update(dt);
-    runtime.flush_destroyed();
-}
 
 } // namespace
 
@@ -61,33 +43,41 @@ int main(int argc, char** argv) {
     }
     auto& renderer = lib_result.plugin->backend().renderer();
     const auto& input = lib_result.plugin->backend().input();
-    if (!renderer.open({.width = 1280, .height = 720, .title = "R-Type", .fullscreen = false})) {
-        std::cerr << "Failed to open window\n";
+
+    const engine::core::time::SteadyClock clock;
+    engine::core::event::EventBus events;
+    engine::network::NetworkClient network(clock, events);
+    std::error_code ec;
+    if (!network.connect(result.config->host, result.config->port, ec)) {
+        std::cerr << "cannot connect to " << result.config->host << ":" << result.config->port
+                  << ": " << ec.message() << "\n";
         return 84;
     }
 
-    EntityManager world;
-    engine::script::ScriptRuntime runtime;
-    runtime.attach_world(world);
-    runtime.load_scripts(executable_dir / "scripts");
+    if (!renderer.open({.width = 1280, .height = 720, .title = "R-Type", .fullscreen = false})) {
+        std::cerr << "Failed to open window\n";
+        network.disconnect();
+        return 84;
+    }
 
-    const engine::core::time::SteadyClock clock;
     engine::core::time::FixedStepLoop loop(clock);
-    rtype::client::WorldDraw world_draw(renderer, executable_dir / "assets");
     rtype::client::Starfield starfield(starfield_seed, renderer.virtual_size());
+    rtype::client::SnapshotView view(renderer, executable_dir / "assets");
 
     while (!renderer.should_close()) {
+        network.update();
         renderer.begin_frame(background);
-        const engine::script::InputState controls = rtype::client::read_controls(input);
+        const auto controls = rtype::client::read_controls(input);
         loop.run_frame([&](engine::core::time::Duration step) {
-            const float dt = std::chrono::duration<float>(step).count();
-            starfield.update(dt);
-            tick(world, runtime, controls, dt);
+            starfield.update(std::chrono::duration<float>(step).count());
+            const auto sent = rtype::common::pack_input(controls);
+            network.send_input(sent.action_flags, sent.move_x, sent.move_y);
         });
         starfield.draw(renderer);
-        world_draw.draw(world);
+        view.draw(network.entities(), network.types(), network.player_id());
         renderer.end_frame();
     }
 
+    network.disconnect();
     return 0;
 }

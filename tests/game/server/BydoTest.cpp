@@ -22,7 +22,7 @@ constexpr float bydo_speed = 300.F;
 constexpr float bydo_width = 63.F;
 
 const std::filesystem::path game_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "client" / "single_player";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
 
 class BydoTest : public ::testing::Test {
 protected:

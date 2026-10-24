@@ -30,7 +30,7 @@ constexpr float missile_width = 48.F;
 constexpr float short_tick = 0.01F;
 
 const std::filesystem::path game_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "client" / "single_player";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
 
 class CollisionTest : public ::testing::Test {
 protected:

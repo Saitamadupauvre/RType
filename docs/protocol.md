@@ -2,7 +2,7 @@
 
 ## Status
 
-Protocol version `1` defines every message payload in this document.
+Protocol version `2` defines every message payload in this document.
 
 ## Transport
 
@@ -20,7 +20,7 @@ Every datagram consists of a 13-byte header followed by `payload_size` payload b
 | Offset | Size | Field | Encoding | Value |
 |---|---:|---|---|---|
 | 0 | 4 | `magic` | Unsigned 32-bit, big-endian | `0x52545950` (`RTYP`) |
-| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `1` |
+| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `2` |
 | 6 | 1 | `type` | Unsigned 8-bit | Message type |
 | 7 | 4 | `sequence` | Unsigned 32-bit, big-endian | Sender packet sequence |
 | 11 | 2 | `payload_size` | Unsigned 16-bit, big-endian | Number of bytes after the header |
@@ -113,7 +113,7 @@ A snapshot is an authoritative world state at one server tick. It has a six-byte
 |---|---:|---|---|
 | 0 | 4 | `server_tick` | Unsigned 32-bit, big-endian |
 | 4 | 2 | `entity_count` | Unsigned 16-bit, big-endian |
-| 6 | Variable | `entities` | `entity_count` records, 14 bytes each |
+| 6 | Variable | `entities` | `entity_count` records, 19 bytes each |
 
 Each entity record has the following layout:
 
@@ -125,10 +125,15 @@ Each entity record has the following layout:
 | 8 | 2 | `y` | Signed 16-bit, big-endian virtual-world coordinate |
 | 10 | 2 | `vx` | Signed 16-bit, big-endian velocity in virtual units per second |
 | 12 | 2 | `vy` | Signed 16-bit, big-endian velocity in virtual units per second |
+| 14 | 1 | `owner` | Unsigned 8-bit player id of the controlling client, `0` for none |
+| 15 | 1 | `r` | Unsigned 8-bit red of the entity color |
+| 16 | 1 | `g` | Unsigned 8-bit green |
+| 17 | 1 | `b` | Unsigned 8-bit blue |
+| 18 | 1 | `a` | Unsigned 8-bit alpha |
 
-A snapshot packet carries at most 84 entities, the largest count that fits in the maximum payload size. A larger world is sent as several snapshot packets with the same `server_tick`, each holding at most 84 entities. The format of each packet does not change.
+A snapshot packet carries at most 62 entities, the largest count that fits in the maximum payload size. A larger world is sent as several snapshot packets with the same `server_tick`, each holding at most 62 entities. The format of each packet does not change.
 
-The server replicates every entity that has the engine's `Replicated` component (its `type_id`) and a position; the velocity is zero when the entity has none. `entity_id` is the entity index. Coordinates and velocities are rounded to the nearest integer and clamped to the signed 16-bit range.
+The server replicates every entity that has the engine's `Replicated` component (its `type_id`) and a position; the velocity is zero when the entity has none. `owner` is `Replicated::owner`; a client compares it with the `player_entity_id` of its `connect_accept` to find its own entities. The color is the entity's sprite color, opaque white when it has no sprite. `entity_id` is the entity index. Coordinates and velocities are rounded to the nearest integer and clamped to the signed 16-bit range.
 
 The client keeps the world of the newest `server_tick` it has received, comparing ticks with wrap-around like sequence numbers:
 
@@ -136,7 +141,7 @@ The client keeps the world of the newest `server_tick` it has received, comparin
 - another packet of the same tick is merged in, an entity already present being updated rather than duplicated;
 - an older tick is ignored.
 
-The receiver rejects a snapshot unless its payload size is exactly `6 + entity_count * 14` and every `type_id` exists in the connection type table.
+The receiver rejects a snapshot unless its payload size is exactly `6 + entity_count * 19` and every `type_id` exists in the connection type table.
 
 ## Event Payload
 
@@ -170,7 +175,7 @@ The `player_left` event payload is five bytes: one-byte event type `5` followed 
 
 The receiver rejects unknown event types, an event with an incorrect fixed payload size, and a spawn event with an unknown `type_id`.
 
-The server sends the events of a tick to every connected session after the tick, in the order they happened, before that tick's snapshot. An event goes only to the sessions that existed when it happened: a client that connects later never receives earlier events. A client drops every snapshot and event that arrives before `connect_accept`. Until acknowledgements exist (protocol version 2), events are sent once and are not retransmitted.
+The server sends the events of a tick to every connected session after the tick, in the order they happened, before that tick's snapshot. An event goes only to the sessions that existed when it happened: a client that connects later never receives earlier events. A client drops every snapshot and event that arrives before `connect_accept`. Until acknowledgements exist (a later protocol version), events are sent once and are not retransmitted.
 
 ## Heartbeat Payload
 

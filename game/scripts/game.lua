@@ -3,17 +3,30 @@ local roster = require("roster")
 
 entity "game"
 
-tags          = { "player" }
-state         = "playing"
-restart_armed = false
+state     = "waiting"
+countdown = 0
 
 function on_spawn(self)
+    roster.add(self, "game")
     spawn("collisions")
-    self:start()
+end
+
+function spawn_ship(self, player)
+    local start = config.ship.start
+    local colors = config.ship.colors
+    local row = player.slot - (#colors - 1) / 2
+    local ship = spawn("ship", {
+        x = start.x,
+        y = start.y + row * config.ship.row_spacing,
+        owner = player,
+    })
+    ship.color = colors[player.slot % #colors + 1]
 end
 
 function start(self)
-    spawn("ship", { x = config.ship.start.x, y = config.ship.start.y })
+    for _, player in ipairs(players()) do
+        self:spawn_ship(player)
+    end
     self.spawner = spawn("bydo_spawner")
     self.state = "playing"
 end
@@ -21,7 +34,7 @@ end
 function finish(self)
     self.spawner:destroy()
     self.spawner = nil
-    self.restart_armed = false
+    self.countdown = config.game.restart_delay
     self.state = "game_over"
 end
 
@@ -33,23 +46,36 @@ function clear(self)
     end
 end
 
-function restart(self)
-    self:clear()
-    self:start()
+function join(self, player)
+    if self.state == "waiting" then
+        self:start()
+    elseif self.state == "playing" then
+        self:spawn_ship(player)
+    end
 end
 
-function wait_for_restart(self)
-    if not self.input:pressed("fire") then
-        self.restart_armed = true
-    elseif self.restart_armed then
-        self:restart()
+function leave(self, player)
+    for _, owned in ipairs(player:entities()) do
+        roster.destroy(owned)
+    end
+end
+
+function restart(self)
+    self:clear()
+    if #players() == 0 then
+        self.state = "waiting"
+    else
+        self:start()
     end
 end
 
 function update(self, dt)
     if self.state == "game_over" then
-        self:wait_for_restart()
-    elseif #roster.list("players") == 0 then
+        self.countdown = self.countdown - dt
+        if self.countdown <= 0 then
+            self:restart()
+        end
+    elseif self.state == "playing" and #roster.list("players") == 0 then
         self:finish()
     end
 end

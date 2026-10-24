@@ -1,10 +1,13 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
@@ -158,6 +161,67 @@ public:
      * @param input Actions for the coming ticks.
      */
     void set_input(core::Entity entity, InputState input) noexcept;
+
+    /**
+     * @brief Registers a connected player and calls `on_player_joined(player)` from `main.lua`.
+     *
+     * The player gets the lowest free slot, starting at 0, and a neutral input. Scripts give it
+     * entities by setting their `owner` field; those entities then read the player's input
+     * through `self.input`. The callback is optional and protected: an error is logged.
+     *
+     * @param player_id Identifier chosen by the caller, unique among connected players.
+     * @return true if the player was added and the callback, when defined, ran to completion;
+     * false if @p player_id is already connected (logged, nothing changes) or the callback failed.
+     * @note Never throws.
+     */
+    bool player_joined(std::uint32_t player_id) noexcept;
+
+    /**
+     * @brief Calls `on_player_left(player)` from `main.lua`, then forgets the player.
+     *
+     * Without that callback, every entity the player owns is marked for destruction and removed
+     * by the next flush_destroyed(). With it, the script decides; entities still owned afterwards
+     * read a nil `owner` and a neutral input.
+     *
+     * @param player_id Player registered by player_joined().
+     * @return true if the player was removed and the callback, when defined, ran to completion;
+     * false if @p player_id is unknown (logged) or the callback failed. The player is removed
+     * even when the callback fails.
+     * @note Never throws.
+     */
+    bool player_left(std::uint32_t player_id) noexcept;
+
+    /**
+     * @brief Sets the actions read by every entity owned by a player until the next call.
+     *
+     * @param player_id Player registered by player_joined(). Unknown players are ignored.
+     * @param input Actions for the coming ticks.
+     */
+    void set_player_input(std::uint32_t player_id, InputState input) noexcept;
+
+    /**
+     * @brief Lists the names of the declared entity types, in ascending order.
+     *
+     * The order is stable for a given set of scripts, so two processes loading the same scripts
+     * get the same list.
+     */
+    [[nodiscard]] std::vector<std::string> entity_types() const;
+
+    /**
+     * @brief Returns the declared type of an entity spawned by this runtime.
+     *
+     * @return The type name, or std::nullopt for entities this runtime did not spawn or already
+     * released.
+     */
+    [[nodiscard]] std::optional<std::string> entity_type(core::Entity entity) const;
+
+    /**
+     * @brief Returns the connected player that owns an entity.
+     *
+     * @return The owner's id, or std::nullopt if the entity is unknown, has no owner, or its
+     * owner has left.
+     */
+    [[nodiscard]] std::optional<std::uint32_t> entity_owner(core::Entity entity) const;
 
     /**
      * @brief Advances every live entity by one tick.

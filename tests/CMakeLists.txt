@@ -36,6 +36,7 @@ engine_add_test(script SOURCES
     engine/script/ScriptRequireTest.cpp
     engine/script/EntityHandleTest.cpp
     engine/script/TickTest.cpp
+    engine/script/PlayersTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
@@ -137,10 +138,14 @@ plugin_add_test(graphics-raylib
 )
 
 game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
+    game/server/ShipTest.cpp game/server/MissileTest.cpp game/server/BydoTest.cpp
+    game/server/SpawnerTest.cpp game/server/CollisionTest.cpp game/server/GameFlowTest.cpp
     LINKS r-type_server_cli r-type_server_app)
 game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
     game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp
+    game/client/SnapshotViewTest.cpp
     LINKS r-type_client_cli r-type_client_controls r-type_client_draw)
+game_add_test(common SOURCES game/common/ActionCodecTest.cpp LINKS r-type_common)
 
 function(game_add_runtime_data_test folder source)
     add_test(NAME game.runtime_data.${folder}
@@ -153,7 +158,3 @@ endfunction()
 
 game_add_runtime_data_test(scripts ${PROJECT_SOURCE_DIR}/game/scripts)
 game_add_runtime_data_test(assets ${PROJECT_SOURCE_DIR}/assets)
-    game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp game/client/ShipTest.cpp
-    game/client/MissileTest.cpp game/client/BydoTest.cpp game/client/SpawnerTest.cpp
-    game/client/CollisionTest.cpp game/client/GameFlowTest.cpp
-    LINKS r-type_client_cli r-type_client_controls r-type_client_draw engine::script)

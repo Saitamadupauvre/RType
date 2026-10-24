@@ -26,6 +26,11 @@ void write_entity(ByteWriter& writer, const EntityState& entity) {
     writer.write_i16(entity.y);
     writer.write_i16(entity.vx);
     writer.write_i16(entity.vy);
+    writer.write_u8(entity.owner);
+    writer.write_u8(entity.r);
+    writer.write_u8(entity.g);
+    writer.write_u8(entity.b);
+    writer.write_u8(entity.a);
 }
 
 void write_event_type(ByteWriter& writer, EventType type) {

@@ -47,6 +47,38 @@ In Part 1 each `main` assembles the engine modules explicitly: reading it
 shows the whole tick (server) or frame (client). In Part 2 they become thin
 entry points over generic `ServerApp` / `ClientApp` classes from the engine.
 
+## Multiplayer
+
+The server runs the Lua game; the client only sends inputs and draws the
+snapshot. The first player to join starts the game, players joining later get
+a ship at once, each on its own row and tinted with the colour of its slot.
+Arrow keys (or `ZQSD`) move the ship, `Space` fires. The game is over once
+every ship is destroyed and restarts after 3 seconds with a ship for every
+connected player; with nobody left, it waits for the next one.
+
+```sh
+cmake --build --preset ninja-debug
+cd build/ninja-debug/bin
+./r-type_server 4242
+./r-type_client 127.0.0.1 4242
+./r-type_client 127.0.0.1 4242
+```
+
+- Move one ship: the other window shows the same position.
+- Close one client: its ship disappears from the other window.
+
+`ServerApp` holds no game rule: it forwards joins, leaves and inputs to the
+script runtime and replicates every scripted entity that has a `sprite` or a
+`color`, with its declared type, owner and colour. Entities without either
+(`game`, `collisions`, `bydo_spawner`) stay on the server. It is the generic
+server of Part 2.
+
+The client (`game/client/SnapshotView.*`) draws each replicated entity with
+`assets/sprites/<type>.png`, where `<type>` is the name the server sent in its
+type table, tinted with the replicated colour; an unknown type is drawn as a
+square of that colour. A dot above an entity marks the ones the local player
+owns.
+
 ## Scripts
 
 - Every `.lua` file under `game/scripts/` is loaded recursively, except

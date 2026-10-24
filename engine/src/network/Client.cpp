@@ -36,7 +36,9 @@ EntitySnapshot to_entity_snapshot(const EntityState& state) {
                           .x = static_cast<float>(state.x),
                           .y = static_cast<float>(state.y),
                           .vx = static_cast<float>(state.vx),
-                          .vy = static_cast<float>(state.vy)};
+                          .vy = static_cast<float>(state.vy),
+                          .owner = state.owner,
+                          .color = {.r = state.r, .g = state.g, .b = state.b, .a = state.a}};
 }
 
 } // namespace
@@ -160,6 +162,18 @@ ConnectionState NetworkClient::state() const {
 std::uint32_t NetworkClient::player_id() const {
     const auto& connection = impl_->connection;
     return connection ? connection->player_id() : 0;
+}
+
+std::vector<ReplicatedType> NetworkClient::types() const {
+    std::vector<ReplicatedType> types;
+    const auto& connection = impl_->connection;
+    if (!connection.has_value()) {
+        return types;
+    }
+    for (const auto& entry : connection.value().type_table().entries()) {
+        types.push_back({.type_id = entry.type_id, .name = entry.name});
+    }
+    return types;
 }
 
 std::optional<std::uint32_t> NetworkClient::server_tick() const {

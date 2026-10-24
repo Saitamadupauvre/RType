@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -8,6 +9,7 @@
 #include <vector>
 
 #include "Declarations.hpp"
+#include "Players.hpp"
 #include "Sol.hpp"
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
@@ -22,7 +24,7 @@ struct EntityHandle {
 
 class Entities {
 public:
-    explicit Entities(sol::state& lua);
+    Entities(sol::state& lua, const Players& players);
 
     void attach(core::EntityManager& world);
     std::optional<core::Entity> spawn(const Declaration& declaration,
@@ -35,6 +37,12 @@ public:
     void set_input(core::Entity entity, InputState input);
     void update(float dt);
     std::size_t flush_destroyed();
+    void doom(core::Entity entity);
+    [[nodiscard]] std::vector<core::Entity> owned_by(std::uint32_t player_id) const;
+    [[nodiscard]] std::optional<std::string> type_of(core::Entity entity) const;
+    [[nodiscard]] std::optional<std::uint32_t> owner_of(core::Entity entity) const;
+    [[nodiscard]] sol::object handle_of(core::Entity entity) const;
+    [[nodiscard]] sol::object player_object(sol::this_state state, std::uint32_t player_id) const;
 
 private:
     struct Record {
@@ -43,6 +51,7 @@ private:
         sol::table prefab;
         sol::object handle;
         InputState input;
+        std::optional<std::uint32_t> owner;
         double age = 0.0;
         bool doomed = false;
     };
@@ -55,10 +64,13 @@ private:
     void apply_prefab_fields(core::Entity entity, const sol::table& prefab);
     Record& live_record(sol::this_state state, const EntityHandle& handle);
     void destroy(sol::this_state state, const EntityHandle& handle);
+    [[nodiscard]] const InputState& input_of(const Record& record) const;
+    void set_owner(sol::this_state state, Record& record, const sol::object& value);
     bool has_tag(sol::this_state state, const EntityHandle& handle, std::string_view label);
     [[nodiscard]] std::vector<core::Entity> live_entities() const;
 
     sol::state& _lua;
+    const Players& _players;
     core::EntityManager* _world = nullptr;
     std::unordered_map<core::Entity::Id, Record> _records;
     std::vector<core::Entity> _doomed;

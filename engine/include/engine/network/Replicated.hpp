@@ -13,11 +13,15 @@ namespace engine::network {
  * An entity is replicated when it has both `Replicated` and `engine::core::Position`. Its
  * `engine::core::Velocity` is sent too when present, otherwise zero.
  *
+ * The color of its `engine::core::Sprite` is sent too when present, otherwise opaque white.
+ *
  * @note The game registers this component on the server registry. `type_id` must be one of
  * the ids of `ServerOptions::types`, or clients drop the snapshot.
  */
 struct ENGINE_NETWORK_EXPORT Replicated {
     std::uint16_t type_id;
+    /** @brief Player id of the client controlling the entity, or `0` for none. */
+    std::uint8_t owner = 0;
 };
 
 /**

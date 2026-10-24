@@ -31,6 +31,7 @@ engine_add_module(script
         src/script/Entities.cpp
         src/script/ModuleLoader.cpp
         src/script/NativeFields.cpp
+        src/script/Players.cpp
         src/script/ScriptFiles.cpp
         src/script/ScriptRuntime.cpp
     DEPENDS engine::core

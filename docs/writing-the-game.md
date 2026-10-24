@@ -212,25 +212,28 @@ end
 
 ## Current state
 
-Not every native system exists yet. Until they land, the single-player game in
+Not every native system exists yet. Until they land, the multiplayer game in
 `game/scripts/` uses Lua stand-ins. Each one goes away once its engine
 counterpart is wired into the tick:
 
 | Missing in the engine | Stand-in | Once it lands |
 |---|---|---|
-| Native movement in the client tick (#76) | `update` writes `self.x` / `self.y` | Set `vx` / `vy` instead |
+| Native movement in the server tick (#76) | `update` writes `self.x` / `self.y` | Set `vx` / `vy` instead |
 | Native collisions | `systems/collisions.lua` tests every `hitbox` pair with `lib/aabb.lua` and calls `on_hit` on both entities | Delete both files: entities already declare `hitbox` and react in `on_hit` |
 | `find_all` | `lib/roster.lua`: entities join a group in `on_spawn` and leave it in `on_destroy`; `roster.destroy(e)` leaves at once, so a doomed entity is never hit twice in one tick | Delete it and use `find_all` with tags |
 | Lua `system` declarations | Entities without a sprite: `game`, `bydo_spawner`, `collisions` | Declare them as `system "..."` |
 | `every`, `random` | Time counters in `update`, `math.random` | `every(interval, ...)`, `random(...)` |
 
-The `game` entity is tagged `player`: the client only hands controls to
-`player` entities, and `game` reads `fire` to restart after a game over.
+The game runs on the server. `main.lua` spawns the `game` entity and forwards
+`on_player_joined` / `on_player_left` to it: `game` spawns a ship owned by each
+player, so each ship reads the input of its own player, and restarts on a timer
+after a game over. The client draws an entity with `sprites/<type>.png`, so
+the sprite of a replicated entity type must be named after the type.
 
-Tests load a copy of the scripts from `tests/fixtures/game/client/single_player/`,
+Tests load a copy of the scripts from `tests/fixtures/game/server/game/`,
 identical except for an empty `on_start` in `main.lua`, so each test spawns only
 what it checks. Re-sync it after editing a script:
 
 ```sh
-rsync -a --delete --exclude /main.lua game/scripts/ tests/fixtures/game/client/single_player/
+rsync -a --delete --exclude /main.lua game/scripts/ tests/fixtures/game/server/game/
 ```
