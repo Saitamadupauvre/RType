@@ -23,8 +23,8 @@ constexpr std::array<std::string_view, 20> reserved_globals{
 constexpr std::array<std::string_view, 7> engine_owned_fields{"age",   "id",      "type",   "input",
                                                               "owner", "destroy", "has_tag"};
 
-constexpr std::array<std::string_view, 5> callbacks{"on_spawn", "update", "on_hit", "on_destroy",
-                                                    "behavior"};
+constexpr std::array<std::string_view, 5> callbacks{"on_spawn", "update", "on_collide",
+                                                    "on_destroy", "behavior"};
 
 template <std::size_t Size>
 bool contains(const std::array<std::string_view, Size>& names, std::string_view name) {

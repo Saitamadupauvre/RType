@@ -3,10 +3,11 @@ local roster = require("roster")
 
 entity "missile"
 
-tags   = { "missile" }
-sprite = "sprites/missile.png"
-speed  = config.missile.speed
-hitbox = config.missile.hitbox
+tags          = { "missile" }
+sprite        = "sprites/missile.png"
+speed         = config.missile.speed
+hitbox        = config.missile.hitbox
+collides_with = { "enemy" }
 
 function on_spawn(self)
     roster.add(self, "missiles")
@@ -16,10 +17,8 @@ function on_destroy(self)
     roster.remove(self)
 end
 
-function on_hit(self, other)
-    if other:has_tag("enemy") then
-        roster.destroy(self)
-    end
+function on_collide(self, other)
+    roster.destroy(self)
 end
 
 function update(self, dt)

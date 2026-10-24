@@ -291,3 +291,38 @@ TEST(CollisionEvent, EventBusDeliversCollisionEvents) {
     EXPECT_EQ(events[0].entity_a, e1);
     EXPECT_EQ(events[0].entity_b, e2);
 }
+
+TEST(PhysicsSystem, HandlersMayAddBodiesWhileCollisionsArePublished) {
+    EntityManager manager;
+    EventBus bus;
+
+    manager.register_component<Position>();
+    manager.register_component<PhysicsBody>();
+    manager.register_component<AABBCollider>();
+    manager.register_component<CircleCollider>();
+    manager.register_component<Scriptable>();
+
+    for (int index = 0; index < 3; ++index) {
+        auto entity = manager.spawn();
+        manager.add(entity, Position{static_cast<float>(index), 0.0f});
+        manager.add(entity,
+                    PhysicsBody{.type = PhysicsBody::Type::Dynamic, .resolve_collisions = false});
+        manager.add(entity, AABBCollider{.offset = {0.0f, 0.0f}, .size = {10.0f, 10.0f}});
+        manager.add(entity, Scriptable{});
+    }
+
+    std::size_t delivered = 0;
+    bus.subscribe<CollisionEvent>([&](const CollisionEvent&) {
+        ++delivered;
+        for (int index = 0; index < 64; ++index) {
+            auto spawned = manager.spawn();
+            manager.add(spawned, Position{1000.0f, 1000.0f});
+            manager.add(spawned, PhysicsBody{});
+        }
+    });
+
+    PhysicsSystem system(manager, bus);
+    system.update(0.016f);
+
+    EXPECT_EQ(delivered, 3u);
+}

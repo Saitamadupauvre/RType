@@ -19,8 +19,8 @@ Both key sets work at the same time, so you can play with either hand.
 ## Sound
 
 A looping music plays during the game; each shot and each explosion has its
-own sound. Every sound has a visual counterpart (a missile, a ship or a Bydo
-disappearing), so the game can be played without sound. Volumes are set when
+own sound. Every sound has a visual counterpart (a missile or a Bydo shot
+appearing, a ship or a Bydo disappearing), so the game can be played without sound. Volumes are set when
 starting the client:
 
 ```sh
@@ -34,9 +34,11 @@ r-type_client 127.0.0.1 4242 --mute
   running game gets a ship immediately.
 - Each ship starts on the left side, on its own row.
 - Bydos spawn at random heights on the right edge, one every 1.5 seconds,
-  and fly to the left.
-- A missile that hits a Bydo destroys both.
-- A Bydo that touches a ship destroys the ship. A destroyed player watches
+  and fly to the left. Each Bydo fires an orange shot straight ahead 0.8
+  seconds after appearing, then every 2.5 seconds.
+- A missile that hits a Bydo destroys both. Missiles and Bydo shots pass
+  through each other.
+- A Bydo or a Bydo shot that touches a ship destroys the ship. A destroyed player watches
   until the next round.
 - When every ship is destroyed, the game is over. A new round starts 3
   seconds later with a ship for every connected player.

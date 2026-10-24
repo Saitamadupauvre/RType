@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "Cli.hpp"
+#include "Collisions.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/SystemScheduler.hpp"
 #include "engine/core/event/EventBus.hpp"
@@ -61,6 +62,7 @@ private:
     std::unordered_map<std::string, std::uint16_t> _sound_ids;
     std::unordered_map<std::string, std::uint16_t> _music_ids;
     engine::network::NetworkServer network_;
+    Collisions _collisions;
 };
 
 } // namespace rtype::server

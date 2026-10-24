@@ -36,7 +36,8 @@ Epitech *Advanced C++* project (B-CPP-500).
 - Up to 4 players, each with their own colour; your own ship is marked with a
   dot.
 - Scrolling, timer-based starfield, Bydos spawning at random heights on the
-  right, missiles, collisions, game over and automatic restart.
+  right and shooting back, missiles, collisions detected by the engine's
+  physics module, game over and automatic restart.
 - Looping music, shot and explosion sounds, with separate music and effects
   volumes and a mute key.
 - A crashed or disconnected client is dropped after 5 seconds and the other

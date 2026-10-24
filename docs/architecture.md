@@ -80,7 +80,7 @@ Third-party headers stay private: `raylib.h` appears only in
 | Logging | `engine-core` | `log::info/warn/error`, `Sink`, `MemorySink` | Levelled logs on stderr; tests capture them |
 | Scripting | `engine-script` | `ScriptRuntime` | Loads and sandboxes Lua, spawns scripted entities, runs callbacks |
 | Networking | `engine-network` | `NetworkServer`, `NetworkClient` | UDP transport, protocol, sessions, replication |
-| Physics | `engine-physics` | `PhysicsSystem`, `PhysicsBody`, `AABBCollider` | Integration and collision detection/resolution (not yet used by R-Type) |
+| Physics | `engine-physics` | `PhysicsSystem`, `PhysicsBody`, `AABBCollider` | Integration and collision detection/resolution; the server uses it to find hitbox overlaps |
 | Rendering and input | `engine-graphics` + plugin | `IRenderer`, `IInput`, `load_graphics_plugin` | Backend-independent drawing and keyboard/mouse input |
 
 ## Executables
@@ -121,7 +121,10 @@ sequenceDiagram
     App->>Net: inputs()
     App->>Lua: set_player_input(player, input)
     App->>Lua: update(dt)
-    Note over Lua: every entity's update(self, dt),<br/>Lua collisions, spawns
+    Note over Lua: every entity's update(self, dt), spawns
+    App->>ECS: Collisions::step(dt): PhysicsSystem
+    Note over ECS: CollisionEvent on the event bus
+    ECS-->>Lua: collide(a, b) → on_collide(self, other)
     App->>Lua: flush_destroyed()
     Note over Lua: on_destroy, entities removed
     App->>ECS: systems_.run(dt)

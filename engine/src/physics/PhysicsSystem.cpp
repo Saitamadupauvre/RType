@@ -51,6 +51,7 @@ void PhysicsSystem::integrate_velocity(float dt) {
 }
 
 void PhysicsSystem::detect_and_handle_collisions() {
+    std::vector<CollisionEvent> collisions;
     std::vector<core::Entity> entities;
     _entity_manager.query<core::Position, physics::PhysicsBody, physics::AABBCollider>().each(
         [&](core::Entity e, core::Position&, physics::PhysicsBody&, physics::AABBCollider&) {
@@ -89,11 +90,10 @@ void PhysicsSystem::detect_and_handle_collisions() {
 
             if (_entity_manager.has<physics::Scriptable>(a) ||
                 _entity_manager.has<physics::Scriptable>(b)) {
-                CollisionEvent event{.entity_a = a,
-                                     .entity_b = b,
-                                     .normal = normal,
-                                     .penetration_depth = penetration_depth};
-                _event_bus.publish(event);
+                collisions.push_back(CollisionEvent{.entity_a = a,
+                                                    .entity_b = b,
+                                                    .normal = normal,
+                                                    .penetration_depth = penetration_depth});
             }
 
             if (!(body_a.resolve_collisions && body_b.resolve_collisions))
@@ -101,6 +101,9 @@ void PhysicsSystem::detect_and_handle_collisions() {
 
             resolve_collision(a, b, normal, penetration_depth);
         }
+    }
+    for (const CollisionEvent& collision : collisions) {
+        _event_bus.publish(collision);
     }
 }
 

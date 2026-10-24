@@ -3,11 +3,12 @@ local roster = require("roster")
 
 entity "ship"
 
-tags     = { "player", "ship" }
-sprite   = "sprites/ship.png"
-speed    = config.ship.speed
-hitbox   = config.ship.hitbox
-cooldown = 0
+tags          = { "player", "ship" }
+sprite        = "sprites/ship.png"
+speed         = config.ship.speed
+hitbox        = config.ship.hitbox
+collides_with = { "enemy", "enemy_shot" }
+cooldown      = 0
 
 local function clamp(value, low, high)
     return math.max(low, math.min(value, high))
@@ -21,11 +22,9 @@ function on_destroy(self)
     roster.remove(self)
 end
 
-function on_hit(self, other)
-    if other:has_tag("enemy") then
-        play("explosion.wav", self)
-        roster.destroy(self)
-    end
+function on_collide(self, other)
+    play("explosion.wav", self)
+    roster.destroy(self)
 end
 
 function steer(self, input, dt)

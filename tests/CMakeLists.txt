@@ -38,6 +38,7 @@ engine_add_test(script SOURCES
     engine/script/TickTest.cpp
     engine/script/PlayersTest.cpp
     engine/script/AudioTest.cpp
+    engine/script/CollisionsTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
@@ -164,7 +165,8 @@ plugin_add_test(audio-raylib
 
 game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
     game/server/ShipTest.cpp game/server/MissileTest.cpp game/server/BydoTest.cpp
-    game/server/SpawnerTest.cpp game/server/CollisionTest.cpp game/server/GameFlowTest.cpp
+    game/server/BydoShotTest.cpp game/server/SpawnerTest.cpp game/server/CollisionTest.cpp
+    game/server/GameFlowTest.cpp
     LINKS r-type_server_cli r-type_server_app)
 game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
     game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp

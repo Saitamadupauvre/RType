@@ -243,7 +243,7 @@ snapshots are rejected correctly even after a wrap.
 | Snapshot splitting | A world larger than 62 entities is split into several packets with the same tick, each below the 1200-byte MTU-safe limit; the client merges them by entity id |
 | Lowest-free player id / slot | Ids and colours are reused when a player leaves, so four simultaneous players always get four distinct slots |
 | Parallax starfield | Three layers at different speeds and brightness, seeded so it looks identical on every client |
-| Lua AABB pass | Temporary O(n·m) overlap test between groups until native collisions are wired into the tick; fine for a few hundred entities |
+| AABB overlap in `engine-physics` | Every pair of hitboxes is tested in C++ each tick (O(n²), fine for a few hundred entities; a broad phase is the next step), then filtered by `collides_with` tags before reaching Lua |
 
 ## Storage
 

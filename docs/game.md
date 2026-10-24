@@ -67,10 +67,11 @@ cannot be bound) and runs it until SIGINT or SIGTERM.
 - forwards `PlayerJoined` / `PlayerLeft` from the network to Lua
   `on_player_joined` / `on_player_left`;
 - each tick: receive, apply each player's input, `update` the scripts,
-  destroy marked entities, run systems, mark every scripted entity with a
+  detect hitbox overlaps with `engine-physics` and call Lua `on_collide`
+  (`Collisions.cpp`), destroy marked entities, run systems, mark every scripted entity with a
   `sprite` or a `color` as `Replicated { type_id, owner }`, send the snapshot.
 
-Entities with neither (`game`, `collisions`, `bydo_spawner`) stay on the
+Entities with neither (`game`, `bydo_spawner`) stay on the
 server.
 
 ### Client
@@ -98,10 +99,10 @@ game/scripts/
 ├── game.lua              entity "game": rounds, ships, game over, restart
 ├── player/ship.lua       entity "ship": movement, shooting
 ├── player/missile.lua    entity "missile"
-├── enemies/bydo.lua      entity "bydo"
+├── enemies/bydo.lua      entity "bydo": flies left, shoots after 0.8 s then every 2.5 s
+├── enemies/bydo_shot.lua entity "bydo_shot": flies left, destroys the ship it hits
 ├── enemies/spawner.lua   entity "bydo_spawner": one Bydo every 1.5 s at a random height
-├── systems/collisions.lua entity "collisions": missile/enemy and player/enemy overlaps
-└── lib/                  config.lua (every tunable value), roster.lua (groups), aabb.lua
+└── lib/                  config.lua (every tunable value), roster.lua (groups)
 ```
 
 - Every `.lua` file under `scripts/` is loaded, except `lib/`, reached with
@@ -122,7 +123,17 @@ stateDiagram-v2
     game_over --> waiting: 3 s later, nobody connected
 ```
 
-Tunable values (speeds, hitboxes, spawn interval, fire cooldown, colours,
+Collisions are declared per entity type with `hitbox` and `collides_with`;
+the engine calls `on_collide` on the side that asked for it:
+
+| Entity | Tags | `collides_with` | On collision |
+|---|---|---|---|
+| `ship` | `player`, `ship` | `enemy`, `enemy_shot` | explodes |
+| `missile` | `missile` | `enemy` | disappears |
+| `bydo` | `enemy` | `missile` | explodes |
+| `bydo_shot` | `enemy_shot` | `player` | disappears |
+
+Tunable values (speeds, hitboxes, spawn interval, fire cooldowns, colours,
 restart delay) are all in `lib/config.lua`.
 
 The Lua API is in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api); how to
