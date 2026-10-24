@@ -1,8 +1,37 @@
 # R-Type UDP Protocol
 
-## Status
+| | |
+|---|---|
+| Category | Informational |
+| Protocol version | `2` |
+| Transport | UDP |
+| Implementation | `engine/src/network/` |
 
-Protocol version `2` defines every message payload in this document.
+## Abstract
+
+This document specifies the binary protocol spoken between an R-Type server
+and its clients. A client connects, sends its inputs, and receives the
+authoritative world state (snapshots) and game events. The protocol is
+generic: entity types are names exchanged at connection time, so the same
+protocol serves any game built on the engine.
+
+Anyone should be able to write a new client for the server from this
+document alone. A summary for client writers is in
+[Writing a client](#writing-a-client).
+
+## Conventions
+
+The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT** and **MAY**
+are to be interpreted as described in
+[RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
+
+- "Server" is the authoritative `r-type_server`; "client" is any program
+  connecting to it.
+- Byte offsets start at 0. Sizes are in bytes.
+- All integers are unsigned unless marked signed. Signed integers use two's
+  complement.
+- World coordinates are in virtual units: the world is 1920 × 1080, origin at
+  the top-left, Y pointing down.
 
 ## Transport
 
@@ -40,7 +69,7 @@ Receivers must reject a datagram when its size is smaller than 13 bytes, its mag
 | 6 | `heartbeat` | Both directions | Unreliable |
 | 7 | `disconnect` | Both directions | Reliable |
 
-Reliable messages use acknowledgement and retransmission rules that will be added in a later protocol version. Until then, implementations must not silently treat reliable messages as delivered.
+The "Delivery" column states the intended guarantee. In version 2 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
 
 ## Connection Payloads
 
@@ -61,7 +90,7 @@ The server sends this message to the endpoint that sent the matching request. Th
 | Offset | Size | Field | Encoding |
 |---|---:|---|---|
 | 0 | 4 | `client_nonce` | Unsigned 32-bit, big-endian |
-| 4 | 4 | `player_entity_id` | Unsigned 32-bit, big-endian |
+| 4 | 4 | `player_entity_id` | Unsigned 32-bit, big-endian: the player id of this client (1 to `max_players`) |
 | 8 | 2 | `type_count` | Unsigned 16-bit, big-endian |
 | 10 | Variable | `type_entries` | `type_count` entries |
 
@@ -207,3 +236,70 @@ Each sender keeps one packet sequence per peer and increments it for every datag
 - Do not process a packet from an endpoint before its connection request has been accepted.
 - Drop duplicated or stale unreliable packets.
 - Treat malformed datagrams as untrusted input: drop and log them without stopping the client or server.
+
+## Examples
+
+All bytes are hexadecimal.
+
+`connect_request` with nonce `0x01020304`, sequence `0`:
+
+```
+52 54 59 50  00 02  01  00 00 00 00  00 04  01 02 03 04
+magic        ver    type sequence    size   client_nonce
+```
+
+`input` holding `fire` and moving left, sequence `42`:
+
+```
+52 54 59 50  00 02  03  00 00 00 2A  00 03  01  FF  00
+                                            fire x=-1 y=0
+```
+
+`heartbeat`, sequence `7`:
+
+```
+52 54 59 50  00 02  06  00 00 00 07  00 00
+```
+
+`disconnect` with reason `normal`, sequence `8`:
+
+```
+52 54 59 50  00 02  07  00 00 00 08  00 01  00
+```
+
+## Writing a client
+
+A minimal client:
+
+1. Open a UDP socket and send `connect_request` with a random nonce to the
+   server. Resend it every 500 ms until an answer arrives; give up after a few
+   attempts.
+2. On `connect_accept` with your nonce: remember your player id
+   (`player_entity_id`) and the type table. On `disconnect(server_full)`: stop.
+3. Every tick (60 Hz), send an `input` with your current actions. Number every
+   packet you send with an increasing sequence.
+4. Send a `heartbeat` every second.
+5. Keep the world of the newest `snapshot` tick, merging packets of the same
+   tick. Draw each entity using the type name from the type table; entities
+   whose `owner` equals your player id are yours.
+6. On `event` `player_left`, show that the player left. On any `disconnect`,
+   or after 5 seconds without a packet, consider the connection over.
+7. Before quitting, send `disconnect(normal)`.
+
+## Security Considerations
+
+The server and the clients treat every datagram as hostile.
+
+| Threat | Mitigation |
+|---|---|
+| Malformed or truncated packets crashing a peer | Every read is bounds-checked; the header, the exact payload size and every field range are validated before use; invalid datagrams are dropped and logged |
+| Oversized datagrams | Datagrams above 1200 bytes are dropped, never truncated or reassembled |
+| Memory exhaustion through announced counts | Counts (`entity_count`, `type_count`) are checked against the bytes actually present **before** allocating |
+| Flooding the server | The receive queue is bounded (4096 messages); extra messages are dropped. Sessions are limited to `max_players` |
+| Cheating by sending positions | Clients only send inputs (one bit and two values in `{-1, 0, 1}`); the server computes every position |
+| Replayed or reordered inputs | Inputs older than the last accepted sequence are ignored |
+| Spoofed packets from another endpoint | Messages from an endpoint without a session are ignored. The protocol has no authentication or encryption: an attacker who can spoof a player's IP address and port can inject inputs for that player. This is accepted for a LAN game and listed as future work |
+| Memory disclosure | C++ object memory is never sent; every field is written explicitly in big-endian order |
+
+Only `connect_request` creates state on the server, and only up to
+`max_players` sessions; each expires after 5 seconds of silence.
