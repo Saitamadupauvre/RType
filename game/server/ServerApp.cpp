@@ -11,6 +11,7 @@
 
 #include "ActionCodec.hpp"
 #include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/Components.hpp"
 #include "engine/core/Entity.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
@@ -79,6 +80,7 @@ ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig
     register_if_missing<engine::network::Replicated>(registry_);
     register_if_missing<engine::core::Position>(registry_);
     register_if_missing<engine::core::Velocity>(registry_);
+    register_if_missing<engine::core::Sprite>(registry_);
     events_.subscribe<engine::network::PlayerJoined>(
         [this](const engine::network::PlayerJoined& joined) {
             _runtime.player_joined(joined.player_id);
@@ -118,8 +120,9 @@ void ServerApp::apply_inputs(const std::vector<engine::network::PlayerInput>& in
 
 void ServerApp::replicate() {
     std::vector<std::pair<engine::core::Entity, engine::network::Replicated>> updates;
-    registry_.query<engine::core::Position>().each(
-        [&](engine::core::Entity entity, const engine::core::Position&) {
+    registry_.query<engine::core::Position, engine::core::Sprite>().each(
+        [&](engine::core::Entity entity, const engine::core::Position&,
+            const engine::core::Sprite&) {
             const auto type = _runtime.entity_type(entity);
             if (!type) {
                 return;

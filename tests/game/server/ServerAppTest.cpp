@@ -9,6 +9,7 @@
 
 #include "ServerApp.hpp"
 #include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/Components.hpp"
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/network/Replicated.hpp"
@@ -67,6 +68,7 @@ TEST(ServerApp, RegistersTheComponentsSentInSnapshots) {
     EXPECT_TRUE(app.registry().is_registered<engine::network::Replicated>());
     EXPECT_TRUE(app.registry().is_registered<engine::core::Position>());
     EXPECT_TRUE(app.registry().is_registered<engine::core::Velocity>());
+    EXPECT_TRUE(app.registry().is_registered<engine::core::Sprite>());
 }
 
 TEST(ServerApp, TickRunsSystemsWithTheFixedStep) {
@@ -164,6 +166,17 @@ TEST(ServerApp, EntitiesNotSpawnedByScriptsAreNotReplicated) {
     app.replicate();
 
     EXPECT_FALSE(app.registry().has<engine::network::Replicated>(native));
+}
+
+TEST(ServerApp, ScriptEntitiesWithoutSpriteOrColorAreNotReplicated) {
+    const ManualClock clock;
+    ServerApp app(clock, config, players_scripts);
+    const auto scenery = app.script().spawn("scenery");
+    ASSERT_TRUE(scenery.has_value());
+
+    app.replicate();
+
+    EXPECT_FALSE(app.registry().has<engine::network::Replicated>(*scenery));
 }
 
 TEST(ServerApp, LeavingPlayerEntitiesAreDestroyedOnTheNextTick) {
