@@ -7,8 +7,8 @@
 #include "ActionCodec.hpp"
 #include "Cli.hpp"
 #include "Controls.hpp"
+#include "SnapshotView.hpp"
 #include "Starfield.hpp"
-#include "TemporaryNetworkView.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/core/time/SteadyClock.hpp"
@@ -62,6 +62,7 @@ int main(int argc, char** argv) {
 
     engine::core::time::FixedStepLoop loop(clock);
     rtype::client::Starfield starfield(starfield_seed, renderer.virtual_size());
+    rtype::client::SnapshotView view(renderer, executable_dir / "assets");
 
     while (!renderer.should_close()) {
         network.update();
@@ -73,7 +74,7 @@ int main(int argc, char** argv) {
             network.send_input(sent.action_flags, sent.move_x, sent.move_y);
         });
         starfield.draw(renderer);
-        rtype::client::temporary_draw_snapshot(renderer, network.entities(), network.player_id());
+        view.draw(network.entities(), network.types(), network.player_id());
         renderer.end_frame();
     }
 
