@@ -105,7 +105,7 @@ std::optional<ConnectAcceptPayload> decode_connect_accept(std::span<const std::u
     auto sounds = types ? read_type_table(reader) : std::nullopt;
     auto musics = sounds ? read_type_table(reader) : std::nullopt;
     const auto current_music = musics ? reader.read_u16() : std::nullopt;
-    if (!current_music) {
+    if (!types || !sounds || !musics || !current_music) {
         return std::nullopt;
     }
 
