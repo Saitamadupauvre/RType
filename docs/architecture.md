@@ -83,6 +83,204 @@ Third-party headers stay private: `raylib.h` appears only in
 | Physics | `engine-physics` | `PhysicsSystem`, `PhysicsBody`, `AABBCollider` | Integration and collision detection/resolution; the server uses it to find hitbox overlaps |
 | Rendering and input | `engine-graphics` + plugin | `IRenderer`, `IInput`, `load_graphics_plugin` | Backend-independent drawing and keyboard/mouse input |
 
+## Class diagram
+
+The main public engine types and the plugin backends that implement them.
+Method lists are abridged; the headers in `engine/include/engine/` are the
+reference.
+
+```mermaid
+classDiagram
+    direction TB
+
+    namespace core {
+        class Entity {
+            +index() uint32
+            +generation() uint32
+            +id() uint64
+        }
+        class EntityPool {
+            +alive(Entity) bool
+            +size() size_t
+        }
+        class ComponentPool~T~ {
+            +emplace(Entity, Args...) T&
+            +erase(Entity) bool
+            +get(Entity) T&
+            +find(Entity) T*
+            +entities() span~Entity~
+        }
+        class EntityManager {
+            +spawn() Entity
+            +kill(Entity) bool
+            +alive(Entity) bool
+            +register_component~T~()
+            +add~T~(Entity, T) T&
+            +get~T~(Entity) T&
+            +has~T~(Entity) bool
+            +query~T~() ComponentQuery
+        }
+        class SystemScheduler {
+            +add(name, order, SystemFunction) SystemHandle
+            +remove(SystemHandle) bool
+            +run(EntityManager&, float dt)
+        }
+        class EventBus {
+            +subscribe~E~(handler) Subscription
+            +unsubscribe(Subscription)
+            +publish~E~(const E&)
+            +enqueue~E~(E)
+            +dispatch()
+        }
+        class IClock {
+            <<interface>>
+            +now() Duration
+        }
+        class SteadyClock
+        class ManualClock {
+            +advance(Duration)
+        }
+        class FixedStepLoop {
+            +run_frame(Update) size_t
+            +alpha() double
+            +step() Duration
+        }
+        class DynamicLibrary {
+            +symbol~F~(name) F
+            +error() string
+            +close()
+        }
+    }
+
+    namespace script {
+        class ScriptRuntime {
+            +load_scripts(path) bool
+            +attach_world(EntityManager&)
+            +spawn(type, ...) optional~Entity~
+            +player_joined(id) bool
+            +player_left(id) bool
+            +set_player_input(id, InputState)
+            +update(float dt)
+            +collide(Entity, Entity)
+            +flush_destroyed() size_t
+            +take_audio_commands() vector~AudioCommand~
+        }
+    }
+
+    namespace network {
+        class NetworkServer {
+            +start(error_code&) bool
+            +stop()
+            +receive()
+            +inputs() vector~PlayerInput~
+            +send_snapshot(EntityManager&)
+            +stats() vector~PlayerStats~
+        }
+        class NetworkClient {
+            +connect(ip, port, error_code&) bool
+            +update()
+            +send_input(flags, move_x, move_y)
+            +disconnect()
+            +state() ConnectionState
+            +entities() vector~EntitySnapshot~
+            +stats() NetworkStats
+        }
+        class Replicated {
+            +type_id uint16
+            +owner uint8
+        }
+    }
+
+    namespace physics {
+        class PhysicsSystem {
+            +update(float dt)
+            +set_gravity(Vec2)
+            +get_gravity() Vec2
+        }
+    }
+
+    namespace graphics {
+        class IGraphicsBackend {
+            <<interface>>
+            +renderer() IRenderer&
+            +input() IInput&
+        }
+        class IRenderer {
+            <<interface>>
+            +open(WindowConfig) bool
+            +load_texture(path) TextureId
+            +begin_frame(Color)
+            +draw_sprite(SpriteDraw)
+            +draw_text(text, position, size, color)
+            +end_frame()
+        }
+        class IInput {
+            <<interface>>
+            +is_key_down(Key) bool
+            +is_key_pressed(Key) bool
+            +mouse_position() Vec2
+        }
+        class GraphicsPlugin {
+            +backend() IGraphicsBackend&
+        }
+    }
+
+    namespace audio {
+        class IAudio {
+            <<interface>>
+            +open() bool
+            +update()
+            +load_sound(path) SoundId
+            +play_sound(SoundId, volume, pitch)
+            +load_music(path) MusicId
+            +play_music(MusicId, loop)
+        }
+        class NullAudio
+        class AudioPlugin {
+            +backend() IAudio&
+        }
+    }
+
+    namespace plugins {
+        class RaylibBackend
+        class RaylibRenderer
+        class RaylibInput
+        class RaylibAudio
+    }
+
+    EntityManager *-- EntityPool
+    EntityManager *-- "many" ComponentPool~T~
+    EntityPool ..> Entity : hands out
+    SystemScheduler ..> EntityManager : runs systems on
+    IClock <|.. SteadyClock
+    IClock <|.. ManualClock
+    FixedStepLoop --> IClock
+
+    ScriptRuntime --> EntityManager : attached world
+    NetworkServer --> IClock
+    NetworkServer --> EventBus : PlayerJoined / PlayerLeft
+    NetworkServer ..> Replicated : reads to build snapshots
+    NetworkClient --> IClock
+    NetworkClient --> EventBus
+    PhysicsSystem --> EntityManager
+    PhysicsSystem --> EventBus : CollisionEvent
+
+    IGraphicsBackend --> IRenderer
+    IGraphicsBackend --> IInput
+    GraphicsPlugin *-- DynamicLibrary
+    GraphicsPlugin *-- IGraphicsBackend
+    AudioPlugin *-- DynamicLibrary
+    AudioPlugin *-- IAudio
+    IAudio <|.. NullAudio
+
+    IGraphicsBackend <|.. RaylibBackend
+    IRenderer <|.. RaylibRenderer
+    IInput <|.. RaylibInput
+    RaylibBackend *-- RaylibRenderer
+    RaylibBackend *-- RaylibInput
+    IAudio <|.. RaylibAudio
+```
+
 ## Executables
 
 ```mermaid
