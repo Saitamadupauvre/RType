@@ -2,16 +2,12 @@
 find_program(CLANG_FORMAT_EXE NAMES clang-format)
 
 if(CLANG_FORMAT_EXE)
-    # Same files as the CI format check: C++ sources under src/ include/ tests/ bench/.
+    # Same files as the CI format check: C++ sources under engine/ plugins/ game/ tests/.
     file(GLOB_RECURSE rtype_format_sources CONFIGURE_DEPENDS
-        "${PROJECT_SOURCE_DIR}/src/*.cpp" "${PROJECT_SOURCE_DIR}/src/*.cc"
-        "${PROJECT_SOURCE_DIR}/src/*.hpp" "${PROJECT_SOURCE_DIR}/src/*.h"
-        "${PROJECT_SOURCE_DIR}/include/*.cpp" "${PROJECT_SOURCE_DIR}/include/*.cc"
-        "${PROJECT_SOURCE_DIR}/include/*.hpp" "${PROJECT_SOURCE_DIR}/include/*.h"
-        "${PROJECT_SOURCE_DIR}/tests/*.cpp" "${PROJECT_SOURCE_DIR}/tests/*.cc"
-        "${PROJECT_SOURCE_DIR}/tests/*.hpp" "${PROJECT_SOURCE_DIR}/tests/*.h"
-        "${PROJECT_SOURCE_DIR}/bench/*.cpp" "${PROJECT_SOURCE_DIR}/bench/*.cc"
-        "${PROJECT_SOURCE_DIR}/bench/*.hpp" "${PROJECT_SOURCE_DIR}/bench/*.h"
+        "${PROJECT_SOURCE_DIR}/engine/*.cpp" "${PROJECT_SOURCE_DIR}/engine/*.hpp"
+        "${PROJECT_SOURCE_DIR}/plugins/*.cpp" "${PROJECT_SOURCE_DIR}/plugins/*.hpp"
+        "${PROJECT_SOURCE_DIR}/game/*.cpp" "${PROJECT_SOURCE_DIR}/game/*.hpp"
+        "${PROJECT_SOURCE_DIR}/tests/*.cpp" "${PROJECT_SOURCE_DIR}/tests/*.hpp"
     )
     add_custom_target(format
         COMMAND ${CLANG_FORMAT_EXE} -i ${rtype_format_sources}

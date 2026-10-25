@@ -1,22 +1,11 @@
-# Contributing to RType
+# Contributing to R-Type
 
-## Workflow
+The contribution guide is [docs/contributing.md](docs/contributing.md), and
+the full code rules are in [AGENTS.md](AGENTS.md).
 
-1. Open (or pick) an issue, then work on a branch named after it.
-2. Open a pull request that says `Closes #<issue>`; CI must pass before merging.
-3. Pull requests target `dev`; `dev` is merged into `main` for releases.
+In short:
 
-## Build and test
-
-```sh
-cmake --preset debug
-cmake --build --preset debug
-ctest --preset debug
-```
-
-CI runs `cmake --workflow --preset ci`: run it locally before pushing.
-
-## Style
-
-Code is formatted with clang-format (`.clang-format`): run the `format` target
-(`cmake --build --preset debug --target format`) before committing.
+1. One issue → one branch from `dev` → one pull request into `dev` with
+   `Closes #<issue>`.
+2. Every change comes with GoogleTest tests and updated documentation.
+3. Run `./fred.sh all` before pushing; CI must be green before merging.
