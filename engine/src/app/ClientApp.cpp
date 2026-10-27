@@ -31,7 +31,7 @@ script::EventCommand to_command(const network::NamedEvent& event) {
     script::EventCommand command{.name = event.name, .arguments = {}};
     command.arguments.reserve(event.arguments.size());
     for (const auto& argument : event.arguments) {
-        command.arguments.push_back({.key = argument.key, .value = argument.value});
+        command.arguments.emplace_back(argument.key, argument.value);
     }
     return command;
 }
