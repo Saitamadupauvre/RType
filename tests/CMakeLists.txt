@@ -14,6 +14,7 @@ endfunction()
 
 engine_add_test(core SOURCES
     engine/core/EntityTest.cpp
+    engine/core/KeysTest.cpp
     engine/core/EntityPoolTest.cpp
     engine/core/ComponentPoolTest.cpp
     engine/core/ComponentTypeIdTest.cpp
