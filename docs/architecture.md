@@ -182,6 +182,7 @@ classDiagram
             +send_input(flags, move_x, move_y)
             +disconnect()
             +state() ConnectionState
+            +strings() StringTable
             +entities() vector~EntitySnapshot~
             +stats() NetworkStats
         }

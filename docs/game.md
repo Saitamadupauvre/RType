@@ -62,8 +62,9 @@ cannot be bound) and runs it until SIGINT or SIGTERM.
 
 `ServerApp` holds no game rule:
 
-- loads the scripts and builds the replicated type table from the Lua
-  declarations (type id = declaration order, starting at 1);
+- loads the scripts and builds the string table sent to clients from the Lua
+  declarations: entity types, sounds and musics, each numbered from 1 in
+  declaration order;
 - forwards `PlayerJoined` / `PlayerLeft` from the network to Lua
   `on_player_joined` / `on_player_left`;
 - each tick: receive, apply each player's input, `update` the scripts,

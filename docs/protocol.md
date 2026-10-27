@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Category | Informational |
-| Protocol version | `3` |
+| Protocol version | `4` |
 | Transport | UDP |
 | Implementation | `engine/src/network/` |
 
@@ -49,7 +49,7 @@ Every datagram consists of a 13-byte header followed by `payload_size` payload b
 | Offset | Size | Field | Encoding | Value |
 |---|---:|---|---|---|
 | 0 | 4 | `magic` | Unsigned 32-bit, big-endian | `0x52545950` (`RTYP`) |
-| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `3` |
+| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `4` |
 | 6 | 1 | `type` | Unsigned 8-bit | Message type |
 | 7 | 4 | `sequence` | Unsigned 32-bit, big-endian | Sender packet sequence |
 | 11 | 2 | `payload_size` | Unsigned 16-bit, big-endian | Number of bytes after the header |
@@ -69,7 +69,7 @@ Receivers must reject a datagram when its size is smaller than 13 bytes, its mag
 | 6 | `heartbeat` | Both directions | Unreliable |
 | 7 | `disconnect` | Both directions | Reliable |
 
-The "Delivery" column states the intended guarantee. In version 3 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
+The "Delivery" column states the intended guarantee. In version 4 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
 
 ## Connection Payloads
 
@@ -85,11 +85,16 @@ The payload is exactly four bytes.
 
 ### Connect Accept
 
-The server sends this message to the endpoint that sent the matching request. It carries three tables that map the numeric IDs used by snapshots and events to names:
+The server sends this message to the endpoint that sent the matching request. It carries one **string table** that maps the numeric IDs used by snapshots and events to names. Each entry belongs to a category, and each category has its own ID space:
 
-- the **type table** names the entity types of snapshots and `spawn` events;
-- the **sound table** names the sounds of `sound` events;
-- the **music table** names the musics of `music` events.
+| Value | Category | Names |
+|---:|---|---|
+| 0 | `type` | entity types of snapshots and `spawn` events |
+| 1 | `sound` | sounds of `sound` events |
+| 2 | `music` | musics of `music` events |
+| 3 | `event` | game events (reserved for a later version) |
+| 4 | `shader` | shaders (reserved for a later version) |
+| 5 | `field` | replicated component fields (reserved for a later version) |
 
 Sound and music names are file names (for R-Type, files under the client's `assets/sounds/` and `assets/music/` folders). Then comes the music the server is playing, so that a player joining mid-game hears it.
 
@@ -97,25 +102,22 @@ Sound and music names are file names (for R-Type, files under the client's `asse
 |---|---:|---|---|
 | 0 | 4 | `client_nonce` | Unsigned 32-bit, big-endian |
 | 4 | 4 | `player_entity_id` | Unsigned 32-bit, big-endian: the player id of this client (1 to `max_players`) |
-| 8 | 2 | `type_count` | Unsigned 16-bit, big-endian |
-| 10 | Variable | `type_entries` | `type_count` entries |
-| … | 2 | `sound_count` | Unsigned 16-bit, big-endian |
-| … | Variable | `sound_entries` | `sound_count` entries |
-| … | 2 | `music_count` | Unsigned 16-bit, big-endian |
-| … | Variable | `music_entries` | `music_count` entries |
-| … | 2 | `current_music` | Unsigned 16-bit, big-endian: a `music_entries` id, or `0xFFFF` for no music |
+| 8 | 2 | `string_count` | Unsigned 16-bit, big-endian |
+| 10 | Variable | `string_entries` | `string_count` entries |
+| … | 2 | `current_music` | Unsigned 16-bit, big-endian: the id of a `music` entry, or `0xFFFF` for no music |
 
-The payload is at least 16 bytes (every table empty). Type, sound and music entries share the following layout, with `type_id` holding the sound or music id:
+The payload is at least 12 bytes (empty table). Each entry has the following layout:
 
 | Offset | Size | Field | Encoding |
 |---|---:|---|---|
-| 0 | 2 | `type_id` | Unsigned 16-bit, big-endian |
-| 2 | 1 | `name_length` | Unsigned 8-bit, from 1 to 63 |
-| 3 | Variable | `name` | Opaque bytes, exactly `name_length` bytes |
+| 0 | 1 | `category` | Unsigned 8-bit, a value of the category table above |
+| 1 | 2 | `id` | Unsigned 16-bit, big-endian, from 0 to `0xFFFE` |
+| 3 | 1 | `name_length` | Unsigned 8-bit, from 1 to 63 |
+| 4 | Variable | `name` | Opaque bytes, exactly `name_length` bytes |
 
-Names are compared byte for byte and are not validated as UTF-8.
+Names are compared byte for byte and are not validated as UTF-8. The whole table must fit in one packet: a server whose names do not fit refuses to start.
 
-The receiver rejects, within one table, duplicate IDs or duplicate names; a name length of 0 or above 63; truncated entries or entries extending beyond the declared payload length; a music entry with id `0xFFFF`; and a `current_music` that is neither `0xFFFF` nor an id of the music table. The same name MAY appear in different tables.
+The receiver rejects an unknown category; within one category, duplicate IDs or duplicate names; the id `0xFFFF`; a name length of 0 or above 63; truncated entries or entries extending beyond the declared payload length; and a `current_music` that is neither `0xFFFF` nor the id of a `music` entry. The same ID or name MAY appear in different categories.
 
 A client MUST NOT use a sound or music name as a path without checking it: R-Type only loads names made of letters, digits, `_`, `-` and `.`, not starting with `.`, and ignores the others.
 
@@ -123,7 +125,7 @@ A client MUST NOT use a sound or music name as a path without checking it: R-Typ
 
 1. The client sends `connect_request` with a fresh `client_nonce`. Without an answer it resends the request after a retry interval, and gives up after a bounded number of attempts.
 2. The server answers with one of:
-   - `connect_accept` carrying the same nonce, the player ID, the type, sound and music tables and the current music;
+   - `connect_accept` carrying the same nonce, the player ID, the string table and the current music;
    - `disconnect` with reason `server_full` when every player slot is taken. The number of slots is set by the game (`r-type_server --max-players`, 1 to 4, default 4). No session is created.
 3. A repeated `connect_request` from an endpoint that already has a session is answered with `connect_accept` again, with the same player ID. It does not create a second session.
 4. Once connected, the client sends `heartbeat` at a fixed interval and the server answers each one with `heartbeat`. Any valid packet from the client refreshes its session.
@@ -183,7 +185,7 @@ The client keeps the world of the newest `server_tick` it has received, comparin
 - another packet of the same tick is merged in, an entity already present being updated rather than duplicated;
 - an older tick is ignored.
 
-The receiver rejects a snapshot unless its payload size is exactly `6 + entity_count * 19` and every `type_id` exists in the connection type table.
+The receiver rejects a snapshot unless its payload size is exactly `6 + entity_count * 19` and every `type_id` is the id of a `type` entry of the connection string table.
 
 ## Event Payload
 
@@ -212,13 +214,13 @@ The `destroy` event payload is five bytes: one-byte event type `2` followed by a
 
 The `fire` event payload is nine bytes: one-byte event type `3`, followed by unsigned 32-bit big-endian `source_entity_id` and `projectile_entity_id`.
 
-The `sound` event payload is seven bytes: one-byte event type `4`, followed by unsigned 32-bit big-endian `source_entity_id` and unsigned 16-bit big-endian `sound_id`. `sound_id` is an id of the sound table. `source_entity_id` is the entity that played the sound, or `0xFFFFFFFF` when none did.
+The `sound` event payload is seven bytes: one-byte event type `4`, followed by unsigned 32-bit big-endian `source_entity_id` and unsigned 16-bit big-endian `sound_id`. `sound_id` is the id of a `sound` entry of the string table. `source_entity_id` is the entity that played the sound, or `0xFFFFFFFF` when none did.
 
 The `music` event payload is three bytes: one-byte event type `6` followed by the unsigned 16-bit big-endian `music_id` of the music to play in a loop from its start, replacing the current one. `0xFFFF` stops the music. The server remembers the last music sent and puts it in the `current_music` of every later `connect_accept`.
 
 The `player_left` event payload is five bytes: one-byte event type `5` followed by the unsigned 32-bit big-endian `player_entity_id` of the player whose session ended.
 
-The receiver rejects unknown event types, an event with an incorrect fixed payload size, and a spawn event with an unknown `type_id`. A `sound` or `music` event with an id missing from its table is ignored.
+The receiver rejects unknown event types, an event with an incorrect fixed payload size, and a spawn event with an unknown `type_id`. A `sound` or `music` event with an id missing from its category is ignored.
 
 The server sends the events of a tick to every connected session after the tick, in the order they happened, before that tick's snapshot. An event goes only to the sessions that existed when it happened: a client that connects later never receives earlier events. A client drops every snapshot and event that arrives before `connect_accept`. Until acknowledgements exist (a later protocol version), events are sent once and are not retransmitted.
 
@@ -298,16 +300,16 @@ A minimal client:
    server. Resend it every 500 ms until an answer arrives; give up after a few
    attempts.
 2. On `connect_accept` with your nonce: remember your player id
-   (`player_entity_id`), the type, sound and music tables, and start
+   (`player_entity_id`), the string table, and start
    `current_music` unless it is `0xFFFF`. On `disconnect(server_full)`: stop.
 3. Every tick (60 Hz), send an `input` with your current actions. Number every
    packet you send with an increasing sequence.
 4. Send a `heartbeat` every second.
 5. Keep the world of the newest `snapshot` tick, merging packets of the same
-   tick. Draw each entity using the type name from the type table; entities
+   tick. Draw each entity using its `type` name from the string table; entities
    whose `owner` equals your player id are yours.
-6. On `event` `sound`, play the sound named by the sound table; on `event`
-   `music`, loop the music named by the music table, or stop it on `0xFFFF`.
+6. On `event` `sound`, play the `sound` entry of that id; on `event`
+   `music`, loop the `music` entry of that id, or stop it on `0xFFFF`.
    On `event` `player_left`, show that the player left. On any `disconnect`,
    or after 5 seconds without a packet, consider the connection over.
 7. Before quitting, send `disconnect(normal)`.

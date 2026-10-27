@@ -126,7 +126,7 @@ spawn(kind, { x = config.world.width, y = math.random(0, config.world.height - c
 
 **5. Run it.** Rebuild (the build copies `scripts/` and `assets/` next to the
 executables) and restart the server. No C++ change, no new network message:
-the new type is added to the type table sent at connection.
+the new type is added to the string table sent at connection.
 
 **6. Keep the test fixture in sync** (see [Tests](#tests)).
 

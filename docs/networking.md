@@ -98,7 +98,7 @@ input and its sequence, packet sequence counter.
 
 | Message from | Result |
 |---|---|
-| New endpoint, `connect_request`, slot free | Session created, `connect_accept` with player id and type table, `PlayerJoined` published |
+| New endpoint, `connect_request`, slot free | Session created, `connect_accept` with player id and string table, `PlayerJoined` published |
 | New endpoint, `connect_request`, server full | `disconnect(server_full)`, no session |
 | Known endpoint, `connect_request` | Same `connect_accept` again (idempotent) |
 | Known endpoint, `input` | Stored if its sequence is newer than the last accepted one; older or duplicated inputs are ignored |
@@ -122,9 +122,10 @@ tick (`EntitySpawned`, `EntityDestroyed`, `ShotFired`, `SoundPlayed`, `MusicChan
 before the snapshot, in order, to the sessions connected when they happened.
 
 `ServerApp` decides what is replicated: every scripted entity with a sprite or
-a colour gets `Replicated { type_id, owner }`; the type table is built from
-the Lua declarations and sent in `connect_accept`, with the sound and music
-tables built from `sounds { ... }` / `musics { ... }`. After each tick it turns
+a colour gets `Replicated { type_id, owner }`. One `StringTable` holds the
+names sent in `connect_accept`: entity types from the Lua declarations (category
+`type`), sounds and musics from `sounds { ... }` / `musics { ... }` (`sound`,
+`music`); each category numbers its names from 1 in declaration order. After each tick it turns
 the scripts' `play` / `music` requests into `SoundPlayed` / `MusicChanged`.
 The server remembers the last music so `connect_accept` gives it to players
 joining later; the client publishes it as a `MusicChanged` on accept.
