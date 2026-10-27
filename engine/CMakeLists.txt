@@ -83,6 +83,7 @@ target_include_directories(engine-network PRIVATE src/network)
 
 engine_add_module(graphics
     SOURCES
+        src/graphics/InputCapture.cpp
         src/graphics/Interfaces.cpp
         src/graphics/PluginLoader.cpp
     DEPENDS engine::core

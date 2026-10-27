@@ -82,6 +82,7 @@ engine_add_test(physics SOURCES
 )
 engine_add_test(graphics SOURCES
     engine/graphics/BackendTest.cpp
+    engine/graphics/InputCaptureTest.cpp
     engine/graphics/TypesTest.cpp
     engine/graphics/PluginLoaderTest.cpp
 )
