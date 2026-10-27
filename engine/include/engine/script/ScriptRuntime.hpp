@@ -1,23 +1,23 @@
 #pragma once
 
+#include <concepts>
 #include <cstddef>
-#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 #include <vector>
 
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
-#include "engine/core/InputState.hpp"
 #include "engine/core/Vec2.hpp"
-#include "engine/script/AudioCommand.hpp"
+#include "engine/script/ApiSet.hpp"
 #include "engine/script/Declaration.hpp"
-#include "engine/script/EventCommand.hpp"
 #include "engine/script/Export.hpp"
+#include "engine/script/ScriptRuntimeBuilder.hpp"
 
 namespace engine::script {
 
@@ -33,22 +33,40 @@ namespace engine::script {
  * the chunk name and line (for example "scripts/bydo.lua:14: attempt to index a nil value") and
  * the runtime stays usable.
  *
- * @note Not thread safe. Not copyable or movable.
+ * The runtime itself only holds the core API: the sandbox, `entity`, `system`, `require` and the
+ * declarations `sounds`, `musics` and `event`. Everything else comes from the API sets chosen
+ * with builder(), such as ServerApi or ClientApi; the functions of a set that was not added do
+ * not exist in the sandbox.
+ *
+ * @note Not thread safe. Not copyable. A moved-from runtime can only be destroyed or assigned.
  */
 class ENGINE_SCRIPT_EXPORT ScriptRuntime {
 public:
     /**
-     * @brief Creates a fresh Lua state with the safe libraries opened.
+     * @brief Starts building a runtime.
      *
-     * @throws std::bad_alloc If the Lua state cannot be allocated.
+     * `ScriptRuntime::builder().build()` creates a runtime with the core API only.
      */
-    ScriptRuntime();
+    [[nodiscard]] static ScriptRuntimeBuilder builder();
+
     ~ScriptRuntime();
 
     ScriptRuntime(const ScriptRuntime&) = delete;
     ScriptRuntime& operator=(const ScriptRuntime&) = delete;
-    ScriptRuntime(ScriptRuntime&&) = delete;
-    ScriptRuntime& operator=(ScriptRuntime&&) = delete;
+    ScriptRuntime(ScriptRuntime&&) noexcept;
+    ScriptRuntime& operator=(ScriptRuntime&&) noexcept;
+
+    /**
+     * @brief Returns an API set added with ScriptRuntimeBuilder::with().
+     *
+     * The reference stays valid until the runtime is destroyed, even if the runtime is moved.
+     *
+     * @tparam Set ServerApi, ClientApi or EditorApi.
+     * @throws std::out_of_range If @p Set was not added to this runtime.
+     */
+    template <std::derived_from<ApiSet> Set> [[nodiscard]] Set& api() {
+        return static_cast<Set&>(find_api(typeid(Set)));
+    }
 
     /**
      * @brief Loads and runs a Lua file.
@@ -86,6 +104,11 @@ public:
      * of its declarations are registered and the error is logged with both file paths for a
      * duplicate. Other files keep loading. Files declaring nothing and reserved names are logged at
      * Level::Warn.
+     *
+     * A declaration may hold `server = { ... }` and `client = { ... }` tables. The section read by
+     * an API set of this runtime is merged into the prefab; both are then removed from it, so a
+     * core-only runtime reads neither. A section that is not a table, or that sets a name the
+     * declaration already sets, rejects the file.
      *
      * @param root Script folder. Paths in messages and in DeclarationInfo are relative to it.
      * @return true if every file loaded, `main.lua` exists and `on_start()` did not fail; false
@@ -170,53 +193,6 @@ public:
     bool call(core::Entity entity, std::string_view method) noexcept;
 
     /**
-     * @brief Sets the actions an entity reads through `self.input` until the next call.
-     *
-     * Entities never given an input read a neutral one: every axis is 0, nothing is pressed.
-     *
-     * @param entity Entity returned by spawn(). Unknown entities are ignored.
-     * @param input Actions for the coming ticks.
-     */
-    void set_input(core::Entity entity, core::InputState input) noexcept;
-
-    /**
-     * @brief Registers a connected player and calls `on_player_joined(player)` from `main.lua`.
-     *
-     * The player gets the lowest free slot, starting at 0, and a neutral input. Scripts give it
-     * entities by setting their `owner` field; those entities then read the player's input
-     * through `self.input`. The callback is optional and protected: an error is logged.
-     *
-     * @param player_id Identifier chosen by the caller, unique among connected players.
-     * @return true if the player was added and the callback, when defined, ran to completion;
-     * false if @p player_id is already connected (logged, nothing changes) or the callback failed.
-     * @note Never throws.
-     */
-    bool player_joined(std::uint32_t player_id) noexcept;
-
-    /**
-     * @brief Calls `on_player_left(player)` from `main.lua`, then forgets the player.
-     *
-     * Without that callback, every entity the player owns is marked for destruction and removed
-     * by the next flush_destroyed(). With it, the script decides; entities still owned afterwards
-     * read a nil `owner` and a neutral input.
-     *
-     * @param player_id Player registered by player_joined().
-     * @return true if the player was removed and the callback, when defined, ran to completion;
-     * false if @p player_id is unknown (logged) or the callback failed. The player is removed
-     * even when the callback fails.
-     * @note Never throws.
-     */
-    bool player_left(std::uint32_t player_id) noexcept;
-
-    /**
-     * @brief Sets the actions read by every entity owned by a player until the next call.
-     *
-     * @param player_id Player registered by player_joined(). Unknown players are ignored.
-     * @param input Actions for the coming ticks.
-     */
-    void set_player_input(std::uint32_t player_id, core::InputState input) noexcept;
-
-    /**
      * @brief Lists the names of the declared entity types, in ascending order.
      *
      * The order is stable for a given set of scripts, so two processes loading the same scripts
@@ -243,20 +219,6 @@ public:
     [[nodiscard]] std::vector<std::string> music_names() const;
 
     /**
-     * @brief Returns the audio requests queued by scripts since the last call, in call order,
-     * and empties the queue.
-     *
-     * Scripts queue them with `play(name)`, `play(name, entity)`, `music(name)` and
-     * `music(nil)`. The runtime plays nothing itself: the host plays the commands or sends them
-     * to clients, typically once per tick. An undeclared name or an argument of the wrong type
-     * raises a Lua error, logged by the protected call that runs the script. At most
-     * 64 commands are kept between two calls; later ones are dropped and logged once.
-     *
-     * @note Never throws.
-     */
-    [[nodiscard]] std::vector<AudioCommand> take_audio_commands() noexcept;
-
-    /**
      * @brief Lists the events declared with `event "name" { key = "kind", ... }`, in ascending
      * order.
      *
@@ -275,34 +237,12 @@ public:
     [[nodiscard]] std::vector<std::string> event_keys() const;
 
     /**
-     * @brief Returns the events queued by scripts since the last call, in call order, and
-     * empties the queue.
-     *
-     * Scripts queue them with `emit(name)` or `emit(name, { key = value, ... })`. Keys left out
-     * are absent from the command. An undeclared event or key, a value of the wrong kind, a
-     * non-finite float or a string longer than `max_event_text_length` bytes raises a Lua error
-     * and queues nothing. At most 64 events are kept between two calls; later ones are dropped
-     * and logged once.
-     *
-     * @note Never throws.
-     */
-    [[nodiscard]] std::vector<EventCommand> take_event_commands() noexcept;
-
-    /**
      * @brief Returns the declared type of an entity spawned by this runtime.
      *
      * @return The type name, or std::nullopt for entities this runtime did not spawn or already
      * released.
      */
     [[nodiscard]] std::optional<std::string> entity_type(core::Entity entity) const;
-
-    /**
-     * @brief Returns the connected player that owns an entity.
-     *
-     * @return The owner's id, or std::nullopt if the entity is unknown, has no owner, or its
-     * owner has left.
-     */
-    [[nodiscard]] std::optional<std::uint32_t> entity_owner(core::Entity entity) const;
 
     /**
      * @brief Advances every live entity by one tick.
@@ -347,7 +287,13 @@ public:
     std::size_t flush_destroyed() noexcept;
 
 private:
+    friend class ScriptRuntimeBuilder;
+
     struct Impl;
+
+    explicit ScriptRuntime(std::vector<std::unique_ptr<ApiSet>> sets);
+    [[nodiscard]] ApiSet& find_api(const std::type_info& type) const;
+
     std::unique_ptr<Impl> _impl;
 };
 

@@ -6,8 +6,8 @@
 #include <string_view>
 #include <vector>
 
-#include "Sol.hpp"
 #include "engine/script/AudioCommand.hpp"
+#include "lua/Sol.hpp"
 
 namespace engine::script {
 

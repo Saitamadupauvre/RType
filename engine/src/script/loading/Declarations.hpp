@@ -7,8 +7,8 @@
 #include <string_view>
 #include <vector>
 
-#include "Sol.hpp"
 #include "engine/script/Declaration.hpp"
+#include "lua/Sol.hpp"
 
 namespace engine::script {
 
@@ -55,9 +55,5 @@ std::optional<std::vector<Declaration>> resolve_declarations(const PendingFile& 
                                                              const sol::table& environment);
 
 void warn_reserved_names(const Declaration& declaration);
-
-std::string caller_location(lua_State* state);
-
-bool report(const sol::protected_function_result& result);
 
 } // namespace engine::script

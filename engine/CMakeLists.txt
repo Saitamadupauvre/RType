@@ -36,19 +36,27 @@ engine_add_module(physics
 
 engine_add_module(script
     SOURCES
-        src/script/Audio.cpp
-        src/script/Declarations.cpp
-        src/script/Entities.cpp
-        src/script/Events.cpp
-        src/script/EntityFields.cpp
-        src/script/LuaFieldValue.cpp
-        src/script/ModuleLoader.cpp
-        src/script/Players.cpp
-        src/script/ScriptFiles.cpp
+        src/script/ApiSet.cpp
+        src/script/ClientApi.cpp
+        src/script/EditorApi.cpp
         src/script/ScriptRuntime.cpp
+        src/script/ScriptRuntimeBuilder.cpp
+        src/script/ServerApi.cpp
+        src/script/audio/Audio.cpp
+        src/script/entity/Entities.cpp
+        src/script/entity/EntityFields.cpp
+        src/script/event/Events.cpp
+        src/script/loading/Declarations.cpp
+        src/script/loading/ModuleLoader.cpp
+        src/script/loading/ScriptFiles.cpp
+        src/script/loading/Sections.cpp
+        src/script/lua/LuaErrors.cpp
+        src/script/lua/LuaFieldValue.cpp
+        src/script/player/Players.cpp
     DEPENDS engine::core
     PRIVATE_DEPENDS engine::physics sol2::sol2 engine_lua
 )
+target_include_directories(engine-script PRIVATE src/script)
 
 engine_add_module(network
     SOURCES

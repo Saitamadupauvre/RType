@@ -10,9 +10,9 @@
 #include <utility>
 #include <variant>
 
-#include "Declarations.hpp"
-#include "LuaFieldValue.hpp"
 #include "engine/core/log/Log.hpp"
+#include "lua/LuaErrors.hpp"
+#include "lua/LuaFieldValue.hpp"
 
 namespace engine::script {
 
@@ -171,6 +171,8 @@ void Events::emit(sol::this_state state, const sol::object& name, const sol::obj
     }
     queue(std::move(command));
 }
+
+bool Events::contains(std::string_view name) const { return _schemas.contains(name); }
 
 std::vector<std::string> Events::names() const {
     std::vector<std::string> names;

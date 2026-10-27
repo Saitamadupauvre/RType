@@ -2,9 +2,9 @@
 
 #include <string_view>
 
-#include "Sol.hpp"
 #include "engine/core/FieldRegistry.hpp"
 #include "engine/core/Vec2.hpp"
+#include "lua/Sol.hpp"
 
 namespace engine::script {
 

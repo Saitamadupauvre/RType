@@ -3,11 +3,12 @@
 #include <cstddef>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include "Sol.hpp"
 #include "engine/core/FieldRegistry.hpp"
 #include "engine/script/EventCommand.hpp"
+#include "lua/Sol.hpp"
 
 namespace engine::script {
 
@@ -21,6 +22,7 @@ public:
     sol::object declare(sol::this_state state, const sol::object& name);
     void emit(sol::this_state state, const sol::object& name, const sol::object& arguments);
 
+    [[nodiscard]] bool contains(std::string_view name) const;
     [[nodiscard]] std::vector<std::string> names() const;
     [[nodiscard]] std::vector<std::string> keys() const;
     [[nodiscard]] std::vector<EventCommand> take_commands() noexcept;

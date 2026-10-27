@@ -7,9 +7,9 @@
 #include <stdexcept>
 #include <utility>
 
-#include "Declarations.hpp"
-#include "Entities.hpp"
 #include "engine/core/log/Log.hpp"
+#include "entity/Entities.hpp"
+#include "lua/LuaErrors.hpp"
 
 namespace engine::script {
 

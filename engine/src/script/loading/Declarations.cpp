@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "engine/core/log/Log.hpp"
+#include "lua/LuaErrors.hpp"
 
 namespace engine::script {
 
@@ -14,14 +15,15 @@ namespace {
 
 namespace log = engine::core::log;
 
-constexpr std::array<std::string_view, 22> reserved_globals{
+constexpr std::array<std::string_view, 23> reserved_globals{
     "entity", "system", "query", "spawn",  "find_all", "find_first",  "count", "after",
     "every",  "wait",   "play",  "music",  "sounds",   "musics",      "event", "emit",
-    "random", "world",  "log",   "synced", "players",  "find_player",
+    "random", "world",  "log",   "synced", "players",  "find_player", "on",
 };
 
-constexpr std::array<std::string_view, 9> engine_owned_fields{
-    "age", "id", "type", "input", "owner", "destroy", "has_tag", "get_field", "set_field"};
+constexpr std::array<std::string_view, 11> engine_owned_fields{
+    "age",     "id",        "type",      "input",  "owner", "destroy",
+    "has_tag", "get_field", "set_field", "server", "client"};
 
 constexpr std::array<std::string_view, 5> callbacks{"on_spawn", "update", "on_collide",
                                                     "on_destroy", "behavior"};
@@ -67,22 +69,6 @@ DeclarationScope::~DeclarationScope() {
 
 std::string_view kind_name(DeclarationKind kind) {
     return kind == DeclarationKind::Entity ? "entity" : "system";
-}
-
-std::string caller_location(lua_State* state) {
-    luaL_where(state, 1);
-    std::string location = lua_tostring(state, -1);
-    lua_pop(state, 1);
-    return location;
-}
-
-bool report(const sol::protected_function_result& result) {
-    if (result.valid()) {
-        return true;
-    }
-    const sol::error error = result;
-    log::error("lua: {}", error.what());
-    return false;
 }
 
 sol::object make_declarator(sol::this_state state, const std::shared_ptr<PendingFile>& file,

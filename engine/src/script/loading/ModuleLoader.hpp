@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Sol.hpp"
+#include "lua/Sol.hpp"
 
 namespace engine::script {
 

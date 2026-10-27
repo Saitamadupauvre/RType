@@ -10,11 +10,12 @@
 #include <unordered_map>
 #include <utility>
 
-#include "Declarations.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/physics/Components.hpp"
+#include "loading/Declarations.hpp"
+#include "lua/LuaErrors.hpp"
 
 namespace engine::script {
 
@@ -22,7 +23,7 @@ namespace {
 
 namespace log = engine::core::log;
 
-constexpr std::array<std::string_view, 4> read_only_fields{"id", "type", "age", "input"};
+constexpr std::array<std::string_view, 3> read_only_fields{"id", "type", "age"};
 
 bool is_read_only(std::string_view name) {
     return std::ranges::find(read_only_fields, name) != read_only_fields.end();
@@ -36,46 +37,6 @@ template <typename Component> void register_if_missing(core::EntityManager& worl
     if (!world.is_registered<Component>()) {
         world.register_component<Component>();
     }
-}
-
-std::string describe_name(const sol::object& name) {
-    if (name.get_type() == sol::type::string) {
-        return std::format("'{}'", name.as<std::string_view>());
-    }
-    return std::format("of type {}", sol::type_name(name.lua_state(), name.get_type()));
-}
-
-bool input_key(const core::InputState& input, const sol::object& name, sol::this_state state) {
-    const auto key = name.get_type() == sol::type::string
-                         ? core::key_from_name(name.as<std::string_view>())
-                         : std::nullopt;
-    if (!key) {
-        throw std::runtime_error(std::format("{}input:key: unknown key {}", caller_location(state),
-                                             describe_name(name)));
-    }
-    return input.keys.contains(*key);
-}
-
-bool input_mouse(const core::InputState& input, const sol::object& name, sol::this_state state) {
-    const auto button = name.get_type() == sol::type::string
-                            ? core::mouse_button_from_name(name.as<std::string_view>())
-                            : std::nullopt;
-    if (!button) {
-        throw std::runtime_error(std::format("{}input:mouse: unknown mouse button {}",
-                                             caller_location(state), describe_name(name)));
-    }
-    return input.mouse_buttons.contains(*button);
-}
-
-sol::variadic_results input_pointer(const core::InputState& input, sol::this_state state) {
-    sol::variadic_results results;
-    if (!input.pointer) {
-        results.push_back(sol::make_object(state, sol::lua_nil));
-        return results;
-    }
-    results.push_back(sol::make_object(state, input.pointer->x));
-    results.push_back(sol::make_object(state, input.pointer->y));
-    return results;
 }
 
 constexpr std::size_t max_table_depth = 64;
@@ -109,8 +70,8 @@ sol::table copy_table(sol::state& lua, const sol::table& source, TableCopies& co
 
 } // namespace
 
-Entities::Entities(sol::state& lua, const Players& players, const core::FieldRegistry& fields)
-    : _lua(lua), _players(players), _fields(fields), _methods(lua.create_table()) {
+Entities::Entities(sol::state& lua, const core::FieldRegistry& fields)
+    : _lua(lua), _fields(fields), _methods(lua.create_table()) {
     sol::table types = _lua.create_table();
     types.new_usertype<EntityHandle>(
         "EntityHandle", sol::no_constructor, sol::meta_function::index,
@@ -120,8 +81,6 @@ Entities::Entities(sol::state& lua, const Players& players, const core::FieldReg
         sol::meta_function::new_index,
         [this](sol::this_state state, const EntityHandle& handle, const sol::object& key,
                const sol::object& value) { set(state, handle, key, value); });
-    types.new_usertype<core::InputState>("InputState", sol::no_constructor, "key", &input_key,
-                                         "mouse", &input_mouse, "pointer", &input_pointer);
     _methods.set_function("destroy", [this](sol::this_state state, const EntityHandle& handle) {
         destroy(state, handle);
     });
@@ -137,6 +96,14 @@ Entities::Entities(sol::state& lua, const Players& players, const core::FieldReg
                                               const sol::object& value) {
         set_field(state, handle, component, field, value);
     });
+}
+
+void Entities::add_handle_field(std::string name, HandleField field) {
+    _handle_fields.insert_or_assign(std::move(name), std::move(field));
+}
+
+void Entities::on_release(std::function<void(core::Entity)> listener) {
+    _release_listeners.push_back(std::move(listener));
 }
 
 void Entities::attach(core::EntityManager& world) {
@@ -180,9 +147,7 @@ std::optional<core::Entity> Entities::spawn(const Declaration& declaration,
                               Record{.type = declaration.name,
                                      .data = std::move(data),
                                      .prefab = declaration.prefab,
-                                     .handle = sol::make_object(_lua, EntityHandle{entity}),
-                                     .input = {},
-                                     .owner = std::nullopt});
+                                     .handle = sol::make_object(_lua, EntityHandle{entity})});
     return entity;
 }
 
@@ -210,7 +175,14 @@ sol::object Entities::spawn_from_lua(sol::this_state state, const Declaration& d
 
 void Entities::finish_spawn(core::Entity entity) { invoke(entity, "on_spawn"); }
 
-void Entities::release(core::Entity entity) { _records.erase(entity.id()); }
+void Entities::release(core::Entity entity) {
+    if (_records.erase(entity.id()) == 0) {
+        return;
+    }
+    for (const auto& listener : _release_listeners) {
+        listener(entity);
+    }
+}
 
 bool Entities::call(core::Entity entity, std::string_view method) {
     const auto found = _records.find(entity.id());
@@ -219,13 +191,6 @@ bool Entities::call(core::Entity entity, std::string_view method) {
         return false;
     }
     return invoke(entity, method);
-}
-
-void Entities::set_input(core::Entity entity, core::InputState input) {
-    const auto found = _records.find(entity.id());
-    if (found != _records.end()) {
-        found->second.input = std::move(input);
-    }
 }
 
 void Entities::update(float dt) {
@@ -314,12 +279,8 @@ sol::object Entities::get(sol::this_state state, const EntityHandle& handle,
         if (name == "age") {
             return sol::make_object(state, record.age);
         }
-        if (name == "input") {
-            return sol::make_object(state, input_of(record));
-        }
-        if (name == "owner") {
-            return record.owner ? player_object(state, *record.owner)
-                                : sol::make_object(state, sol::lua_nil);
+        if (const auto field = _handle_fields.find(name); field != _handle_fields.end()) {
+            return field->second.read(state, handle.entity);
         }
         if (_fields.has_alias(name)) {
             return _fields.read_alias(state, *_world, handle.entity, name);
@@ -345,8 +306,12 @@ void Entities::set(sol::this_state state, const EntityHandle& handle, const sol:
             throw std::runtime_error(
                 std::format("{}entity field '{}' is read-only", caller_location(state), name));
         }
-        if (name == "owner") {
-            set_owner(state, record, value);
+        if (const auto field = _handle_fields.find(name); field != _handle_fields.end()) {
+            if (!field->second.write) {
+                throw std::runtime_error(
+                    std::format("{}entity field '{}' is read-only", caller_location(state), name));
+            }
+            field->second.write(state, handle.entity, value);
             return;
         }
         if (_fields.has_alias(name)) {
@@ -407,17 +372,6 @@ void Entities::doom(core::Entity entity) {
     _doomed.push_back(entity);
 }
 
-std::vector<core::Entity> Entities::owned_by(std::uint32_t player_id) const {
-    std::vector<core::Entity> owned;
-    for (const core::Entity entity : live_entities()) {
-        const Record& record = _records.at(entity.id());
-        if (!record.doomed && record.owner == player_id) {
-            owned.push_back(entity);
-        }
-    }
-    return owned;
-}
-
 std::optional<std::string> Entities::type_of(core::Entity entity) const {
     const auto found = _records.find(entity.id());
     if (found == _records.end()) {
@@ -426,53 +380,8 @@ std::optional<std::string> Entities::type_of(core::Entity entity) const {
     return found->second.type;
 }
 
-std::optional<std::uint32_t> Entities::owner_of(core::Entity entity) const {
-    const auto found = _records.find(entity.id());
-    if (found == _records.end()) {
-        return std::nullopt;
-    }
-    const std::optional<std::uint32_t>& owner = found->second.owner;
-    if (owner.has_value() && _players.contains(owner.value())) {
-        return owner;
-    }
-    return std::nullopt;
-}
-
 sol::object Entities::handle_of(core::Entity entity) const {
     return _records.at(entity.id()).handle;
-}
-
-sol::object Entities::player_object(sol::this_state state, std::uint32_t player_id) const {
-    if (!_players.contains(player_id)) {
-        return sol::make_object(state, sol::lua_nil);
-    }
-    return sol::make_object(state, PlayerHandle{player_id});
-}
-
-const core::InputState& Entities::input_of(const Record& record) const {
-    if (record.owner) {
-        if (const core::InputState* owned = _players.input(*record.owner)) {
-            return *owned;
-        }
-    }
-    return record.input;
-}
-
-void Entities::set_owner(sol::this_state state, Record& record, const sol::object& value) {
-    if (is_nil(value)) {
-        record.owner.reset();
-        return;
-    }
-    if (!value.is<PlayerHandle>()) {
-        throw std::runtime_error(
-            std::format("{}entity field 'owner' must be a player or nil", caller_location(state)));
-    }
-    const std::uint32_t player_id = value.as<PlayerHandle>().id;
-    if (!_players.contains(player_id)) {
-        throw std::runtime_error(
-            std::format("{}player {} is not connected", caller_location(state), player_id));
-    }
-    record.owner = player_id;
 }
 
 bool Entities::has_tag(sol::this_state state, const EntityHandle& handle, std::string_view label) {

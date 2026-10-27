@@ -4,10 +4,10 @@
 #include <string_view>
 #include <vector>
 
-#include "Sol.hpp"
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
+#include "lua/Sol.hpp"
 
 namespace engine::script {
 

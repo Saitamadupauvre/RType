@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <utility>
 
-#include "ScriptFiles.hpp"
+#include "loading/ScriptFiles.hpp"
 
 namespace engine::script {
 

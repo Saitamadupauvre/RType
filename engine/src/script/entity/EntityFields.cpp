@@ -6,9 +6,9 @@
 #include <stdexcept>
 #include <string>
 
-#include "Declarations.hpp"
-#include "LuaFieldValue.hpp"
 #include "engine/physics/Components.hpp"
+#include "lua/LuaErrors.hpp"
+#include "lua/LuaFieldValue.hpp"
 
 namespace engine::script {
 

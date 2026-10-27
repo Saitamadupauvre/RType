@@ -9,7 +9,7 @@
 #include <utility>
 #include <variant>
 
-#include "Declarations.hpp"
+#include "lua/LuaErrors.hpp"
 
 namespace engine::script {
 
