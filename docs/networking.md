@@ -15,7 +15,7 @@ id, inputs made of action bits and two axes, but nothing about R-Type.
 | `engine/network/Client.hpp` | `NetworkClient`, `EntitySnapshot`, `ReplicatedValue`, `ConnectionState` | `r-type_client` |
 | `engine/network/Replicated.hpp` | `Replicated { type_id, owner }` | Marks the entities sent in snapshots |
 | `engine/network/Fields.hpp` | `register_network_fields` | Registers `Replicated.owner` in a `FieldRegistry` |
-| `engine/network/Events.hpp` | `PlayerJoined`, `PlayerLeft`, `Disconnected`, `EntitySpawned`... | Published on the `EventBus` |
+| `engine/network/Events.hpp` | `PlayerJoined`, `PlayerLeft`, `Disconnected`, `NamedEvent`... | Published on the `EventBus` |
 | `engine/network/Stats.hpp` | `NetworkStats`, `PlayerStats` | Traffic statistics |
 
 Both classes are pimpl wrappers: sockets and protocol types never appear in
@@ -123,8 +123,11 @@ with `Replicated`: its `type_id`, then each replicated field it owns as
 `[field_id, kind, value]`. Marking a field replicated needs no network code. The
 entities are split into packets of at most 1181 bytes of records that share the
 same server tick, and queued for every session. Game events published on the bus during the
-tick (`EntitySpawned`, `EntityDestroyed`, `ShotFired`, `SoundPlayed`, `MusicChanged`) are sent
-before the snapshot, in order, to the sessions connected when they happened.
+tick (`SoundPlayed`, `MusicChanged`, `NamedEvent`) are sent before the snapshot, in order, to
+the sessions connected when they happened. A `NamedEvent` is sent with the ids of its name
+(`event` category) and keys (`event_key`); one with a name or key missing from the string table,
+or breaking the limits (16 arguments, 63-byte texts, no list), is dropped and logged. The client
+publishes it back with names.
 
 `ServerApp` decides what is replicated: every scripted entity with a sprite or
 a colour gets `Replicated { type_id, owner }`. Its field registry comes from
@@ -132,8 +135,10 @@ a colour gets `Replicated { type_id, owner }`. Its field registry comes from
 client uses too, so both sides know the same names. One `StringTable` holds the
 names sent in `connect_accept`: entity types from the Lua declarations (category
 `type`), sounds and musics from `sounds { ... }` / `musics { ... }` (`sound`,
-`music`); each category numbers its names from 1 in declaration order. After each tick it turns
-the scripts' `play` / `music` requests into `SoundPlayed` / `MusicChanged`.
+`music`), events and their keys from `event "name" { ... }` (`event`, `event_key`); each
+category numbers its names from 1 in ascending order. After each tick it turns the scripts'
+`play` / `music` requests into `SoundPlayed` / `MusicChanged`, then their `emit` calls into
+`NamedEvent`.
 The server remembers the last music so `connect_accept` gives it to players
 joining later; the client publishes it as a `MusicChanged` on accept.
 

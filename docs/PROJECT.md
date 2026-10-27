@@ -586,6 +586,11 @@ play("explosion.wav", self)      -- with the entity that makes it
 music("stage1.ogg")              -- loop a declared music, replacing the current one
 music(nil)                       -- stop the music
 
+-- game events (sent to clients)
+event "explosion" { at = "vec2", size = "float" }   -- declare, while the scripts load
+emit("explosion", { at = { x = self.x, y = self.y }, size = 2 })
+emit("explosion")                -- arguments left out are simply absent
+
 -- utilities
 random(1, 10)
 world.width, world.height        -- 1920, 1080
@@ -597,6 +602,12 @@ log("message")
 - `sounds` and `musics` take a list of file names and can only be called while the scripts load (top level of any file, or `on_start`). A name is 1 to 63 letters, digits, `_`, `-` or `.`, not starting with `.`. A bad or already declared name raises an error and declares none of the names of that call. R-Type clients look for sounds in `assets/sounds/` and musics in `assets/music/`.
 - `play` and `music` with an undeclared name, or with arguments of the wrong type, raise an error. Nothing is played on the server: the requests are queued, and after each tick the server sends them to every client (`sound` and `music` events, see the [protocol](protocol.md)). At most 64 requests are kept per tick.
 - The current music is also sent to players who join later.
+
+**Event rules.**
+
+- `event "name" { key = "kind", ... }` declares a game event while the scripts load. A name is 1 to 63 letters, digits, `_`, `-` or `.`, starting with a letter (`boss.died`). Keys are Lua identifiers of 1 to 63 characters; kinds are `float`, `int`, `bool`, `string`, `vec2`, `color` or `asset` (no `list`). An event has at most 16 keys. A bad name, key or kind, a name declared twice or a declaration after loading raises an error.
+- `emit(name, arguments)` queues a declared event. `arguments` is a table or `nil`; keys left out are absent from the event. An undeclared event or key, a value of the wrong kind (same conversions as entity fields), a non-finite number, a fractional `int` or a `string`/`asset` longer than 63 bytes raises an error and emits nothing. At most 64 events are kept per tick.
+- After each tick the server sends the queued events to every client (`named` events, see the [protocol](protocol.md)), after that tick's sounds and musics. Event names and keys are sent once in `connect_accept`; a client publishes each event on its event bus as `engine::network::NamedEvent`. Reacting to events in client-side Lua comes with the client script API.
 
 ### 10.7 Systems
 
@@ -724,7 +735,7 @@ end
 - Scripts are written once; the developer does not write network code.
 - All logic (`update`, `on_collide`, `behavior`, systems) runs **on the server only**.
 - Clients load the same declarations only to know how each entity type looks (sprite).
-- `play` and `music` are sent to clients as events; clients receive the declared names in `connect_accept`.
+- `play`, `music` and `emit` are sent to clients as events; clients receive the declared names (and event keys) in `connect_accept`.
 - Native fields are replicated automatically. A free field is replicated only when marked:
 
 ```lua
@@ -751,7 +762,7 @@ Developers must not use these names for their own fields or methods; the engine 
 - Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
 - Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`.
 - Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
 
 ### 10.13 Error handling and sandbox
 

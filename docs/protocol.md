@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Category | Informational |
-| Protocol version | `5` |
+| Protocol version | `6` |
 | Transport | UDP |
 | Implementation | `engine/src/network/` |
 
@@ -49,7 +49,7 @@ Every datagram consists of a 13-byte header followed by `payload_size` payload b
 | Offset | Size | Field | Encoding | Value |
 |---|---:|---|---|---|
 | 0 | 4 | `magic` | Unsigned 32-bit, big-endian | `0x52545950` (`RTYP`) |
-| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `5` |
+| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `6` |
 | 6 | 1 | `type` | Unsigned 8-bit | Message type |
 | 7 | 4 | `sequence` | Unsigned 32-bit, big-endian | Sender packet sequence |
 | 11 | 2 | `payload_size` | Unsigned 16-bit, big-endian | Number of bytes after the header |
@@ -69,7 +69,7 @@ Receivers must reject a datagram when its size is smaller than 13 bytes, its mag
 | 6 | `heartbeat` | Both directions | Unreliable |
 | 7 | `disconnect` | Both directions | Reliable |
 
-The "Delivery" column states the intended guarantee. In version 5 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
+The "Delivery" column states the intended guarantee. In version 6 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
 
 ## Connection Payloads
 
@@ -89,12 +89,13 @@ The server sends this message to the endpoint that sent the matching request. It
 
 | Value | Category | Names |
 |---:|---|---|
-| 0 | `type` | entity types of snapshots and `spawn` events |
+| 0 | `type` | entity types of snapshots |
 | 1 | `sound` | sounds of `sound` events |
 | 2 | `music` | musics of `music` events |
-| 3 | `event` | game events (reserved for a later version) |
+| 3 | `event` | names of `named` events |
 | 4 | `shader` | shaders (reserved for a later version) |
 | 5 | `field` | replicated component fields, named `Component.field` (e.g. `Position.pos`) |
+| 6 | `event_key` | argument keys of `named` events, shared by every event |
 
 Sound and music names are file names (for R-Type, files under the client's `assets/sounds/` and `assets/music/` folders). Then comes the music the server is playing, so that a player joining mid-game hears it.
 
@@ -208,26 +209,12 @@ An event payload begins with a one-byte event type. Each event packet contains o
 
 | Value | Name | Remaining payload |
 |---:|---|---|
-| 1 | `spawn` | `entity_id`, `type_id`, `x`, `y` |
-| 2 | `destroy` | `entity_id` |
-| 3 | `fire` | `source_entity_id`, `projectile_entity_id` |
 | 4 | `sound` | `source_entity_id`, `sound_id` |
 | 5 | `player_left` | `player_entity_id` |
 | 6 | `music` | `music_id` |
+| 7 | `named` | `name_id`, `argument_count`, arguments |
 
-The `spawn` event payload is 11 bytes.
-
-| Offset | Size | Field | Encoding |
-|---|---:|---|---|
-| 0 | 1 | `event_type` | `1` |
-| 1 | 4 | `entity_id` | Unsigned 32-bit, big-endian |
-| 5 | 2 | `type_id` | Unsigned 16-bit, big-endian |
-| 7 | 2 | `x` | Signed 16-bit, big-endian |
-| 9 | 2 | `y` | Signed 16-bit, big-endian |
-
-The `destroy` event payload is five bytes: one-byte event type `2` followed by an unsigned 32-bit big-endian `entity_id`.
-
-The `fire` event payload is nine bytes: one-byte event type `3`, followed by unsigned 32-bit big-endian `source_entity_id` and `projectile_entity_id`.
+Values 1 to 3 (`spawn`, `destroy` and `fire` before version 6) are no longer used and are rejected.
 
 The `sound` event payload is seven bytes: one-byte event type `4`, followed by unsigned 32-bit big-endian `source_entity_id` and unsigned 16-bit big-endian `sound_id`. `sound_id` is the id of a `sound` entry of the string table. `source_entity_id` is the entity that played the sound, or `0xFFFFFFFF` when none did.
 
@@ -235,7 +222,18 @@ The `music` event payload is three bytes: one-byte event type `6` followed by th
 
 The `player_left` event payload is five bytes: one-byte event type `5` followed by the unsigned 32-bit big-endian `player_entity_id` of the player whose session ended.
 
-The receiver rejects unknown event types, an event with an incorrect fixed payload size, and a spawn event with an unknown `type_id`. A `sound` or `music` event with an id missing from its category is ignored.
+The `named` event carries a game-defined event and its arguments. Its payload is at least four bytes:
+
+| Offset | Size | Field | Encoding |
+|---|---:|---|---|
+| 0 | 1 | `event_type` | `7` |
+| 1 | 2 | `name_id` | Unsigned 16-bit, big-endian: id of an `event` entry |
+| 3 | 1 | `argument_count` | Unsigned 8-bit, at most 16 |
+| 4 | | arguments | `argument_count` times `key_id`, `kind`, value |
+
+Each argument is an unsigned 16-bit big-endian `key_id` (id of an `event_key` entry), a one-byte `kind` and a value encoded exactly like a snapshot field value of that kind. `list` is not allowed, and `string` and `asset` values are at most 63 bytes long, so a `named` event always fits in one packet. The server checks no schema: which arguments an event carries is up to the game.
+
+The receiver rejects unknown event types, an event with an incorrect fixed payload size, and a `named` event that is truncated, has trailing bytes, more than 16 arguments, the same `key_id` twice, an unknown or `list` `kind`, a `bool` other than `0` or `1`, a NaN or infinite `float`, or a text longer than 63 bytes. A `sound` or `music` event with an id missing from its category is ignored; a `named` event whose `name_id` or one `key_id` is missing from its category is dropped and logged.
 
 The server sends the events of a tick to every connected session after the tick, in the order they happened, before that tick's snapshot. An event goes only to the sessions that existed when it happened: a client that connects later never receives earlier events. A client drops every snapshot and event that arrives before `connect_accept`. Until acknowledgements exist (a later protocol version), events are sent once and are not retransmitted.
 
@@ -277,34 +275,41 @@ All bytes are hexadecimal.
 `connect_request` with nonce `0x01020304`, sequence `0`:
 
 ```
-52 54 59 50  00 03  01  00 00 00 00  00 04  01 02 03 04
+52 54 59 50  00 06  01  00 00 00 00  00 04  01 02 03 04
 magic        ver    type sequence    size   client_nonce
 ```
 
 `input` holding `fire` and moving left, sequence `42`:
 
 ```
-52 54 59 50  00 03  03  00 00 00 2A  00 03  01  FF  00
+52 54 59 50  00 06  03  00 00 00 2A  00 03  01  FF  00
                                             fire x=-1 y=0
 ```
 
 `heartbeat`, sequence `7`:
 
 ```
-52 54 59 50  00 03  06  00 00 00 07  00 00
+52 54 59 50  00 06  06  00 00 00 07  00 00
 ```
 
 `disconnect` with reason `normal`, sequence `8`:
 
 ```
-52 54 59 50  00 03  07  00 00 00 08  00 01  00
+52 54 59 50  00 06  07  00 00 00 08  00 01  00
 ```
 
 `event` `music` playing music id `1`, sequence `9`:
 
 ```
-52 54 59 50  00 03  05  00 00 00 09  00 03  06  00 01
+52 54 59 50  00 06  05  00 00 00 09  00 03  06  00 01
                                             music music_id
+```
+
+`event` `named` with name id `2` and one `vec2` argument of key id `1` at `(10, -4)`, sequence `10`:
+
+```
+52 54 59 50  00 06  05  00 00 00 0A  00 0A  07  00 02  01  00 01  04  00 0A FF FC
+                                            named name  n   key   vec2 x     y
 ```
 
 ## Writing a client
@@ -325,7 +330,9 @@ A minimal client:
    whose `owner` equals your player id are yours.
 6. On `event` `sound`, play the `sound` entry of that id; on `event`
    `music`, loop the `music` entry of that id, or stop it on `0xFFFF`.
-   On `event` `player_left`, show that the player left. On any `disconnect`,
+   On `event` `named`, look up its `event` name and `event_key` keys to
+   react to it (e.g. show an explosion). On `event` `player_left`, show that
+   the player left. On any `disconnect`,
    or after 5 seconds without a packet, consider the connection over.
 7. Before quitting, send `disconnect(normal)`.
 
