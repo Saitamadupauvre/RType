@@ -36,7 +36,7 @@ struct NetworkServer::ImplNet {
             [this](const MusicChanged& changed) { network.set_current_music(changed.music_id); }));
         subscriptions.push_back(events.get().subscribe<NamedEvent>([this](const NamedEvent& event) {
             if (auto payload = to_payload(event, options.strings)) {
-                network.queue_event(*payload);
+                network.queue_event(std::move(*payload));
             }
         }));
     }

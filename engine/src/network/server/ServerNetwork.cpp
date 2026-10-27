@@ -45,8 +45,8 @@ void ServerNetwork::report_stats() {
     }
 }
 
-void ServerNetwork::queue_event(const EventPayload& event) {
-    append(queued_events_, sessions_.broadcast(event));
+void ServerNetwork::queue_event(EventPayload event) {
+    append(queued_events_, sessions_.broadcast(Message{std::move(event)}));
 }
 
 std::vector<Outbound> ServerNetwork::snapshot(core::EntityManager& world) {
