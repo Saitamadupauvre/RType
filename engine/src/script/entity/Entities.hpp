@@ -36,6 +36,8 @@ public:
     void on_release(std::function<void(core::Entity)> listener);
 
     void attach(core::EntityManager& world);
+    [[nodiscard]] core::EntityManager* world() const noexcept { return _world; }
+    core::Entity prototype(core::EntityManager& scratch, const Declaration& declaration);
     std::optional<core::Entity> spawn(const Declaration& declaration,
                                       std::optional<core::Vec2> position);
     sol::object spawn_from_lua(sol::this_state state, const Declaration& declaration,
@@ -48,6 +50,8 @@ public:
     std::size_t flush_destroyed();
     void doom(core::Entity entity);
     [[nodiscard]] std::optional<std::string> type_of(core::Entity entity) const;
+    [[nodiscard]] std::optional<std::string> name_of(core::Entity entity) const;
+    bool rename(core::Entity entity, std::string name);
     [[nodiscard]] sol::object handle_of(core::Entity entity) const;
     [[nodiscard]] std::vector<core::Entity> live_entities() const;
     [[nodiscard]] bool is_active(core::Entity entity) const;
@@ -60,6 +64,7 @@ private:
         sol::object handle;
         double age = 0.0;
         bool doomed = false;
+        std::string name{};
     };
 
     template <typename... Args>
@@ -67,7 +72,8 @@ private:
     sol::object get(sol::this_state state, const EntityHandle& handle, const sol::object& key);
     void set(sol::this_state state, const EntityHandle& handle, const sol::object& key,
              const sol::object& value);
-    void apply_prefab_fields(core::Entity entity, const sol::table& prefab);
+    void apply_prefab_fields(core::EntityManager& world, core::Entity entity,
+                             const sol::table& prefab);
     sol::table own_copies(const sol::table& prefab);
     Record& live_record(sol::this_state state, const EntityHandle& handle);
     void destroy(sol::this_state state, const EntityHandle& handle);

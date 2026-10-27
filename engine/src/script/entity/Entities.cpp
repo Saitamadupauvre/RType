@@ -39,6 +39,17 @@ template <typename Component> void register_if_missing(core::EntityManager& worl
     }
 }
 
+void register_script_components(core::EntityManager& world) {
+    register_if_missing<core::Position>(world);
+    register_if_missing<core::Sprite>(world);
+    register_if_missing<core::Tags>(world);
+    register_if_missing<physics::CollidesWith>(world);
+    register_if_missing<physics::AABBCollider>(world);
+    register_if_missing<physics::PhysicsBody>(world);
+    register_if_missing<physics::CircleCollider>(world);
+    register_if_missing<physics::Scriptable>(world);
+}
+
 constexpr std::size_t max_table_depth = 64;
 
 using TableCopies = std::unordered_map<const void*, sol::table>;
@@ -107,15 +118,21 @@ void Entities::on_release(std::function<void(core::Entity)> listener) {
 }
 
 void Entities::attach(core::EntityManager& world) {
-    register_if_missing<core::Position>(world);
-    register_if_missing<core::Sprite>(world);
-    register_if_missing<core::Tags>(world);
-    register_if_missing<physics::CollidesWith>(world);
-    register_if_missing<physics::AABBCollider>(world);
-    register_if_missing<physics::PhysicsBody>(world);
-    register_if_missing<physics::CircleCollider>(world);
-    register_if_missing<physics::Scriptable>(world);
+    register_script_components(world);
     _world = &world;
+}
+
+core::Entity Entities::prototype(core::EntityManager& scratch, const Declaration& declaration) {
+    register_script_components(scratch);
+    const core::Entity entity = scratch.spawn();
+    scratch.add(entity, core::Position{});
+    try {
+        apply_prefab_fields(scratch, entity, declaration.prefab);
+    } catch (...) {
+        scratch.kill(entity);
+        throw;
+    }
+    return entity;
 }
 
 std::optional<core::Entity> Entities::spawn(const Declaration& declaration,
@@ -133,7 +150,7 @@ std::optional<core::Entity> Entities::spawn(const Declaration& declaration,
     _world->add(entity, core::Position{});
     sol::table data;
     try {
-        apply_prefab_fields(entity, declaration.prefab);
+        apply_prefab_fields(*_world, entity, declaration.prefab);
         data = own_copies(declaration.prefab);
     } catch (const std::exception& error) {
         _world->kill(entity);
@@ -326,12 +343,13 @@ void Entities::set(sol::this_state state, const EntityHandle& handle, const sol:
     record.data.raw_set(key, value);
 }
 
-void Entities::apply_prefab_fields(core::Entity entity, const sol::table& prefab) {
+void Entities::apply_prefab_fields(core::EntityManager& world, core::Entity entity,
+                                   const sol::table& prefab) {
     const sol::this_state state{_lua.lua_state()};
     for (const std::string_view name : _fields.alias_names()) {
         const auto value = prefab.raw_get<sol::object>(name);
         if (!is_nil(value)) {
-            _fields.write_alias(state, *_world, entity, name, value);
+            _fields.write_alias(state, world, entity, name, value);
         }
     }
 }
@@ -378,6 +396,23 @@ std::optional<std::string> Entities::type_of(core::Entity entity) const {
         return std::nullopt;
     }
     return found->second.type;
+}
+
+std::optional<std::string> Entities::name_of(core::Entity entity) const {
+    const auto found = _records.find(entity.id());
+    if (found == _records.end()) {
+        return std::nullopt;
+    }
+    return found->second.name;
+}
+
+bool Entities::rename(core::Entity entity, std::string name) {
+    const auto found = _records.find(entity.id());
+    if (found == _records.end()) {
+        return false;
+    }
+    found->second.name = std::move(name);
+    return true;
 }
 
 sol::object Entities::handle_of(core::Entity entity) const {
