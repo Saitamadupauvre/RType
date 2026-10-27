@@ -18,6 +18,7 @@
 #include "engine/network/Server.hpp"
 #include "engine/network/StringTable.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 namespace rtype::server {
 
@@ -41,6 +42,7 @@ public:
     [[nodiscard]] engine::core::event::EventBus& events() noexcept { return events_; }
     [[nodiscard]] engine::network::NetworkServer& network() noexcept { return network_; }
     [[nodiscard]] engine::script::ScriptRuntime& script() noexcept { return _runtime; }
+    [[nodiscard]] engine::script::ServerApi& script_server() noexcept { return _server; }
     [[nodiscard]] const engine::network::StringTable& strings() const noexcept { return _strings; }
 
 private:
@@ -49,6 +51,7 @@ private:
     engine::core::EntityManager registry_;
     engine::core::SystemScheduler systems_;
     engine::script::ScriptRuntime _runtime;
+    engine::script::ServerApi& _server;
     engine::network::StringTable _strings;
     engine::core::FieldRegistry _fields;
     engine::network::NetworkServer network_;

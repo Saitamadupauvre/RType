@@ -83,8 +83,10 @@ std::uint8_t wire_owner(std::optional<std::uint32_t> owner) {
 
 ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig& config,
                      const std::filesystem::path& scripts)
-    : clock_(clock), _strings(load_game(_runtime, registry_, scripts)),
-      _fields(common::game_fields()),
+    : clock_(clock),
+      _runtime(engine::script::ScriptRuntime::builder().with<engine::script::ServerApi>().build()),
+      _server(_runtime.api<engine::script::ServerApi>()),
+      _strings(load_game(_runtime, registry_, scripts)), _fields(common::game_fields()),
       network_(clock, events_, _fields,
                engine::network::ServerOptions{
                    .port = config.port, .max_players = config.max_players, .strings = _strings}),
@@ -94,10 +96,10 @@ ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig
     register_if_missing<engine::core::Sprite>(registry_);
     events_.subscribe<engine::network::PlayerJoined>(
         [this](const engine::network::PlayerJoined& joined) {
-            _runtime.player_joined(joined.player_id);
+            _server.player_joined(joined.player_id);
         });
     events_.subscribe<engine::network::PlayerLeft>(
-        [this](const engine::network::PlayerLeft& left) { _runtime.player_left(left.player_id); });
+        [this](const engine::network::PlayerLeft& left) { _server.player_left(left.player_id); });
 }
 
 bool ServerApp::start(std::string& error) {
@@ -124,7 +126,7 @@ void ServerApp::tick(engine::core::time::Duration step) {
 }
 
 void ServerApp::publish_audio() {
-    for (const auto& command : _runtime.take_audio_commands()) {
+    for (const auto& command : _server.take_audio_commands()) {
         if (command.kind == engine::script::AudioCommandKind::StopMusic) {
             events_.publish(engine::network::MusicChanged{.music_id = engine::network::no_music});
             continue;
@@ -146,14 +148,14 @@ void ServerApp::publish_audio() {
 }
 
 void ServerApp::publish_events() {
-    for (auto& command : _runtime.take_event_commands()) {
+    for (auto& command : _server.take_event_commands()) {
         events_.publish(to_named_event(std::move(command)));
     }
 }
 
 void ServerApp::apply_inputs(const std::vector<engine::network::PlayerInput>& inputs) {
     for (const auto& input : inputs) {
-        _runtime.set_player_input(input.player_id, input.input);
+        _server.set_player_input(input.player_id, input.input);
     }
 }
 
@@ -172,7 +174,7 @@ void ServerApp::replicate() {
             }
             updates.emplace_back(entity, engine::network::Replicated{
                                              .type_id = *type_id,
-                                             .owner = wire_owner(_runtime.entity_owner(entity))});
+                                             .owner = wire_owner(_server.entity_owner(entity))});
         });
     for (const auto& [entity, replicated] : updates) {
         if (registry_.has<engine::network::Replicated>(entity)) {
