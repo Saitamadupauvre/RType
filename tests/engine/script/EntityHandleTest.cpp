@@ -214,9 +214,9 @@ TEST_F(EntityHandleTest, RejectsReadOnlyFieldWrite) {
     EXPECT_TRUE(logged_error("entity field 'type' is read-only"));
 }
 
-TEST_F(EntityHandleTest, RejectsWrongTypeForNativeField) {
+TEST_F(EntityHandleTest, RejectsWrongTypeForComponentField) {
     EXPECT_FALSE(_runtime.run_string("spawn('bydo').x = 'left'", "test"));
-    EXPECT_TRUE(logged_error("entity field cannot be set to a string"));
+    EXPECT_TRUE(logged_error("test:1: entity field 'x' cannot be set to a string"));
     EXPECT_FALSE(_runtime.run_string("spawn('bydo').vx = nil", "test"));
 }
 

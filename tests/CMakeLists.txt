@@ -40,6 +40,7 @@ engine_add_test(script SOURCES
     engine/script/PlayersTest.cpp
     engine/script/AudioTest.cpp
     engine/script/CollisionsTest.cpp
+    engine/script/EntityFieldsTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp

@@ -169,7 +169,7 @@ TEST_F(ScriptCollisionsTest, ChangingTagsOrFilterAtRuntimeChangesWhoCollides) {
 
 TEST_F(ScriptCollisionsTest, InvalidHitboxOrFilterFailsTheSpawn) {
     EXPECT_FALSE(_runtime.spawn("flat", std::nullopt));
-    EXPECT_TRUE(logged_error("'w' must be positive"));
+    EXPECT_TRUE(logged_error("entity field 'hitbox': size must be positive"));
     EXPECT_FALSE(_runtime.spawn("shapeless", std::nullopt));
     EXPECT_TRUE(logged_error("entity field 'hitbox' cannot be set to a string"));
     EXPECT_FALSE(_runtime.spawn("half", std::nullopt));
