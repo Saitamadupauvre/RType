@@ -178,11 +178,10 @@ game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.c
     game/server/BydoShotTest.cpp game/server/SpawnerTest.cpp game/server/CollisionTest.cpp
     game/server/GameFlowTest.cpp
     LINKS r-type_server_cli r-type_server_app)
-game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
+game_add_test(client SOURCES game/client/CliTest.cpp
     game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp
     game/client/SnapshotViewTest.cpp game/client/AudioPlayerTest.cpp
-    LINKS r-type_client_cli r-type_client_controls r-type_client_draw r-type_client_audio)
-game_add_test(common SOURCES game/common/ActionCodecTest.cpp LINKS r-type_common)
+    LINKS r-type_client_cli r-type_client_draw r-type_client_audio)
 
 function(game_add_runtime_data_test folder source)
     add_test(NAME game.runtime_data.${folder}

@@ -4,10 +4,8 @@
 #include <iostream>
 #include <system_error>
 
-#include "ActionCodec.hpp"
 #include "AudioPlayer.hpp"
 #include "Cli.hpp"
-#include "Controls.hpp"
 #include "GameFields.hpp"
 #include "SnapshotView.hpp"
 #include "Starfield.hpp"
@@ -17,6 +15,7 @@
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/core/time/SteadyClock.hpp"
+#include "engine/graphics/InputCapture.hpp"
 #include "engine/graphics/PluginLoader.hpp"
 #include "engine/graphics/Types.hpp"
 #include "engine/network/Client.hpp"
@@ -103,11 +102,10 @@ int main(int argc, char** argv) {
         if (input.is_key_pressed(engine::graphics::Key::M)) {
             sound.toggle_mute();
         }
-        const auto controls = rtype::client::read_controls(input);
+        const auto controls = engine::graphics::capture_input(input);
         loop.run_frame([&](engine::core::time::Duration step) {
             starfield.update(std::chrono::duration<float>(step).count());
-            const auto sent = rtype::common::pack_input(controls);
-            network.send_input(sent.action_flags, sent.move_x, sent.move_y);
+            network.send_input(controls);
         });
         starfield.draw(renderer);
         view.draw(network.entities(), network.strings(), network.player_id());

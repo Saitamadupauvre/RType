@@ -2,24 +2,26 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/script/AudioCommand.hpp"
-#include "engine/script/InputState.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;
+using engine::core::InputState;
+using engine::core::Key;
 using engine::core::Position;
 using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::Vec2;
-using engine::script::InputState;
 using engine::script::ScriptRuntime;
 
 namespace {
@@ -38,16 +40,24 @@ const std::filesystem::path game_scripts =
 
 InputState moving(float move_x, float move_y) {
     InputState input;
-    input.axes.emplace("move_x", move_x);
-    input.axes.emplace("move_y", move_y);
+    if (move_x > 0.F) {
+        input.keys.insert(Key::Right);
+    } else if (move_x < 0.F) {
+        input.keys.insert(Key::Left);
+    }
+    if (move_y > 0.F) {
+        input.keys.insert(Key::Down);
+    } else if (move_y < 0.F) {
+        input.keys.insert(Key::Up);
+    }
     return input;
 }
 
-InputState firing() {
-    InputState input = moving(0.F, 0.F);
-    input.pressed.emplace("fire");
-    return input;
+InputState holding(std::initializer_list<Key> keys) {
+    return InputState{.keys = keys, .mouse_buttons = {}, .pointer = {}};
 }
+
+InputState firing() { return holding({Key::Space}); }
 
 class ShipTest : public ::testing::Test {
 protected:
@@ -102,6 +112,27 @@ TEST_F(ShipTest, MovesAlongBothAxesAtItsSpeed) {
     _runtime.update(0.1F);
     EXPECT_FLOAT_EQ(position().x, ship_start.x + (ship_speed * 0.1F));
     EXPECT_FLOAT_EQ(position().y, ship_start.y - (ship_speed * 0.1F));
+}
+
+TEST_F(ShipTest, ZqsdKeysSteerLikeTheArrows) {
+    _runtime.set_input(_ship, holding({Key::D, Key::Z}));
+    _runtime.update(0.1F);
+    EXPECT_FLOAT_EQ(position().x, ship_start.x + (ship_speed * 0.1F));
+    EXPECT_FLOAT_EQ(position().y, ship_start.y - (ship_speed * 0.1F));
+}
+
+TEST_F(ShipTest, OppositeKeysCancel) {
+    _runtime.set_input(_ship, holding({Key::Left, Key::D, Key::Up, Key::Down}));
+    _runtime.update(0.1F);
+    EXPECT_FLOAT_EQ(position().x, ship_start.x);
+    EXPECT_FLOAT_EQ(position().y, ship_start.y);
+}
+
+TEST_F(ShipTest, IgnoresKeysWithoutABinding) {
+    _runtime.set_input(_ship, holding({Key::A, Key::Enter}));
+    _runtime.update(0.1F);
+    EXPECT_FLOAT_EQ(position().x, ship_start.x);
+    EXPECT_EQ(missiles(), 0U);
 }
 
 TEST_F(ShipTest, StopsAtTheLeftAndTopEdges) {

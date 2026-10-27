@@ -17,7 +17,7 @@ target_link_libraries(r-type_server_cli PRIVATE clap::clap)
 target_include_directories(r-type_server_cli PUBLIC server)
 rtype_set_warnings(r-type_server_cli)
 
-add_library(r-type_common STATIC common/ActionCodec.cpp common/GameFields.cpp)
+add_library(r-type_common STATIC common/GameFields.cpp)
 target_link_libraries(r-type_common PUBLIC engine::core engine::network engine::physics engine::script)
 target_include_directories(r-type_common PUBLIC common)
 rtype_set_warnings(r-type_common)
@@ -37,11 +37,6 @@ target_link_libraries(r-type_client_cli PRIVATE clap::clap)
 target_include_directories(r-type_client_cli PUBLIC client)
 rtype_set_warnings(r-type_client_cli)
 
-add_library(r-type_client_controls STATIC client/Controls.cpp)
-target_link_libraries(r-type_client_controls PUBLIC engine::graphics engine::script)
-target_include_directories(r-type_client_controls PUBLIC client)
-rtype_set_warnings(r-type_client_controls)
-
 add_library(r-type_client_draw STATIC client/Starfield.cpp client/WorldDraw.cpp client/SnapshotView.cpp)
 target_link_libraries(r-type_client_draw PUBLIC r-type_common engine::core engine::graphics engine::network)
 target_include_directories(r-type_client_draw PUBLIC client)
@@ -53,7 +48,7 @@ target_include_directories(r-type_client_audio PUBLIC client)
 rtype_set_warnings(r-type_client_audio)
 
 add_executable(r-type_client client/main.cpp)
-target_link_libraries(r-type_client PRIVATE r-type_client_cli r-type_client_controls r-type_client_draw r-type_client_audio r-type_common engine::core engine::network engine::graphics engine::audio)
+target_link_libraries(r-type_client PRIVATE r-type_client_cli r-type_client_draw r-type_client_audio r-type_common engine::core engine::network engine::graphics engine::audio)
 target_compile_definitions(r-type_client PRIVATE
     GRAPHICS_PLUGIN_FILE="$<TARGET_FILE_NAME:graphics-raylib>"
     AUDIO_PLUGIN_FILE="$<TARGET_FILE_NAME:audio-raylib>"

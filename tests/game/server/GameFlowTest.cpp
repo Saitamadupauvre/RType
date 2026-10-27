@@ -10,21 +10,21 @@
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/core/event/EventBus.hpp"
-#include "engine/script/InputState.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
 #include "Collisions.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;
+using engine::core::InputState;
 using engine::core::Position;
 using engine::core::Rgba;
 using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::Vec2;
-using engine::script::InputState;
 using engine::script::ScriptRuntime;
 
 namespace {
@@ -109,7 +109,11 @@ protected:
 
     void steer(std::uint32_t player_id, float move_x) {
         InputState input;
-        input.axes.emplace("move_x", move_x);
+        if (move_x > 0.F) {
+            input.keys.insert(engine::core::Key::Right);
+        } else if (move_x < 0.F) {
+            input.keys.insert(engine::core::Key::Left);
+        }
         _runtime.set_player_input(player_id, input);
     }
 

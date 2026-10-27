@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -58,8 +59,9 @@ engine::core::Vec2 position_of(ServerApp& app, std::uint32_t player_id) {
     return app.registry().get<engine::core::Position>(ship_of(app, player_id)).pos;
 }
 
-PlayerInput input_for(std::uint32_t player_id, std::int8_t move_x, std::int8_t move_y) {
-    return {.player_id = player_id, .action_flags = 0, .move_x = move_x, .move_y = move_y};
+PlayerInput input_for(std::uint32_t player_id, std::initializer_list<engine::core::Key> keys) {
+    return {.player_id = player_id,
+            .input = engine::core::InputState{.keys = keys, .mouse_buttons = {}, .pointer = {}}};
 }
 
 } // namespace
@@ -200,24 +202,12 @@ TEST(ServerApp, InputMovesOnlyThatPlayerEntity) {
     const auto start_one = position_of(app, 1);
     const auto start_two = position_of(app, 2);
 
-    app.apply_inputs({input_for(1, 1, 0)});
+    app.apply_inputs({input_for(1, {engine::core::Key::Right})});
     app.tick(tick_step);
 
     EXPECT_FLOAT_EQ(position_of(app, 1).x, start_one.x + 1.F);
     EXPECT_FLOAT_EQ(position_of(app, 1).y, start_one.y);
     EXPECT_FLOAT_EQ(position_of(app, 2).x, start_two.x);
-}
-
-TEST(ServerApp, InputAxisIsClampedToUnitRange) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
-    app.events().publish(PlayerJoined{.player_id = 1});
-    const auto start = position_of(app, 1);
-
-    app.apply_inputs({input_for(1, 0, -128)});
-    app.tick(tick_step);
-
-    EXPECT_FLOAT_EQ(position_of(app, 1).y, start.y - 1.F);
 }
 
 TEST(ServerApp, InputFromUnknownPlayerIsIgnored) {
@@ -226,7 +216,7 @@ TEST(ServerApp, InputFromUnknownPlayerIsIgnored) {
     app.events().publish(PlayerJoined{.player_id = 1});
     const auto start = position_of(app, 1);
 
-    app.apply_inputs({input_for(9, 1, 0)});
+    app.apply_inputs({input_for(9, {engine::core::Key::Right})});
     app.tick(tick_step);
 
     EXPECT_FLOAT_EQ(position_of(app, 1).x, start.x);

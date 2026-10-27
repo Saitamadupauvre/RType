@@ -9,7 +9,6 @@
 #include <thread>
 #include <utility>
 
-#include "ActionCodec.hpp"
 #include "GameFields.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
@@ -154,10 +153,7 @@ void ServerApp::publish_events() {
 
 void ServerApp::apply_inputs(const std::vector<engine::network::PlayerInput>& inputs) {
     for (const auto& input : inputs) {
-        _runtime.set_player_input(input.player_id,
-                                  common::unpack_input({.action_flags = input.action_flags,
-                                                        .move_x = input.move_x,
-                                                        .move_y = input.move_y}));
+        _runtime.set_player_input(input.player_id, input.input);
     }
 }
 
