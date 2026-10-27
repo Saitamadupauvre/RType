@@ -439,7 +439,7 @@ bool ScriptRuntime::call(core::Entity entity, std::string_view method) noexcept 
     return false;
 }
 
-void ScriptRuntime::set_input(core::Entity entity, InputState input) noexcept {
+void ScriptRuntime::set_input(core::Entity entity, core::InputState input) noexcept {
     _impl->entities.set_input(entity, std::move(input));
 }
 
@@ -465,7 +465,7 @@ bool ScriptRuntime::player_left(std::uint32_t player_id) noexcept {
     return false;
 }
 
-void ScriptRuntime::set_player_input(std::uint32_t player_id, InputState input) noexcept {
+void ScriptRuntime::set_player_input(std::uint32_t player_id, core::InputState input) noexcept {
     _impl->players.set_input(player_id, std::move(input));
 }
 

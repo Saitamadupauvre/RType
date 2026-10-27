@@ -9,17 +9,17 @@
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
-#include "engine/script/InputState.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
 namespace logger = engine::core::log;
 using engine::core::Entity;
 using engine::core::EntityManager;
+using engine::core::InputState;
 using engine::core::Position;
 using engine::core::Tags;
-using engine::script::InputState;
 using engine::script::ScriptRuntime;
 
 namespace {
@@ -70,7 +70,9 @@ protected:
     }
 };
 
-InputState moving_right() { return InputState{.axes = {{"move_x", 1.F}}, .pressed = {}}; }
+InputState moving_right() {
+    return InputState{.keys = {engine::core::Key::Right}, .mouse_buttons = {}, .pointer = {}};
+}
 
 } // namespace
 

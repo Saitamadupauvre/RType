@@ -12,12 +12,12 @@
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/script/AudioCommand.hpp"
 #include "engine/script/Declaration.hpp"
 #include "engine/script/EventCommand.hpp"
 #include "engine/script/Export.hpp"
-#include "engine/script/InputState.hpp"
 
 namespace engine::script {
 
@@ -177,7 +177,7 @@ public:
      * @param entity Entity returned by spawn(). Unknown entities are ignored.
      * @param input Actions for the coming ticks.
      */
-    void set_input(core::Entity entity, InputState input) noexcept;
+    void set_input(core::Entity entity, core::InputState input) noexcept;
 
     /**
      * @brief Registers a connected player and calls `on_player_joined(player)` from `main.lua`.
@@ -214,7 +214,7 @@ public:
      * @param player_id Player registered by player_joined(). Unknown players are ignored.
      * @param input Actions for the coming ticks.
      */
-    void set_player_input(std::uint32_t player_id, InputState input) noexcept;
+    void set_player_input(std::uint32_t player_id, core::InputState input) noexcept;
 
     /**
      * @brief Lists the names of the declared entity types, in ascending order.

@@ -9,23 +9,25 @@
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/physics/Components.hpp"
-#include "engine/script/InputState.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
 namespace logger = engine::core::log;
 using engine::core::Entity;
 using engine::core::EntityManager;
+using engine::core::InputState;
+using engine::core::Key;
+using engine::core::MouseButton;
 using engine::core::Position;
 using engine::core::Rgba;
 using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::Vec2;
 using engine::physics::PhysicsBody;
-using engine::script::InputState;
 using engine::script::ScriptRuntime;
 
 namespace {
@@ -251,11 +253,49 @@ TEST_F(TickTest, HasTagReadsTags) {
 TEST_F(TickTest, InputDrivesEntity) {
     const Entity ship = spawn("ship");
     _runtime.set_input(
-        ship, InputState{.axes = {{"move_x", 1.0F}, {"move_y", -0.5F}}, .pressed = {"fire"}});
+        ship,
+        InputState{.keys = {Key::Right, Key::Up, Key::Space}, .mouse_buttons = {}, .pointer = {}});
     _runtime.update(0.1F);
     EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(ship).velocity.x, 100.0F);
-    EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(ship).velocity.y, -50.0F);
+    EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(ship).velocity.y, -100.0F);
     EXPECT_FLOAT_EQ(position(ship).x, 5.0F);
+}
+
+TEST_F(TickTest, InputGivesPointerAndMouseButtons) {
+    const Entity cursor = spawn("cursor");
+    _runtime.set_input(
+        cursor,
+        InputState{.keys = {}, .mouse_buttons = {MouseButton::Left}, .pointer = Vec2{120.F, 45.F}});
+    _runtime.update(0.1F);
+    EXPECT_EQ(position(cursor), (Vec2{120.F, 45.F}));
+    ASSERT_TRUE(_runtime.call(cursor, "read_click"));
+    EXPECT_FLOAT_EQ(position(cursor).x, 1.F);
+}
+
+TEST_F(TickTest, PointerIsNilWithoutOne) {
+    const Entity cursor = spawn("cursor");
+    _runtime.update(0.1F);
+    EXPECT_EQ(position(cursor), (Vec2{-1.F, -1.F}));
+    ASSERT_TRUE(_runtime.call(cursor, "read_click"));
+    EXPECT_FLOAT_EQ(position(cursor).x, 0.F);
+}
+
+TEST_F(TickTest, UnknownKeyNameIsALuaError) {
+    const Entity cursor = spawn("cursor");
+    EXPECT_FALSE(_runtime.call(cursor, "read_unknown_key"));
+    EXPECT_TRUE(logged_error("input:key: unknown key 'Spcae'"));
+}
+
+TEST_F(TickTest, UnknownMouseButtonNameIsALuaError) {
+    const Entity cursor = spawn("cursor");
+    EXPECT_FALSE(_runtime.call(cursor, "read_unknown_button"));
+    EXPECT_TRUE(logged_error("input:mouse: unknown mouse button 'Back'"));
+}
+
+TEST_F(TickTest, KeyNameMustBeAString) {
+    const Entity cursor = spawn("cursor");
+    EXPECT_FALSE(_runtime.call(cursor, "read_key_of_wrong_type"));
+    EXPECT_TRUE(logged_error("input:key: unknown key of type number"));
 }
 
 TEST_F(TickTest, MissingInputIsNeutral) {

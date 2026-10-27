@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <format>
+#include <optional>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
@@ -36,13 +38,44 @@ template <typename Component> void register_if_missing(core::EntityManager& worl
     }
 }
 
-float input_axis(const InputState& input, std::string_view name) {
-    const auto found = input.axes.find(name);
-    return found == input.axes.end() ? 0.F : found->second;
+std::string describe_name(const sol::object& name) {
+    if (name.get_type() == sol::type::string) {
+        return std::format("'{}'", name.as<std::string_view>());
+    }
+    return std::format("of type {}", sol::type_name(name.lua_state(), name.get_type()));
 }
 
-bool input_pressed(const InputState& input, std::string_view name) {
-    return input.pressed.contains(name);
+bool input_key(const core::InputState& input, const sol::object& name, sol::this_state state) {
+    const auto key = name.get_type() == sol::type::string
+                         ? core::key_from_name(name.as<std::string_view>())
+                         : std::nullopt;
+    if (!key) {
+        throw std::runtime_error(std::format("{}input:key: unknown key {}", caller_location(state),
+                                             describe_name(name)));
+    }
+    return input.keys.contains(*key);
+}
+
+bool input_mouse(const core::InputState& input, const sol::object& name, sol::this_state state) {
+    const auto button = name.get_type() == sol::type::string
+                            ? core::mouse_button_from_name(name.as<std::string_view>())
+                            : std::nullopt;
+    if (!button) {
+        throw std::runtime_error(std::format("{}input:mouse: unknown mouse button {}",
+                                             caller_location(state), describe_name(name)));
+    }
+    return input.mouse_buttons.contains(*button);
+}
+
+sol::variadic_results input_pointer(const core::InputState& input, sol::this_state state) {
+    sol::variadic_results results;
+    if (!input.pointer) {
+        results.push_back(sol::make_object(state, sol::lua_nil));
+        return results;
+    }
+    results.push_back(sol::make_object(state, input.pointer->x));
+    results.push_back(sol::make_object(state, input.pointer->y));
+    return results;
 }
 
 constexpr std::size_t max_table_depth = 64;
@@ -87,8 +120,8 @@ Entities::Entities(sol::state& lua, const Players& players, const core::FieldReg
         sol::meta_function::new_index,
         [this](sol::this_state state, const EntityHandle& handle, const sol::object& key,
                const sol::object& value) { set(state, handle, key, value); });
-    types.new_usertype<InputState>("InputState", sol::no_constructor, "axis", &input_axis,
-                                   "pressed", &input_pressed);
+    types.new_usertype<core::InputState>("InputState", sol::no_constructor, "key", &input_key,
+                                         "mouse", &input_mouse, "pointer", &input_pointer);
     _methods.set_function("destroy", [this](sol::this_state state, const EntityHandle& handle) {
         destroy(state, handle);
     });
@@ -188,7 +221,7 @@ bool Entities::call(core::Entity entity, std::string_view method) {
     return invoke(entity, method);
 }
 
-void Entities::set_input(core::Entity entity, InputState input) {
+void Entities::set_input(core::Entity entity, core::InputState input) {
     const auto found = _records.find(entity.id());
     if (found != _records.end()) {
         found->second.input = std::move(input);
@@ -416,9 +449,9 @@ sol::object Entities::player_object(sol::this_state state, std::uint32_t player_
     return sol::make_object(state, PlayerHandle{player_id});
 }
 
-const InputState& Entities::input_of(const Record& record) const {
+const core::InputState& Entities::input_of(const Record& record) const {
     if (record.owner) {
-        if (const InputState* owned = _players.input(*record.owner)) {
+        if (const core::InputState* owned = _players.input(*record.owner)) {
             return *owned;
         }
     }

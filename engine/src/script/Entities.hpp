@@ -15,8 +15,8 @@
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/Vec2.hpp"
-#include "engine/script/InputState.hpp"
 
 namespace engine::script {
 
@@ -36,7 +36,7 @@ public:
     void finish_spawn(core::Entity entity);
     void release(core::Entity entity);
     bool call(core::Entity entity, std::string_view method);
-    void set_input(core::Entity entity, InputState input);
+    void set_input(core::Entity entity, core::InputState input);
     void update(float dt);
     void collide(core::Entity first, core::Entity second);
     std::size_t flush_destroyed();
@@ -53,7 +53,7 @@ private:
         sol::table data;
         sol::table prefab;
         sol::object handle;
-        InputState input;
+        core::InputState input;
         std::optional<std::uint32_t> owner;
         double age = 0.0;
         bool doomed = false;
@@ -68,7 +68,7 @@ private:
     sol::table own_copies(const sol::table& prefab);
     Record& live_record(sol::this_state state, const EntityHandle& handle);
     void destroy(sol::this_state state, const EntityHandle& handle);
-    [[nodiscard]] const InputState& input_of(const Record& record) const;
+    [[nodiscard]] const core::InputState& input_of(const Record& record) const;
     void set_owner(sol::this_state state, Record& record, const sol::object& value);
     bool has_tag(sol::this_state state, const EntityHandle& handle, std::string_view label);
     sol::object get_field(sol::this_state state, const EntityHandle& handle,

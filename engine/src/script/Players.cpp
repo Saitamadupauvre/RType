@@ -15,7 +15,7 @@ bool Players::join(std::uint32_t id) {
 
 bool Players::leave(std::uint32_t id) { return _players.erase(id) > 0; }
 
-void Players::set_input(std::uint32_t id, InputState input) {
+void Players::set_input(std::uint32_t id, core::InputState input) {
     const auto found = _players.find(id);
     if (found != _players.end()) {
         found->second.input = std::move(input);
@@ -32,7 +32,7 @@ std::optional<std::size_t> Players::slot(std::uint32_t id) const {
     return found->second.slot;
 }
 
-const InputState* Players::input(std::uint32_t id) const {
+const core::InputState* Players::input(std::uint32_t id) const {
     const auto found = _players.find(id);
     return found == _players.end() ? nullptr : &found->second.input;
 }
