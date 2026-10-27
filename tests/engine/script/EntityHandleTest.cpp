@@ -255,3 +255,40 @@ TEST(EntityHandle, SpawnFailsWithoutWorld) {
     EXPECT_FALSE(runtime.spawn("bydo"));
     EXPECT_TRUE(runtime.run_string("assert(spawn('bydo') == nil)", "test"));
 }
+
+TEST_F(EntityHandleTest, PrefabTableDefaultsAreNotSharedBetweenEntities) {
+    EXPECT_TRUE(_runtime.run_string(R"(
+        local first = spawn('patrol')
+        local second = spawn('patrol')
+        first:forget_first()
+        first.settings.nested.depth = 9
+        assert(#first.waypoints == 1 and first.waypoints[1].x == 3)
+        assert(#second.waypoints == 2 and second.waypoints[1].x == 1)
+        assert(second.settings.nested.depth == 1)
+    )",
+                                    "test"));
+}
+
+TEST_F(EntityHandleTest, PrefabTableCopiesKeepCyclesInsideTheCopy) {
+    EXPECT_TRUE(_runtime.run_string(R"(
+        local patrol = spawn('patrol')
+        assert(patrol.settings.nested.owner == patrol.settings)
+        assert(patrol.settings ~= spawn('patrol').settings)
+    )",
+                                    "test"));
+}
+
+TEST_F(EntityHandleTest, PrefabTableDefaultsStayIntactAfterInstancesChange) {
+    EXPECT_TRUE(_runtime.run_string(R"(
+        local patrol = spawn('patrol')
+        patrol.waypoints[1].x = 100
+        assert(spawn('patrol').waypoints[1].x == 1)
+    )",
+                                    "test"));
+}
+
+TEST_F(EntityHandleTest, TooDeepPrefabTableFailsTheSpawn) {
+    EXPECT_FALSE(_runtime.spawn("abyss"));
+    EXPECT_TRUE(logged_error("cannot spawn 'abyss': prefab table nests deeper than 64 levels"));
+    EXPECT_TRUE(living_entities().empty());
+}
