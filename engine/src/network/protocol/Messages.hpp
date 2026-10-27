@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "engine/network/Events.hpp"
+#include "engine/network/StringTable.hpp"
 
 namespace engine::network {
 
@@ -15,19 +16,10 @@ struct ConnectRequestPayload {
     bool operator==(const ConnectRequestPayload&) const = default;
 };
 
-struct TypeEntry {
-    std::uint16_t type_id{};
-    std::string name;
-
-    bool operator==(const TypeEntry&) const = default;
-};
-
 struct ConnectAcceptPayload {
     std::uint32_t client_nonce{};
     std::uint32_t player_entity_id{};
-    std::vector<TypeEntry> types;
-    std::vector<TypeEntry> sounds{};
-    std::vector<TypeEntry> musics{};
+    StringTable strings{};
     std::uint16_t current_music{no_music};
 
     bool operator==(const ConnectAcceptPayload&) const = default;

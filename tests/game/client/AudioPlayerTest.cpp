@@ -7,10 +7,12 @@
 #include "AudioPlayer.hpp"
 #include "engine/audio/IAudio.hpp"
 #include "engine/network/Audio.hpp"
+#include "engine/network/StringTable.hpp"
 
 using engine::audio::MusicId;
 using engine::audio::SoundId;
-using engine::network::AudioName;
+using engine::network::StringCategory;
+using engine::network::StringTable;
 using rtype::client::AudioPlayer;
 using rtype::client::AudioSettings;
 using rtype::client::is_plain_file_name;
@@ -55,8 +57,16 @@ public:
     float effects_volume{-1.F};
 };
 
-const std::vector<AudioName> sounds{{.id = 1, .name = "shot.wav"}, {.id = 2, .name = "boom.wav"}};
-const std::vector<AudioName> musics{{.id = 1, .name = "stage.ogg"}};
+StringTable strings_of(StringCategory category, const std::vector<std::string>& names) {
+    StringTable strings;
+    for (const std::string& name : names) {
+        strings.add(category, name);
+    }
+    return strings;
+}
+
+const StringTable sounds = strings_of(StringCategory::sound, {"shot.wav", "boom.wav"});
+const StringTable musics = strings_of(StringCategory::music, {"stage.ogg"});
 
 } // namespace
 
@@ -140,9 +150,8 @@ TEST(AudioPlayer, IgnoresIdsMissingFromTheTable) {
 TEST(AudioPlayer, NeverLoadsANameThatLeavesTheAssetFolder) {
     RecordingAudio audio;
     AudioPlayer player(audio, "assets", AudioSettings{});
-    const std::vector<AudioName> hostile{{.id = 1, .name = "../../secret.wav"},
-                                         {.id = 2, .name = "sub/shot.wav"},
-                                         {.id = 3, .name = ".hidden"}};
+    const StringTable hostile =
+        strings_of(StringCategory::sound, {"../../secret.wav", "sub/shot.wav", ".hidden"});
 
     player.play_sound(hostile, 1);
     player.play_sound(hostile, 2);

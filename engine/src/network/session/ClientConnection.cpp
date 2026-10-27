@@ -39,7 +39,7 @@ bool ClientConnection::handle(const Inbound& inbound) {
     last_received_ = now;
     traffic_.on_received(inbound.message, now);
     const auto& message = inbound.message.message;
-    if (!type_table_.admits(message)) {
+    if (!_strings.admits(message)) {
         return false;
     }
     if (std::holds_alternative<HeartbeatPayload>(message)) {
@@ -117,7 +117,7 @@ void ClientConnection::on_accept(const ConnectAcceptPayload& accept) {
     state_ = ConnectionState::connected;
     last_heartbeat_ = clock_.get().now();
     player_id_ = accept.player_entity_id;
-    type_table_.assign(accept);
+    _strings.assign(accept);
     core::log::info("network: connected to {} as player {}", server_.to_string(), player_id_);
 }
 

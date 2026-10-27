@@ -22,7 +22,9 @@
 #include "engine/network/Events.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
+#include "engine/network/StringTable.hpp"
 
+#include "PayloadSamples.hpp"
 #include "protocol/Messages.hpp"
 #include "protocol/Protocol.hpp"
 #include "protocol/ProtocolHandler.hpp"
@@ -35,7 +37,6 @@ using engine::core::Position;
 using engine::core::event::EventBus;
 using engine::core::time::ManualClock;
 using engine::core::time::SteadyClock;
-using engine::network::AudioName;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectionState;
 using engine::network::ConnectRequestPayload;
@@ -54,10 +55,10 @@ using engine::network::PlayerLeft;
 using engine::network::ProtocolHandler;
 using engine::network::ReceivedMessage;
 using engine::network::Replicated;
-using engine::network::ReplicatedType;
 using engine::network::ServerOptions;
 using engine::network::ShotFired;
 using engine::network::SoundPlayed;
+using engine::network::StringCategory;
 using engine::network::UdpSocket;
 using namespace std::chrono_literals;
 
@@ -157,11 +158,13 @@ protected:
     EventBus server_bus;
     EventBus client_bus;
     std::vector<DisconnectReason> reasons;
-    NetworkServer server{clock, server_bus,
-                         ServerOptions{.port = 0,
-                                       .max_players = 1,
-                                       .types = {ReplicatedType{.type_id = 1, .name = "player"},
-                                                 ReplicatedType{.type_id = 2, .name = "enemy"}}}};
+    NetworkServer server{
+        clock, server_bus,
+        ServerOptions{.port = 0,
+                      .max_players = 1,
+                      .strings = payload_samples::strings_of(
+                          {{.category = StringCategory::type, .id = 1, .name = "player"},
+                           {.category = StringCategory::type, .id = 2, .name = "enemy"}})}};
     NetworkClient client{clock, client_bus};
 };
 
@@ -176,9 +179,7 @@ TEST_F(NetworkClientTest, IsDisconnectedAndInertBeforeConnecting) {
     EXPECT_EQ(client.player_id(), 0U);
     EXPECT_FALSE(client.server_tick().has_value());
     EXPECT_TRUE(client.entities().empty());
-    EXPECT_TRUE(client.types().empty());
-    EXPECT_TRUE(client.sounds().empty());
-    EXPECT_TRUE(client.musics().empty());
+    EXPECT_TRUE(client.strings().entries().empty());
     EXPECT_TRUE(reasons.empty());
 }
 
@@ -212,12 +213,10 @@ TEST_F(NetworkClientTest, ReceivesTheWorldAndSendsInputs) {
     connect(client);
     ASSERT_EQ(client.state(), ConnectionState::connected);
     EXPECT_EQ(client.player_id(), 1U);
-    const auto types = client.types();
-    ASSERT_EQ(types.size(), 2U);
-    EXPECT_EQ(types[0].type_id, 1);
-    EXPECT_EQ(types[0].name, "player");
-    EXPECT_EQ(types[1].type_id, 2);
-    EXPECT_EQ(types[1].name, "enemy");
+    const auto strings = client.strings();
+    ASSERT_EQ(strings.entries().size(), 2U);
+    EXPECT_EQ(strings.id_of(StringCategory::type, "player"), 1U);
+    EXPECT_EQ(strings.id_of(StringCategory::type, "enemy"), 2U);
 
     client.send_input(1, -1, 1);
     ASSERT_TRUE(wait_until(
@@ -303,13 +302,15 @@ TEST_F(NetworkClientTest, PublishesGameEventsInTheOrderTheServerPublishedThem) {
                                                   "destroy 4"}));
 }
 
-TEST_F(NetworkClientTest, ReceivesAudioTablesAndTheMusicAlreadyPlaying) {
-    NetworkServer audio(clock, server_bus,
-                        ServerOptions{.port = 0,
-                                      .max_players = 1,
-                                      .sounds = {AudioName{.id = 1, .name = "shot.wav"},
-                                                 AudioName{.id = 2, .name = "boom.wav"}},
-                                      .musics = {AudioName{.id = 3, .name = "stage.ogg"}}});
+TEST_F(NetworkClientTest, ReceivesAudioNamesAndTheMusicAlreadyPlaying) {
+    NetworkServer audio(
+        clock, server_bus,
+        ServerOptions{.port = 0,
+                      .max_players = 1,
+                      .strings = payload_samples::strings_of(
+                          {{.category = StringCategory::sound, .id = 1, .name = "shot.wav"},
+                           {.category = StringCategory::sound, .id = 2, .name = "boom.wav"},
+                           {.category = StringCategory::music, .id = 3, .name = "stage.ogg"}})});
     std::error_code ec;
     ASSERT_TRUE(audio.start(ec)) << ec.message();
     server_bus.publish(MusicChanged{.music_id = 3});
@@ -326,15 +327,12 @@ TEST_F(NetworkClientTest, ReceivesAudioTablesAndTheMusicAlreadyPlaying) {
         [&] { return client.state() != ConnectionState::connecting; }));
 
     ASSERT_EQ(client.state(), ConnectionState::connected);
-    const auto sounds = client.sounds();
-    ASSERT_EQ(sounds.size(), 2U);
-    EXPECT_EQ(sounds[0].id, 1);
-    EXPECT_EQ(sounds[0].name, "shot.wav");
-    EXPECT_EQ(sounds[1].name, "boom.wav");
-    const auto tracks = client.musics();
-    ASSERT_EQ(tracks.size(), 1U);
-    EXPECT_EQ(tracks[0].id, 3);
-    EXPECT_EQ(tracks[0].name, "stage.ogg");
+    const auto strings = client.strings();
+    ASSERT_EQ(strings.entries(StringCategory::sound).size(), 2U);
+    EXPECT_EQ(strings.id_of(StringCategory::sound, "shot.wav"), 1U);
+    EXPECT_EQ(strings.id_of(StringCategory::sound, "boom.wav"), 2U);
+    ASSERT_EQ(strings.entries(StringCategory::music).size(), 1U);
+    EXPECT_EQ(strings.id_of(StringCategory::music, "stage.ogg"), 3U);
     EXPECT_EQ(musics, (std::vector<std::uint16_t>{3}));
 }
 
@@ -485,8 +483,7 @@ TEST(NetworkClient, MeasuresTheRoundTripToTheServer) {
     const auto request = fake.receive();
     ASSERT_TRUE(request.has_value());
     const auto nonce = std::get<ConnectRequestPayload>(request->message.message).client_nonce;
-    fake.send(request->from,
-              ConnectAcceptPayload{.client_nonce = nonce, .player_entity_id = 1, .types = {}});
+    fake.send(request->from, ConnectAcceptPayload{.client_nonce = nonce, .player_entity_id = 1});
     ASSERT_TRUE(wait_until([&client] { client.update(); },
                            [&client] { return client.state() == ConnectionState::connected; }));
 
@@ -517,8 +514,7 @@ TEST(NetworkClient, ReportsTimeoutWhenTheServerGoesSilent) {
     const auto request = fake.receive();
     ASSERT_TRUE(request.has_value());
     const auto nonce = std::get<ConnectRequestPayload>(request->message.message).client_nonce;
-    fake.send(request->from,
-              ConnectAcceptPayload{.client_nonce = nonce, .player_entity_id = 1, .types = {}});
+    fake.send(request->from, ConnectAcceptPayload{.client_nonce = nonce, .player_entity_id = 1});
     ASSERT_TRUE(wait_until([&client] { client.update(); },
                            [&client] { return client.state() == ConnectionState::connected; }));
 

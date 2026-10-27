@@ -169,36 +169,9 @@ std::uint32_t NetworkClient::player_id() const {
     return connection ? connection->player_id() : 0;
 }
 
-std::vector<ReplicatedType> NetworkClient::types() const {
-    std::vector<ReplicatedType> types;
+StringTable NetworkClient::strings() const {
     const auto& connection = impl_->connection;
-    if (!connection.has_value()) {
-        return types;
-    }
-    for (const auto& entry : connection.value().type_table().entries()) {
-        types.push_back({.type_id = entry.type_id, .name = entry.name});
-    }
-    return types;
-}
-
-std::vector<AudioName> NetworkClient::sounds() const {
-    std::vector<AudioName> sounds;
-    if (const auto& connection = impl_->connection) {
-        for (const auto& entry : connection->type_table().sounds()) {
-            sounds.push_back({.id = entry.type_id, .name = entry.name});
-        }
-    }
-    return sounds;
-}
-
-std::vector<AudioName> NetworkClient::musics() const {
-    std::vector<AudioName> musics;
-    if (const auto& connection = impl_->connection) {
-        for (const auto& entry : connection->type_table().musics()) {
-            musics.push_back({.id = entry.type_id, .name = entry.name});
-        }
-    }
-    return musics;
+    return connection ? connection->strings().table() : StringTable{};
 }
 
 std::optional<std::uint32_t> NetworkClient::server_tick() const {

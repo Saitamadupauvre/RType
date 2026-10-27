@@ -14,6 +14,7 @@
 #include "engine/network/Events.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
+#include "engine/network/StringTable.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;
@@ -22,6 +23,8 @@ using engine::core::time::ManualClock;
 using engine::network::PlayerInput;
 using engine::network::PlayerJoined;
 using engine::network::PlayerLeft;
+using engine::network::StringCategory;
+using engine::network::StringEntry;
 using rtype::server::ServerApp;
 using rtype::server::ServerConfig;
 
@@ -108,15 +111,14 @@ TEST(ServerApp, StartReportsPortAlreadyInUse) {
     EXPECT_NE(error.find(std::to_string(first.network().port())), std::string::npos) << error;
 }
 
-TEST(ServerApp, TypeTableListsDeclaredEntitiesInOrder) {
+TEST(ServerApp, StringTableListsDeclaredEntitiesInOrder) {
     const ManualClock clock;
     const ServerApp app(clock, config, players_scripts);
 
-    ASSERT_EQ(app.types().size(), 2U);
-    EXPECT_EQ(app.types()[0].name, "scenery");
-    EXPECT_EQ(app.types()[0].type_id, 1U);
-    EXPECT_EQ(app.types()[1].name, "square");
-    EXPECT_EQ(app.types()[1].type_id, 2U);
+    EXPECT_EQ(
+        app.strings().entries(StringCategory::type),
+        (std::vector<StringEntry>{{.category = StringCategory::type, .id = 1, .name = "scenery"},
+                                  {.category = StringCategory::type, .id = 2, .name = "square"}}));
 }
 
 TEST(ServerApp, JoiningPlayerGetsTheEntitiesOfOnPlayerJoined) {
@@ -237,7 +239,7 @@ TEST(ServerApp, MissingScriptsGiveAnEmptyGame) {
     app.events().publish(PlayerJoined{.player_id = 1});
     app.tick(tick_step);
 
-    EXPECT_TRUE(app.types().empty());
+    EXPECT_TRUE(app.strings().entries().empty());
     EXPECT_TRUE(owned_by(app, 1).empty());
 }
 
@@ -267,26 +269,25 @@ HeardAudio listen(ServerApp& app) {
 
 } // namespace
 
-TEST(ServerApp, AudioTablesListDeclaredNamesInOrder) {
+TEST(ServerApp, StringTableListsDeclaredAudioNamesInOrder) {
     const ManualClock clock;
     const ServerApp app(clock, config, audio_scripts);
 
-    ASSERT_EQ(app.sounds().size(), 2U);
-    EXPECT_EQ(app.sounds()[0].name, "boom.wav");
-    EXPECT_EQ(app.sounds()[0].id, 1U);
-    EXPECT_EQ(app.sounds()[1].name, "shot.wav");
-    EXPECT_EQ(app.sounds()[1].id, 2U);
-    ASSERT_EQ(app.musics().size(), 1U);
-    EXPECT_EQ(app.musics()[0].name, "stage.ogg");
-    EXPECT_EQ(app.musics()[0].id, 1U);
+    EXPECT_EQ(app.strings().entries(StringCategory::sound),
+              (std::vector<StringEntry>{
+                  {.category = StringCategory::sound, .id = 1, .name = "boom.wav"},
+                  {.category = StringCategory::sound, .id = 2, .name = "shot.wav"}}));
+    EXPECT_EQ(app.strings().entries(StringCategory::music),
+              (std::vector<StringEntry>{
+                  {.category = StringCategory::music, .id = 1, .name = "stage.ogg"}}));
 }
 
-TEST(ServerApp, ScriptsWithoutAudioHaveEmptyAudioTables) {
+TEST(ServerApp, ScriptsWithoutAudioHaveNoAudioNames) {
     const ManualClock clock;
     const ServerApp app(clock, config, players_scripts);
 
-    EXPECT_TRUE(app.sounds().empty());
-    EXPECT_TRUE(app.musics().empty());
+    EXPECT_TRUE(app.strings().entries(StringCategory::sound).empty());
+    EXPECT_TRUE(app.strings().entries(StringCategory::music).empty());
 }
 
 TEST(ServerApp, TickPublishesTheMusicStartedByOnStart) {

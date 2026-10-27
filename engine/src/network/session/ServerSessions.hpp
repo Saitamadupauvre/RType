@@ -22,9 +22,7 @@ namespace engine::network {
 struct ServerSessionsConfig {
     std::size_t max_players{};
     core::time::Duration timeout = std::chrono::seconds(5);
-    std::vector<TypeEntry> types{};
-    std::vector<TypeEntry> sounds{};
-    std::vector<TypeEntry> musics{};
+    StringTable strings{};
     std::uint16_t current_music{no_music};
 };
 

@@ -12,18 +12,19 @@ namespace engine::network {
 
 namespace {
 
-void write_type_entry(ByteWriter& writer, const TypeEntry& entry) {
-    writer.write_u16(entry.type_id);
+void write_string_entry(ByteWriter& writer, const StringEntry& entry) {
+    writer.write_u8(static_cast<std::uint8_t>(entry.category));
+    writer.write_u16(entry.id);
     writer.write_u8(static_cast<std::uint8_t>(entry.name.size()));
     for (const char character : entry.name) {
         writer.write_u8(static_cast<std::uint8_t>(character));
     }
 }
 
-void write_type_table(ByteWriter& writer, const std::vector<TypeEntry>& entries) {
-    writer.write_u16(static_cast<std::uint16_t>(entries.size()));
-    for (const auto& entry : entries) {
-        write_type_entry(writer, entry);
+void write_string_table(ByteWriter& writer, const StringTable& table) {
+    writer.write_u16(static_cast<std::uint16_t>(table.entries().size()));
+    for (const auto& entry : table.entries()) {
+        write_string_entry(writer, entry);
     }
 }
 
@@ -96,9 +97,7 @@ EncodedPayload encode_payload(const ConnectAcceptPayload& payload) {
     ByteWriter writer;
     writer.write_u32(payload.client_nonce);
     writer.write_u32(payload.player_entity_id);
-    write_type_table(writer, payload.types);
-    write_type_table(writer, payload.sounds);
-    write_type_table(writer, payload.musics);
+    write_string_table(writer, payload.strings);
     writer.write_u16(payload.current_music);
     return std::move(writer).take();
 }

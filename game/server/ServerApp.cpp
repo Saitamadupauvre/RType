@@ -24,7 +24,6 @@ namespace {
 using namespace std::chrono_literals;
 
 constexpr auto idle_between_frames = 1ms;
-constexpr std::size_t max_type_name_length = 63;
 
 template <typename Component> void register_if_missing(engine::core::EntityManager& registry) {
     if (!registry.is_registered<Component>()) {
@@ -32,55 +31,26 @@ template <typename Component> void register_if_missing(engine::core::EntityManag
     }
 }
 
-std::vector<engine::network::ReplicatedType> load_game(engine::script::ScriptRuntime& runtime,
-                                                       engine::core::EntityManager& registry,
-                                                       const std::filesystem::path& scripts) {
+engine::network::StringTable load_game(engine::script::ScriptRuntime& runtime,
+                                       engine::core::EntityManager& registry,
+                                       const std::filesystem::path& scripts) {
     runtime.attach_world(registry);
     if (!scripts.empty()) {
         runtime.load_scripts(scripts);
     }
-    std::vector<engine::network::ReplicatedType> types;
-    for (std::string& name : runtime.entity_types()) {
-        if (name.size() > max_type_name_length ||
-            types.size() == std::numeric_limits<std::uint16_t>::max()) {
-            engine::core::log::warn("server: entity type '{}' cannot be replicated", name);
-            continue;
+    engine::network::StringTable strings;
+    const auto add_all = [&strings](engine::network::StringCategory category,
+                                    std::vector<std::string> names, std::string_view kind) {
+        for (std::string& name : names) {
+            if (!strings.add(category, name)) {
+                engine::core::log::warn("server: {} '{}' cannot be sent to clients", kind, name);
+            }
         }
-        const auto type_id = static_cast<std::uint16_t>(types.size() + 1);
-        types.push_back({.type_id = type_id, .name = std::move(name)});
-    }
-    return types;
-}
-
-std::unordered_map<std::string, std::uint16_t>
-index_types(const std::vector<engine::network::ReplicatedType>& types) {
-    std::unordered_map<std::string, std::uint16_t> ids;
-    for (const auto& type : types) {
-        ids.emplace(type.name, type.type_id);
-    }
-    return ids;
-}
-
-std::vector<engine::network::AudioName> audio_table(std::vector<std::string> names) {
-    std::vector<engine::network::AudioName> table;
-    for (std::string& name : names) {
-        if (table.size() + 1 >= engine::network::no_music) {
-            engine::core::log::warn("server: too many sounds or musics, '{}' is ignored", name);
-            continue;
-        }
-        const auto id = static_cast<std::uint16_t>(table.size() + 1);
-        table.push_back({.id = id, .name = std::move(name)});
-    }
-    return table;
-}
-
-std::unordered_map<std::string, std::uint16_t>
-index_audio(const std::vector<engine::network::AudioName>& table) {
-    std::unordered_map<std::string, std::uint16_t> ids;
-    for (const auto& entry : table) {
-        ids.emplace(entry.name, entry.id);
-    }
-    return ids;
+    };
+    add_all(engine::network::StringCategory::type, runtime.entity_types(), "entity type");
+    add_all(engine::network::StringCategory::sound, runtime.sound_names(), "sound");
+    add_all(engine::network::StringCategory::music, runtime.music_names(), "music");
+    return strings;
 }
 
 std::uint32_t wire_source(std::optional<engine::core::Entity> source) {
@@ -98,16 +68,10 @@ std::uint8_t wire_owner(std::optional<std::uint32_t> owner) {
 
 ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig& config,
                      const std::filesystem::path& scripts)
-    : clock_(clock), _types(load_game(_runtime, registry_, scripts)),
-      _type_ids(index_types(_types)), _sounds(audio_table(_runtime.sound_names())),
-      _musics(audio_table(_runtime.music_names())), _sound_ids(index_audio(_sounds)),
-      _music_ids(index_audio(_musics)),
+    : clock_(clock), _strings(load_game(_runtime, registry_, scripts)),
       network_(clock, events_,
-               engine::network::ServerOptions{.port = config.port,
-                                              .max_players = config.max_players,
-                                              .types = _types,
-                                              .sounds = _sounds,
-                                              .musics = _musics}),
+               engine::network::ServerOptions{
+                   .port = config.port, .max_players = config.max_players, .strings = _strings}),
       _collisions(registry_, events_, _runtime) {
     register_if_missing<engine::network::Replicated>(registry_);
     register_if_missing<engine::core::Position>(registry_);
@@ -149,16 +113,17 @@ void ServerApp::publish_audio() {
             continue;
         }
         const bool is_sound = command.kind == engine::script::AudioCommandKind::Sound;
-        const auto& ids = is_sound ? _sound_ids : _music_ids;
-        const auto id = ids.find(command.name);
-        if (id == ids.end()) {
+        const auto id = _strings.id_of(is_sound ? engine::network::StringCategory::sound
+                                                : engine::network::StringCategory::music,
+                                       command.name);
+        if (!id) {
             continue;
         }
         if (is_sound) {
             events_.publish(engine::network::SoundPlayed{
-                .source_entity_id = wire_source(command.source), .sound_id = id->second});
+                .source_entity_id = wire_source(command.source), .sound_id = *id});
         } else {
-            events_.publish(engine::network::MusicChanged{.music_id = id->second});
+            events_.publish(engine::network::MusicChanged{.music_id = *id});
         }
     }
 }
@@ -181,12 +146,12 @@ void ServerApp::replicate() {
             if (!type) {
                 return;
             }
-            const auto type_id = _type_ids.find(*type);
-            if (type_id == _type_ids.end()) {
+            const auto type_id = _strings.id_of(engine::network::StringCategory::type, *type);
+            if (!type_id) {
                 return;
             }
             updates.emplace_back(entity, engine::network::Replicated{
-                                             .type_id = type_id->second,
+                                             .type_id = *type_id,
                                              .owner = wire_owner(_runtime.entity_owner(entity))});
         });
     for (const auto& [entity, replicated] : updates) {

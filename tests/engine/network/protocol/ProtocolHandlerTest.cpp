@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include "PayloadSamples.hpp"
 #include "encoder/PayloadEncoder.hpp"
 #include "protocol/ProtocolHandler.hpp"
 
@@ -36,9 +37,11 @@ template <typename T> T value_of(std::optional<T> value) {
 std::vector<std::pair<Message, MessageType>> sample_messages() {
     return {
         {ConnectRequestPayload{.client_nonce = 0xCAFE'F00D}, MessageType::connect_request},
-        {ConnectAcceptPayload{.client_nonce = 0xCAFE'F00D,
-                              .player_entity_id = 12,
-                              .types = {{.type_id = 1, .name = "player"}}},
+        {ConnectAcceptPayload{
+             .client_nonce = 0xCAFE'F00D,
+             .player_entity_id = 12,
+             .strings = payload_samples::strings_of(
+                 {{.category = engine::network::StringCategory::type, .id = 1, .name = "player"}})},
          MessageType::connect_accept},
         {InputPayload{.action_flags = 0x01, .move_x = -1, .move_y = 1}, MessageType::input},
         {SnapshotPayload{.server_tick = 99,
@@ -81,7 +84,7 @@ TEST(ProtocolHandler, SerializesPacketInBigEndianOrder) {
 
     const auto packet = handler.serialize(input_header(0x0102'0304, payload.size()), payload);
 
-    const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x03, 0x03, 0x01,
+    const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x04, 0x03, 0x01,
                                              0x02, 0x03, 0x04, 0x00, 0x03, 0x01, 0x00, 0x01};
 
     EXPECT_EQ(packet, expected);

@@ -53,8 +53,8 @@ engine_add_test(network SOURCES
     engine/network/encoder/PayloadEncoderTest.cpp
     engine/network/event/GameEventsTest.cpp
     engine/network/protocol/ProtocolHandlerTest.cpp
+    engine/network/protocol/ReceivedStringsTest.cpp
     engine/network/protocol/SequenceTest.cpp
-    engine/network/protocol/TypeTableTest.cpp
     engine/network/server/ServerNetworkTest.cpp
     engine/network/session/ClientConnectionTest.cpp
     engine/network/session/ServerSessionsTest.cpp

@@ -4,7 +4,6 @@
 #include <filesystem>
 #include <functional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "Cli.hpp"
@@ -16,6 +15,7 @@
 #include "engine/network/Audio.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
+#include "engine/network/StringTable.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
 namespace rtype::server {
@@ -39,15 +39,7 @@ public:
     [[nodiscard]] engine::core::event::EventBus& events() noexcept { return events_; }
     [[nodiscard]] engine::network::NetworkServer& network() noexcept { return network_; }
     [[nodiscard]] engine::script::ScriptRuntime& script() noexcept { return _runtime; }
-    [[nodiscard]] const std::vector<engine::network::ReplicatedType>& types() const noexcept {
-        return _types;
-    }
-    [[nodiscard]] const std::vector<engine::network::AudioName>& sounds() const noexcept {
-        return _sounds;
-    }
-    [[nodiscard]] const std::vector<engine::network::AudioName>& musics() const noexcept {
-        return _musics;
-    }
+    [[nodiscard]] const engine::network::StringTable& strings() const noexcept { return _strings; }
 
 private:
     std::reference_wrapper<const engine::core::time::IClock> clock_;
@@ -55,12 +47,7 @@ private:
     engine::core::EntityManager registry_;
     engine::core::SystemScheduler systems_;
     engine::script::ScriptRuntime _runtime;
-    std::vector<engine::network::ReplicatedType> _types;
-    std::unordered_map<std::string, std::uint16_t> _type_ids;
-    std::vector<engine::network::AudioName> _sounds;
-    std::vector<engine::network::AudioName> _musics;
-    std::unordered_map<std::string, std::uint16_t> _sound_ids;
-    std::unordered_map<std::string, std::uint16_t> _music_ids;
+    engine::network::StringTable _strings;
     engine::network::NetworkServer network_;
     Collisions _collisions;
 };

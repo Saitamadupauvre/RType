@@ -14,14 +14,15 @@ namespace engine::network {
 
 namespace {
 
-bool can_hold_type_entries(const ByteReader& reader, std::size_t count) noexcept {
-    return count * min_type_entry_size <= reader.remaining();
+bool can_hold_string_entries(const ByteReader& reader, std::size_t count) noexcept {
+    return count * min_string_entry_size <= reader.remaining();
 }
 
-std::optional<TypeEntry> read_type_entry(ByteReader& reader) {
-    const auto type_id = reader.read_u16();
+std::optional<StringEntry> read_string_entry(ByteReader& reader) {
+    const auto category = reader.read_u8();
+    const auto id = reader.read_u16();
     const auto name_length = reader.read_u8();
-    if (!type_id || !name_length) {
+    if (!category || *category >= string_category_count || !id || !name_length) {
         return std::nullopt;
     }
 
@@ -29,24 +30,24 @@ std::optional<TypeEntry> read_type_entry(ByteReader& reader) {
     if (!name) {
         return std::nullopt;
     }
-    return TypeEntry{.type_id = *type_id, .name = std::string(name->begin(), name->end())};
+    return StringEntry{.category = static_cast<StringCategory>(*category),
+                       .id = *id,
+                       .name = std::string(name->begin(), name->end())};
 }
 
-std::optional<std::vector<TypeEntry>> read_type_table(ByteReader& reader) {
+std::optional<StringTable> read_string_table(ByteReader& reader) {
     const auto count = reader.read_u16();
-    if (!count || !can_hold_type_entries(reader, *count)) {
+    if (!count || !can_hold_string_entries(reader, *count)) {
         return std::nullopt;
     }
-    std::vector<TypeEntry> entries;
-    entries.reserve(*count);
+    StringTable table;
     for (std::size_t index = 0; index < *count; ++index) {
-        auto entry = read_type_entry(reader);
-        if (!entry) {
+        auto entry = read_string_entry(reader);
+        if (!entry || !table.insert(std::move(*entry))) {
             return std::nullopt;
         }
-        entries.push_back(std::move(*entry));
     }
-    return entries;
+    return table;
 }
 
 bool has_exact_entity_records(const ByteReader& reader, std::size_t count) noexcept {
@@ -101,20 +102,16 @@ std::optional<ConnectAcceptPayload> decode_connect_accept(std::span<const std::u
     if (!client_nonce || !player_entity_id) {
         return std::nullopt;
     }
-    auto types = read_type_table(reader);
-    auto sounds = types ? read_type_table(reader) : std::nullopt;
-    auto musics = sounds ? read_type_table(reader) : std::nullopt;
-    const auto current_music = musics ? reader.read_u16() : std::nullopt;
-    if (!types || !sounds || !musics || !current_music) {
+    auto strings = read_string_table(reader);
+    const auto current_music = strings ? reader.read_u16() : std::nullopt;
+    if (!strings || !current_music) {
         return std::nullopt;
     }
 
     ConnectAcceptPayload accept{
         .client_nonce = *client_nonce,
         .player_entity_id = *player_entity_id,
-        .types = std::move(*types),
-        .sounds = std::move(*sounds),
-        .musics = std::move(*musics),
+        .strings = std::move(*strings),
         .current_music = *current_music,
     };
     if (!reader.at_end() || !is_valid(accept)) {

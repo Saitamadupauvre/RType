@@ -71,11 +71,11 @@ int main(int argc, char** argv) {
     engine::core::event::EventBus events;
     engine::network::NetworkClient network(clock, events);
     events.subscribe<engine::network::SoundPlayed>([&](const engine::network::SoundPlayed& played) {
-        sound.play_sound(network.sounds(), played.sound_id);
+        sound.play_sound(network.strings(), played.sound_id);
     });
     events.subscribe<engine::network::MusicChanged>(
         [&](const engine::network::MusicChanged& changed) {
-            sound.change_music(network.musics(), changed.music_id);
+            sound.change_music(network.strings(), changed.music_id);
         });
     std::error_code ec;
     if (!network.connect(result.config->host, result.config->port, ec)) {
@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
             network.send_input(sent.action_flags, sent.move_x, sent.move_y);
         });
         starfield.draw(renderer);
-        view.draw(network.entities(), network.types(), network.player_id());
+        view.draw(network.entities(), network.strings(), network.player_id());
         renderer.end_frame();
     }
 

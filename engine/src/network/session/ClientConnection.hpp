@@ -12,7 +12,7 @@
 #include "engine/network/Export.hpp"
 
 #include "protocol/Messages.hpp"
-#include "protocol/TypeTable.hpp"
+#include "protocol/ReceivedStrings.hpp"
 #include "socket/UdpSocket.hpp"
 #include "stats/TrafficMeter.hpp"
 #include "thread/NetworkMessages.hpp"
@@ -41,7 +41,7 @@ public:
         return disconnect_reason_;
     }
     [[nodiscard]] std::uint32_t player_id() const noexcept { return player_id_; }
-    [[nodiscard]] const TypeTable& type_table() const noexcept { return type_table_; }
+    [[nodiscard]] const ReceivedStrings& strings() const noexcept { return _strings; }
     [[nodiscard]] NetworkStats stats() const;
 
 private:
@@ -67,7 +67,7 @@ private:
     std::optional<core::time::Duration> unanswered_heartbeat_;
     std::uint32_t next_sequence_{0};
     std::uint32_t player_id_{0};
-    TypeTable type_table_;
+    ReceivedStrings _strings;
     TrafficMeter traffic_;
 };
 

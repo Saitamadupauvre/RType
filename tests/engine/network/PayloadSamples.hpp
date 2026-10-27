@@ -9,6 +9,8 @@
 
 #include <gtest/gtest.h>
 
+#include "engine/network/StringTable.hpp"
+
 #include "encoder/PayloadEncoder.hpp"
 
 namespace payload_samples {
@@ -48,23 +50,32 @@ inline engine::network::SnapshotPayload snapshot_with(std::size_t entity_count) 
     return snapshot;
 }
 
-inline engine::network::ConnectAcceptPayload
-accept_with(std::vector<engine::network::TypeEntry> types) {
+inline engine::network::StringTable strings_of(std::vector<engine::network::StringEntry> entries) {
+    engine::network::StringTable table;
+    for (auto& entry : entries) {
+        EXPECT_TRUE(table.insert(std::move(entry)));
+    }
+    return table;
+}
+
+inline engine::network::ConnectAcceptPayload accept_with(engine::network::StringTable strings) {
     return {
         .client_nonce = 0x0102'0304,
         .player_entity_id = 0x0506'0708,
-        .types = std::move(types),
+        .strings = std::move(strings),
     };
 }
 
-inline std::vector<engine::network::TypeEntry> long_name_types(std::size_t count) {
-    std::vector<engine::network::TypeEntry> types;
+inline engine::network::StringTable long_name_strings(std::size_t count) {
+    engine::network::StringTable table;
     for (std::size_t index = 0; index < count; ++index) {
-        std::string name(engine::network::max_type_name_length, 'a');
+        std::string name(engine::network::max_string_name_length, 'a');
         name.back() = static_cast<char>('A' + index);
-        types.push_back({.type_id = static_cast<std::uint16_t>(index), .name = std::move(name)});
+        EXPECT_TRUE(table.insert({.category = engine::network::StringCategory::type,
+                                  .id = static_cast<std::uint16_t>(index),
+                                  .name = std::move(name)}));
     }
-    return types;
+    return table;
 }
 
 } // namespace payload_samples

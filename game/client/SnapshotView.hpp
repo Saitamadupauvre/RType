@@ -10,7 +10,7 @@
 #include "engine/core/EntityManager.hpp"
 #include "engine/graphics/IRenderer.hpp"
 #include "engine/network/Client.hpp"
-#include "engine/network/Replicated.hpp"
+#include "engine/network/StringTable.hpp"
 
 namespace rtype::client {
 
@@ -19,14 +19,13 @@ public:
     SnapshotView(engine::graphics::IRenderer& renderer, std::filesystem::path assets);
 
     void draw(const std::vector<engine::network::EntitySnapshot>& entities,
-              const std::vector<engine::network::ReplicatedType>& types,
-              std::uint32_t local_player);
+              const engine::network::StringTable& strings, std::uint32_t local_player);
 
     [[nodiscard]] static std::string sprite_of(const std::string& type_name);
 
 private:
     void mirror(const std::vector<engine::network::EntitySnapshot>& entities,
-                const std::vector<engine::network::ReplicatedType>& types);
+                const engine::network::StringTable& strings);
     void mark_local(const std::vector<engine::network::EntitySnapshot>& entities,
                     std::uint32_t local_player);
 

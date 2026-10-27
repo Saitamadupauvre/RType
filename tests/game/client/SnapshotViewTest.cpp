@@ -8,7 +8,7 @@
 #include "SnapshotView.hpp"
 #include "engine/graphics/IRenderer.hpp"
 #include "engine/network/Client.hpp"
-#include "engine/network/Replicated.hpp"
+#include "engine/network/StringTable.hpp"
 
 using engine::core::Vec2;
 using engine::graphics::Color;
@@ -16,7 +16,8 @@ using engine::graphics::Rect;
 using engine::graphics::SpriteDraw;
 using engine::graphics::TextureId;
 using engine::network::EntitySnapshot;
-using engine::network::ReplicatedType;
+using engine::network::StringCategory;
+using engine::network::StringTable;
 using rtype::client::SnapshotView;
 
 namespace {
@@ -64,7 +65,13 @@ public:
     std::vector<DrawnCircle> circles;
 };
 
-const std::vector<ReplicatedType> types{{.type_id = ship_type, .name = "ship"}};
+StringTable ship_strings() {
+    StringTable strings;
+    strings.insert({.category = StringCategory::type, .id = ship_type, .name = "ship"});
+    return strings;
+}
+
+const StringTable strings = ship_strings();
 
 EntitySnapshot entity(std::uint16_t type_id, float x, std::uint8_t owner) {
     return {.entity_id = 1,
@@ -87,7 +94,7 @@ TEST(SnapshotView, DrawsEachEntityWithTheSpriteOfItsTypeAndItsColor) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets");
 
-    view.draw({entity(ship_type, 5.F, 2)}, types, 1);
+    view.draw({entity(ship_type, 5.F, 2)}, strings, 1);
 
     ASSERT_EQ(renderer.loaded.size(), 1U);
     EXPECT_EQ(renderer.loaded.front(),
@@ -101,7 +108,7 @@ TEST(SnapshotView, EntityOfUnknownTypeIsAColoredSquare) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets");
 
-    view.draw({entity(unknown_type, 5.F, 0)}, types, 1);
+    view.draw({entity(unknown_type, 5.F, 0)}, strings, 1);
 
     EXPECT_TRUE(renderer.sprites.empty());
     ASSERT_EQ(renderer.rects.size(), 1U);
@@ -112,7 +119,7 @@ TEST(SnapshotView, MarksOnlyTheLocalPlayerEntities) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets");
 
-    view.draw({entity(ship_type, 5.F, 1), entity(ship_type, 200.F, 2)}, types, 1);
+    view.draw({entity(ship_type, 5.F, 1), entity(ship_type, 200.F, 2)}, strings, 1);
 
     ASSERT_EQ(renderer.circles.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.circles.front().center.x, 5.F);
@@ -123,7 +130,7 @@ TEST(SnapshotView, UnownedEntitiesAreNeverMarkedBeforeAccept) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets");
 
-    view.draw({entity(ship_type, 5.F, 0)}, types, 0);
+    view.draw({entity(ship_type, 5.F, 0)}, strings, 0);
 
     EXPECT_TRUE(renderer.circles.empty());
 }
@@ -131,10 +138,10 @@ TEST(SnapshotView, UnownedEntitiesAreNeverMarkedBeforeAccept) {
 TEST(SnapshotView, DrawsOnlyTheNewestSnapshot) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets");
-    view.draw({entity(ship_type, 5.F, 0), entity(ship_type, 50.F, 0)}, types, 0);
+    view.draw({entity(ship_type, 5.F, 0), entity(ship_type, 50.F, 0)}, strings, 0);
     renderer.sprites.clear();
 
-    view.draw({entity(ship_type, 90.F, 0)}, types, 0);
+    view.draw({entity(ship_type, 90.F, 0)}, strings, 0);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 90.F);

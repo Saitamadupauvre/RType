@@ -15,29 +15,8 @@ namespace engine::network {
 
 namespace {
 
-std::vector<TypeEntry> to_type_entries(const std::vector<ReplicatedType>& types) {
-    std::vector<TypeEntry> entries;
-    entries.reserve(types.size());
-    for (const auto& type : types) {
-        entries.push_back(TypeEntry{.type_id = type.type_id, .name = type.name});
-    }
-    return entries;
-}
-
-std::vector<TypeEntry> to_type_entries(const std::vector<AudioName>& names) {
-    std::vector<TypeEntry> entries;
-    entries.reserve(names.size());
-    for (const auto& name : names) {
-        entries.push_back(TypeEntry{.type_id = name.id, .name = name.name});
-    }
-    return entries;
-}
-
 ServerSessionsConfig sessions_config(const ServerOptions& options) {
-    return ServerSessionsConfig{.max_players = options.max_players,
-                                .types = to_type_entries(options.types),
-                                .sounds = to_type_entries(options.sounds),
-                                .musics = to_type_entries(options.musics)};
+    return ServerSessionsConfig{.max_players = options.max_players, .strings = options.strings};
 }
 
 } // namespace
@@ -94,11 +73,8 @@ NetworkServer::~NetworkServer() = default;
 bool NetworkServer::start(std::error_code& ec) {
     ec.clear();
     const auto config = sessions_config(impl_->options);
-    if (!is_valid(ConnectAcceptPayload{
-            .types = config.types, .sounds = config.sounds, .musics = config.musics})) {
-        core::log::error("network: invalid type, sound or music table: ids and names must be "
-                         "unique, names 1 to 63 bytes, no music with id 65535, and the tables "
-                         "must fit in one packet");
+    if (!is_valid(ConnectAcceptPayload{.strings = config.strings})) {
+        core::log::error("network: the string table does not fit in one packet");
         ec = std::make_error_code(std::errc::invalid_argument);
         return false;
     }

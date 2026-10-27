@@ -89,8 +89,7 @@ protected:
     ManualClock clock;
     EventBus bus;
     EntityManager registry;
-    ServerNetwork network{clock, bus,
-                          ServerSessionsConfig{.max_players = 4, .timeout = 5s, .types = {}}};
+    ServerNetwork network{clock, bus, ServerSessionsConfig{.max_players = 4, .timeout = 5s}};
 };
 
 } // namespace

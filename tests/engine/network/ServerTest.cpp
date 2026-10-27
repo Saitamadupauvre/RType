@@ -16,7 +16,9 @@
 #include "engine/network/Events.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
+#include "engine/network/StringTable.hpp"
 
+#include "PayloadSamples.hpp"
 #include "protocol/Messages.hpp"
 #include "protocol/Protocol.hpp"
 #include "protocol/ProtocolHandler.hpp"
@@ -29,7 +31,6 @@ using engine::core::EntityManager;
 using engine::core::Position;
 using engine::core::event::EventBus;
 using engine::core::time::SteadyClock;
-using engine::network::AudioName;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
 using engine::network::DestroyEvent;
@@ -48,11 +49,10 @@ using engine::network::PlayerJoined;
 using engine::network::ProtocolHandler;
 using engine::network::ReceivedMessage;
 using engine::network::Replicated;
-using engine::network::ReplicatedType;
 using engine::network::ServerOptions;
 using engine::network::SnapshotPayload;
 using engine::network::SocketError;
-using engine::network::TypeEntry;
+using engine::network::StringCategory;
 using engine::network::UdpSocket;
 using namespace std::chrono_literals;
 
@@ -180,49 +180,22 @@ TEST_F(NetworkServerTest, ServesAClientOverLoopback) {
     EXPECT_EQ(payload.entities.front().y, 4);
 }
 
-TEST_F(NetworkServerTest, StartRejectsAnInvalidTypeTable) {
-    NetworkServer duplicated(clock, bus,
-                             ServerOptions{.port = 0,
-                                           .max_players = 1,
-                                           .types = {ReplicatedType{.type_id = 1, .name = "a"},
-                                                     ReplicatedType{.type_id = 1, .name = "b"}}});
-    NetworkServer unnamed(clock, bus,
+TEST_F(NetworkServerTest, StartRejectsAStringTableTooLargeForOnePacket) {
+    NetworkServer crowded(clock, bus,
                           ServerOptions{.port = 0,
                                         .max_players = 1,
-                                        .types = {ReplicatedType{.type_id = 1, .name = ""}}});
+                                        .strings = payload_samples::long_name_strings(18)});
     std::error_code ec;
 
-    EXPECT_FALSE(duplicated.start(ec));
-    EXPECT_EQ(ec, std::errc::invalid_argument);
-    EXPECT_FALSE(unnamed.start(ec));
+    EXPECT_FALSE(crowded.start(ec));
     EXPECT_EQ(ec, std::errc::invalid_argument);
 }
 
-TEST_F(NetworkServerTest, StartRejectsInvalidSoundOrMusicTables) {
-    NetworkServer duplicated_sound(clock, bus,
-                                   ServerOptions{.port = 0,
-                                                 .max_players = 1,
-                                                 .sounds = {AudioName{.id = 1, .name = "a.wav"},
-                                                            AudioName{.id = 2, .name = "a.wav"}}});
-    NetworkServer reserved_music(
-        clock, bus,
-        ServerOptions{.port = 0,
-                      .max_players = 1,
-                      .musics = {AudioName{.id = engine::network::no_music, .name = "a.ogg"}}});
-    std::error_code ec;
-
-    EXPECT_FALSE(duplicated_sound.start(ec));
-    EXPECT_EQ(ec, std::errc::invalid_argument);
-    EXPECT_FALSE(reserved_music.start(ec));
-    EXPECT_EQ(ec, std::errc::invalid_argument);
-}
-
-TEST_F(NetworkServerTest, SendsAudioTablesAndTheCurrentMusicToPlayersJoiningLater) {
-    NetworkServer audio(clock, bus,
-                        ServerOptions{.port = 0,
-                                      .max_players = 1,
-                                      .sounds = {AudioName{.id = 1, .name = "shot.wav"}},
-                                      .musics = {AudioName{.id = 2, .name = "stage.ogg"}}});
+TEST_F(NetworkServerTest, SendsTheStringTableAndTheCurrentMusicToPlayersJoiningLater) {
+    const auto strings = payload_samples::strings_of(
+        {{.category = StringCategory::sound, .id = 1, .name = "shot.wav"},
+         {.category = StringCategory::music, .id = 2, .name = "stage.ogg"}});
+    NetworkServer audio(clock, bus, ServerOptions{.port = 0, .max_players = 1, .strings = strings});
     std::error_code ec;
     ASSERT_TRUE(audio.start(ec)) << ec.message();
     bus.publish(MusicChanged{.music_id = 2});
@@ -234,8 +207,7 @@ TEST_F(NetworkServerTest, SendsAudioTablesAndTheCurrentMusicToPlayersJoiningLate
 
     ASSERT_TRUE(accept.has_value());
     const auto& payload = std::get<ConnectAcceptPayload>(accept->message);
-    EXPECT_EQ(payload.sounds, (std::vector<TypeEntry>{{.type_id = 1, .name = "shot.wav"}}));
-    EXPECT_EQ(payload.musics, (std::vector<TypeEntry>{{.type_id = 2, .name = "stage.ogg"}}));
+    EXPECT_EQ(payload.strings, strings);
     EXPECT_EQ(payload.current_music, 2);
 }
 
@@ -256,11 +228,10 @@ TEST_F(NetworkServerTest, SendsMusicChangesToPlayers) {
               Message{EventPayload{MusicEvent{.music_id = engine::network::no_music}}});
 }
 
-TEST_F(NetworkServerTest, SendsItsTypeTableAndPublishedEventsToPlayers) {
-    NetworkServer typed(clock, bus,
-                        ServerOptions{.port = 0,
-                                      .max_players = 1,
-                                      .types = {ReplicatedType{.type_id = 3, .name = "bydo"}}});
+TEST_F(NetworkServerTest, SendsItsStringTableAndPublishedEventsToPlayers) {
+    const auto strings =
+        payload_samples::strings_of({{.category = StringCategory::type, .id = 3, .name = "bydo"}});
+    NetworkServer typed(clock, bus, ServerOptions{.port = 0, .max_players = 1, .strings = strings});
     std::error_code ec;
     ASSERT_TRUE(typed.start(ec)) << ec.message();
     auto peer = bound_peer();
@@ -268,8 +239,7 @@ TEST_F(NetworkServerTest, SendsItsTypeTableAndPublishedEventsToPlayers) {
     ASSERT_TRUE(receive_until(typed, [&typed] { return typed.player_count() == 1; }));
     const auto accept = receive_from_server(peer);
     ASSERT_TRUE(accept.has_value());
-    EXPECT_EQ(std::get<ConnectAcceptPayload>(accept->message).types,
-              (std::vector<TypeEntry>{{.type_id = 3, .name = "bydo"}}));
+    EXPECT_EQ(std::get<ConnectAcceptPayload>(accept->message).strings, strings);
     EntityManager registry;
 
     bus.publish(EntityDestroyed{.entity_id = 12});

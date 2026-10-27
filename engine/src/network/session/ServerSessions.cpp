@@ -122,8 +122,7 @@ std::vector<PlayerStats> ServerSessions::stats() const {
 
 void ServerSessions::set_current_music(std::uint16_t music_id) {
     const bool known =
-        music_id == no_music ||
-        std::ranges::find(config_.musics, music_id, &TypeEntry::type_id) != config_.musics.end();
+        music_id == no_music || config_.strings.name_of(StringCategory::music, music_id) != nullptr;
     if (!known) {
         core::log::warn("network: ignored unknown music id {} for players joining later", music_id);
         return;
@@ -157,9 +156,7 @@ Outbound ServerSessions::accept_message(Session& session,
                                         const ConnectRequestPayload& request) const {
     return send_to(session, ConnectAcceptPayload{.client_nonce = request.client_nonce,
                                                  .player_entity_id = session.player_id,
-                                                 .types = config_.types,
-                                                 .sounds = config_.sounds,
-                                                 .musics = config_.musics,
+                                                 .strings = config_.strings,
                                                  .current_music = config_.current_music});
 }
 

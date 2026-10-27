@@ -38,9 +38,9 @@ using engine::network::Inbound;
 using engine::network::InputPayload;
 using engine::network::max_datagram_size;
 using engine::network::max_payload_size;
-using engine::network::max_type_name_length;
+using engine::network::max_string_name_length;
 using engine::network::Message;
-using engine::network::min_type_entry_size;
+using engine::network::min_string_entry_size;
 using engine::network::NetworkIo;
 using engine::network::Outbound;
 using engine::network::ProtocolHandler;
@@ -126,13 +126,16 @@ bool wait_for_log_containing(const logger::MemorySink& sink, std::string_view te
 
 Bytes max_size_datagram() {
     constexpr std::size_t full_entries = 17;
-    constexpr std::size_t full_entry_size = min_type_entry_size + max_type_name_length;
+    constexpr std::size_t full_entry_size = min_string_entry_size + max_string_name_length;
     constexpr std::size_t last_name_length = max_payload_size - connect_accept_prefix_size -
-                                             (full_entries * full_entry_size) - min_type_entry_size;
-    auto types = payload_samples::long_name_types(full_entries);
-    types.push_back({.type_id = full_entries, .name = std::string(last_name_length, 'z')});
+                                             (full_entries * full_entry_size) -
+                                             min_string_entry_size;
+    auto strings = payload_samples::long_name_strings(full_entries);
+    EXPECT_TRUE(strings.insert({.category = engine::network::StringCategory::type,
+                                .id = full_entries,
+                                .name = std::string(last_name_length, 'z')}));
 
-    auto datagram = encoded(payload_samples::accept_with(std::move(types)));
+    auto datagram = encoded(payload_samples::accept_with(std::move(strings)));
     EXPECT_EQ(datagram.size(), max_datagram_size);
     return datagram;
 }

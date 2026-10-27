@@ -11,6 +11,7 @@
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/network/Events.hpp"
 
+#include "PayloadSamples.hpp"
 #include "protocol/Messages.hpp"
 #include "session/ServerSessions.hpp"
 
@@ -34,11 +35,23 @@ using engine::network::PlayerLeft;
 using engine::network::PlayerLeftEvent;
 using engine::network::ServerSessions;
 using engine::network::ServerSessionsConfig;
-using engine::network::TypeEntry;
+using engine::network::StringCategory;
+using engine::network::StringTable;
 using namespace std::chrono_literals;
 
 constexpr auto session_timeout = 5s;
 constexpr std::uint32_t sample_nonce = 0xCAFE;
+
+StringTable player_strings() {
+    return payload_samples::strings_of(
+        {{.category = StringCategory::type, .id = 1, .name = "player"}});
+}
+
+StringTable audio_strings() {
+    return payload_samples::strings_of(
+        {{.category = StringCategory::sound, .id = 1, .name = "shot.wav"},
+         {.category = StringCategory::music, .id = 4, .name = "stage.ogg"}});
+}
 
 Endpoint client(std::uint16_t port) {
     const auto endpoint = Endpoint::from_string("127.0.0.1", port);
@@ -96,7 +109,7 @@ protected:
     ServerSessions sessions{clock, bus,
                             ServerSessionsConfig{.max_players = 4,
                                                  .timeout = session_timeout,
-                                                 .types = {{.type_id = 1, .name = "player"}}}};
+                                                 .strings = player_strings()}};
 };
 
 } // namespace
@@ -106,9 +119,8 @@ TEST_F(ServerSessionsTest, AcceptsConnectRequestWithNonceFirstPlayerIdAndTypes) 
 
     ASSERT_EQ(replies.size(), 1U);
     EXPECT_EQ(replies.front().to, client(5000));
-    const ConnectAcceptPayload expected{.client_nonce = sample_nonce,
-                                        .player_entity_id = 1,
-                                        .types = {TypeEntry{.type_id = 1, .name = "player"}}};
+    const ConnectAcceptPayload expected{
+        .client_nonce = sample_nonce, .player_entity_id = 1, .strings = player_strings()};
     EXPECT_EQ(replies.front().message, Message{expected});
     ASSERT_EQ(sessions.sessions().size(), 1U);
     EXPECT_EQ(sessions.sessions().front().endpoint, client(5000));
@@ -389,13 +401,11 @@ TEST_F(ServerSessionsTest, ReportsTrafficOfEachPlayer) {
     EXPECT_FALSE(stats[1].network.round_trip_time.has_value());
 }
 
-TEST(ServerSessionsAudio, AcceptCarriesSoundMusicTablesAndCurrentMusic) {
+TEST(ServerSessionsAudio, AcceptCarriesTheStringTableAndCurrentMusic) {
     ManualClock clock;
     EventBus bus;
     ServerSessions sessions(clock, bus,
-                            ServerSessionsConfig{.max_players = 1,
-                                                 .sounds = {{.type_id = 1, .name = "shot.wav"}},
-                                                 .musics = {{.type_id = 4, .name = "stage.ogg"}}});
+                            ServerSessionsConfig{.max_players = 1, .strings = audio_strings()});
 
     sessions.set_current_music(4);
     const auto replies = sessions.handle(connect_from(client(5000)));
@@ -403,17 +413,15 @@ TEST(ServerSessionsAudio, AcceptCarriesSoundMusicTablesAndCurrentMusic) {
     ASSERT_EQ(replies.size(), 1U);
     const auto* accept = std::get_if<ConnectAcceptPayload>(&replies.front().message);
     ASSERT_NE(accept, nullptr);
-    EXPECT_EQ(accept->sounds, (std::vector<TypeEntry>{{.type_id = 1, .name = "shot.wav"}}));
-    EXPECT_EQ(accept->musics, (std::vector<TypeEntry>{{.type_id = 4, .name = "stage.ogg"}}));
+    EXPECT_EQ(accept->strings, audio_strings());
     EXPECT_EQ(accept->current_music, 4);
 }
 
 TEST(ServerSessionsAudio, IgnoresAnUnknownCurrentMusic) {
     ManualClock clock;
     EventBus bus;
-    ServerSessions sessions(
-        clock, bus,
-        ServerSessionsConfig{.max_players = 1, .musics = {{.type_id = 4, .name = "stage.ogg"}}});
+    ServerSessions sessions(clock, bus,
+                            ServerSessionsConfig{.max_players = 1, .strings = audio_strings()});
 
     sessions.set_current_music(4);
     sessions.set_current_music(9);

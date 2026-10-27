@@ -34,9 +34,8 @@ AudioPlayer::AudioPlayer(engine::audio::IAudio& audio, const std::filesystem::pa
     audio.set_master_volume(_muted ? 0.F : 1.F);
 }
 
-void AudioPlayer::play_sound(const std::vector<engine::network::AudioName>& table,
-                             std::uint16_t sound_id) {
-    const auto name = name_of(table, sound_id, "sound");
+void AudioPlayer::play_sound(const engine::network::StringTable& strings, std::uint16_t sound_id) {
+    const auto name = name_of(strings, engine::network::StringCategory::sound, sound_id);
     if (!name) {
         return;
     }
@@ -46,13 +45,13 @@ void AudioPlayer::play_sound(const std::vector<engine::network::AudioName>& tabl
     }
 }
 
-void AudioPlayer::change_music(const std::vector<engine::network::AudioName>& table,
+void AudioPlayer::change_music(const engine::network::StringTable& strings,
                                std::uint16_t music_id) {
     if (music_id == engine::network::no_music) {
         _audio.get().stop_music();
         return;
     }
-    const auto name = name_of(table, music_id, "music");
+    const auto name = name_of(strings, engine::network::StringCategory::music, music_id);
     if (!name) {
         return;
     }
@@ -67,19 +66,20 @@ void AudioPlayer::toggle_mute() {
     _audio.get().set_master_volume(_muted ? 0.F : 1.F);
 }
 
-std::optional<std::string>
-AudioPlayer::name_of(const std::vector<engine::network::AudioName>& table, std::uint16_t id,
-                     const char* kind) {
-    const auto entry = std::ranges::find(table, id, &engine::network::AudioName::id);
-    if (entry == table.end()) {
+std::optional<std::string> AudioPlayer::name_of(const engine::network::StringTable& strings,
+                                                engine::network::StringCategory category,
+                                                std::uint16_t id) {
+    const char* kind = category == engine::network::StringCategory::sound ? "sound" : "music";
+    const std::string* name = strings.name_of(category, id);
+    if (name == nullptr) {
         log::warn("client: ignored unknown {} id {}", kind, id);
         return std::nullopt;
     }
-    if (!is_plain_file_name(entry->name)) {
-        log::warn("client: ignored {} '{}': not a plain file name", kind, entry->name);
+    if (!is_plain_file_name(*name)) {
+        log::warn("client: ignored {} '{}': not a plain file name", kind, *name);
         return std::nullopt;
     }
-    return entry->name;
+    return *name;
 }
 
 engine::audio::SoundId AudioPlayer::sound(const std::string& name) {

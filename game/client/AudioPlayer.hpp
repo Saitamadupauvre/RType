@@ -6,11 +6,11 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 #include "engine/audio/IAudio.hpp"
 #include "engine/audio/Types.hpp"
 #include "engine/network/Audio.hpp"
+#include "engine/network/StringTable.hpp"
 
 namespace rtype::client {
 
@@ -25,15 +25,15 @@ public:
     AudioPlayer(engine::audio::IAudio& audio, const std::filesystem::path& assets,
                 AudioSettings settings);
 
-    void play_sound(const std::vector<engine::network::AudioName>& table, std::uint16_t sound_id);
-    void change_music(const std::vector<engine::network::AudioName>& table, std::uint16_t music_id);
+    void play_sound(const engine::network::StringTable& strings, std::uint16_t sound_id);
+    void change_music(const engine::network::StringTable& strings, std::uint16_t music_id);
     void toggle_mute();
     [[nodiscard]] bool muted() const noexcept { return _muted; }
 
 private:
     [[nodiscard]] static std::optional<std::string>
-    name_of(const std::vector<engine::network::AudioName>& table, std::uint16_t id,
-            const char* kind);
+    name_of(const engine::network::StringTable& strings, engine::network::StringCategory category,
+            std::uint16_t id);
     engine::audio::SoundId sound(const std::string& name);
     engine::audio::MusicId music(const std::string& name);
 

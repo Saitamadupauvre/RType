@@ -9,6 +9,7 @@
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/ManualClock.hpp"
 
+#include "PayloadSamples.hpp"
 #include "protocol/Messages.hpp"
 #include "session/ClientConnection.hpp"
 #include "session/ServerSessions.hpp"
@@ -37,7 +38,7 @@ using engine::network::ServerSessions;
 using engine::network::ServerSessionsConfig;
 using engine::network::SnapshotPayload;
 using engine::network::SpawnEvent;
-using engine::network::TypeEntry;
+using engine::network::StringCategory;
 using namespace std::chrono_literals;
 
 constexpr auto retry_interval = 500ms;
@@ -60,10 +61,12 @@ Inbound from(const Endpoint& sender, Message message, std::uint32_t sequence = 0
 }
 
 Inbound accept_from_server(std::uint32_t nonce = sample_nonce) {
-    return from(server_endpoint(),
-                ConnectAcceptPayload{.client_nonce = nonce,
-                                     .player_entity_id = 3,
-                                     .types = {TypeEntry{.type_id = 1, .name = "player"}}});
+    return from(
+        server_endpoint(),
+        ConnectAcceptPayload{.client_nonce = nonce,
+                             .player_entity_id = 3,
+                             .strings = payload_samples::strings_of(
+                                 {{.category = StringCategory::type, .id = 1, .name = "player"}})});
 }
 
 Inbound disconnect_from_server(DisconnectReason reason) {
@@ -141,8 +144,8 @@ TEST_F(ClientConnectionTest, ConnectsOnAcceptWithMatchingNonce) {
 
     EXPECT_EQ(connection.state(), ConnectionState::connected);
     EXPECT_EQ(connection.player_id(), 3U);
-    EXPECT_TRUE(connection.type_table().is_known(1));
-    EXPECT_FALSE(connection.type_table().is_known(2));
+    EXPECT_TRUE(connection.strings().is_known_type(1));
+    EXPECT_FALSE(connection.strings().is_known_type(2));
 }
 
 TEST_F(ClientConnectionTest, DropsSnapshotsAndEventsBeforeConnectAccept) {

@@ -14,6 +14,7 @@
 #include "engine/network/Export.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Stats.hpp"
+#include "engine/network/StringTable.hpp"
 
 namespace engine::network {
 
@@ -144,24 +145,12 @@ public:
     [[nodiscard]] std::uint32_t player_id() const;
 
     /**
-     * @return The type table the server sent in `connect_accept`, to name the
-     * `EntitySnapshot::type_id` of each entity; empty until accepted. Kept after the connection
-     * ends.
+     * @return The names the server sent in `connect_accept`, to name the
+     * `EntitySnapshot::type_id` of each entity (category `type`), `SoundPlayed::sound_id`
+     * (`sound`) and `MusicChanged::music_id` (`music`); empty until accepted. Kept after the
+     * connection ends.
      */
-    [[nodiscard]] std::vector<ReplicatedType> types() const;
-
-    /**
-     * @return The sound table the server sent in `connect_accept`, to name the
-     * `SoundPlayed::sound_id` of each sound; empty until accepted. Kept after the connection ends.
-     */
-    [[nodiscard]] std::vector<AudioName> sounds() const;
-
-    /**
-     * @return The music table the server sent in `connect_accept`, to name the
-     * `MusicChanged::music_id` of each music; empty until accepted. Kept after the connection
-     * ends.
-     */
-    [[nodiscard]] std::vector<AudioName> musics() const;
+    [[nodiscard]] StringTable strings() const;
 
     /**
      * @return The server tick of the newest snapshot received, if any.
