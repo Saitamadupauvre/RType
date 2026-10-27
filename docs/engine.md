@@ -15,6 +15,7 @@ The [architecture](architecture.md) page shows how they fit together.
 | physics | `engine::physics` | core | — |
 | graphics | `engine::graphics` | core | — (backends are [plugins](plugins.md)) |
 | audio | `engine::audio` | core | — (backends are [plugins](plugins.md)) |
+| app | `engine::app` | core, script, network, graphics, audio (physics privately) | — |
 
 ### core
 
@@ -114,6 +115,21 @@ Backend-independent `IAudio` interface (sound effects, streamed music, master,
 music and effects volumes), `SoundId` / `MusicId`, `NullAudio` (a silent
 backend) and `load_audio_plugin()`, which loads a backend at runtime. See
 [Plugins](plugins.md#audio-raylib).
+
+### app
+
+The composition root: the only module that depends on most of the others. It
+runs any game folder (`scripts/` and `assets/`) without knowing the game.
+
+| Header | What it gives |
+|---|---|
+| `ServerApp.hpp` | Authoritative server over any `ServerTransport`: Lua with the server API, string table, 60 Hz tick (scripts, physics, collisions, systems, replication, audio and events) |
+| `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, snapshot drawing, audio, local input to Lua and to the server |
+| `Launch.hpp` | `Mode` (`dedicated`, `client`, `host`, `solo`), `LaunchOptions` and `launch()`: picks the transports, loads the plugins and runs the apps; `host` runs the server on a background thread, `solo` runs both in one thread over a `LoopbackNetwork` |
+
+Its private helpers (`SnapshotView`, `WorldDraw`, `AudioPlayer`,
+`Collisions`) are tested in `tests/engine/app/`, with a fixture game in
+`tests/fixtures/app/game/` played over a `LoopbackNetwork`.
 
 ## The contract
 

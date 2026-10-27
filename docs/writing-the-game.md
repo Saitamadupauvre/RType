@@ -53,8 +53,10 @@ Ask in order:
    → A coordinating entity today, a Lua `system` once systems run (see
    [Current state](#current-state)). Examples: spawning waves, rounds.
 
-Never put gameplay in `game/client` or `game/server` C++: those files only wire
-engine modules together.
+Never put gameplay in `game/client` or `game/server` C++: those files only parse
+the command line and pick a mode of `engine-app`. Client-side behaviour such as
+hotkeys goes in the `client = { ... }` table of `main.lua` (see
+[PROJECT §10.10](PROJECT.md#1010-networking-from-the-scripts-point-of-view)).
 
 ## Tutorial: add a new enemy
 
@@ -232,8 +234,8 @@ Setting `vx` / `vy` already moves an entity every server tick. The target style
 ## Tests
 
 Tests load a copy of the scripts from `tests/fixtures/game/server/game/`,
-identical except for an empty `on_start` in `main.lua`, so each test spawns
-only what it checks. Re-sync it after editing a script:
+identical except for `main.lua`, whose `server` `on_start` is empty and which
+has no `client` table, so each test spawns only what it checks. Re-sync it after editing a script:
 
 ```sh
 rsync -a --delete --exclude /main.lua game/scripts/ tests/fixtures/game/server/game/

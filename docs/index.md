@@ -42,7 +42,7 @@ Part 1 (playable networked prototype) is in progress. What works today:
 
 - authoritative multithreaded server, binary UDP protocol, sessions,
   timeouts and crash notification;
-- up to 4 players, starfield, random Bydo waves that shoot back, missiles,
+- up to 4 players, random Bydo waves that shoot back, missiles,
   game over and restart, all written in Lua; collisions detected by
   `engine-physics` and handled in Lua;
 - engine built as shared libraries with the Raylib backend loaded at runtime.

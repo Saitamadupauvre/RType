@@ -22,10 +22,10 @@ Status: ✅ available, 🔜 planned for the next releases.
 
 | Measure | Status | Details |
 |---|---|---|
-| Not colour alone | ✅ | Your own ship is marked with a white dot, so you can find yourself without telling colours apart. |
+| Not colour alone | 🔜 | The white dot marking your own ship was drawn by the C++ client; it left with the generic `ClientApp` and comes back from the game's scripts once the client can draw from Lua. |
 | Distinct colours | ✅ | The four players are blue, red, green and yellow. |
 | Scalable display | ✅ | The window is resizable and the full play area is scaled to it with letterboxing, so a large screen gives larger sprites. |
-| High-contrast background | ✅ | A plain black background with small grey stars; entities are drawn on top in full colour. |
+| High-contrast background | ✅ | A plain black background; entities are drawn on top in full colour. |
 | Colour-blind palette | 🔜 | Replace red/green with a palette distinguishable under protanopia and deuteranopia (e.g. blue, orange, white, magenta), selectable in `lib/config.lua`. |
 | Shape or number per player | 🔜 | A player number drawn next to each ship, as in *Overcooked*. |
 | Fullscreen | 🔜 | The renderer already supports `set_fullscreen()`; add a key and a command-line flag. |

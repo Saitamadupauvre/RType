@@ -46,7 +46,7 @@ The success criterion for the engine is simple: **a second, different game can b
 
 A playable, networked R-Type prototype:
 
-- Starfield scrolling background, timer-based (never tied to CPU speed).
+- Starfield scrolling background, timer-based (never tied to CPU speed). Removed from the C++ client with the generic `ClientApp`; it comes back as a shader.
 - Up to 4 players, visually distinguishable (not only by colour).
 - Players move with the arrow keys and shoot.
 - Bydos (enemies) spawn randomly from the right side of the screen.
@@ -151,14 +151,13 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
 r-type/
 ├── engine/
 │   ├── cmake/              engine_add_module / engine_add_plugin
-│   ├── include/engine/     public headers (core, graphics, network, physics, script)
+│   ├── include/engine/     public headers (core, graphics, audio, network, physics, script, app)
 │   └── src/                implementation
 ├── plugins/
 │   └── graphics-raylib/    the only code that includes raylib.h
 ├── game/
-│   ├── server/             → r-type_server (Cli, ServerApp, main.cpp)
-│   ├── client/             → r-type_client (Cli, SnapshotView, Starfield, main.cpp)
-│   ├── common/             field registry shared by both
+│   ├── server/             → r-type_server (Cli, main.cpp)
+│   ├── client/             → r-type_client (Cli, main.cpp)
 │   ├── sandbox/            → r-type_sandbox
 │   └── scripts/            Lua game code (free layout, see §10)
 ├── assets/                 sprites
@@ -176,12 +175,15 @@ r-type/
 bin/
 ├── r-type_server
 ├── r-type_client
+├── libengine-app.so
+├── libengine-audio.so
 ├── libengine-core.so
 ├── libengine-graphics.so
 ├── libengine-network.so
 ├── libengine-physics.so
 ├── libengine-script.so
 ├── plugins/
+│   ├── audio-raylib.so
 │   └── graphics-raylib.so
 ├── scripts/
 └── assets/
@@ -193,48 +195,59 @@ Executables locate their libraries, plugins, scripts and assets **relative to th
 
 ## 6. Executables
 
-In Part 1, each executable has a short, explicit `main` that assembles engine modules. Nothing is hidden: reading it shows the whole tick or frame. Simplified from the real code:
+The executables are thin: `main` parses the command line and calls `engine::app::launch()` with a mode. `engine-app` holds a generic `ServerApp` and `ClientApp` that run any game folder (`scripts/` and `assets/` next to the executable) and know nothing about R-Type.
+
+| Mode | Server | Client | Network |
+|---|---|---|---|
+| `dedicated` | `ServerApp` on the main thread | none | UDP |
+| `client` | elsewhere | `ClientApp` | UDP |
+| `host` | `ServerApp` on a background thread | `ClientApp` on `127.0.0.1` | UDP, others can join |
+| `solo` | `ServerApp` and `ClientApp` in the same thread | | `LoopbackNetwork`, no socket |
+
+Which modes a binary offers is the game's choice: R-Type ships `r-type_server` (dedicated) and `r-type_client` (client, host, solo); one binary offering every mode works the same way. Simplified from the real code:
 
 ```cpp
-// game/server/ServerApp.cpp: one tick, run at 60 Hz by a FixedStepLoop
-void ServerApp::tick(Duration step)
+// engine/src/app/ServerApp.cpp: one tick, run at 60 Hz by a FixedStepLoop
+void ServerApp::Impl::tick(Duration step)
 {
-    network_.receive();                    // sessions, timeouts, latest input of each player
-    apply_inputs(network_.inputs());       // to the Lua entities each player owns
-    _runtime.update(dt);                   // every entity's update(self, dt)
-    _runtime.flush_destroyed();            // on_destroy, then removal
-    systems_.run(registry_, dt);           // native systems
+    network.receive();                     // sessions, timeouts, latest input of each player
+    apply_inputs();                        // to the Lua entities each player owns
+    runtime.update(dt);                    // every entity's update(self, dt), then main.lua update(dt)
+    collisions.step(dt);                   // engine-physics, then on_collide
+    runtime.flush_destroyed();             // on_destroy, then removal
+    systems.run(world, dt);                // native systems
     replicate();                           // mark scripted entities with a sprite or colour
-    network_.send_snapshot(registry_);     // queued for the send thread
+    publish_audio(); publish_events();     // play, music, emit
+    network.send_snapshot(world);          // queued for the send thread
 }
 ```
 
 ```cpp
-// game/client/main.cpp
-auto plugin = engine::graphics::load_graphics_plugin(executable_dir / "plugins" / GRAPHICS_PLUGIN_FILE);
-engine::network::UdpClientTransport transport(host, port);
-engine::network::NetworkClient network(clock, events, fields, transport);
-network.connect(ec);                                   // exit 84 on failure
-renderer.open({.width = 1280, .height = 720, .title = "R-Type"});
-while (!renderer.should_close()) {
-    network.update();                                  // snapshots, retries, heartbeats, server timeout
+// engine/src/app/ClientApp.cpp: one frame
+void ClientApp::Impl::frame()
+{
+    network.update();                                  // snapshots, events, retries, heartbeats
+    audio.update();
+    const auto local = graphics::capture_input(input);
     loop.run_frame([&](Duration step) {                // fixed 60 Hz
-        starfield.update(step);
-        network.send_input(engine::graphics::capture_input(input));
+        client.set_input(local);                       // Lua `input`
+        runtime.update(dt);                            // main.lua client update(dt)
+        network.send_input(local);
     });
-    starfield.draw(renderer);
-    view.draw(network.entities(), network.types(), network.player_id());
+    sound.apply(client.audio_settings());              // Lua `audio`
+    renderer.begin_frame(background);
+    view.draw(network.entities(), network.strings());  // assets/sprites/<type>.png
+    renderer.end_frame();
 }
-network.disconnect();
 ```
-
-The client does not run Lua: it draws each entity with `assets/sprites/<type>.png`, using the type names sent by the server.
 
 Usage:
 
 ```
 ./r-type_server <port> [--max-players <1-4>]
 ./r-type_client <server-ip> <port>
+./r-type_client --host <port>
+./r-type_client --solo
 ```
 
 ---
@@ -382,13 +395,14 @@ This section is the specification of the Lua API. Not everything is implemented 
 | `entity "name"` declarations (short and table forms), `require` from `lib/`, sandbox | Implemented |
 | `system "name"` declarations | Parsed and validated; systems do not run yet |
 | `spawn(type, overrides)`, `players()`, `find_player(id)` | Implemented |
-| `main.lua`: `on_start`, `on_player_joined`, `on_player_left` | Implemented |
+| `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `update(dt)`, `server` / `client` sections | Implemented |
 | Entity fields `x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`, `id`, `type`, `age`, `input`, `owner`; free fields | Implemented |
 | Entity methods `destroy()`, `has_tag()`, `get_field()`, `set_field()`; callbacks `on_spawn`, `update`, `on_collide`, `on_destroy` | Implemented |
 | Native collisions: `engine-physics` detects `hitbox` overlaps in the server tick and calls `on_collide` (see §10.5) | Implemented |
 | Native movement from `vx` / `vy` in the server tick (`engine-physics` integrates the body velocity) | Implemented |
 | `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
 | API sets (`core`, `server`, `client`, `editor`), `server = { ... }` / `client = { ... }` sections, client `on(name, handler)` | Implemented (see §10.10) |
+| Client `input` (`key`, `mouse`, `pointer`, `pressed`) and `audio` (`muted`, `set_muted`, `volume`, `set_volume`) | Implemented (see §10.10) |
 | `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
 
 [Writing the game](writing-the-game.md) shows how the current game works around what is missing.
@@ -408,7 +422,7 @@ This section is the specification of the Lua API. Not everything is implemented 
 ### 10.2 Loading order
 
 1. Load every declaration file (entities and systems are registered, nothing is spawned).
-2. Call `on_start()` from `main.lua`. `on_player_joined(player)` and `on_player_left(player)` are called later, whenever a player connects or leaves.
+2. Merge the `server = { ... }` or `client = { ... }` table of `main.lua` into it (see §10.10), then call `on_start()` from `main.lua`. `on_player_joined(player)` and `on_player_left(player)` are called later, whenever a player connects or leaves; `update(dt)`, when `main.lua` defines one, runs once per tick after every entity's `update`.
 
 Since `spawn` is only used once the game has started, file order never matters.
 
@@ -594,6 +608,12 @@ emit("explosion", { at = { x = self.x, y = self.y }, size = 2 })
 emit("explosion")                -- arguments left out are simply absent
 on("explosion", function(event) ... end)   -- client only: react to a received event
 
+-- local input and audio (client only)
+input:pressed("M")               -- true on the tick the key goes down
+input:key("Space")               -- held keys, like self.input on the server
+audio.set_muted(not audio.muted())
+audio.set_volume("music", 0.5)   -- "music" or "effects", from 0 to 1
+
 -- utilities
 random(1, 10)
 world.width, world.height        -- 1920, 1080
@@ -745,8 +765,7 @@ end
 ### 10.10 Networking from the script's point of view
 
 - Scripts are written once; the developer does not write network code.
-- All logic (`update`, `on_collide`, `behavior`, systems) runs **on the server only**.
-- Clients load the same declarations only to know how each entity type looks (sprite).
+- Game logic (`update`, `on_collide`, `behavior`, systems) runs **on the server only**. The client runs the same scripts but spawns no entity: its `main.lua` code (`client = { ... }`) reacts to events, reads the local input and changes the audio levels.
 - `play`, `music` and `emit` are sent to clients as events; clients receive the declared names (and event keys) in `connect_accept`.
 - Native fields are replicated automatically. A free field is replicated only when marked:
 
@@ -763,7 +782,7 @@ speed  = 150         -- server only
 |---|---|---|
 | `core` | `entity`, `system`, `require`, `sounds`, `musics`, `event`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
 | `server` | `spawn`, `players`, `find_player`, `play`, `music`, `emit`, `self.input`, `self.owner`, `on_player_joined`, `on_player_left` | server (`core` + `server`) |
-| `client` | `on` | client (`core` + `client`) |
+| `client` | `on`, `input`, `audio` | client (`core` + `client`) |
 | `editor` | nothing yet | editor (`core` + `editor`) |
 
 Top-level code of a file runs on every side, so it may only use `core` functions; side-specific calls belong in callbacks.
@@ -788,6 +807,23 @@ entity "bydo" {
 
 Short forms work the same way (`server = { ... }` at the top of the file). A section that is not a table, or that sets a name the declaration already sets outside it (`speed = 1` and `server = { speed = 2 }`), rejects the whole file on every side. The same name in both sections is fine.
 
+`main.lua` follows the same rule with its globals, so each side gets its own callbacks:
+
+```lua
+server = {
+    on_start = function() spawn("game") music("stage1.ogg") end,
+    on_player_joined = function(player) ... end,
+}
+
+client = {
+    update = function(dt)                 -- every client tick, 60 per second
+        if input:pressed("M") then audio.set_muted(not audio.muted()) end
+    end,
+}
+```
+
+**Client input and audio.** `input` is the local keyboard and mouse of the current tick. `input:key(name)`, `input:mouse(name)` and `input:pointer()` read it like `self.input` on the server; `input:pressed(name)` is true only on the tick the key goes down, for toggles. An unknown key or button name raises an error. `audio.muted()`, `audio.set_muted(bool)`, `audio.volume(kind)` and `audio.set_volume(kind, volume)` read and change the client's audio levels; `kind` is `"music"` or `"effects"`, `volume` a number from 0 to 1, and anything else raises an error and changes nothing. The levels start from the command line (`--music-volume`, `--effects-volume`, `--mute`).
+
 ### 10.11 Server tick order
 
 1. Apply received inputs.
@@ -805,8 +841,8 @@ Developers must not use these names for their own fields or methods; the engine 
 - Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
 - Declaration sections: `server`, `client`.
 - Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`.
-- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`.
+- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `update`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`.
 
 ### 10.13 Error handling and sandbox
 
@@ -908,7 +944,7 @@ Part 1 status:
 |---|---|
 | ECS, fixed-timestep loop, event bus, scheduler | Done |
 | Graphics plugin: window, sprites, input, letterboxing | Done |
-| Starfield | Done |
+| Starfield | Removed with the generic `ClientApp`; to be redone as a shader |
 | Network: protocol, threads, sessions, timeouts, snapshots, statistics | Done |
 | Lua runtime: declarations, entities, players, sandbox | Done |
 | Player movement and shooting, Bydo spawning, game over | Done (in Lua) |
@@ -924,7 +960,7 @@ Part 1 status:
 
 1. **Modularity:** finer-grained libraries; more subsystems as runtime plugins.
 2. **Standalone engine:** `engine/` moves to its own repository; R-Type consumes it as a dependency.
-3. **Generic runtime:** the executables' `main` functions become generic `ServerApp` / `ClientApp` in the engine, with a launcher (`engine run <game-folder>`); `r-type_server` / `r-type_client` remain as thin entry points.
+3. **Generic runtime:** done for the apps: `engine-app` holds generic `ServerApp` / `ClientApp` and the dedicated, client, host and solo modes (§6); `r-type_server` / `r-type_client` are thin entry points. A launcher (`engine run <game-folder>`) and the editor's export choice of binaries remain.
 4. **Tooling:** hot reload of scripts, developer console executing Lua, level editor.
 5. **Second game:** a different game (e.g. a platformer or networked Breakout) written only in Lua and assets, proving the engine is generic.
 
