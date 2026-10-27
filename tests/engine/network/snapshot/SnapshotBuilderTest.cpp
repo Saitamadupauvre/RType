@@ -23,7 +23,6 @@ namespace {
 using engine::core::Entity;
 using engine::core::EntityManager;
 using engine::core::Position;
-using engine::core::Velocity;
 using engine::network::build_snapshots;
 using engine::network::encode_payload;
 using engine::network::EntityState;
@@ -39,7 +38,6 @@ EntityManager registry_with_components() {
     EntityManager registry;
     registry.register_component<Replicated>();
     registry.register_component<Position>();
-    registry.register_component<Velocity>();
     return registry;
 }
 
@@ -80,11 +78,10 @@ TEST(SnapshotBuilder, RegistryWithoutReplicatedComponentGivesOneEmptySnapshot) {
 
 TEST(SnapshotBuilder, SnapshotMatchesReplicatedEntities) {
     auto registry = registry_with_components();
-    const auto moving = spawn_replicated(registry, 10.0F, -20.0F);
-    registry.add(moving, Velocity{3.0F, -4.0F});
-    const auto still = registry.spawn();
-    registry.add(still, Replicated{.type_id = 2});
-    registry.add(still, Position{5.0F, 6.0F});
+    const auto first = spawn_replicated(registry, 10.0F, -20.0F);
+    const auto second = registry.spawn();
+    registry.add(second, Replicated{.type_id = 2});
+    registry.add(second, Position{5.0F, 6.0F});
     const auto hidden = registry.spawn();
     registry.add(hidden, Position{1.0F, 1.0F});
 
@@ -93,26 +90,13 @@ TEST(SnapshotBuilder, SnapshotMatchesReplicatedEntities) {
     ASSERT_EQ(snapshots.size(), 1U);
     const auto& states = snapshots.front().entities;
     ASSERT_EQ(states.size(), 2U);
+    EXPECT_EQ(*find_state(states, first),
+              (EntityState{
+                  .entity_id = first.index(), .type_id = 1, .x = 10, .y = -20, .vx = 0, .vy = 0}));
     EXPECT_EQ(
-        *find_state(states, moving),
-        (EntityState{
-            .entity_id = moving.index(), .type_id = 1, .x = 10, .y = -20, .vx = 3, .vy = -4}));
-    EXPECT_EQ(
-        *find_state(states, still),
-        (EntityState{.entity_id = still.index(), .type_id = 2, .x = 5, .y = 6, .vx = 0, .vy = 0}));
+        *find_state(states, second),
+        (EntityState{.entity_id = second.index(), .type_id = 2, .x = 5, .y = 6, .vx = 0, .vy = 0}));
     EXPECT_EQ(find_state(states, hidden), nullptr);
-}
-
-TEST(SnapshotBuilder, WorksWhenVelocityIsNotRegistered) {
-    EntityManager registry;
-    registry.register_component<Replicated>();
-    registry.register_component<Position>();
-    const auto entity = spawn_replicated(registry, 7.0F, 8.0F);
-
-    const auto snapshots = build_snapshots(registry, sample_tick);
-
-    ASSERT_EQ(snapshots.front().entities.size(), 1U);
-    EXPECT_EQ(find_state(snapshots.front().entities, entity)->vx, 0);
 }
 
 TEST(SnapshotBuilder, SendsOwnerAndSpriteColor) {

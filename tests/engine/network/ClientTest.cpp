@@ -32,7 +32,6 @@ namespace {
 
 using engine::core::EntityManager;
 using engine::core::Position;
-using engine::core::Velocity;
 using engine::core::event::EventBus;
 using engine::core::time::ManualClock;
 using engine::core::time::SteadyClock;
@@ -205,11 +204,9 @@ TEST_F(NetworkClientTest, ReceivesTheWorldAndSendsInputs) {
     EntityManager registry;
     registry.register_component<Replicated>();
     registry.register_component<Position>();
-    registry.register_component<Velocity>();
     const auto entity = registry.spawn();
     registry.add(entity, Replicated{.type_id = 2});
     registry.add(entity, Position{30.0F, -40.0F});
-    registry.add(entity, Velocity{1.0F, 0.0F});
     start_server();
 
     connect(client);
@@ -236,7 +233,6 @@ TEST_F(NetworkClientTest, ReceivesTheWorldAndSendsInputs) {
     EXPECT_EQ(received.type_id, 2);
     EXPECT_FLOAT_EQ(received.x, 30.0F);
     EXPECT_FLOAT_EQ(received.y, -40.0F);
-    EXPECT_FLOAT_EQ(received.vx, 1.0F);
     EXPECT_TRUE(reasons.empty());
 }
 

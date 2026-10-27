@@ -11,7 +11,7 @@ namespace engine::network {
  * @brief Marks an entity as sent to clients in every server snapshot.
  *
  * An entity is replicated when it has both `Replicated` and `engine::core::Position`. Its
- * `engine::core::Velocity` is sent too when present, otherwise zero.
+ * velocity is always sent as zero.
  *
  * The color of its `engine::core::Sprite` is sent too when present, otherwise opaque white.
  *

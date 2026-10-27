@@ -111,7 +111,6 @@ ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig
       _collisions(registry_, events_, _runtime) {
     register_if_missing<engine::network::Replicated>(registry_);
     register_if_missing<engine::core::Position>(registry_);
-    register_if_missing<engine::core::Velocity>(registry_);
     register_if_missing<engine::core::Sprite>(registry_);
     events_.subscribe<engine::network::PlayerJoined>(
         [this](const engine::network::PlayerJoined& joined) {

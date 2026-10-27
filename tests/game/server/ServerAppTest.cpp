@@ -67,7 +67,6 @@ TEST(ServerApp, RegistersTheComponentsSentInSnapshots) {
 
     EXPECT_TRUE(app.registry().is_registered<engine::network::Replicated>());
     EXPECT_TRUE(app.registry().is_registered<engine::core::Position>());
-    EXPECT_TRUE(app.registry().is_registered<engine::core::Velocity>());
     EXPECT_TRUE(app.registry().is_registered<engine::core::Sprite>());
 }
 
