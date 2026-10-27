@@ -54,6 +54,7 @@ engine_add_module(network
         src/network/Client.cpp
         src/network/Module.cpp
         src/network/Server.cpp
+        src/network/StringTable.cpp
         src/network/decoder/EventReader.cpp
         src/network/decoder/PayloadDecoder.cpp
         src/network/encoder/PayloadEncoder.cpp
