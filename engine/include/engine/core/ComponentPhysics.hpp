@@ -12,12 +12,4 @@ struct Position {
     constexpr Position(float x, float y) noexcept : pos(x, y) {}
 };
 
-struct Velocity {
-    Vec2 vel;
-
-    constexpr Velocity() noexcept = default;
-    constexpr Velocity(Vec2 vel_) noexcept : vel(vel_) {}
-    constexpr Velocity(float x, float y) noexcept : vel(x, y) {}
-};
-
 } // namespace engine::core

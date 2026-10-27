@@ -74,6 +74,15 @@ TEST_F(PhysicsFieldsTest, FieldsHaveExpectedKinds) {
               FieldKind::String);
 }
 
+TEST_F(PhysicsFieldsTest, OnlyBodyVelocityIsReplicated) {
+    const ComponentDescriptor* body = registry.find_component("PhysicsBody");
+    ASSERT_NE(body, nullptr);
+    for (const auto& field : body->fields()) {
+        EXPECT_EQ(field.flags().replicated, field.name() == "velocity") << field.name();
+        EXPECT_TRUE(field.flags().editable) << field.name();
+    }
+}
+
 TEST_F(PhysicsFieldsTest, ReadsAndWritesBody) {
     registry.set(world, entity, "PhysicsBody", "type", std::int64_t{1});
     registry.set(world, entity, "PhysicsBody", "mass", 2.5F);

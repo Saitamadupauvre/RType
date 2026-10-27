@@ -239,8 +239,6 @@ FieldRef FieldRegistry::require(std::string_view component, std::string_view fie
 void register_core_fields(FieldRegistry& registry) {
     registry.add<Position>("Position",
                            {member_field<&Position::pos>("pos", field_flags::replicated)});
-    registry.add<Velocity>("Velocity",
-                           {member_field<&Velocity::vel>("vel", field_flags::replicated)});
     registry.add<Sprite>("Sprite",
                          {asset_field<&Sprite::path>("path", field_flags::editable),
                           member_field<&Sprite::color>("color", field_flags::replicated)});

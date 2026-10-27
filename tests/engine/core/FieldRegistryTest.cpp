@@ -35,7 +35,6 @@ using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::UnknownField;
 using engine::core::Vec2;
-using engine::core::Velocity;
 
 namespace {
 
@@ -100,7 +99,6 @@ protected:
     void SetUp() override {
         world.register_component<Sample>();
         world.register_component<Position>();
-        world.register_component<Velocity>();
         world.register_component<Sprite>();
     }
 
@@ -356,26 +354,24 @@ TEST(FieldRegistry, SetOnComponentUnknownToWorldThrows) {
                  engine::core::ComponentNotRegistered);
 }
 
-TEST(CoreFields, RegistersPositionVelocitySpriteAndTags) {
+TEST(CoreFields, RegistersPositionSpriteAndTags) {
     FieldRegistry registry;
     engine::core::register_core_fields(registry);
 
     const FieldRef pos = registry.find_field("Position", "pos");
-    const FieldRef vel = registry.find_field("Velocity", "vel");
     const FieldRef path = registry.find_field("Sprite", "path");
     const FieldRef color = registry.find_field("Sprite", "color");
     const FieldRef labels = registry.find_field("Tags", "labels");
-    ASSERT_TRUE(pos && vel && path && color && labels);
+    ASSERT_TRUE(pos && path && color && labels);
+    EXPECT_EQ(registry.find_component("Velocity"), nullptr);
     EXPECT_EQ(labels.field->kind(), FieldKind::List);
     EXPECT_EQ(labels.field->element_kind(), FieldKind::String);
     EXPECT_EQ(labels.field->flags(), (FieldFlags{.replicated = false, .editable = true}));
     EXPECT_EQ(pos.field->element_kind(), std::nullopt);
     EXPECT_EQ(pos.field->kind(), FieldKind::Vec2);
-    EXPECT_EQ(vel.field->kind(), FieldKind::Vec2);
     EXPECT_EQ(path.field->kind(), FieldKind::Asset);
     EXPECT_EQ(color.field->kind(), FieldKind::Color);
     EXPECT_EQ(pos.field->flags(), (FieldFlags{.replicated = true, .editable = true}));
-    EXPECT_EQ(vel.field->flags(), (FieldFlags{.replicated = true, .editable = true}));
     EXPECT_EQ(path.field->flags(), (FieldFlags{.replicated = false, .editable = true}));
     EXPECT_EQ(color.field->flags(), (FieldFlags{.replicated = true, .editable = true}));
 }
@@ -391,12 +387,10 @@ TEST_F(FieldRegistryTest, CoreFieldsReadAndWriteComponents) {
     engine::core::register_core_fields(core);
 
     core.set(world, entity, "Position", "pos", Vec2(3.0F, 4.0F));
-    core.set(world, entity, "Velocity", "vel", Vec2(-1.0F, 0.5F));
     core.set(world, entity, "Sprite", "path", AssetName{"ship.png"});
     core.set(world, entity, "Sprite", "color", Rgba{.r = 0, .g = 128, .b = 255, .a = 255});
 
     EXPECT_EQ(world.get<Position>(entity).pos, Vec2(3.0F, 4.0F));
-    EXPECT_EQ(world.get<Velocity>(entity).vel, Vec2(-1.0F, 0.5F));
     EXPECT_EQ(world.get<Sprite>(entity).path, "ship.png");
     EXPECT_EQ(core.get(world, entity, "Sprite", "color"),
               FieldValue{(Rgba{.r = 0, .g = 128, .b = 255, .a = 255})});

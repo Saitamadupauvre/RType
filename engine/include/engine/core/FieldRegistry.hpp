@@ -546,8 +546,7 @@ private:
 [[nodiscard]] ENGINE_CORE_EXPORT Tags labels_from_list(const FieldList& list);
 
 /**
- * @brief Registers the fields of the engine-core components: Position, Velocity, Sprite and
- * Tags.
+ * @brief Registers the fields of the engine-core components: Position, Sprite and Tags.
  *
  * @throws DuplicateComponentName If one of them is already registered.
  */

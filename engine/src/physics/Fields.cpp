@@ -99,7 +99,8 @@ core::FieldDescriptor collides_with_field() {
 void register_physics_fields(core::FieldRegistry& registry) {
     registry.add<PhysicsBody>(
         "PhysicsBody",
-        {body_type_field(), core::member_field<&PhysicsBody::velocity>("velocity", editable),
+        {body_type_field(),
+         core::member_field<&PhysicsBody::velocity>("velocity", core::field_flags::replicated),
          core::member_field<&PhysicsBody::acceleration>("acceleration", editable),
          core::member_field<&PhysicsBody::mass>("mass", editable),
          core::member_field<&PhysicsBody::resolve_collisions>("resolve_collisions", editable),
