@@ -20,8 +20,8 @@ constexpr std::array<std::string_view, 20> reserved_globals{
     "random", "world",  "log",   "synced", "players",  "find_player",
 };
 
-constexpr std::array<std::string_view, 7> engine_owned_fields{"age",   "id",      "type",   "input",
-                                                              "owner", "destroy", "has_tag"};
+constexpr std::array<std::string_view, 9> engine_owned_fields{
+    "age", "id", "type", "input", "owner", "destroy", "has_tag", "get_field", "set_field"};
 
 constexpr std::array<std::string_view, 5> callbacks{"on_spawn", "update", "on_collide",
                                                     "on_destroy", "behavior"};

@@ -39,8 +39,9 @@ engine_add_module(script
         src/script/Audio.cpp
         src/script/Declarations.cpp
         src/script/Entities.cpp
+        src/script/EntityFields.cpp
+        src/script/LuaFieldValue.cpp
         src/script/ModuleLoader.cpp
-        src/script/NativeFields.cpp
         src/script/Players.cpp
         src/script/ScriptFiles.cpp
         src/script/ScriptRuntime.cpp

@@ -9,10 +9,12 @@
 #include <vector>
 
 #include "Declarations.hpp"
+#include "EntityFields.hpp"
 #include "Players.hpp"
 #include "Sol.hpp"
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/script/InputState.hpp"
 
@@ -24,7 +26,7 @@ struct EntityHandle {
 
 class Entities {
 public:
-    Entities(sol::state& lua, const Players& players);
+    Entities(sol::state& lua, const Players& players, const core::FieldRegistry& fields);
 
     void attach(core::EntityManager& world);
     std::optional<core::Entity> spawn(const Declaration& declaration,
@@ -68,12 +70,17 @@ private:
     [[nodiscard]] const InputState& input_of(const Record& record) const;
     void set_owner(sol::this_state state, Record& record, const sol::object& value);
     bool has_tag(sol::this_state state, const EntityHandle& handle, std::string_view label);
+    sol::object get_field(sol::this_state state, const EntityHandle& handle,
+                          std::string_view component, std::string_view field);
+    void set_field(sol::this_state state, const EntityHandle& handle, std::string_view component,
+                   std::string_view field, const sol::object& value);
     [[nodiscard]] std::vector<core::Entity> live_entities() const;
     [[nodiscard]] bool is_active(core::Entity entity) const;
     [[nodiscard]] bool wants_collision(core::Entity entity, core::Entity other) const;
 
     sol::state& _lua;
     const Players& _players;
+    EntityFields _fields;
     core::EntityManager* _world = nullptr;
     std::unordered_map<core::Entity::Id, Record> _records;
     std::vector<core::Entity> _doomed;

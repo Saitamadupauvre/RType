@@ -17,7 +17,9 @@
 #include "Players.hpp"
 #include "ScriptFiles.hpp"
 #include "Sol.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/log/Log.hpp"
+#include "engine/physics/Fields.hpp"
 
 namespace engine::script {
 
@@ -29,12 +31,20 @@ namespace log = engine::core::log;
 constexpr std::string_view on_player_joined = "on_player_joined";
 constexpr std::string_view on_player_left = "on_player_left";
 
+core::FieldRegistry engine_fields() {
+    core::FieldRegistry fields;
+    core::register_core_fields(fields);
+    physics::register_physics_fields(fields);
+    return fields;
+}
+
 } // namespace
 
 struct ScriptRuntime::Impl {
+    core::FieldRegistry fields = engine_fields();
     sol::state lua;
     Players players;
-    Entities entities{lua, players};
+    Entities entities{lua, players, fields};
     std::optional<sol::environment> main;
     std::map<std::string, Declaration, std::less<>> declarations;
     std::shared_ptr<PendingFile> current_file;
@@ -381,6 +391,8 @@ std::optional<DeclarationInfo> ScriptRuntime::find_declaration(std::string_view 
 }
 
 void ScriptRuntime::attach_world(core::EntityManager& world) { _impl->entities.attach(world); }
+
+const core::FieldRegistry& ScriptRuntime::fields() const noexcept { return _impl->fields; }
 
 std::optional<core::Entity> ScriptRuntime::spawn(std::string_view type,
                                                  std::optional<core::Vec2> position) noexcept {

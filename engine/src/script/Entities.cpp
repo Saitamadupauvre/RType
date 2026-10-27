@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "Declarations.hpp"
-#include "NativeFields.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/log/Log.hpp"
@@ -47,8 +46,8 @@ bool input_pressed(const InputState& input, std::string_view name) {
 
 } // namespace
 
-Entities::Entities(sol::state& lua, const Players& players)
-    : _lua(lua), _players(players), _methods(lua.create_table()) {
+Entities::Entities(sol::state& lua, const Players& players, const core::FieldRegistry& fields)
+    : _lua(lua), _players(players), _fields(fields), _methods(lua.create_table()) {
     sol::table types = _lua.create_table();
     types.new_usertype<EntityHandle>(
         "EntityHandle", sol::no_constructor, sol::meta_function::index,
@@ -66,6 +65,15 @@ Entities::Entities(sol::state& lua, const Players& players)
     _methods.set_function("has_tag",
                           [this](sol::this_state state, const EntityHandle& handle,
                                  std::string_view label) { return has_tag(state, handle, label); });
+    _methods.set_function("get_field", [this](sol::this_state state, const EntityHandle& handle,
+                                              std::string_view component, std::string_view field) {
+        return get_field(state, handle, component, field);
+    });
+    _methods.set_function("set_field", [this](sol::this_state state, const EntityHandle& handle,
+                                              std::string_view component, std::string_view field,
+                                              const sol::object& value) {
+        set_field(state, handle, component, field, value);
+    });
 }
 
 void Entities::attach(core::EntityManager& world) {
@@ -73,9 +81,10 @@ void Entities::attach(core::EntityManager& world) {
     register_if_missing<core::Velocity>(world);
     register_if_missing<core::Sprite>(world);
     register_if_missing<core::Tags>(world);
-    register_if_missing<CollisionFilter>(world);
+    register_if_missing<physics::CollidesWith>(world);
     register_if_missing<physics::AABBCollider>(world);
     register_if_missing<physics::PhysicsBody>(world);
+    register_if_missing<physics::CircleCollider>(world);
     register_if_missing<physics::Scriptable>(world);
     _world = &world;
 }
@@ -205,12 +214,12 @@ bool Entities::is_active(core::Entity entity) const {
 
 bool Entities::wants_collision(core::Entity entity, core::Entity other) const {
     if (!_records.contains(entity.id()) || !_records.contains(other.id()) ||
-        !_world->alive(entity) || !_world->alive(other) || !_world->has<CollisionFilter>(entity) ||
-        !_world->has<core::Tags>(other)) {
+        !_world->alive(entity) || !_world->alive(other) ||
+        !_world->has<physics::CollidesWith>(entity) || !_world->has<core::Tags>(other)) {
         return false;
     }
     const core::Tags& tags = _world->get<core::Tags>(other);
-    return std::ranges::any_of(_world->get<CollisionFilter>(entity).tags.labels(),
+    return std::ranges::any_of(_world->get<physics::CollidesWith>(entity).tags.labels(),
                                [&](const std::string& label) { return tags.has(label); });
 }
 
@@ -249,8 +258,8 @@ sol::object Entities::get(sol::this_state state, const EntityHandle& handle,
             return record.owner ? player_object(state, *record.owner)
                                 : sol::make_object(state, sol::lua_nil);
         }
-        if (const auto field = find_native_field(name)) {
-            return field->read(state, *_world, handle.entity);
+        if (_fields.has_alias(name)) {
+            return _fields.read_alias(state, *_world, handle.entity, name);
         }
         auto method = _methods.raw_get<sol::object>(name);
         if (!is_nil(method)) {
@@ -277,8 +286,8 @@ void Entities::set(sol::this_state state, const EntityHandle& handle, const sol:
             set_owner(state, record, value);
             return;
         }
-        if (const auto field = find_native_field(name)) {
-            field->write(state, *_world, handle.entity, value);
+        if (_fields.has_alias(name)) {
+            _fields.write_alias(state, *_world, handle.entity, name, value);
             return;
         }
     }
@@ -291,10 +300,10 @@ void Entities::set(sol::this_state state, const EntityHandle& handle, const sol:
 
 void Entities::apply_prefab_fields(core::Entity entity, const sol::table& prefab) {
     const sol::this_state state{_lua.lua_state()};
-    for (const NativeField& field : native_fields()) {
-        const auto value = prefab.raw_get<sol::object>(field.name);
+    for (const std::string_view name : _fields.alias_names()) {
+        const auto value = prefab.raw_get<sol::object>(name);
         if (!is_nil(value)) {
-            field.write(state, *_world, entity, value);
+            _fields.write_alias(state, *_world, entity, name, value);
         }
     }
 }
@@ -394,6 +403,19 @@ bool Entities::has_tag(sol::this_state state, const EntityHandle& handle, std::s
     live_record(state, handle);
     return _world->has<core::Tags>(handle.entity) &&
            _world->get<core::Tags>(handle.entity).has(label);
+}
+
+sol::object Entities::get_field(sol::this_state state, const EntityHandle& handle,
+                                std::string_view component, std::string_view field) {
+    live_record(state, handle);
+    return _fields.read(state, *_world, handle.entity, component, field);
+}
+
+void Entities::set_field(sol::this_state state, const EntityHandle& handle,
+                         std::string_view component, std::string_view field,
+                         const sol::object& value) {
+    live_record(state, handle);
+    _fields.write(state, *_world, handle.entity, component, field, value);
 }
 
 std::vector<core::Entity> Entities::live_entities() const {

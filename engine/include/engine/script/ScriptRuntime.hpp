@@ -11,6 +11,7 @@
 
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/script/AudioCommand.hpp"
 #include "engine/script/Declaration.hpp"
@@ -103,19 +104,31 @@ public:
     /**
      * @brief Connects the runtime to the world whose entities scripts read and write.
      *
-     * Registers core::Position and core::Velocity in @p world if they are not registered yet.
+     * Registers in @p world every component scripts can reach and that is not registered yet:
+     * the engine-core components, physics::PhysicsBody, physics::AABBCollider,
+     * physics::CollidesWith and physics::Scriptable.
      *
      * @param world Entity storage. It must outlive this runtime, or be replaced by another call.
      */
     void attach_world(core::EntityManager& world);
 
     /**
+     * @brief The component fields scripts read and write, filled with the engine-core and
+     * physics fields.
+     *
+     * Every entity field seen by Lua goes through this registry, so other consumers such as
+     * snapshots can share it.
+     */
+    [[nodiscard]] const core::FieldRegistry& fields() const noexcept;
+
+    /**
      * @brief Creates an entity from a declaration registered by load_scripts().
      *
-     * The entity gets a core::Position and a core::Velocity, initialised from the native fields
-     * of its prefab (`x`, `y`, `vx`, `vy`, 0 when absent), and its own table for custom fields.
-     * Scripts reach it through a handle whose fields resolve, in order, to native components,
-     * the entity's own fields, then its prefab.
+     * The entity gets a core::Position and a core::Velocity, then every component field its
+     * prefab sets through an alias (`x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`,
+     * `collides_with`), and its own table for custom fields. Scripts reach the entity through a
+     * handle whose fields resolve, in order, to component aliases, methods, the entity's own
+     * fields, then its prefab.
      *
      * @param type Declared entity name.
      * Calls the entity's `on_spawn(self)` callback once it is ready; an error raised by it is
@@ -123,7 +136,7 @@ public:
      *
      * @param position Starting position. Overrides the prefab's `x` and `y` when given.
      * @return The new entity, or std::nullopt if no world is attached, @p type is unknown or
-     * declared as a system, or a prefab native field has the wrong type. The error is logged.
+     * declared as a system, or a prefab component field is invalid. The error is logged.
      * @note Never throws.
      */
     std::optional<core::Entity> spawn(std::string_view type,
