@@ -354,6 +354,16 @@ TEST(FieldRegistry, SetOnComponentUnknownToWorldThrows) {
                  engine::core::ComponentNotRegistered);
 }
 
+TEST(FieldRegistry, TellsWhetherWorldRegisteredComponent) {
+    FieldRegistry registry = sample_registry();
+    const ComponentDescriptor* sample = registry.find_component("Sample");
+    ASSERT_NE(sample, nullptr);
+    EntityManager world;
+    EXPECT_FALSE(sample->is_registered_in(world));
+    world.register_component<Sample>();
+    EXPECT_TRUE(sample->is_registered_in(world));
+}
+
 TEST(CoreFields, RegistersPositionSpriteAndTags) {
     FieldRegistry registry;
     engine::core::register_core_fields(registry);

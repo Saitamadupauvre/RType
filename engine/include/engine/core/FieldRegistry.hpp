@@ -182,9 +182,18 @@ public:
     [[nodiscard]] ENGINE_CORE_EXPORT const FieldDescriptor*
     find_field(std::string_view field_name) const noexcept;
 
+    /**
+     * @return Whether @p world registered the component type, so that its fields can be set.
+     * @note Setting a field also needs the required components to be registered.
+     */
+    [[nodiscard]] bool is_registered_in(const EntityManager& world) const {
+        return _registered(world);
+    }
+
 private:
     friend class FieldRegistry;
 
+    using Registration = bool (*)(const EntityManager&);
     using Presence = bool (*)(const EntityManager&, Entity);
 
     struct Requirement {
@@ -193,13 +202,15 @@ private:
         const char* type_name;
     };
 
-    ComponentDescriptor(std::string name, ComponentTypeId type, Presence present,
-                        std::vector<FieldDescriptor> fields, std::vector<Requirement> required)
-        : _name(std::move(name)), _type(type), _present(present), _fields(std::move(fields)),
-          _required(std::move(required)) {}
+    ComponentDescriptor(std::string name, ComponentTypeId type, Registration registered,
+                        Presence present, std::vector<FieldDescriptor> fields,
+                        std::vector<Requirement> required)
+        : _name(std::move(name)), _type(type), _registered(registered), _present(present),
+          _fields(std::move(fields)), _required(std::move(required)) {}
 
     std::string _name;
     ComponentTypeId _type;
+    Registration _registered;
     Presence _present;
     std::vector<FieldDescriptor> _fields;
     std::vector<Requirement> _required;
@@ -447,6 +458,7 @@ public:
         add(ComponentDescriptor{
             std::move(name),
             component_type_id<Component>(),
+            &is_known<Component>,
             &owns<Component>,
             std::move(fields),
             {ComponentDescriptor::Requirement{.registered = &is_known<Required>,
