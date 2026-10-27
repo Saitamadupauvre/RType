@@ -9,11 +9,13 @@
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 namespace logger = engine::core::log;
 using engine::script::DeclarationInfo;
 using engine::script::DeclarationKind;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -25,7 +27,8 @@ class ScriptDeclarationsTest : public ::testing::Test {
 protected:
     std::shared_ptr<logger::MemorySink> _sink = std::make_shared<logger::MemorySink>();
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
 
     [[nodiscard]] std::vector<std::string> messages(logger::Level level) const {
         std::vector<std::string> result;

@@ -22,7 +22,7 @@ class ScriptRuntimeTest : public ::testing::Test {
 protected:
     std::shared_ptr<logger::MemorySink> _sink = std::make_shared<logger::MemorySink>();
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().build();
 
     [[nodiscard]] std::vector<logger::MemoryRecord> errors() const {
         std::vector<logger::MemoryRecord> result;

@@ -33,16 +33,19 @@ engine_add_test(core SOURCES
     engine/core/FieldRegistryTest.cpp
 )
 engine_add_test(script SOURCES
+    engine/script/ApiSetsTest.cpp
+    engine/script/ClientApiTest.cpp
     engine/script/ScriptRuntimeTest.cpp
-    engine/script/ScriptDeclarationsTest.cpp
-    engine/script/ScriptRequireTest.cpp
-    engine/script/EntityHandleTest.cpp
-    engine/script/TickTest.cpp
-    engine/script/PlayersTest.cpp
-    engine/script/AudioTest.cpp
-    engine/script/EventsTest.cpp
-    engine/script/CollisionsTest.cpp
-    engine/script/EntityFieldsTest.cpp
+    engine/script/audio/AudioTest.cpp
+    engine/script/entity/CollisionsTest.cpp
+    engine/script/entity/EntityFieldsTest.cpp
+    engine/script/entity/EntityHandleTest.cpp
+    engine/script/entity/TickTest.cpp
+    engine/script/event/EventsTest.cpp
+    engine/script/loading/ScriptDeclarationsTest.cpp
+    engine/script/loading/ScriptRequireTest.cpp
+    engine/script/loading/SectionsTest.cpp
+    engine/script/player/PlayersTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp

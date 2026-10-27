@@ -9,9 +9,11 @@
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 namespace logger = engine::core::log;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -23,7 +25,8 @@ class ScriptRequireTest : public ::testing::Test {
 protected:
     std::shared_ptr<logger::MemorySink> _sink = std::make_shared<logger::MemorySink>();
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
 
     void SetUp() override { ASSERT_TRUE(_runtime.load_scripts(modules_fixture())); }
 
@@ -134,7 +137,7 @@ TEST_F(ScriptRequireTest, RejectsBytecodeModule) {
 TEST(ScriptRequire, FailsBeforeScriptsAreLoaded) {
     auto sink = std::make_shared<logger::MemorySink>();
     const logger::ScopedSink scope{sink, logger::Level::Trace};
-    ScriptRuntime runtime;
+    ScriptRuntime runtime = ScriptRuntime::builder().with<ServerApi>().build();
 
     EXPECT_FALSE(runtime.run_string("require('helper')", "early"));
     ASSERT_EQ(sink->records().size(), 1U);

@@ -15,6 +15,7 @@
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/physics/Components.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 namespace logger = engine::core::log;
 using engine::core::Entity;
@@ -29,6 +30,7 @@ using engine::core::Tags;
 using engine::core::Vec2;
 using engine::physics::PhysicsBody;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -41,7 +43,8 @@ protected:
     std::shared_ptr<logger::MemorySink> _sink = std::make_shared<logger::MemorySink>();
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
     EntityManager _world;
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
 
     void SetUp() override {
         _runtime.attach_world(_world);
@@ -252,7 +255,7 @@ TEST_F(TickTest, HasTagReadsTags) {
 
 TEST_F(TickTest, InputDrivesEntity) {
     const Entity ship = spawn("ship");
-    _runtime.set_input(
+    _server.set_input(
         ship,
         InputState{.keys = {Key::Right, Key::Up, Key::Space}, .mouse_buttons = {}, .pointer = {}});
     _runtime.update(0.1F);
@@ -263,7 +266,7 @@ TEST_F(TickTest, InputDrivesEntity) {
 
 TEST_F(TickTest, InputGivesPointerAndMouseButtons) {
     const Entity cursor = spawn("cursor");
-    _runtime.set_input(
+    _server.set_input(
         cursor,
         InputState{.keys = {}, .mouse_buttons = {MouseButton::Left}, .pointer = Vec2{120.F, 45.F}});
     _runtime.update(0.1F);
@@ -312,7 +315,7 @@ TEST_F(TickTest, InputIsReadOnly) {
 }
 
 TEST_F(TickTest, SetInputOnUnknownEntityIsIgnored) {
-    EXPECT_NO_THROW(_runtime.set_input(Entity{999}, InputState{}));
+    EXPECT_NO_THROW(_server.set_input(Entity{999}, InputState{}));
 }
 
 TEST_F(TickTest, HandleIsStaleAfterFlush) {

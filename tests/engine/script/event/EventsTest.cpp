@@ -12,6 +12,7 @@
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/script/EventCommand.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 namespace logger = engine::core::log;
 using engine::core::AssetName;
@@ -21,6 +22,7 @@ using engine::core::Vec2;
 using engine::script::EventArgument;
 using engine::script::EventCommand;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -33,7 +35,8 @@ protected:
     std::shared_ptr<logger::MemorySink> _sink = std::make_shared<logger::MemorySink>();
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
     EntityManager _world;
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
 
     void SetUp() override { _runtime.attach_world(_world); }
 
@@ -42,7 +45,7 @@ protected:
     void expect_emit_error(const std::string& code, const std::string& expected) {
         EXPECT_FALSE(_runtime.run_string(code, "events")) << code;
         EXPECT_EQ(count_logged(logger::Level::Error, expected), 1U) << code;
-        EXPECT_TRUE(_runtime.take_event_commands().empty()) << code;
+        EXPECT_TRUE(_server.take_event_commands().empty()) << code;
     }
 
     [[nodiscard]] std::size_t count_logged(logger::Level level, const std::string& part) const {
@@ -66,7 +69,7 @@ TEST_F(EventsTest, ListsDeclaredNamesAndKeysInAscendingOrder) {
 TEST_F(EventsTest, NothingIsDeclaredWithoutScripts) {
     EXPECT_TRUE(_runtime.event_names().empty());
     EXPECT_TRUE(_runtime.event_keys().empty());
-    EXPECT_TRUE(_runtime.take_event_commands().empty());
+    EXPECT_TRUE(_server.take_event_commands().empty());
 }
 
 TEST_F(EventsTest, EmitQueuesArgumentsInKeyOrder) {
@@ -76,7 +79,7 @@ TEST_F(EventsTest, EmitQueuesArgumentsInKeyOrder) {
         R"(emit("explosion", { size = 1.5, label = "big", at = { x = 3, y = 4 } }))", "events"));
 
     EXPECT_EQ(
-        _runtime.take_event_commands(),
+        _server.take_event_commands(),
         (std::vector<EventCommand>{{.name = "explosion",
                                     .arguments = {{.key = "at", .value = Vec2{3.0F, 4.0F}},
                                                   {.key = "label", .value = std::string("big")},
@@ -91,7 +94,7 @@ TEST_F(EventsTest, EmitConvertsEveryKind) {
                                     "events"));
 
     EXPECT_EQ(
-        _runtime.take_event_commands(),
+        _server.take_event_commands(),
         (std::vector<EventCommand>{
             {.name = "boss.died",
              .arguments = {{.key = "final", .value = true},
@@ -106,7 +109,7 @@ TEST_F(EventsTest, LeftOutArgumentsAreAbsent) {
     ASSERT_TRUE(
         _runtime.run_string(R"(emit("ping") emit("explosion", {}) emit("ping", nil))", "events"));
 
-    EXPECT_EQ(_runtime.take_event_commands(),
+    EXPECT_EQ(_server.take_event_commands(),
               (std::vector<EventCommand>{{.name = "ping", .arguments = {}},
                                          {.name = "explosion", .arguments = {}},
                                          {.name = "ping", .arguments = {}}}));
@@ -119,7 +122,7 @@ TEST_F(EventsTest, EntityCallbacksCanEmit) {
 
     ASSERT_TRUE(_runtime.call(*ship, "blow_up"));
 
-    EXPECT_EQ(_runtime.take_event_commands(),
+    EXPECT_EQ(_server.take_event_commands(),
               (std::vector<EventCommand>{{.name = "explosion",
                                           .arguments = {{.key = "at", .value = Vec2{1.0F, -2.0F}},
                                                         {.key = "size", .value = 2.0F}}}}));
@@ -129,8 +132,8 @@ TEST_F(EventsTest, TakingCommandsEmptiesTheQueue) {
     load_declared();
     ASSERT_TRUE(_runtime.run_string(R"(emit("ping"))", "events"));
 
-    EXPECT_EQ(_runtime.take_event_commands().size(), 1U);
-    EXPECT_TRUE(_runtime.take_event_commands().empty());
+    EXPECT_EQ(_server.take_event_commands().size(), 1U);
+    EXPECT_TRUE(_server.take_event_commands().empty());
 }
 
 TEST_F(EventsTest, EmitRejectsUnknownEvents) {
@@ -189,7 +192,7 @@ TEST_F(EventsTest, EmitRejectsTextLongerThanTheLimit) {
                                         std::to_string(engine::script::max_event_text_length) +
                                         R"() }))",
                                     "events"));
-    EXPECT_EQ(_runtime.take_event_commands().size(), 1U);
+    EXPECT_EQ(_server.take_event_commands().size(), 1U);
     expect_emit_error(R"(emit("explosion", { label = string.rep("a", )" +
                           std::to_string(engine::script::max_event_text_length + 1) + R"() }))",
                       "emit: event 'explosion' argument 'label' is longer than 63 bytes");
@@ -200,7 +203,7 @@ TEST_F(EventsTest, DropsEventsBeyondTheLimitAndWarnsOnce) {
 
     ASSERT_TRUE(_runtime.run_string(R"(for _ = 1, 100 do emit("ping") end)", "events"));
 
-    EXPECT_EQ(_runtime.take_event_commands().size(), 64U);
+    EXPECT_EQ(_server.take_event_commands().size(), 64U);
     EXPECT_EQ(count_logged(logger::Level::Warn, "more than 64 events emitted"), 1U);
 }
 
@@ -238,7 +241,7 @@ TEST_F(EventsTest, RejectsAKeyThatIsNotAnIdentifier) {
 
 TEST_F(EventsTest, RejectsUnknownAndListKinds) {
     for (const std::string fixture : {"unknown_kind", "list_kind"}) {
-        ScriptRuntime runtime;
+        ScriptRuntime runtime = ScriptRuntime::builder().with<ServerApi>().build();
 
         EXPECT_FALSE(runtime.load_scripts(events_fixture(fixture))) << fixture;
         EXPECT_TRUE(runtime.event_names().empty()) << fixture;

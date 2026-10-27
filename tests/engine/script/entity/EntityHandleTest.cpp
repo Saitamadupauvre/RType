@@ -15,6 +15,7 @@
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/physics/Components.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 namespace logger = engine::core::log;
 using engine::core::Entity;
@@ -23,6 +24,7 @@ using engine::core::Position;
 using engine::core::Vec2;
 using engine::physics::PhysicsBody;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -35,7 +37,8 @@ protected:
     std::shared_ptr<logger::MemorySink> _sink = std::make_shared<logger::MemorySink>();
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
     EntityManager _world;
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
 
     void SetUp() override {
         _runtime.attach_world(_world);
@@ -280,7 +283,7 @@ TEST_F(EntityHandleTest, PrefabWithWrongNativeTypeFailsSpawn) {
 TEST(EntityHandle, SpawnFailsWithoutWorld) {
     const auto sink = std::make_shared<logger::MemorySink>();
     const logger::ScopedSink scope{sink, logger::Level::Trace};
-    ScriptRuntime runtime;
+    ScriptRuntime runtime = ScriptRuntime::builder().with<ServerApi>().build();
     ASSERT_TRUE(runtime.load_scripts(entities_fixture()));
 
     EXPECT_FALSE(runtime.spawn("bydo"));

@@ -13,6 +13,7 @@
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 namespace logger = engine::core::log;
 using engine::core::Entity;
@@ -21,6 +22,7 @@ using engine::core::InputState;
 using engine::core::Position;
 using engine::core::Tags;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -33,7 +35,8 @@ protected:
     std::shared_ptr<logger::MemorySink> _sink = std::make_shared<logger::MemorySink>();
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
     EntityManager _world;
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
 
     void load(const std::string& fixture) {
         _runtime.attach_world(_world);
@@ -53,7 +56,7 @@ protected:
     [[nodiscard]] std::vector<Entity> ships_owned_by(std::uint32_t player_id) {
         std::vector<Entity> owned;
         for (const Entity ship : tagged("ship")) {
-            if (_runtime.entity_owner(ship) == player_id) {
+            if (_server.entity_owner(ship) == player_id) {
                 owned.push_back(ship);
             }
         }
@@ -79,8 +82,8 @@ InputState moving_right() {
 TEST_F(PlayersTest, JoinCallsOnPlayerJoinedWithTheLowestFreeSlot) {
     load("callbacks");
 
-    EXPECT_TRUE(_runtime.player_joined(7));
-    EXPECT_TRUE(_runtime.player_joined(9));
+    EXPECT_TRUE(_server.player_joined(7));
+    EXPECT_TRUE(_server.player_joined(9));
 
     ASSERT_EQ(ships_owned_by(7).size(), 1U);
     ASSERT_EQ(ships_owned_by(9).size(), 1U);
@@ -90,9 +93,9 @@ TEST_F(PlayersTest, JoinCallsOnPlayerJoinedWithTheLowestFreeSlot) {
 
 TEST_F(PlayersTest, DuplicateJoinIsRejected) {
     load("callbacks");
-    ASSERT_TRUE(_runtime.player_joined(1));
+    ASSERT_TRUE(_server.player_joined(1));
 
-    EXPECT_FALSE(_runtime.player_joined(1));
+    EXPECT_FALSE(_server.player_joined(1));
 
     EXPECT_EQ(tagged("ship").size(), 1U);
     EXPECT_TRUE(logged(logger::Level::Warn, "already connected"));
@@ -100,12 +103,12 @@ TEST_F(PlayersTest, DuplicateJoinIsRejected) {
 
 TEST_F(PlayersTest, SlotIsReusedAfterLeave) {
     load("callbacks");
-    _runtime.player_joined(1);
-    _runtime.player_joined(2);
-    _runtime.player_left(1);
+    _server.player_joined(1);
+    _server.player_joined(2);
+    _server.player_left(1);
     _runtime.flush_destroyed();
 
-    _runtime.player_joined(3);
+    _server.player_joined(3);
 
     ASSERT_EQ(ships_owned_by(3).size(), 1U);
     EXPECT_FLOAT_EQ(y_of(ships_owned_by(3).front()), 0.F);
@@ -113,10 +116,10 @@ TEST_F(PlayersTest, SlotIsReusedAfterLeave) {
 
 TEST_F(PlayersTest, InputReachesOnlyEntitiesOwnedByThatPlayer) {
     load("callbacks");
-    _runtime.player_joined(1);
-    _runtime.player_joined(2);
+    _server.player_joined(1);
+    _server.player_joined(2);
 
-    _runtime.set_player_input(1, moving_right());
+    _server.set_player_input(1, moving_right());
     _runtime.update(1.F);
 
     EXPECT_FLOAT_EQ(x_of(ships_owned_by(1).front()), 1.F);
@@ -125,9 +128,9 @@ TEST_F(PlayersTest, InputReachesOnlyEntitiesOwnedByThatPlayer) {
 
 TEST_F(PlayersTest, InputForUnknownPlayerIsIgnored) {
     load("callbacks");
-    _runtime.player_joined(1);
+    _server.player_joined(1);
 
-    _runtime.set_player_input(5, moving_right());
+    _server.set_player_input(5, moving_right());
     _runtime.update(1.F);
 
     EXPECT_FLOAT_EQ(x_of(ships_owned_by(1).front()), 0.F);
@@ -135,9 +138,9 @@ TEST_F(PlayersTest, InputForUnknownPlayerIsIgnored) {
 
 TEST_F(PlayersTest, LeaveCallsOnPlayerLeft) {
     load("callbacks");
-    _runtime.player_joined(4);
+    _server.player_joined(4);
 
-    EXPECT_TRUE(_runtime.player_left(4));
+    EXPECT_TRUE(_server.player_left(4));
     _runtime.flush_destroyed();
 
     EXPECT_TRUE(tagged("ship").empty());
@@ -148,7 +151,7 @@ TEST_F(PlayersTest, LeaveCallsOnPlayerLeft) {
 TEST_F(PlayersTest, UnknownPlayerLeavingIsRejected) {
     load("callbacks");
 
-    EXPECT_FALSE(_runtime.player_left(3));
+    EXPECT_FALSE(_server.player_left(3));
 
     EXPECT_TRUE(tagged("marker").empty());
     EXPECT_TRUE(logged(logger::Level::Warn, "unknown player 3"));
@@ -156,10 +159,10 @@ TEST_F(PlayersTest, UnknownPlayerLeavingIsRejected) {
 
 TEST_F(PlayersTest, LeaveWithoutCallbackDestroysOwnedEntities) {
     load("default");
-    _runtime.player_joined(1);
-    _runtime.player_joined(2);
+    _server.player_joined(1);
+    _server.player_joined(2);
 
-    _runtime.player_left(1);
+    _server.player_left(1);
     _runtime.flush_destroyed();
 
     EXPECT_TRUE(ships_owned_by(1).empty());
@@ -169,18 +172,18 @@ TEST_F(PlayersTest, LeaveWithoutCallbackDestroysOwnedEntities) {
 TEST_F(PlayersTest, FailingCallbacksAreLoggedAndPlayersStillTracked) {
     load("broken");
 
-    EXPECT_FALSE(_runtime.player_joined(1));
+    EXPECT_FALSE(_server.player_joined(1));
     EXPECT_TRUE(logged(logger::Level::Error, "join failed for 1"));
     EXPECT_TRUE(_runtime.run_string("assert(#players() == 1)", "test"));
 
-    EXPECT_FALSE(_runtime.player_left(1));
+    EXPECT_FALSE(_server.player_left(1));
     EXPECT_TRUE(logged(logger::Level::Error, "leave failed for 1"));
     EXPECT_TRUE(_runtime.run_string("assert(#players() == 0)", "test"));
 }
 
 TEST_F(PlayersTest, PlayerHandleExposesIdSlotAndConnection) {
     load("default");
-    _runtime.player_joined(12);
+    _server.player_joined(12);
 
     EXPECT_TRUE(_runtime.run_string(R"(
         local player = find_player(12)
@@ -196,7 +199,7 @@ TEST_F(PlayersTest, PlayerHandleExposesIdSlotAndConnection) {
 
 TEST_F(PlayersTest, OwnerCanBeSetAndClearedFromLua) {
     load("default");
-    _runtime.player_joined(1);
+    _server.player_joined(1);
 
     EXPECT_TRUE(_runtime.run_string(R"(
         local ship = spawn("ship", { owner = find_player(1) })
@@ -217,12 +220,12 @@ TEST_F(PlayersTest, OwnerMustBeAPlayer) {
 
 TEST_F(PlayersTest, OwnerReadsNilOnceThePlayerHasLeft) {
     load("callbacks");
-    _runtime.player_joined(1);
+    _server.player_joined(1);
     _runtime.run_string("kept = spawn('marker')", "test");
     _runtime.run_string("kept.owner = find_player(1)", "test");
     _runtime.run_string("handle = find_player(1)", "test");
 
-    _runtime.player_left(1);
+    _server.player_left(1);
 
     EXPECT_TRUE(_runtime.run_string("assert(kept.owner == nil)", "test"));
     EXPECT_TRUE(_runtime.run_string("assert(not handle.connected and handle.slot == nil)", "test"));
