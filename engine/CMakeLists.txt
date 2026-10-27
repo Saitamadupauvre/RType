@@ -13,6 +13,7 @@ engine_add_module(core
         src/core/ComponentTypeId.cpp
         src/core/DynamicLibrary.cpp
         src/core/EntityManager.cpp
+        src/core/FieldRegistry.cpp
         src/core/SystemScheduler.cpp
         src/core/event/EventBus.cpp
         src/core/log/Log.cpp
