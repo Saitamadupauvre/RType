@@ -30,6 +30,7 @@ engine_add_module(physics
     SOURCES
         src/physics/PhysicsSystem.cpp
         src/physics/Collisions.cpp
+        src/physics/Fields.cpp
     DEPENDS engine::core
 )
 
