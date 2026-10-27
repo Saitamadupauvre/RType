@@ -10,8 +10,8 @@
 #include <utility>
 
 #include "RuntimeContext.hpp"
-#include "engine/core/Keys.hpp"
 #include "engine/core/log/Log.hpp"
+#include "input/LuaInput.hpp"
 #include "lua/LuaErrors.hpp"
 #include "player/Players.hpp"
 
@@ -28,46 +28,6 @@ const core::InputState neutral_input{};
 
 bool is_nil(const sol::object& value) {
     return value.get_type() == sol::type::lua_nil || value.get_type() == sol::type::none;
-}
-
-std::string describe_name(const sol::object& name) {
-    if (name.get_type() == sol::type::string) {
-        return std::format("'{}'", name.as<std::string_view>());
-    }
-    return std::format("of type {}", sol::type_name(name.lua_state(), name.get_type()));
-}
-
-bool input_key(const core::InputState& input, const sol::object& name, sol::this_state state) {
-    const auto key = name.get_type() == sol::type::string
-                         ? core::key_from_name(name.as<std::string_view>())
-                         : std::nullopt;
-    if (!key) {
-        throw std::runtime_error(std::format("{}input:key: unknown key {}", caller_location(state),
-                                             describe_name(name)));
-    }
-    return input.keys.contains(*key);
-}
-
-bool input_mouse(const core::InputState& input, const sol::object& name, sol::this_state state) {
-    const auto button = name.get_type() == sol::type::string
-                            ? core::mouse_button_from_name(name.as<std::string_view>())
-                            : std::nullopt;
-    if (!button) {
-        throw std::runtime_error(std::format("{}input:mouse: unknown mouse button {}",
-                                             caller_location(state), describe_name(name)));
-    }
-    return input.mouse_buttons.contains(*button);
-}
-
-sol::variadic_results input_pointer(const core::InputState& input, sol::this_state state) {
-    sol::variadic_results results;
-    if (!input.pointer) {
-        results.push_back(sol::make_object(state, sol::lua_nil));
-        return results;
-    }
-    results.push_back(sol::make_object(state, input.pointer->x));
-    results.push_back(sol::make_object(state, input.pointer->y));
-    return results;
 }
 
 } // namespace
@@ -116,9 +76,7 @@ void ServerApi::State::bind_players() {
         },
         sol::meta_function::equal_to,
         [](const PlayerHandle& left, const PlayerHandle& right) { return left.id == right.id; });
-    context->types.new_usertype<core::InputState>("InputState", sol::no_constructor, "key",
-                                                  &input_key, "mouse", &input_mouse, "pointer",
-                                                  &input_pointer);
+    bind_input_state(context->types);
 }
 
 void ServerApi::State::bind_entity_fields() {

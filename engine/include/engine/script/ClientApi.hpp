@@ -3,6 +3,7 @@
 #include <memory>
 #include <string_view>
 
+#include "engine/core/InputState.hpp"
 #include "engine/script/ApiSet.hpp"
 #include "engine/script/EventCommand.hpp"
 #include "engine/script/Export.hpp"
@@ -12,12 +13,36 @@ namespace engine::script {
 class ScriptRuntimeBuilder;
 
 /**
- * @brief API set of the presentation side: reacting to events received from the server.
+ * @brief Audio levels of a client, read and changed by scripts through `audio`.
+ */
+struct AudioSettings {
+    /** @brief Music volume, from 0 to 1. */
+    float music_volume{1.F};
+    /** @brief Sound effects volume, from 0 to 1. */
+    float effects_volume{1.F};
+    /** @brief Whether every sound and the music are silenced, whatever the volumes. */
+    bool muted{false};
+
+    bool operator==(const AudioSettings&) const = default;
+};
+
+/**
+ * @brief API set of the presentation side: local input, audio levels and events received from
+ * the server.
  *
- * Adds the Lua global `on(name, handler)` and reads the `client = { ... }` section of
- * declarations. `on` takes an event declared with `event "name" { ... }` and a function; the
- * function is called with a table of the event's arguments every time dispatch() receives that
- * event. An undeclared event or a handler that is not a function raises a Lua error.
+ * Reads the `client = { ... }` section of declarations and of `main.lua`, and adds these Lua
+ * globals:
+ * - `on(name, handler)` takes an event declared with `event "name" { ... }` and a function; the
+ *   function is called with a table of the event's arguments every time dispatch() receives
+ *   that event. An undeclared event or a handler that is not a function raises a Lua error.
+ * - `input` is the local input given to set_input(): `input:key(name)`, `input:mouse(name)` and
+ *   `input:pointer()` read it like an entity's `self.input` on the server, and
+ *   `input:pressed(name)` is true only when the key went down since the previous set_input().
+ *   An unknown key or button name raises a Lua error.
+ * - `audio.muted()`, `audio.set_muted(muted)`, `audio.volume(kind)` and
+ *   `audio.set_volume(kind, volume)` read and change audio_settings(); `kind` is `"music"` or
+ *   `"effects"` and `volume` a number from 0 to 1. Any other argument raises a Lua error and
+ *   changes nothing.
  *
  * @note Not thread safe. Created by ScriptRuntimeBuilder::with(), reached with
  * ScriptRuntime::api(), destroyed with its runtime.
@@ -46,6 +71,26 @@ public:
      * @note Never throws.
      */
     bool dispatch(const EventCommand& event) noexcept;
+
+    /**
+     * @brief Sets the input read through `input` until the next call.
+     *
+     * The input given to the previous call becomes the one `input:pressed()` compares with.
+     * Typically called once per frame, before ScriptRuntime::update().
+     *
+     * @param input Local input of this frame.
+     */
+    void set_input(core::InputState input) noexcept;
+
+    /** @return The audio levels, as last set by set_audio_settings() or by scripts. */
+    [[nodiscard]] AudioSettings audio_settings() const noexcept;
+
+    /**
+     * @brief Replaces the audio levels scripts read and change.
+     *
+     * @param settings New levels; volumes are clamped to [0, 1].
+     */
+    void set_audio_settings(AudioSettings settings) noexcept;
 
 private:
     friend class ScriptRuntimeBuilder;

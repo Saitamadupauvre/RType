@@ -15,10 +15,11 @@ namespace {
 
 namespace log = engine::core::log;
 
-constexpr std::array<std::string_view, 23> reserved_globals{
-    "entity", "system", "query", "spawn",  "find_all", "find_first",  "count", "after",
-    "every",  "wait",   "play",  "music",  "sounds",   "musics",      "event", "emit",
-    "random", "world",  "log",   "synced", "players",  "find_player", "on",
+constexpr std::array<std::string_view, 25> reserved_globals{
+    "entity",      "system", "query",  "spawn", "find_all", "find_first", "count",
+    "after",       "every",  "wait",   "play",  "music",    "sounds",     "musics",
+    "event",       "emit",   "random", "world", "log",      "synced",     "players",
+    "find_player", "on",     "input",  "audio",
 };
 
 constexpr std::array<std::string_view, 11> engine_owned_fields{
