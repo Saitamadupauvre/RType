@@ -133,3 +133,50 @@ TEST_F(SectionsTest, WarnsWhenSectionSetsReservedSectionName) {
                    std::string::npos;
     }));
 }
+
+TEST_F(SectionsTest, MainReadsOnlyTheSectionOfItsRuntime) {
+    auto server = ScriptRuntime::builder().with<ServerApi>().build();
+    auto client = ScriptRuntime::builder().with<ClientApi>().build();
+    auto core = ScriptRuntime::builder().build();
+
+    ASSERT_TRUE(server.load_scripts(sections_fixture("main_split")));
+    ASSERT_TRUE(client.load_scripts(sections_fixture("main_split")));
+    ASSERT_TRUE(core.load_scripts(sections_fixture("main_split")));
+
+    EXPECT_TRUE(server.run_string("assert(started == 'server')", "check"));
+    EXPECT_TRUE(client.run_string("assert(started == 'client')", "check"));
+    EXPECT_TRUE(core.run_string("assert(started == 'none')", "check"));
+}
+
+TEST_F(SectionsTest, MainUpdateRunsOnEveryRuntimeUpdate) {
+    auto client = ScriptRuntime::builder().with<ClientApi>().build();
+    auto server = ScriptRuntime::builder().with<ServerApi>().build();
+    ASSERT_TRUE(client.load_scripts(sections_fixture("main_split")));
+    ASSERT_TRUE(server.load_scripts(sections_fixture("main_split")));
+
+    client.update(0.5F);
+    client.update(0.5F);
+    server.update(0.5F);
+
+    EXPECT_TRUE(client.run_string("assert(ticks == 2 and last_dt == 0.5)", "check"));
+    EXPECT_TRUE(server.run_string("assert(ticks == 0)", "check"));
+}
+
+TEST_F(SectionsTest, RejectsMainSettingNameInsideAndOutsideSection) {
+    auto runtime = ScriptRuntime::builder().with<ServerApi>().build();
+
+    EXPECT_FALSE(runtime.load_scripts(sections_fixture("main_conflict")));
+
+    EXPECT_TRUE(logged_error({"main.lua", "'on_start'", "section 'client'"}));
+}
+
+TEST_F(SectionsTest, MainUpdateErrorIsLoggedAndRunsAgainNextTime) {
+    auto runtime = ScriptRuntime::builder().with<ClientApi>().build();
+    ASSERT_TRUE(runtime.load_scripts(sections_fixture("main_error")));
+
+    runtime.update(0.1F);
+    runtime.update(0.1F);
+
+    EXPECT_TRUE(logged_error({"main.lua", "broken update"}));
+    EXPECT_TRUE(runtime.run_string("assert(calls == 2)", "check"));
+}

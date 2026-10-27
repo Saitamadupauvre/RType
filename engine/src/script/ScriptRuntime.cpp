@@ -192,7 +192,9 @@ bool ScriptRuntime::Impl::load_all(const fs::path& root, const std::vector<fs::p
         success = loaded && success;
         if (relative == fs::path(entry_point)) {
             found_entry_point = true;
-            entry = loaded ? std::optional(environment) : std::nullopt;
+            const bool sectioned =
+                loaded && apply_section(environment, std::string(entry_point), section);
+            entry = sectioned ? std::optional(environment) : std::nullopt;
         }
     }
     if (!found_entry_point) {
@@ -415,6 +417,10 @@ std::optional<std::string> ScriptRuntime::entity_type(core::Entity entity) const
 void ScriptRuntime::update(float dt) noexcept {
     try {
         _impl->context.entities.update(dt);
+        const auto main_update = _impl->context.main_callback("update");
+        if (main_update.valid()) {
+            report(main_update(dt));
+        }
     } catch (const std::exception& exception) {
         log::error("lua: update: {}", exception.what());
     } catch (...) {

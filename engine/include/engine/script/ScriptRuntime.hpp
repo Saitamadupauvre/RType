@@ -108,7 +108,8 @@ public:
      * A declaration may hold `server = { ... }` and `client = { ... }` tables. The section read by
      * an API set of this runtime is merged into the prefab; both are then removed from it, so a
      * core-only runtime reads neither. A section that is not a table, or that sets a name the
-     * declaration already sets, rejects the file.
+     * declaration already sets, rejects the file. `main.lua` follows the same rule with its
+     * globals: `server = { on_start = ... }` defines `on_start()` on the server only.
      *
      * @param root Script folder. Paths in messages and in DeclarationInfo are relative to it.
      * @return true if every file loaded, `main.lua` exists and `on_start()` did not fail; false
@@ -249,8 +250,9 @@ public:
      *
      * In ascending id order, adds @p dt to each entity's `age`, then calls its `update(self, dt)`
      * callback if it has one. Entities marked with `self:destroy()` are skipped. Entities spawned
-     * during the pass are first updated on the next call. An error raised by a callback is logged
-     * with its file and line and the other entities still run.
+     * during the pass are first updated on the next call. Then calls `update(dt)` from
+     * `main.lua` if it defines one. An error raised by a callback is logged with its file and line
+     * and the other callbacks still run.
      *
      * @param dt Fixed time step in seconds.
      * @note Never throws.
