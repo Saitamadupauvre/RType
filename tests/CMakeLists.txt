@@ -29,6 +29,7 @@ engine_add_test(core SOURCES
     engine/core/ComponentPhysicsTest.cpp
     engine/core/ComponentsTest.cpp
     engine/core/DynamicLibraryTest.cpp
+    engine/core/FieldRegistryTest.cpp
 )
 engine_add_test(script SOURCES
     engine/script/ScriptRuntimeTest.cpp
