@@ -42,7 +42,7 @@ protected:
     void SetUp() override {
         _runtime.attach_world(_world);
         ASSERT_TRUE(_runtime.load_scripts(entities_fixture()));
-        ASSERT_TRUE(_runtime.run_string("bydo = spawn('bydo')", "setup"));
+        ASSERT_TRUE(_runtime.run_string("rock = spawn('rock')", "setup"));
     }
 
     [[nodiscard]] bool logged_error(const std::string& part) const {
@@ -52,7 +52,7 @@ protected:
         });
     }
 
-    [[nodiscard]] Entity bydo() {
+    [[nodiscard]] Entity rock() {
         std::optional<Entity> found;
         _world.query<Position>().each([&](Entity entity, Position&) { found = entity; });
         EXPECT_TRUE(found.has_value());
@@ -72,120 +72,120 @@ TEST_F(EntityFieldsTest, RuntimeSharesItsFieldRegistry) {
 }
 
 TEST_F(EntityFieldsTest, SetFieldWritesAnyRegisteredField) {
-    ASSERT_TRUE(_runtime.run_string("bydo:set_field('PhysicsBody', 'mass', 2.5)", "test"));
-    ASSERT_TRUE(_world.has<PhysicsBody>(bydo()));
-    EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(bydo()).mass, 2.5F);
+    ASSERT_TRUE(_runtime.run_string("rock:set_field('PhysicsBody', 'mass', 2.5)", "test"));
+    ASSERT_TRUE(_world.has<PhysicsBody>(rock()));
+    EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(rock()).mass, 2.5F);
     EXPECT_TRUE(
-        _runtime.run_string("assert(bydo:get_field('PhysicsBody', 'mass') == 2.5)", "test"));
+        _runtime.run_string("assert(rock:get_field('PhysicsBody', 'mass') == 2.5)", "test"));
 }
 
 TEST_F(EntityFieldsTest, GetFieldIsNilWithoutComponent) {
     EXPECT_TRUE(
-        _runtime.run_string("assert(bydo:get_field('CircleCollider', 'radius') == nil)", "test"));
+        _runtime.run_string("assert(rock:get_field('CircleCollider', 'radius') == nil)", "test"));
 }
 
 TEST_F(EntityFieldsTest, Vec2FieldsAreTablesWithXAndY) {
-    ASSERT_TRUE(_runtime.run_string("bydo:set_field('Position', 'pos', { x = 3, y = 4 })", "test"));
-    EXPECT_EQ(_world.get<Position>(bydo()).pos, Vec2(3.0F, 4.0F));
+    ASSERT_TRUE(_runtime.run_string("rock:set_field('Position', 'pos', { x = 3, y = 4 })", "test"));
+    EXPECT_EQ(_world.get<Position>(rock()).pos, Vec2(3.0F, 4.0F));
     EXPECT_TRUE(_runtime.run_string(R"(
-        local pos = bydo:get_field('Position', 'pos')
-        assert(pos.x == 3 and pos.y == 4 and bydo.x == 3)
+        local pos = rock:get_field('Position', 'pos')
+        assert(pos.x == 3 and pos.y == 4 and rock.x == 3)
     )",
                                     "test"));
 }
 
 TEST_F(EntityFieldsTest, ListFieldsAreArrays) {
     ASSERT_TRUE(
-        _runtime.run_string("bydo:set_field('Tags', 'labels', { 'enemy', 'boss' })", "test"));
-    EXPECT_TRUE(_world.get<engine::core::Tags>(bydo()).has("boss"));
+        _runtime.run_string("rock:set_field('Tags', 'labels', { 'enemy', 'boss' })", "test"));
+    EXPECT_TRUE(_world.get<engine::core::Tags>(rock()).has("boss"));
     EXPECT_TRUE(_runtime.run_string(R"(
-        local labels = bydo:get_field('Tags', 'labels')
-        assert(#labels == 2 and labels[1] == 'enemy' and bydo:has_tag('boss'))
+        local labels = rock:get_field('Tags', 'labels')
+        assert(#labels == 2 and labels[1] == 'enemy' and rock:has_tag('boss'))
     )",
                                     "test"));
 }
 
 TEST_F(EntityFieldsTest, ListAliasIsEmptyWithoutComponent) {
-    EXPECT_TRUE(_runtime.run_string("assert(#bydo.collides_with == 0)", "test"));
+    EXPECT_TRUE(_runtime.run_string("assert(#rock.collides_with == 0)", "test"));
 }
 
 TEST_F(EntityFieldsTest, UnknownFieldIsALuaErrorWithLocation) {
-    EXPECT_FALSE(_runtime.run_string("bydo:get_field('Ghost', 'mass')", "test"));
+    EXPECT_FALSE(_runtime.run_string("rock:get_field('Ghost', 'mass')", "test"));
     EXPECT_TRUE(logged_error("test:1: unknown entity field 'Ghost.mass'"));
-    EXPECT_FALSE(_runtime.run_string("bydo:set_field('PhysicsBody', 'ghost', 1)", "test"));
+    EXPECT_FALSE(_runtime.run_string("rock:set_field('PhysicsBody', 'ghost', 1)", "test"));
     EXPECT_TRUE(logged_error("test:1: unknown entity field 'PhysicsBody.ghost'"));
 }
 
 TEST_F(EntityFieldsTest, WrongLuaTypeNamesTheField) {
-    EXPECT_FALSE(_runtime.run_string("bydo:set_field('PhysicsBody', 'mass', 'heavy')", "test"));
+    EXPECT_FALSE(_runtime.run_string("rock:set_field('PhysicsBody', 'mass', 'heavy')", "test"));
     EXPECT_TRUE(logged_error("test:1: entity field 'PhysicsBody.mass' cannot be set to a string"));
-    EXPECT_FALSE(_world.has<PhysicsBody>(bydo()));
+    EXPECT_FALSE(_world.has<PhysicsBody>(rock()));
 }
 
 TEST_F(EntityFieldsTest, RejectsNonFiniteNumbers) {
-    EXPECT_FALSE(_runtime.run_string("bydo.x = 0 / 0", "test"));
+    EXPECT_FALSE(_runtime.run_string("rock.x = 0 / 0", "test"));
     EXPECT_TRUE(logged_error("test:1: entity field 'x' must be a finite number"));
-    EXPECT_FALSE(_runtime.run_string("bydo.vy = math.huge", "test"));
+    EXPECT_FALSE(_runtime.run_string("rock.vy = math.huge", "test"));
     EXPECT_TRUE(logged_error("entity field 'vy' must be a finite number"));
     EXPECT_FALSE(
-        _runtime.run_string("bydo:set_field('Position', 'pos', { x = 1, y = 1e39 })", "test"));
-    EXPECT_FLOAT_EQ(_world.get<Position>(bydo()).pos.x, 800.0F);
+        _runtime.run_string("rock:set_field('Position', 'pos', { x = 1, y = 1e39 })", "test"));
+    EXPECT_FLOAT_EQ(_world.get<Position>(rock()).pos.x, 800.0F);
 }
 
 TEST_F(EntityFieldsTest, IntegerFieldsNeedWholeNumbers) {
     EXPECT_FALSE(
-        _runtime.run_string("bydo:set_field('PhysicsBody', 'collision_layer', 1.5)", "test"));
+        _runtime.run_string("rock:set_field('PhysicsBody', 'collision_layer', 1.5)", "test"));
     EXPECT_TRUE(logged_error("entity field 'PhysicsBody.collision_layer' must be a whole number"));
     EXPECT_TRUE(
-        _runtime.run_string("bydo:set_field('PhysicsBody', 'collision_layer', 4.0)", "test"));
-    EXPECT_EQ(_world.get<PhysicsBody>(bydo()).collision_layer, 4U);
+        _runtime.run_string("rock:set_field('PhysicsBody', 'collision_layer', 4.0)", "test"));
+    EXPECT_EQ(_world.get<PhysicsBody>(rock()).collision_layer, 4U);
 }
 
 TEST_F(EntityFieldsTest, OutOfRangeValueReportsTheComponentReason) {
-    EXPECT_FALSE(_runtime.run_string("bydo:set_field('PhysicsBody', 'type', 5)", "test"));
+    EXPECT_FALSE(_runtime.run_string("rock:set_field('PhysicsBody', 'type', 5)", "test"));
     EXPECT_TRUE(logged_error(
         "test:1: entity field 'PhysicsBody.type': body type must be 0 (static) or 1 (dynamic)"));
-    EXPECT_FALSE(_world.has<PhysicsBody>(bydo()));
+    EXPECT_FALSE(_world.has<PhysicsBody>(rock()));
 }
 
 TEST_F(EntityFieldsTest, RejectedHitboxAddsNoComponent) {
-    EXPECT_FALSE(_runtime.run_string("bydo.hitbox = { w = -1, h = 4 }", "test"));
+    EXPECT_FALSE(_runtime.run_string("rock.hitbox = { w = -1, h = 4 }", "test"));
     EXPECT_TRUE(logged_error("entity field 'hitbox': size must be positive"));
-    EXPECT_FALSE(_world.has<AABBCollider>(bydo()));
-    EXPECT_FALSE(_world.has<PhysicsBody>(bydo()));
-    EXPECT_FALSE(_world.has<engine::physics::Scriptable>(bydo()));
+    EXPECT_FALSE(_world.has<AABBCollider>(rock()));
+    EXPECT_FALSE(_world.has<PhysicsBody>(rock()));
+    EXPECT_FALSE(_world.has<engine::physics::Scriptable>(rock()));
 }
 
 TEST_F(EntityFieldsTest, HitboxGivesAScriptBodyCentredCollider) {
-    ASSERT_TRUE(_runtime.run_string("bydo.hitbox = { w = 8, h = 4 }", "test"));
-    const PhysicsBody& body = _world.get<PhysicsBody>(bydo());
+    ASSERT_TRUE(_runtime.run_string("rock.hitbox = { w = 8, h = 4 }", "test"));
+    const PhysicsBody& body = _world.get<PhysicsBody>(rock());
     EXPECT_EQ(body.type, PhysicsBody::Type::Dynamic);
     EXPECT_FALSE(body.affected_by_gravity);
     EXPECT_FALSE(body.resolve_collisions);
-    EXPECT_EQ(_world.get<AABBCollider>(bydo()).offset, Vec2(4.0F, 2.0F));
-    EXPECT_TRUE(_world.has<engine::physics::Scriptable>(bydo()));
-    EXPECT_TRUE(_runtime.run_string("assert(bydo.hitbox.w == 8 and bydo.hitbox.h == 4)", "test"));
+    EXPECT_EQ(_world.get<AABBCollider>(rock()).offset, Vec2(4.0F, 2.0F));
+    EXPECT_TRUE(_world.has<engine::physics::Scriptable>(rock()));
+    EXPECT_TRUE(_runtime.run_string("assert(rock.hitbox.w == 8 and rock.hitbox.h == 4)", "test"));
 }
 
 TEST_F(EntityFieldsTest, HitboxKeepsAnExistingBody) {
-    ASSERT_TRUE(_runtime.run_string("bydo:set_field('PhysicsBody', 'mass', 3)", "test"));
-    ASSERT_TRUE(_runtime.run_string("bydo.hitbox = { w = 8, h = 4 }", "test"));
-    EXPECT_EQ(_world.get<PhysicsBody>(bydo()).type, PhysicsBody::Type::Static);
-    EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(bydo()).mass, 3.0F);
+    ASSERT_TRUE(_runtime.run_string("rock:set_field('PhysicsBody', 'mass', 3)", "test"));
+    ASSERT_TRUE(_runtime.run_string("rock.hitbox = { w = 8, h = 4 }", "test"));
+    EXPECT_EQ(_world.get<PhysicsBody>(rock()).type, PhysicsBody::Type::Static);
+    EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(rock()).mass, 3.0F);
 }
 
 TEST_F(EntityFieldsTest, SpriteIsNilUntilSet) {
-    EXPECT_TRUE(_runtime.run_string("assert(bydo.sprite == nil and bydo.color == nil)", "test"));
+    EXPECT_TRUE(_runtime.run_string("assert(rock.sprite == nil and rock.color == nil)", "test"));
     EXPECT_TRUE(_runtime.run_string(R"(
-        bydo.sprite = 'bydo.png'
-        assert(bydo.sprite == 'bydo.png' and bydo.color.a == 255)
+        rock.sprite = 'rock.png'
+        assert(rock.sprite == 'rock.png' and rock.color.a == 255)
     )",
                                     "test"));
 }
 
 TEST_F(EntityFieldsTest, FieldMethodsNeedALiveEntity) {
-    ASSERT_TRUE(_runtime.run_string("bydo:destroy()", "test"));
+    ASSERT_TRUE(_runtime.run_string("rock:destroy()", "test"));
     _runtime.flush_destroyed();
-    EXPECT_FALSE(_runtime.run_string("bydo:get_field('Position', 'pos')", "stale"));
+    EXPECT_FALSE(_runtime.run_string("rock:get_field('Position', 'pos')", "stale"));
     EXPECT_TRUE(logged_error("stale:1: attempt to use a destroyed entity"));
 }
