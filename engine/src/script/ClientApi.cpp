@@ -103,7 +103,7 @@ float& ClientApi::State::volume(sol::this_state state, const sol::object& kind,
             return audio.effects_volume;
         }
     }
-    throw std::runtime_error(std::format("{}audio.{}: kind must be \"music\" or \"effects\"",
+    throw std::runtime_error(std::format(R"({}audio.{}: kind must be "music" or "effects")",
                                          caller_location(state), function));
 }
 
