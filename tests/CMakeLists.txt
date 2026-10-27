@@ -39,6 +39,7 @@ engine_add_test(script SOURCES
     engine/script/TickTest.cpp
     engine/script/PlayersTest.cpp
     engine/script/AudioTest.cpp
+    engine/script/EventsTest.cpp
     engine/script/CollisionsTest.cpp
     engine/script/EntityFieldsTest.cpp
 )

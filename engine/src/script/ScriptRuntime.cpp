@@ -13,6 +13,7 @@
 #include "Audio.hpp"
 #include "Declarations.hpp"
 #include "Entities.hpp"
+#include "Events.hpp"
 #include "ModuleLoader.hpp"
 #include "Players.hpp"
 #include "ScriptFiles.hpp"
@@ -50,6 +51,7 @@ struct ScriptRuntime::Impl {
     std::shared_ptr<PendingFile> current_file;
     std::optional<ModuleLoader> modules;
     Audio audio;
+    Events events;
 
     sol::object declare(sol::this_state state, DeclarationKind kind, const std::string& name);
     sol::object require(sol::this_state state, const std::string& name);
@@ -126,7 +128,9 @@ bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
     }
     modules.emplace(root);
     audio.allow_declarations(true);
+    events.allow_declarations(true);
     const bool loaded = load_all(root, files);
+    events.allow_declarations(false);
     audio.allow_declarations(false);
     return loaded;
 }
@@ -343,6 +347,13 @@ ScriptRuntime::ScriptRuntime() : _impl(std::make_unique<Impl>()) {
     _impl->lua.set_function("music", [impl](sol::this_state state, const sol::object& name) {
         impl->audio.music(state, name);
     });
+    _impl->lua.set_function("event", [impl](sol::this_state state, const sol::object& name) {
+        return impl->events.declare(state, name);
+    });
+    _impl->lua.set_function("emit", [impl](sol::this_state state, const sol::object& name,
+                                           const sol::object& arguments) {
+        impl->events.emit(state, name, arguments);
+    });
 }
 
 ScriptRuntime::~ScriptRuntime() = default;
@@ -474,6 +485,14 @@ std::vector<std::string> ScriptRuntime::music_names() const { return _impl->audi
 
 std::vector<AudioCommand> ScriptRuntime::take_audio_commands() noexcept {
     return _impl->audio.take_commands();
+}
+
+std::vector<std::string> ScriptRuntime::event_names() const { return _impl->events.names(); }
+
+std::vector<std::string> ScriptRuntime::event_keys() const { return _impl->events.keys(); }
+
+std::vector<EventCommand> ScriptRuntime::take_event_commands() noexcept {
+    return _impl->events.take_commands();
 }
 
 std::optional<std::string> ScriptRuntime::entity_type(core::Entity entity) const {

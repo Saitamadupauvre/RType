@@ -15,6 +15,7 @@
 #include "engine/core/Vec2.hpp"
 #include "engine/script/AudioCommand.hpp"
 #include "engine/script/Declaration.hpp"
+#include "engine/script/EventCommand.hpp"
 #include "engine/script/Export.hpp"
 #include "engine/script/InputState.hpp"
 
@@ -254,6 +255,38 @@ public:
      * @note Never throws.
      */
     [[nodiscard]] std::vector<AudioCommand> take_audio_commands() noexcept;
+
+    /**
+     * @brief Lists the events declared with `event "name" { key = "kind", ... }`, in ascending
+     * order.
+     *
+     * Events are declared while the scripts load, e.g. `event "explosion" { at = "vec2",
+     * size = "float" }`. A name is 1 to 63 letters, digits, `_`, `-` or `.`, starting with a
+     * letter. Keys are Lua identifiers of 1 to 63 characters; kinds are `float`, `int`, `bool`,
+     * `string`, `vec2`, `color` or `asset`; an event has at most `max_event_arguments` keys. An
+     * invalid declaration, a name declared twice or a declaration made after loading raises a
+     * Lua error.
+     */
+    [[nodiscard]] std::vector<std::string> event_names() const;
+
+    /**
+     * @brief Lists every argument key of every declared event, once each, in ascending order.
+     */
+    [[nodiscard]] std::vector<std::string> event_keys() const;
+
+    /**
+     * @brief Returns the events queued by scripts since the last call, in call order, and
+     * empties the queue.
+     *
+     * Scripts queue them with `emit(name)` or `emit(name, { key = value, ... })`. Keys left out
+     * are absent from the command. An undeclared event or key, a value of the wrong kind, a
+     * non-finite float or a string longer than `max_event_text_length` bytes raises a Lua error
+     * and queues nothing. At most 64 events are kept between two calls; later ones are dropped
+     * and logged once.
+     *
+     * @note Never throws.
+     */
+    [[nodiscard]] std::vector<EventCommand> take_event_commands() noexcept;
 
     /**
      * @brief Returns the declared type of an entity spawned by this runtime.
