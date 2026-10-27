@@ -11,7 +11,7 @@ The engine is an ECS driven by Lua scripts.
 | Concept | What it is | Where it lives |
 |---|---|---|
 | **Entity** | An id. No data, no logic. | `engine::core::EntityManager` |
-| **Component** | Plain data attached to an id: `Position`, `Velocity`, `Sprite`, `Tags`... | C++ component pools |
+| **Component** | Plain data attached to an id: `Position`, `Sprite`, `PhysicsBody`, `Tags`... | C++ component pools |
 | **Native system** | C++ loop over every entity with given components | `engine/` |
 | **Entity script** | Lua callbacks of one entity type (`update`, `on_collide`...) | `game/scripts/` |
 | **Lua system** | Lua logic spanning several entity types (waves, score) | `game/scripts/` |
@@ -219,14 +219,14 @@ engine counterpart exists:
 
 | Missing in the engine | Stand-in today | Once it lands |
 |---|---|---|
-| Native movement in the server tick | `update` writes `self.x` / `self.y` | Set `vx` / `vy` and let C++ integrate |
 | `find_all`, `count` | `lib/roster.lua` groups, joined in `on_spawn`, left in `on_destroy` | `find_all("enemy")` |
 | Running Lua `system` declarations | Entities without a sprite: `game`, `bydo_spawner` | `system "waves"` |
 | `after`, `every`, `random` | Time counters in `update`, `math.random` | `every(1.5, ...)`, `random(...)` |
 | `behavior` coroutines, `wait` | Counters in `update` | Sequences written top to bottom |
 
-The target style (velocity, systems, coroutines) is
-described in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
+Setting `vx` / `vy` already moves an entity every server tick. The target style
+(velocity, systems, coroutines) is described in
+[PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
 
 ## Tests
 

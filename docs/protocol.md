@@ -175,7 +175,7 @@ Each entity record has the following layout:
 
 A snapshot packet carries at most 62 entities, the largest count that fits in the maximum payload size. A larger world is sent as several snapshot packets with the same `server_tick`, each holding at most 62 entities. The format of each packet does not change.
 
-The server replicates every entity that has the engine's `Replicated` component (its `type_id`) and a position; the velocity is zero when the entity has none. `owner` is `Replicated::owner`; a client compares it with the `player_entity_id` of its `connect_accept` to find its own entities. The color is the entity's sprite color, opaque white when it has no sprite. `entity_id` is the entity index. Coordinates and velocities are rounded to the nearest integer and clamped to the signed 16-bit range.
+The server replicates every entity that has the engine's `Replicated` component (its `type_id`) and a position; `vx` and `vy` are always zero for now. `owner` is `Replicated::owner`; a client compares it with the `player_entity_id` of its `connect_accept` to find its own entities. The color is the entity's sprite color, opaque white when it has no sprite. `entity_id` is the entity index. Coordinates and velocities are rounded to the nearest integer and clamped to the signed 16-bit range.
 
 The client keeps the world of the newest `server_tick` it has received, comparing ticks with wrap-around like sequence numbers:
 

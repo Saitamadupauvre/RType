@@ -115,7 +115,7 @@ every remaining session and publishes `PlayerLeft` on the event bus, which
 ### Replication
 
 Each tick, `send_snapshot(registry)` builds snapshots from every entity with
-`Replicated` and `Position` (plus `Velocity` and `Sprite` colour when present),
+`Replicated` and `Position` (plus `Sprite` colour when present; velocity is sent as zero),
 split into packets of at most 62 entities that share the same server tick, and
 queues them for every session. Game events published on the bus during the
 tick (`EntitySpawned`, `EntityDestroyed`, `ShotFired`, `SoundPlayed`, `MusicChanged`) are sent

@@ -24,7 +24,7 @@ The foundation every other module builds on.
 |---|---|---|
 | Entities | `Entity.hpp`, `EntityPool.hpp` | 32-bit ids with a generation counter: a recycled id never matches a destroyed entity |
 | Components | `ComponentPool.hpp`, `ComponentTypeId.hpp`, `EntityManager.hpp`, `ComponentQuery.hpp` | Sparse-set pools, `spawn`/`kill`/`add`/`get`/`has`, `query<A, B>().each(...)` |
-| Common components | `Components.hpp`, `ComponentPhysics.hpp` | `Position`, `Velocity`, `Sprite` (path + colour), `Tags` |
+| Common components | `Components.hpp`, `ComponentPhysics.hpp` | `Position`, `Sprite` (path + colour), `Tags` |
 | Systems | `SystemScheduler.hpp` | Named systems run by ascending order; one that throws is disabled and logged, the others keep running |
 | Events | `event/EventBus.hpp` | Typed publish/subscribe; a `Subscription` unsubscribes when destroyed |
 | Time | `time/IClock.hpp`, `SteadyClock.hpp`, `ManualClock.hpp`, `FixedStepLoop.hpp` | Fixed-step loop (60 Hz by default) over an injectable clock, so tests control time |
@@ -44,8 +44,9 @@ Component types are identified by stable names registered in a `.cpp` of
   `loadfile` and bytecode loading; `require` only reaches `lib/`;
 - spawns scripted entities, maps native fields (`x`, `y`, `vx`, `vy`,
   `sprite`, `color`, `tags`, `hitbox`, `collides_with`) to C++ components and
-  keeps free fields in Lua; `hitbox` becomes a non-resolving `PhysicsBody` +
-  `AABBCollider` of `engine-physics`;
+  keeps free fields in Lua; `vx` / `vy` are the velocity of the entity's
+  `PhysicsBody` and `hitbox` its `AABBCollider` (`engine-physics`); setting
+  one of them gives the entity a dynamic, non-resolving body without gravity;
 - calls `update`, `on_spawn`, `on_destroy` and the `main.lua` callbacks
   through protected calls: an error is logged with file and line and the game
   continues;

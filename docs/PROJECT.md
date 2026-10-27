@@ -385,7 +385,7 @@ This section is the specification of the Lua API. Not everything is implemented 
 | Entity fields `x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`, `id`, `type`, `age`, `input`, `owner`; free fields | Implemented |
 | Entity methods `destroy()`, `has_tag()`, `get_field()`, `set_field()`; callbacks `on_spawn`, `update`, `on_collide`, `on_destroy` | Implemented |
 | Native collisions: `engine-physics` detects `hitbox` overlaps in the server tick and calls `on_collide` (see §10.5) | Implemented |
-| Native movement from `vx` / `vy` in the server tick | Not yet: scripts move entities by writing `x` / `y` |
+| Native movement from `vx` / `vy` in the server tick (`engine-physics` integrates the body velocity) | Implemented |
 | `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
 | `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
 
@@ -506,7 +506,7 @@ Free fields holding a table are the exception: each entity gets its own deep cop
 
 ```lua
 self.x, self.y      -- position (native)
-self.vx, self.vy    -- velocity: moved by the C++ engine every tick
+self.vx, self.vy    -- velocity: moved by the C++ engine every tick, nil until set
 self.age            -- seconds since spawn (read-only)
 self.id             -- unique id (read-only)
 self.type           -- declared name, e.g. "bydo" (read-only)
@@ -542,7 +542,7 @@ end
 
 `owner` takes a player handle or `nil`, also as a `spawn` override (`spawn("ship", { owner = player })`). The entity then reads that player's input through `self.input`, and clients receive the owner so each one can highlight its own entities. Once the player leaves, `owner` reads `nil`.
 
-Native fields are aliases of component fields declared in the engine's field registry: `x` / `y` are the axes of `Position.pos`, `vx` / `vy` of `Velocity.vel`, `sprite` is `Sprite.path`, `color` is `Sprite.color`, `tags` is `Tags.labels`, `hitbox` is `AABBCollider.size` and `collides_with` is `CollidesWith.labels`. `get_field` / `set_field` reach every other registered field by component and field name, with the same conversions:
+Native fields are aliases of component fields declared in the engine's field registry: `x` / `y` are the axes of `Position.pos`, `vx` / `vy` of `PhysicsBody.velocity`, `sprite` is `Sprite.path`, `color` is `Sprite.color`, `tags` is `Tags.labels`, `hitbox` is `AABBCollider.size` and `collides_with` is `CollidesWith.labels`. `get_field` / `set_field` reach every other registered field by component and field name, with the same conversions:
 
 | Field kind | Lua value |
 |---|---|
@@ -555,6 +555,8 @@ Native fields are aliases of component fields declared in the engine's field reg
 | `list` | array of one kind, e.g. strings; reads an empty array when the component is absent |
 
 Every value read is a new table or a copy: change a field by assigning it. A value of the wrong type, `NaN`, infinity or a value the component rejects raises a Lua error naming the field and the caller's line (`bydo.lua:12: entity field 'hitbox': size must be positive`), and leaves the entity unchanged.
+
+Setting `vx`, `vy` or `hitbox` on an entity without a physics body gives it one: dynamic, without gravity and without collision response. Until then `vx` and `vy` read `nil`, so write `(self.vx or 0)` when an entity may not have moved yet.
 
 **Performance tip:** prefer setting `vx` / `vy` over moving the entity in `update`; native movement runs entirely in C++.
 
@@ -626,7 +628,7 @@ system "gravity"
 query = { "gravity" }
 
 function update(e, dt)
-    e.vy = e.vy + e.gravity * dt
+    e.vy = (e.vy or 0) + e.gravity * dt
 end
 ```
 
