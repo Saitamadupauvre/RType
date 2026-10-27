@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -31,11 +32,28 @@ struct AssetName {
     bool operator==(const AssetName&) const = default;
 };
 
-/** @brief Value of one component field, whatever the concrete component type. */
-using FieldValue = std::variant<float, std::int64_t, bool, std::string, Vec2, Rgba, AssetName>;
+/** @brief Value of one list item: any field kind except List. */
+using ScalarValue = std::variant<float, std::int64_t, bool, std::string, Vec2, Rgba, AssetName>;
 
 /** @brief Closed list of field kinds, in the order of the FieldValue alternatives. */
-enum class FieldKind : std::uint8_t { Float, Int, Bool, String, Vec2, Color, Asset };
+enum class FieldKind : std::uint8_t { Float, Int, Bool, String, Vec2, Color, Asset, List };
+
+/**
+ * @brief Ordered values of one scalar kind, such as tags or waypoints.
+ *
+ * @note Lists never nest: @ref element is never FieldKind::List.
+ */
+struct FieldList {
+    /** Kind of every item. */
+    FieldKind element = FieldKind::String;
+    std::vector<ScalarValue> items;
+
+    bool operator==(const FieldList&) const = default;
+};
+
+/** @brief Value of one component field, whatever the concrete component type. */
+using FieldValue =
+    std::variant<float, std::int64_t, bool, std::string, Vec2, Rgba, AssetName, FieldList>;
 
 /** @brief A field kind and its lowercase name, used in messages and files. */
 struct FieldKindInfo {
@@ -52,6 +70,7 @@ inline constexpr std::array field_kinds{
     FieldKindInfo{.kind = FieldKind::Vec2, .name = "vec2"},
     FieldKindInfo{.kind = FieldKind::Color, .name = "color"},
     FieldKindInfo{.kind = FieldKind::Asset, .name = "asset"},
+    FieldKindInfo{.kind = FieldKind::List, .name = "list"},
 };
 
 namespace detail {
@@ -79,6 +98,11 @@ template <FieldType T> [[nodiscard]] constexpr FieldKind field_kind_of() noexcep
 
 /** @return The kind held by @p value. */
 [[nodiscard]] constexpr FieldKind kind_of(const FieldValue& value) noexcept {
+    return static_cast<FieldKind>(value.index());
+}
+
+/** @return The kind held by @p value, never FieldKind::List. */
+[[nodiscard]] constexpr FieldKind kind_of(const ScalarValue& value) noexcept {
     return static_cast<FieldKind>(value.index());
 }
 
@@ -123,15 +147,18 @@ public:
      * @param getter Reads the field of an entity owning the component.
      * @param setter Writes a value of @p kind, adding the component when the entity has none.
      * Throws std::out_of_range for a value the component cannot hold.
-     * @note Prefer member_field, asset_field or component_field.
+     * @param element Item kind, required when @p kind is FieldKind::List and empty otherwise.
+     * @note Prefer member_field, asset_field, component_field or list_field.
      */
     FieldDescriptor(std::string name, FieldKind kind, FieldFlags flags, Getter getter,
-                    Setter setter)
-        : _name(std::move(name)), _kind(kind), _flags(flags), _getter(std::move(getter)),
-          _setter(std::move(setter)) {}
+                    Setter setter, std::optional<FieldKind> element = std::nullopt)
+        : _name(std::move(name)), _kind(kind), _element(element), _flags(flags),
+          _getter(std::move(getter)), _setter(std::move(setter)) {}
 
     [[nodiscard]] const std::string& name() const noexcept { return _name; }
     [[nodiscard]] FieldKind kind() const noexcept { return _kind; }
+    /** @return The item kind of a list field, std::nullopt for any other kind. */
+    [[nodiscard]] std::optional<FieldKind> element_kind() const noexcept { return _element; }
     [[nodiscard]] FieldFlags flags() const noexcept { return _flags; }
 
 private:
@@ -139,6 +166,7 @@ private:
 
     std::string _name;
     FieldKind _kind;
+    std::optional<FieldKind> _element;
     FieldFlags _flags;
     Getter _getter;
     Setter _setter;
@@ -159,15 +187,33 @@ private:
 
     using Presence = bool (*)(const EntityManager&, Entity);
 
+    struct Requirement {
+        bool (*registered)(const EntityManager&);
+        void (*ensure)(EntityManager&, Entity);
+        const char* type_name;
+    };
+
     ComponentDescriptor(std::string name, ComponentTypeId type, Presence present,
-                        std::vector<FieldDescriptor> fields)
-        : _name(std::move(name)), _type(type), _present(present), _fields(std::move(fields)) {}
+                        std::vector<FieldDescriptor> fields, std::vector<Requirement> required)
+        : _name(std::move(name)), _type(type), _present(present), _fields(std::move(fields)),
+          _required(std::move(required)) {}
 
     std::string _name;
     ComponentTypeId _type;
     Presence _present;
     std::vector<FieldDescriptor> _fields;
+    std::vector<Requirement> _required;
 };
+
+/**
+ * @brief Components added with default values whenever a field of another component is set.
+ *
+ * Pass `required<PhysicsBody>` to FieldRegistry::add.
+ */
+template <typename... Components> struct RequiredComponents {};
+
+/** @brief The RequiredComponents value for @p Components. */
+template <typename... Components> inline constexpr RequiredComponents<Components...> required{};
 
 /** @brief A field together with the component it belongs to, as found in a FieldRegistry. */
 struct FieldRef {
@@ -206,6 +252,10 @@ class ENGINE_CORE_EXPORT FieldKindMismatch : public std::invalid_argument {
 public:
     FieldKindMismatch(std::string_view component, std::string_view field, FieldKind expected,
                       FieldKind actual);
+
+    /** @param expected, actual Type descriptions such as "list of string". */
+    FieldKindMismatch(std::string_view component, std::string_view field, std::string_view expected,
+                      std::string_view actual);
 };
 
 /** @brief Thrown when a field is given a value its component cannot hold. */
@@ -213,25 +263,27 @@ class ENGINE_CORE_EXPORT FieldValueOutOfRange : public std::out_of_range {
 public:
     FieldValueOutOfRange(std::string_view component, std::string_view field,
                          std::string_view reason);
+
+    /** @return Why the value was rejected, without the field name, e.g. "size must be positive". */
+    [[nodiscard]] const std::string& reason() const noexcept { return _reason; }
+
+private:
+    std::string _reason;
 };
 
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
 
-/**
- * @brief Builds a field from accessors working on the concrete component.
- *
- * @tparam Component Component type the field belongs to.
- * @param read Callable `FieldValue(const Component&)`.
- * @param write Callable `void(Component&, const FieldValue&)`, given a value of @p kind. It
- * rejects a value by throwing std::out_of_range.
- * @note A throwing @p write leaves the entity unchanged.
- */
+namespace detail {
+
 template <typename Component, typename Read, typename Write>
-[[nodiscard]] FieldDescriptor component_field(std::string name, FieldKind kind, FieldFlags flags,
-                                              Read read, Write write) {
-    return FieldDescriptor{std::move(name), kind, flags,
+[[nodiscard]] FieldDescriptor make_field(std::string name, FieldKind kind,
+                                         std::optional<FieldKind> element, FieldFlags flags,
+                                         Read read, Write write) {
+    return FieldDescriptor{std::move(name),
+                           kind,
+                           flags,
                            [read](EntityManager& world, Entity entity) -> FieldValue {
                                return read(std::as_const(world.get<Component>(entity)));
                            },
@@ -241,7 +293,47 @@ template <typename Component, typename Read, typename Write>
                                                          : Component{};
                                write(component, value);
                                world.add(entity, std::move(component));
-                           }};
+                           },
+                           element};
+}
+
+} // namespace detail
+
+/**
+ * @brief Builds a field from accessors working on the concrete component.
+ *
+ * @tparam Component Component type the field belongs to.
+ * @param read Callable `FieldValue(const Component&)`.
+ * @param write Callable `void(Component&, const FieldValue&)`, given a value of @p kind. It
+ * rejects a value by throwing std::out_of_range.
+ * @note A throwing @p write leaves the entity unchanged. Use list_field for FieldKind::List.
+ */
+template <typename Component, typename Read, typename Write>
+[[nodiscard]] FieldDescriptor component_field(std::string name, FieldKind kind, FieldFlags flags,
+                                              Read read, Write write) {
+    return detail::make_field<Component>(std::move(name), kind, std::nullopt, flags,
+                                         std::move(read), std::move(write));
+}
+
+/**
+ * @brief Builds a list field from accessors working on the concrete component.
+ *
+ * @tparam Component Component type the field belongs to.
+ * @param element Kind of every item; FieldRegistry::add rejects FieldKind::List.
+ * @param read Callable `FieldList(const Component&)`.
+ * @param write Callable `void(Component&, const FieldList&)`, given a list of @p element items.
+ * It rejects a value by throwing std::out_of_range.
+ * @note A throwing @p write leaves the entity unchanged.
+ */
+template <typename Component, typename Read, typename Write>
+[[nodiscard]] FieldDescriptor list_field(std::string name, FieldKind element, FieldFlags flags,
+                                         Read read, Write write) {
+    return detail::make_field<Component>(
+        std::move(name), FieldKind::List, element, flags,
+        [read](const Component& component) { return FieldValue{read(component)}; },
+        [write](Component& component, const FieldValue& value) {
+            write(component, std::get<FieldList>(value));
+        });
 }
 
 namespace detail {
@@ -334,11 +426,32 @@ public:
      * @tparam Component Type every field of @p fields was built for.
      * @throws DuplicateComponentName If @p name or @p Component is already registered.
      * @throws DuplicateFieldName If two fields share a name.
-     * @throws std::invalid_argument If a name is empty or a field has no getter or setter.
+     * @throws std::invalid_argument If a name is empty, a field has no getter or setter, or a
+     * list field has no scalar item kind.
      */
     template <typename Component> void add(std::string name, std::vector<FieldDescriptor> fields) {
-        add(ComponentDescriptor{std::move(name), component_type_id<Component>(), &owns<Component>,
-                                std::move(fields)});
+        add<Component>(std::move(name), std::move(fields), required<>);
+    }
+
+    /**
+     * @brief Registers a component type whose fields need other components to work.
+     *
+     * Setting any field of @p Component also adds every one of @p Required the entity lacks,
+     * with default values, as a collider needs a body to be simulated.
+     *
+     * @note Throws everything the other overload throws.
+     */
+    template <typename Component, typename... Required>
+    void add(std::string name, std::vector<FieldDescriptor> fields,
+             RequiredComponents<Required...>) {
+        add(ComponentDescriptor{
+            std::move(name),
+            component_type_id<Component>(),
+            &owns<Component>,
+            std::move(fields),
+            {ComponentDescriptor::Requirement{.registered = &is_known<Required>,
+                                              .ensure = &ensure<Required>,
+                                              .type_name = typeid(Required).name()}...}});
     }
 
     /** @return The component called @p name, or nullptr. */
@@ -382,9 +495,13 @@ public:
      *
      * @param field A FieldRef returned by this registry.
      * @throws std::invalid_argument If @p field is empty or the entity is not alive.
-     * @throws FieldKindMismatch If @p value is not of the field's kind; the entity is unchanged.
+     * Also adds the components the field's component requires.
+     *
+     * @throws FieldKindMismatch If @p value is not of the field's kind, or is a list holding
+     * items of another kind; the entity is unchanged.
      * @throws FieldValueOutOfRange If the component cannot hold @p value; the entity is unchanged.
-     * @throws ComponentNotRegistered If the world does not know the component type.
+     * @throws ComponentNotRegistered If the world does not know the component type or a
+     * component it requires; the entity is unchanged.
      */
     ENGINE_CORE_EXPORT void set(EntityManager& world, Entity entity, FieldRef field,
                                 const FieldValue& value) const;
@@ -403,14 +520,34 @@ private:
         return world.is_registered<Component>() && world.has<Component>(entity);
     }
 
+    template <typename Component> static bool is_known(const EntityManager& world) {
+        return world.is_registered<Component>();
+    }
+
+    template <typename Component> static void ensure(EntityManager& world, Entity entity) {
+        if (!world.has<Component>(entity)) {
+            world.add(entity, Component{});
+        }
+    }
+
     ENGINE_CORE_EXPORT void add(ComponentDescriptor component);
     [[nodiscard]] FieldRef require(std::string_view component, std::string_view field) const;
 
     std::vector<ComponentDescriptor> _components;
 };
 
+/** @return The labels of @p tags as a list of strings, in insertion order. */
+[[nodiscard]] ENGINE_CORE_EXPORT FieldList labels_to_list(const Tags& tags);
+
 /**
- * @brief Registers the fields of the engine-core components: Position, Velocity and Sprite.
+ * @return Tags holding every string of @p list once, in order.
+ * @throws std::bad_variant_access If an item is not a string.
+ */
+[[nodiscard]] ENGINE_CORE_EXPORT Tags labels_from_list(const FieldList& list);
+
+/**
+ * @brief Registers the fields of the engine-core components: Position, Velocity, Sprite and
+ * Tags.
  *
  * @throws DuplicateComponentName If one of them is already registered.
  */

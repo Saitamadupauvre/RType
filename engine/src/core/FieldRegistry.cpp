@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <format>
+#include <optional>
+#include <string>
 #include <unordered_set>
 
 #include "engine/core/ComponentPhysics.hpp"
@@ -28,6 +30,8 @@ static_assert(field_kind_of<std::string>() == FieldKind::String);
 static_assert(field_kind_of<Vec2>() == FieldKind::Vec2);
 static_assert(field_kind_of<Rgba>() == FieldKind::Color);
 static_assert(field_kind_of<AssetName>() == FieldKind::Asset);
+static_assert(field_kind_of<FieldList>() == FieldKind::List);
+static_assert(std::variant_size_v<ScalarValue> + 1 == std::variant_size_v<FieldValue>);
 
 void require_name(std::string_view name, std::string_view what) {
     if (name.empty()) {
@@ -38,6 +42,36 @@ void require_name(std::string_view name, std::string_view what) {
 void require_ref(FieldRef field) {
     if (!field) {
         throw std::invalid_argument("empty field reference");
+    }
+}
+
+void require_item_kind(std::string_view component, const FieldDescriptor& field) {
+    const std::optional<FieldKind> element = field.element_kind();
+    const bool is_list = field.kind() == FieldKind::List;
+    if (is_list != element.has_value() || (is_list && *element == FieldKind::List)) {
+        throw std::invalid_argument(
+            std::format("field '{}.{}' needs a scalar item kind if and only if it is a list",
+                        component, field.name()));
+    }
+}
+
+std::string list_type_name(FieldKind element) {
+    return std::format("list of {}", field_kind_name(element));
+}
+
+void require_list_items(std::string_view component, const FieldDescriptor& field,
+                        const FieldList& list) {
+    const FieldKind expected = field.element_kind().value_or(FieldKind::List);
+    if (list.element != expected) {
+        throw FieldKindMismatch(component, field.name(), list_type_name(expected),
+                                list_type_name(list.element));
+    }
+    for (const ScalarValue& item : list.items) {
+        if (kind_of(item) != expected) {
+            throw FieldKindMismatch(component, field.name(), list_type_name(expected),
+                                    std::format("{} holding a {}", list_type_name(list.element),
+                                                field_kind_name(kind_of(item))));
+        }
     }
 }
 
@@ -58,9 +92,15 @@ FieldKindMismatch::FieldKindMismatch(std::string_view component, std::string_vie
     : std::invalid_argument(std::format("field '{}.{}' expects a {}, not a {}", component, field,
                                         field_kind_name(expected), field_kind_name(actual))) {}
 
+FieldKindMismatch::FieldKindMismatch(std::string_view component, std::string_view field,
+                                     std::string_view expected, std::string_view actual)
+    : std::invalid_argument(std::format("field '{}.{}' expects a {}, not a {}", component, field,
+                                        expected, actual)) {}
+
 FieldValueOutOfRange::FieldValueOutOfRange(std::string_view component, std::string_view field,
                                            std::string_view reason)
-    : std::out_of_range(std::format("field '{}.{}': {}", component, field, reason)) {}
+    : std::out_of_range(std::format("field '{}.{}': {}", component, field, reason)),
+      _reason(reason) {}
 
 const FieldDescriptor* ComponentDescriptor::find_field(std::string_view field_name) const noexcept {
     const auto found = std::ranges::find(_fields, field_name, &FieldDescriptor::name);
@@ -82,6 +122,7 @@ void FieldRegistry::add(ComponentDescriptor component) {
             throw std::invalid_argument(std::format("field '{}.{}' needs a getter and a setter",
                                                     component.name(), field.name()));
         }
+        require_item_kind(component.name(), field);
         if (!names.insert(field.name()).second) {
             throw DuplicateFieldName(component.name(), field.name());
         }
@@ -144,20 +185,47 @@ void FieldRegistry::set(EntityManager& world, Entity entity, FieldRef field,
     if (kind_of(value) != descriptor.kind()) {
         throw FieldKindMismatch(component, descriptor.name(), descriptor.kind(), kind_of(value));
     }
+    if (const auto* list = std::get_if<FieldList>(&value)) {
+        require_list_items(component, descriptor, *list);
+    }
     if (!world.alive(entity)) {
         throw std::invalid_argument(
             std::format("cannot set field '{}.{}' of a dead entity", component, descriptor.name()));
+    }
+    for (const ComponentDescriptor::Requirement& requirement : field.component->_required) {
+        if (!requirement.registered(world)) {
+            throw ComponentNotRegistered(requirement.type_name);
+        }
     }
     try {
         descriptor._setter(world, entity, value);
     } catch (const std::out_of_range& error) {
         throw FieldValueOutOfRange(component, descriptor.name(), error.what());
     }
+    for (const ComponentDescriptor::Requirement& requirement : field.component->_required) {
+        requirement.ensure(world, entity);
+    }
 }
 
 void FieldRegistry::set(EntityManager& world, Entity entity, std::string_view component,
                         std::string_view field, const FieldValue& value) const {
     set(world, entity, require(component, field), value);
+}
+
+FieldList labels_to_list(const Tags& tags) {
+    FieldList list{.element = FieldKind::String, .items = {}};
+    for (const std::string& label : tags.labels()) {
+        list.items.emplace_back(label);
+    }
+    return list;
+}
+
+Tags labels_from_list(const FieldList& list) {
+    Tags tags;
+    for (const ScalarValue& label : list.items) {
+        tags.add(std::get<std::string>(label));
+    }
+    return tags;
 }
 
 FieldRef FieldRegistry::require(std::string_view component, std::string_view field) const {
@@ -176,6 +244,11 @@ void register_core_fields(FieldRegistry& registry) {
     registry.add<Sprite>("Sprite",
                          {asset_field<&Sprite::path>("path", field_flags::editable),
                           member_field<&Sprite::color>("color", field_flags::replicated)});
+    registry.add<Tags>("Tags",
+                       {list_field<Tags>("labels", FieldKind::String, field_flags::editable,
+                                         &labels_to_list, [](Tags& tags, const FieldList& list) {
+                                             tags = labels_from_list(list);
+                                         })});
 }
 
 } // namespace engine::core
