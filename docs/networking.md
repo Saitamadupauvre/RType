@@ -12,8 +12,9 @@ id, inputs made of action bits and two axes, but nothing about R-Type.
 | Header | Type | Used by |
 |---|---|---|
 | `engine/network/Server.hpp` | `NetworkServer`, `ServerOptions`, `PlayerInput` | `r-type_server` |
-| `engine/network/Client.hpp` | `NetworkClient`, `EntitySnapshot`, `ConnectionState` | `r-type_client` |
+| `engine/network/Client.hpp` | `NetworkClient`, `EntitySnapshot`, `ReplicatedValue`, `ConnectionState` | `r-type_client` |
 | `engine/network/Replicated.hpp` | `Replicated { type_id, owner }` | Marks the entities sent in snapshots |
+| `engine/network/Fields.hpp` | `register_network_fields` | Registers `Replicated.owner` in a `FieldRegistry` |
 | `engine/network/Events.hpp` | `PlayerJoined`, `PlayerLeft`, `Disconnected`, `EntitySpawned`... | Published on the `EventBus` |
 | `engine/network/Stats.hpp` | `NetworkStats`, `PlayerStats` | Traffic statistics |
 
@@ -21,7 +22,7 @@ Both classes are pimpl wrappers: sockets and protocol types never appear in
 public headers.
 
 ```cpp
-engine::network::NetworkServer server(clock, events, {.port = 4242, .max_players = 4, .types = types});
+engine::network::NetworkServer server(clock, events, fields, {.port = 4242, .max_players = 4, .strings = strings});
 server.start(ec);                    // binds 0.0.0.0:4242, starts the threads
 // every tick:
 server.receive();                    // sessions, timeouts, inputs
@@ -35,12 +36,12 @@ server.send_snapshot(registry);      // queues snapshots for every session
 engine/src/network/
 ├── socket/      UdpSocket (RAII, POSIX), SocketError (engine error codes)
 ├── bytes/       ByteReader / ByteWriter: bounds-checked big-endian I/O
-├── protocol/    header, messages, validation, ProtocolHandler, TypeTable, Sequence
+├── protocol/    header, messages, validation, FieldWire, ProtocolHandler, ReceivedStrings, Sequence
 ├── encoder/     one encode_payload() per message
 ├── decoder/     one decode_<message>() per message, event reader table
 ├── thread/      MessageQueue, DatagramHandler, NetworkIo
 ├── session/     ServerSessions, ClientConnection
-├── snapshot/    SnapshotBuilder (server), SnapshotReceiver (client)
+├── snapshot/    ReplicatedFields + SnapshotBuilder (server), SnapshotReceiver (client)
 ├── event/       public events <-> protocol events
 ├── stats/       TrafficMeter
 ├── server/      ServerNetwork: one server tick of networking, without sockets
@@ -114,15 +115,21 @@ every remaining session and publishes `PlayerLeft` on the event bus, which
 
 ### Replication
 
-Each tick, `send_snapshot(registry)` builds snapshots from every entity with
-`Replicated` and `Position` (plus `Sprite` colour when present; velocity is sent as zero),
-split into packets of at most 62 entities that share the same server tick, and
-queues them for every session. Game events published on the bus during the
+Snapshots are built from the `core::FieldRegistry` given to `NetworkServer`.
+At construction the server names every field flagged `replicated`
+`Component.field` (e.g. `Position.pos`) in the `field` category of the string
+table (`ReplicatedFields`). Each tick, `send_snapshot(world)` sends every entity
+with `Replicated`: its `type_id`, then each replicated field it owns as
+`[field_id, kind, value]`. Marking a field replicated needs no network code. The
+entities are split into packets of at most 1181 bytes of records that share the
+same server tick, and queued for every session. Game events published on the bus during the
 tick (`EntitySpawned`, `EntityDestroyed`, `ShotFired`, `SoundPlayed`, `MusicChanged`) are sent
 before the snapshot, in order, to the sessions connected when they happened.
 
 `ServerApp` decides what is replicated: every scripted entity with a sprite or
-a colour gets `Replicated { type_id, owner }`. One `StringTable` holds the
+a colour gets `Replicated { type_id, owner }`. Its field registry comes from
+`rtype::common::game_fields()` (core, physics and network fields), which the
+client uses too, so both sides know the same names. One `StringTable` holds the
 names sent in `connect_accept`: entity types from the Lua declarations (category
 `type`), sounds and musics from `sounds { ... }` / `musics { ... }` (`sound`,
 `music`); each category numbers its names from 1 in declaration order. After each tick it turns

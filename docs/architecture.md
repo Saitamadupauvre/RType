@@ -176,6 +176,12 @@ classDiagram
             +send_snapshot(EntityManager&)
             +stats() vector~PlayerStats~
         }
+        class EntitySnapshot {
+            +entity_id uint32
+            +type_id uint16
+            +fields vector~ReplicatedValue~
+            +find(component, field) FieldValue
+        }
         class NetworkClient {
             +connect(ip, port, error_code&) bool
             +update()
@@ -261,6 +267,8 @@ classDiagram
     NetworkServer --> IClock
     NetworkServer --> EventBus : PlayerJoined / PlayerLeft
     NetworkServer ..> Replicated : reads to build snapshots
+    NetworkServer ..> FieldRegistry : reads replicated fields
+    NetworkClient ..> FieldRegistry : resolves field names
     NetworkClient --> IClock
     NetworkClient --> EventBus
     PhysicsSystem --> EntityManager
@@ -343,7 +351,9 @@ sequenceDiagram
    server.
 4. Draw the starfield, then every replicated entity with
    `assets/sprites/<type>.png` tinted with its colour, then the marker above
-   the local player's ship.
+   the local player's ship. `SnapshotView` mirrors each entity into a local
+   world by setting its replicated fields through the field registry, skipping
+   components that world does not register (such as `PhysicsBody`).
 
 The client never runs game rules: it draws what the server sent.
 

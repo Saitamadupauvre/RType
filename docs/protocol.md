@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Category | Informational |
-| Protocol version | `4` |
+| Protocol version | `5` |
 | Transport | UDP |
 | Implementation | `engine/src/network/` |
 
@@ -49,7 +49,7 @@ Every datagram consists of a 13-byte header followed by `payload_size` payload b
 | Offset | Size | Field | Encoding | Value |
 |---|---:|---|---|---|
 | 0 | 4 | `magic` | Unsigned 32-bit, big-endian | `0x52545950` (`RTYP`) |
-| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `4` |
+| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `5` |
 | 6 | 1 | `type` | Unsigned 8-bit | Message type |
 | 7 | 4 | `sequence` | Unsigned 32-bit, big-endian | Sender packet sequence |
 | 11 | 2 | `payload_size` | Unsigned 16-bit, big-endian | Number of bytes after the header |
@@ -69,7 +69,7 @@ Receivers must reject a datagram when its size is smaller than 13 bytes, its mag
 | 6 | `heartbeat` | Both directions | Unreliable |
 | 7 | `disconnect` | Both directions | Reliable |
 
-The "Delivery" column states the intended guarantee. In version 4 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
+The "Delivery" column states the intended guarantee. In version 5 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
 
 ## Connection Payloads
 
@@ -94,7 +94,7 @@ The server sends this message to the endpoint that sent the matching request. It
 | 2 | `music` | musics of `music` events |
 | 3 | `event` | game events (reserved for a later version) |
 | 4 | `shader` | shaders (reserved for a later version) |
-| 5 | `field` | replicated component fields (reserved for a later version) |
+| 5 | `field` | replicated component fields, named `Component.field` (e.g. `Position.pos`) |
 
 Sound and music names are file names (for R-Type, files under the client's `assets/sounds/` and `assets/music/` folders). Then comes the music the server is playing, so that a player joining mid-game hears it.
 
@@ -118,6 +118,8 @@ The payload is at least 12 bytes (empty table). Each entry has the following lay
 Names are compared byte for byte and are not validated as UTF-8. The whole table must fit in one packet: a server whose names do not fit refuses to start.
 
 The receiver rejects an unknown category; within one category, duplicate IDs or duplicate names; the id `0xFFFF`; a name length of 0 or above 63; truncated entries or entries extending beyond the declared payload length; and a `current_music` that is neither `0xFFFF` nor the id of a `music` entry. The same ID or name MAY appear in different categories.
+
+The server fills the `field` category itself with every field its field registry flags `replicated`. A client resolves each `field` name in its own field registry. When one is unknown, it ends the connection: it sends `disconnect` with reason `protocol_error` and reports the connection as rejected.
 
 A client MUST NOT use a sound or music name as a path without checking it: R-Type only loads names made of letters, digits, `_`, `-` and `.`, not starting with `.`, and ignores the others.
 
@@ -151,33 +153,46 @@ The client sends its current input every tick while connected; an input also cou
 
 ## Snapshot Payload
 
-A snapshot is an authoritative world state at one server tick. It has a six-byte prefix followed by fixed-size entity records.
+A snapshot is an authoritative world state at one server tick. It has a six-byte prefix followed by variable-size entity records.
 
 | Offset | Size | Field | Encoding |
 |---|---:|---|---|
 | 0 | 4 | `server_tick` | Unsigned 32-bit, big-endian |
 | 4 | 2 | `entity_count` | Unsigned 16-bit, big-endian |
-| 6 | Variable | `entities` | `entity_count` records, 19 bytes each |
+| 6 | Variable | `entities` | `entity_count` records |
 
-Each entity record has the following layout:
+Each entity record has a seven-byte header followed by its fields:
 
 | Offset | Size | Field | Encoding |
 |---|---:|---|---|
 | 0 | 4 | `entity_id` | Unsigned 32-bit, big-endian |
 | 4 | 2 | `type_id` | Unsigned 16-bit, big-endian |
-| 6 | 2 | `x` | Signed 16-bit, big-endian virtual-world coordinate |
-| 8 | 2 | `y` | Signed 16-bit, big-endian virtual-world coordinate |
-| 10 | 2 | `vx` | Signed 16-bit, big-endian velocity in virtual units per second |
-| 12 | 2 | `vy` | Signed 16-bit, big-endian velocity in virtual units per second |
-| 14 | 1 | `owner` | Unsigned 8-bit player id of the controlling client, `0` for none |
-| 15 | 1 | `r` | Unsigned 8-bit red of the entity color |
-| 16 | 1 | `g` | Unsigned 8-bit green |
-| 17 | 1 | `b` | Unsigned 8-bit blue |
-| 18 | 1 | `a` | Unsigned 8-bit alpha |
+| 6 | 1 | `field_count` | Unsigned 8-bit |
+| 7 | Variable | `fields` | `field_count` fields |
 
-A snapshot packet carries at most 62 entities, the largest count that fits in the maximum payload size. A larger world is sent as several snapshot packets with the same `server_tick`, each holding at most 62 entities. The format of each packet does not change.
+Each field has the following layout:
 
-The server replicates every entity that has the engine's `Replicated` component (its `type_id`) and a position; `vx` and `vy` are always zero for now. `owner` is `Replicated::owner`; a client compares it with the `player_entity_id` of its `connect_accept` to find its own entities. The color is the entity's sprite color, opaque white when it has no sprite. `entity_id` is the entity index. Coordinates and velocities are rounded to the nearest integer and clamped to the signed 16-bit range.
+| Offset | Size | Field | Encoding |
+|---|---:|---|---|
+| 0 | 2 | `field_id` | Unsigned 16-bit, big-endian: the id of a `field` entry of the connection string table |
+| 2 | 1 | `kind` | Unsigned 8-bit, a value of the kind table below |
+| 3 | Variable | `value` | Encoded according to `kind` |
+
+| Kind | Name | Value encoding |
+|---:|---|---|
+| 0 | `float` | IEEE 754 single precision, big-endian (4 bytes); never NaN or infinite |
+| 1 | `int` | Signed 32-bit, big-endian (4 bytes) |
+| 2 | `bool` | Unsigned 8-bit, `0` or `1` |
+| 3 | `string` | Unsigned 8-bit length, then that many opaque bytes |
+| 4 | `vec2` | Two signed 16-bit, big-endian: `x` then `y` (4 bytes) |
+| 5 | `color` | Four unsigned 8-bit: `r`, `g`, `b`, `a` |
+| 6 | `asset` | Same as `string`: a path relative to the assets folder |
+
+Lists (kind 7 in the engine field registry) are not replicated: a server with a replicated list field refuses to start.
+
+The server replicates every entity that has the engine's `Replicated` component. Its record carries `Replicated::type_id` and, in registration order, every field flagged `replicated` that the entity owns; a field of a component the entity lacks is left out, and the client keeps its default value (opaque white for a missing `Sprite.color`). A string longer than 255 bytes or a non-finite float is left out and logged. `entity_id` is the entity index. Vec2 components (positions, velocities) are rounded to the nearest integer and clamped to the signed 16-bit range; ints are clamped to the signed 32-bit range. With the R-Type fields, an entity sends `Position.pos`, `Sprite.color`, `PhysicsBody.velocity` (when it has a body) and `Replicated.owner`; a client compares `owner` with the `player_entity_id` of its `connect_accept` to find its own entities.
+
+A snapshot packet carries as many entities as fit in the maximum payload size: their records take at most 1181 bytes. A larger world is sent as several snapshot packets with the same `server_tick`. The format of each packet does not change. A server whose replicated fields, all present with the longest strings, would not fit one entity in a packet refuses to start, as does one with more than 255 replicated fields or a field name longer than 63 bytes.
 
 The client keeps the world of the newest `server_tick` it has received, comparing ticks with wrap-around like sequence numbers:
 
@@ -185,7 +200,7 @@ The client keeps the world of the newest `server_tick` it has received, comparin
 - another packet of the same tick is merged in, an entity already present being updated rather than duplicated;
 - an older tick is ignored.
 
-The receiver rejects a snapshot unless its payload size is exactly `6 + entity_count * 19` and every `type_id` is the id of a `type` entry of the connection string table.
+The receiver rejects the whole snapshot when a record is truncated or extends beyond the payload, when bytes remain after the last record, when the records take more than 1181 bytes, on an unknown `kind`, a `bool` other than `0` or `1`, a NaN or infinite `float`, the same `field_id` twice in one record, a `type_id` that is not the id of a `type` entry, a `field_id` that is not the id of a `field` entry, or a `kind` other than the kind of that field in the client's registry.
 
 ## Event Payload
 

@@ -272,7 +272,7 @@ The protocol is specified RFC-style in [protocol.md](protocol.md) and its implem
 - Entity types are sent as numeric IDs; the table *type name → ID* is sent at connection time.
 - Every incoming packet is validated (size, type, bounds) before use.
 
-The engine replicates position, velocity, type, owner and colour of every replicated entity. Replicating Lua fields marked `synced(...)` is planned (see §10.10).
+The engine replicates the type of every replicated entity and each component field flagged `replicated` in the field registry it owns: for R-Type, position, velocity, owner and colour. Snapshot entities are `entity_id, type_id, [field_id, value]*`, field names are sent once in `connect_accept`, so a new replicated field needs no protocol change. Replicating Lua fields marked `synced(...)` is planned (see §10.10).
 
 ---
 
