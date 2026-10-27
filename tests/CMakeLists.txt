@@ -49,6 +49,7 @@ engine_add_test(script SOURCES
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
+    engine/network/FieldsTest.cpp
     engine/network/ModuleTest.cpp
     engine/network/ServerTest.cpp
     engine/network/StringTableTest.cpp
