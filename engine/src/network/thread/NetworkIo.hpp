@@ -29,8 +29,8 @@ public:
     void start(const Endpoint& bind_to, std::error_code& ec);
     void stop();
 
-    [[nodiscard]] std::vector<Inbound> poll();
-    void send(Outbound outbound);
+    [[nodiscard]] std::vector<AddressedInbound> poll();
+    void send(AddressedOutbound outbound);
 
     [[nodiscard]] Endpoint local_endpoint(std::error_code& ec) const;
 
@@ -38,12 +38,12 @@ private:
     void run_receive(const std::stop_token& stop_token);
     void run_send(const std::stop_token& stop_token);
     bool receive_one(std::span<std::uint8_t> buffer);
-    void send_all(const std::vector<Outbound>& outbound);
+    void send_all(const std::vector<AddressedOutbound>& outbound);
 
     UdpSocket socket_;
     ProtocolHandler protocol_;
-    MessageQueue<Inbound> inbox_;
-    MessageQueue<Outbound> outbox_;
+    MessageQueue<AddressedInbound> inbox_;
+    MessageQueue<AddressedOutbound> outbox_;
     std::jthread receive_thread_;
     std::jthread send_thread_;
 };

@@ -14,18 +14,12 @@
 #include "input/InputCodec.hpp"
 #include "session/ClientConnection.hpp"
 #include "snapshot/SnapshotReceiver.hpp"
-#include "socket/UdpSocket.hpp"
 #include "stats/TrafficMeter.hpp"
-#include "thread/NetworkIo.hpp"
+#include "transport/Link.hpp"
 
 namespace engine::network {
 
 namespace {
-
-Endpoint any_local_endpoint(const Endpoint& server) {
-    const auto any_address = server.addr()->sa_family == AF_INET6 ? "::" : "0.0.0.0";
-    return Endpoint::from_string(any_address, 0).value_or(Endpoint{});
-}
 
 std::uint32_t fresh_nonce() {
     std::random_device random;
@@ -55,12 +49,12 @@ const core::FieldValue* EntitySnapshot::find(std::string_view component,
 
 struct NetworkClient::ImplNet {
     ImplNet(const core::time::IClock& game_clock, core::event::EventBus& game_events,
-            const core::FieldRegistry& known_fields)
-        : clock(game_clock), events(game_events), fields(known_fields) {}
+            const core::FieldRegistry& known_fields, Link& transport)
+        : clock(game_clock), events(game_events), fields(known_fields), link(transport) {}
 
     void send(std::optional<Outbound> outbound) {
         if (outbound) {
-            io.send(std::move(*outbound));
+            link.get().send(std::move(*outbound));
         }
     }
 
@@ -91,10 +85,18 @@ struct NetworkClient::ImplNet {
     }
 
     void close() {
-        if (connection) {
-            send(connection->disconnect());
+        if (!connection || closed) {
+            return;
         }
-        io.stop();
+        send(connection->disconnect());
+        close_link();
+    }
+
+    void close_link() {
+        if (!closed) {
+            closed = true;
+            link.get().close();
+        }
     }
 
     void report_end() {
@@ -103,45 +105,43 @@ struct NetworkClient::ImplNet {
             return;
         }
         reported = true;
-        io.stop();
+        close_link();
         events.get().publish(Disconnected{.reason = *reason});
     }
 
     std::reference_wrapper<const core::time::IClock> clock;
     std::reference_wrapper<core::event::EventBus> events;
     std::reference_wrapper<const core::FieldRegistry> fields;
+    std::reference_wrapper<Link> link;
     std::optional<ClientConnection> connection;
     SnapshotReceiver snapshots;
     std::string server_label;
     core::time::Duration last_report{};
     bool reported{false};
-    NetworkIo io;
+    bool closed{false};
 };
 
 NetworkClient::NetworkClient(const core::time::IClock& clock, core::event::EventBus& events,
-                             const core::FieldRegistry& fields)
-    : impl_(std::make_unique<ImplNet>(clock, events, fields)) {}
+                             const core::FieldRegistry& fields, ClientTransport& transport)
+    : impl_(std::make_unique<ImplNet>(clock, events, fields, transport.link())) {}
 
 NetworkClient::~NetworkClient() { impl_->close(); }
 
-bool NetworkClient::connect(std::string_view server_ip, std::uint16_t port, std::error_code& ec) {
+bool NetworkClient::connect(std::error_code& ec) {
     ec.clear();
     if (impl_->connection) {
         ec = std::make_error_code(std::errc::already_connected);
         return false;
     }
-    const auto server = Endpoint::from_string(server_ip, port);
-    if (!server) {
-        ec = std::make_error_code(std::errc::invalid_argument);
-        return false;
-    }
 
-    impl_->io.start(any_local_endpoint(*server), ec);
+    auto& link = impl_->link.get();
+    link.open(ec);
     if (ec) {
         return false;
     }
-    impl_->connection.emplace(impl_->clock.get(), impl_->fields.get(), *server, fresh_nonce());
-    impl_->server_label = server->to_string();
+    impl_->server_label = link.describe(server_peer);
+    impl_->connection.emplace(impl_->clock.get(), impl_->fields.get(), impl_->server_label,
+                              fresh_nonce());
     impl_->last_report = impl_->clock.get().now();
     return true;
 }
@@ -152,7 +152,7 @@ void NetworkClient::update() {
         return;
     }
     auto& live = *connection;
-    for (const auto& inbound : impl_->io.poll()) {
+    for (const auto& inbound : impl_->link.get().poll()) {
         impl_->handle(live, inbound);
     }
     impl_->send(live.update());

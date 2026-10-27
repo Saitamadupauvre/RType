@@ -12,6 +12,10 @@
 
 namespace engine::network {
 
+std::string describe_peer_id(PeerId peer) {
+    return "peer " + std::to_string(static_cast<std::uint32_t>(peer));
+}
+
 ServerSessions::ServerSessions(const core::time::IClock& clock, core::event::EventBus& events,
                                ServerSessionsConfig config)
     : clock_(clock), events_(events), config_(std::move(config)) {}
@@ -19,14 +23,13 @@ ServerSessions::ServerSessions(const core::time::IClock& clock, core::event::Eve
 std::vector<Outbound> ServerSessions::handle(const Inbound& inbound) {
     const auto& message = inbound.message.message;
     const auto* request = std::get_if<ConnectRequestPayload>(&message);
-    const auto session = std::ranges::find(sessions_, inbound.from, &Session::endpoint);
+    const auto session = std::ranges::find(sessions_, inbound.from, &Session::peer);
 
     if (session == sessions_.end()) {
         if (request != nullptr) {
             return admit(inbound, *request);
         }
-        core::log::debug("network: ignored message from unknown endpoint {}",
-                         inbound.from.to_string());
+        core::log::debug("network: ignored message from unknown {}", describe(inbound.from));
         return {};
     }
 
@@ -46,7 +49,7 @@ std::vector<Outbound> ServerSessions::handle(const Inbound& inbound) {
     if (std::holds_alternative<DisconnectPayload>(message)) {
         const auto player_id = session->player_id;
         core::log::info("network: player {} at {} disconnected", player_id,
-                        session->endpoint.to_string());
+                        describe(session->peer));
         sessions_.erase(session);
         return leave(player_id);
     }
@@ -66,7 +69,7 @@ std::vector<Outbound> ServerSessions::drop_timed_out() {
     std::vector<Outbound> outbound;
     for (auto& session : expired) {
         core::log::info("network: player {} at {} timed out", session.player_id,
-                        session.endpoint.to_string());
+                        describe(session.peer));
         outbound.push_back(
             send_to(session, DisconnectPayload{.reason = DisconnectReason::timeout}));
         std::ranges::move(leave(session.player_id), std::back_inserter(outbound));
@@ -78,18 +81,18 @@ std::vector<Outbound> ServerSessions::admit(const Inbound& inbound,
                                             const ConnectRequestPayload& request) {
     const auto& from = inbound.from;
     if (sessions_.size() >= config_.max_players) {
-        core::log::info("network: rejected {}: server full", from.to_string());
+        core::log::info("network: rejected {}: server full", describe(from));
         return {Outbound{.to = from,
                          .message = DisconnectPayload{.reason = DisconnectReason::server_full}}};
     }
 
     const auto now = clock_.get().now();
-    auto& session = sessions_.emplace_back(Session{.endpoint = from,
+    auto& session = sessions_.emplace_back(Session{.peer = from,
                                                    .player_id = free_player_id(),
                                                    .last_seen = now,
                                                    .traffic = TrafficMeter(now)});
     session.traffic.on_received(inbound.message, now);
-    core::log::info("network: player {} joined from {}", session.player_id, from.to_string());
+    core::log::info("network: player {} joined from {}", session.player_id, describe(from));
     events_.get().publish(PlayerJoined{.player_id = session.player_id});
     return {accept_message(session, request)};
 }
@@ -149,7 +152,7 @@ void ServerSessions::store_input(Session& session, const InputPayload& input,
 Outbound ServerSessions::send_to(Session& session, Message message) const {
     session.traffic.on_sent(message, clock_.get().now());
     return Outbound{
-        .to = session.endpoint, .message = std::move(message), .sequence = session.next_sequence++};
+        .to = session.peer, .message = std::move(message), .sequence = session.next_sequence++};
 }
 
 Outbound ServerSessions::accept_message(Session& session,
@@ -166,6 +169,10 @@ std::uint32_t ServerSessions::free_player_id() const {
         ++player_id;
     }
     return player_id;
+}
+
+std::string ServerSessions::describe(PeerId peer) const {
+    return config_.describe_peer ? config_.describe_peer(peer) : describe_peer_id(peer);
 }
 
 } // namespace engine::network

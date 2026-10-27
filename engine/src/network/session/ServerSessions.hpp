@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "engine/core/event/EventBus.hpp"
@@ -13,21 +14,23 @@
 #include "engine/network/Stats.hpp"
 
 #include "protocol/Messages.hpp"
-#include "socket/UdpSocket.hpp"
 #include "stats/TrafficMeter.hpp"
 #include "thread/NetworkMessages.hpp"
 
 namespace engine::network {
+
+[[nodiscard]] ENGINE_NETWORK_EXPORT std::string describe_peer_id(PeerId peer);
 
 struct ServerSessionsConfig {
     std::size_t max_players{};
     core::time::Duration timeout = std::chrono::seconds(5);
     StringTable strings{};
     std::uint16_t current_music{no_music};
+    std::function<std::string(PeerId)> describe_peer = describe_peer_id;
 };
 
 struct Session {
-    Endpoint endpoint;
+    PeerId peer{};
     std::uint32_t player_id{};
     core::time::Duration last_seen{};
     InputPayload input{};
@@ -60,6 +63,7 @@ private:
     [[nodiscard]] Outbound accept_message(Session& session,
                                           const ConnectRequestPayload& request) const;
     [[nodiscard]] std::uint32_t free_player_id() const;
+    [[nodiscard]] std::string describe(PeerId peer) const;
 
     std::reference_wrapper<const core::time::IClock> clock_;
     std::reference_wrapper<core::event::EventBus> events_;

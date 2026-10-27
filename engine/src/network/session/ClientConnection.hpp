@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "engine/core/FieldRegistry.hpp"
@@ -14,7 +15,6 @@
 
 #include "protocol/Messages.hpp"
 #include "protocol/ReceivedStrings.hpp"
-#include "socket/UdpSocket.hpp"
 #include "stats/TrafficMeter.hpp"
 #include "thread/NetworkMessages.hpp"
 
@@ -30,7 +30,7 @@ struct ClientConnectionConfig {
 class ENGINE_NETWORK_EXPORT ClientConnection {
 public:
     ClientConnection(const core::time::IClock& clock, const core::FieldRegistry& fields,
-                     const Endpoint& server, std::uint32_t client_nonce,
+                     std::string server_label, std::uint32_t client_nonce,
                      ClientConnectionConfig config = {});
 
     [[nodiscard]] std::optional<Outbound> update();
@@ -57,7 +57,7 @@ private:
     [[nodiscard]] Outbound to_server(Message message);
 
     std::reference_wrapper<const core::time::IClock> clock_;
-    Endpoint server_;
+    std::string _server_label;
     std::uint32_t client_nonce_;
     ClientConnectionConfig config_;
     ConnectionState state_{ConnectionState::connecting};

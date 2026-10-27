@@ -16,6 +16,7 @@
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Stats.hpp"
 #include "engine/network/StringTable.hpp"
+#include "engine/network/Transport.hpp"
 
 namespace engine::network {
 
@@ -23,8 +24,6 @@ namespace engine::network {
  * @brief Settings of a NetworkServer, chosen by the game.
  */
 struct ENGINE_NETWORK_EXPORT ServerOptions {
-    /** @brief UDP port to listen on, on every IPv4 interface. `0` picks a free port. */
-    std::uint16_t port;
     /** @brief Number of player slots. A client arriving when all are taken is rejected. */
     std::size_t max_players;
     /** @brief Names sent to every client in `connect_accept`: every `Replicated::type_id`
@@ -50,10 +49,11 @@ struct ENGINE_NETWORK_EXPORT PlayerInput {
 #endif
 
 /**
- * @brief Authoritative game server: player sessions, inputs and world snapshots over UDP.
+ * @brief Authoritative game server: player sessions, inputs and world snapshots.
  *
- * The socket is read and written by two background threads. Everything else happens on the
- * thread that calls receive() and send_snapshot(), once per fixed tick:
+ * Packets travel through a ServerTransport (UDP or in-memory loopback); the server behaves the
+ * same on both. Everything happens on the thread that calls receive() and send_snapshot(), once
+ * per fixed tick:
  *
  * 1. receive(): handles every packet received since the last call (connections,
  *    disconnections, inputs) and removes players silent for longer than the session timeout.
@@ -67,8 +67,8 @@ struct ENGINE_NETWORK_EXPORT PlayerInput {
  *
  * Malformed packets are dropped and logged; they never reach the game.
  *
- * @note Not thread-safe: call every member from the same thread. The clock, the event bus and
- * the field registry must outlive the server.
+ * @note Not thread-safe: call every member from the same thread. The clock, the event bus, the
+ * field registry and the transport must outlive the server.
  */
 class ENGINE_NETWORK_EXPORT NetworkServer {
 public:
@@ -76,9 +76,11 @@ public:
      * @param fields Fields of the server world. Every field flagged `replicated` is sent in
      * snapshots under the name `Component.field`, category `field` of the string table. Clients
      * must know every such name.
+     * @param transport Carries the packets; opened by start() and closed by stop().
      */
     NetworkServer(const core::time::IClock& clock, core::event::EventBus& events,
-                  const core::FieldRegistry& fields, ServerOptions options);
+                  const core::FieldRegistry& fields, ServerTransport& transport,
+                  ServerOptions options);
     ~NetworkServer();
 
     NetworkServer(const NetworkServer&) = delete;
@@ -87,20 +89,20 @@ public:
     NetworkServer& operator=(NetworkServer&&) = delete;
 
     /**
-     * @brief Binds the UDP port and starts the network threads.
+     * @brief Opens the transport: binds the UDP port and starts its threads, or joins the
+     * loopback network.
      *
      * @param ec Set to `std::errc::invalid_argument` when the string table does not fit in one
      * packet, or when the replicated fields cannot be sent: a list field, a name longer than 63
      * characters, more than 255 fields, or an entity holding all of them that does not fit in
-     * one snapshot. Set when the port cannot be bound (for example already in use); cleared
-     * otherwise.
+     * one snapshot. Set when the transport cannot open (for example a UDP port already in use);
+     * cleared otherwise.
      * @return `true` when the server is listening.
      */
     bool start(std::error_code& ec);
 
     /**
-     * @brief Ends every session, sends the messages still queued, then closes the socket and
-     * joins the threads.
+     * @brief Ends every session, sends the messages still queued, then closes the transport.
      *
      * Every connected player receives `disconnect` with reason `server_shutdown`. `PlayerLeft`
      * is not published for them.
@@ -129,11 +131,6 @@ public:
      * out and logged. Ints are clamped to 32 bits and vec2 components rounded to 16-bit ints.
      */
     void send_snapshot(core::EntityManager& world);
-
-    /**
-     * @return The bound port once started (useful with port `0`), otherwise the requested one.
-     */
-    [[nodiscard]] std::uint16_t port() const;
 
     /**
      * @return Number of connected players.

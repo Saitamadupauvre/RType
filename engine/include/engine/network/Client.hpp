@@ -17,6 +17,7 @@
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Stats.hpp"
 #include "engine/network/StringTable.hpp"
+#include "engine/network/Transport.hpp"
 
 namespace engine::network {
 
@@ -68,10 +69,10 @@ struct ENGINE_NETWORK_EXPORT EntitySnapshot {
 #endif
 
 /**
- * @brief Client side of the game protocol: one connection to a server over UDP.
+ * @brief Client side of the game protocol: one connection to a server.
  *
- * The socket is read and written by two background threads. Everything else happens on the
- * thread that calls update(), once per frame:
+ * Packets travel through a ClientTransport (UDP or in-memory loopback); the client behaves the
+ * same on both. Everything happens on the thread that calls update(), once per frame:
  *
  * 1. update(): handles every packet received since the last call, resends the connect request
  *    or a heartbeat when due, and ends the connection when the server stays silent for longer
@@ -82,8 +83,8 @@ struct ENGINE_NETWORK_EXPORT EntitySnapshot {
  * 2. send_input(): sends the current input of the local player while connected.
  * 3. entities(): the newest world received from the server, for the game to draw.
  *
- * When the connection ends, for any reason, the network threads are stopped and `Disconnected`
- * is published once on the event bus. Packets arriving afterwards are ignored.
+ * When the connection ends, for any reason, the transport is closed and `Disconnected` is
+ * published once on the event bus. Packets arriving afterwards are ignored.
  *
  * Snapshots and spawn events are checked against the type table the server sent in
  * `connect_accept`: one with a type id missing from the table is dropped whole and logged.
@@ -92,14 +93,18 @@ struct ENGINE_NETWORK_EXPORT EntitySnapshot {
  * connection ends as `rejected` right after `connect_accept`. Snapshot fields with an unknown id
  * or a kind other than the registry's drop the whole snapshot.
  *
- * @note Not thread-safe: call every member from the same thread. The clock, the event bus and
- * the field registry must outlive the client. One client makes at most one connection.
+ * @note Not thread-safe: call every member from the same thread. The clock, the event bus, the
+ * field registry and the transport must outlive the client. One client makes at most one
+ * connection.
  */
 class ENGINE_NETWORK_EXPORT NetworkClient {
 public:
-    /** @param fields Fields the server may replicate, matched by `Component.field` name. */
+    /**
+     * @param fields Fields the server may replicate, matched by `Component.field` name.
+     * @param transport Carries the packets to the server; opened by connect().
+     */
     NetworkClient(const core::time::IClock& clock, core::event::EventBus& events,
-                  const core::FieldRegistry& fields);
+                  const core::FieldRegistry& fields, ClientTransport& transport);
 
     /**
      * @brief Closes the connection like disconnect(), without publishing `Disconnected`.
@@ -112,18 +117,16 @@ public:
     NetworkClient& operator=(NetworkClient&&) = delete;
 
     /**
-     * @brief Opens a socket on a free local port and starts connecting to the server.
+     * @brief Opens the transport and starts connecting to its server.
      *
      * The first `connect_request` is sent by the next update().
      *
-     * @param server_ip Numeric IPv4 or IPv6 address of the server, e.g. `127.0.0.1`.
-     * @param port UDP port of the server.
-     * @param ec Set to `std::errc::invalid_argument` when `server_ip` is not a numeric address,
-     * to `std::errc::already_connected` on a second call, or to the socket error; cleared
-     * otherwise.
+     * @param ec Set to `std::errc::already_connected` on a second call, to
+     * `std::errc::invalid_argument` when a UdpClientTransport was given a server address that is
+     * not numeric, or to the socket error; cleared otherwise.
      * @return `true` when the client is connecting.
      */
-    bool connect(std::string_view server_ip, std::uint16_t port, std::error_code& ec);
+    bool connect(std::error_code& ec);
 
     /**
      * @brief Handles every packet received since the last call, then sends what is due.
@@ -144,7 +147,7 @@ public:
     void send_input(const core::InputState& input);
 
     /**
-     * @brief Tells the server the player leaves, then stops the network threads.
+     * @brief Tells the server the player leaves, then closes the transport.
      *
      * Publishes `Disconnected` with reason `normal` if the connection was still open.
      * @note Idempotent.

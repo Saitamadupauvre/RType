@@ -64,9 +64,9 @@ void NetworkIo::stop() {
     }
 }
 
-std::vector<Inbound> NetworkIo::poll() { return inbox_.drain(); }
+std::vector<AddressedInbound> NetworkIo::poll() { return inbox_.drain(); }
 
-void NetworkIo::send(Outbound outbound) { outbox_.push(std::move(outbound)); }
+void NetworkIo::send(AddressedOutbound outbound) { outbox_.push(std::move(outbound)); }
 
 Endpoint NetworkIo::local_endpoint(std::error_code& ec) const { return socket_.local_endpoint(ec); }
 
@@ -107,7 +107,7 @@ bool NetworkIo::receive_one(std::span<std::uint8_t> buffer) {
     return true;
 }
 
-void NetworkIo::send_all(const std::vector<Outbound>& outbound) {
+void NetworkIo::send_all(const std::vector<AddressedOutbound>& outbound) {
     for (const auto& message : outbound) {
         const auto bytes = encode_outbound(protocol_, message, message.sequence);
         if (!bytes) {

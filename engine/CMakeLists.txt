@@ -65,6 +65,7 @@ engine_add_module(network
         src/network/Server.cpp
         src/network/Fields.cpp
         src/network/StringTable.cpp
+        src/network/Transport.cpp
         src/network/decoder/EventReader.cpp
         src/network/decoder/PayloadDecoder.cpp
         src/network/decoder/ValueReader.cpp
@@ -86,6 +87,8 @@ engine_add_module(network
         src/network/socket/UdpSocket.cpp
         src/network/thread/DatagramHandler.cpp
         src/network/thread/NetworkIo.cpp
+        src/network/transport/LoopbackLinks.cpp
+        src/network/transport/UdpLinks.cpp
     DEPENDS engine::core
 )
 target_include_directories(engine-network PRIVATE src/network)
