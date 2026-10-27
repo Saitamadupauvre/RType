@@ -329,6 +329,60 @@ TEST(ServerApp, SoundPlayedByAnEntityCarriesItsIndex) {
     EXPECT_EQ(heard.sounds[0].source_entity_id, speaker->index());
 }
 
+namespace {
+
+const std::filesystem::path events_scripts =
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "events";
+
+std::vector<engine::network::NamedEvent> listen_events(ServerApp& app) {
+    std::vector<engine::network::NamedEvent> heard;
+    const auto subscription = app.events().subscribe<engine::network::NamedEvent>(
+        [&heard](const engine::network::NamedEvent& event) { heard.push_back(event); });
+    app.tick(tick_step);
+    app.events().unsubscribe(subscription);
+    return heard;
+}
+
+} // namespace
+
+TEST(ServerApp, StringTableListsDeclaredEventNamesAndKeysInOrder) {
+    const ManualClock clock;
+    const ServerApp app(clock, config, events_scripts);
+
+    EXPECT_EQ(
+        app.strings().entries(StringCategory::event),
+        (std::vector<StringEntry>{{.category = StringCategory::event, .id = 1, .name = "explosion"},
+                                  {.category = StringCategory::event, .id = 2, .name = "ping"}}));
+    EXPECT_EQ(app.strings().entries(StringCategory::event_key),
+              (std::vector<StringEntry>{
+                  {.category = StringCategory::event_key, .id = 1, .name = "at"},
+                  {.category = StringCategory::event_key, .id = 2, .name = "size"}}));
+}
+
+TEST(ServerApp, ScriptsWithoutEventsHaveNoEventNames) {
+    const ManualClock clock;
+    const ServerApp app(clock, config, players_scripts);
+
+    EXPECT_TRUE(app.strings().entries(StringCategory::event).empty());
+    EXPECT_TRUE(app.strings().entries(StringCategory::event_key).empty());
+}
+
+TEST(ServerApp, TickPublishesEmittedEventsInOrder) {
+    const ManualClock clock;
+    ServerApp app(clock, config, events_scripts);
+    ASSERT_TRUE(app.script().run_string(
+        R"(emit("explosion", { at = { x = 4, y = 5 }, size = 2 }) emit("ping"))", "test"));
+
+    const auto heard = listen_events(app);
+
+    EXPECT_EQ(heard, (std::vector<engine::network::NamedEvent>{
+                         {.name = "explosion",
+                          .arguments = {{.key = "at", .value = engine::core::Vec2{4.0F, 5.0F}},
+                                        {.key = "size", .value = 2.0F}}},
+                         {.name = "ping", .arguments = {}}}));
+    EXPECT_TRUE(listen_events(app).empty());
+}
+
 TEST(ServerApp, TickDestroysEntitiesWhoseHitboxesOverlap) {
     const ManualClock clock;
     ServerApp app(clock, config,

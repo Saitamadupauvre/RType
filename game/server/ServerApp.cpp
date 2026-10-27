@@ -51,7 +51,22 @@ engine::network::StringTable load_game(engine::script::ScriptRuntime& runtime,
     add_all(engine::network::StringCategory::type, runtime.entity_types(), "entity type");
     add_all(engine::network::StringCategory::sound, runtime.sound_names(), "sound");
     add_all(engine::network::StringCategory::music, runtime.music_names(), "music");
+    add_all(engine::network::StringCategory::event, runtime.event_names(), "event");
+    add_all(engine::network::StringCategory::event_key, runtime.event_keys(), "event key");
     return strings;
+}
+
+static_assert(engine::script::max_event_arguments <= engine::network::max_event_arguments);
+static_assert(engine::script::max_event_text_length <= engine::network::max_event_text_length);
+
+engine::network::NamedEvent to_named_event(engine::script::EventCommand command) {
+    engine::network::NamedEvent event{.name = std::move(command.name), .arguments = {}};
+    event.arguments.reserve(command.arguments.size());
+    for (auto& argument : command.arguments) {
+        event.arguments.push_back(
+            {.key = std::move(argument.key), .value = std::move(argument.value)});
+    }
+    return event;
 }
 
 std::uint32_t wire_source(std::optional<engine::core::Entity> source) {
@@ -105,6 +120,7 @@ void ServerApp::tick(engine::core::time::Duration step) {
     systems_.run(registry_, dt);
     replicate();
     publish_audio();
+    publish_events();
     network_.send_snapshot(registry_);
 }
 
@@ -127,6 +143,12 @@ void ServerApp::publish_audio() {
         } else {
             events_.publish(engine::network::MusicChanged{.music_id = *id});
         }
+    }
+}
+
+void ServerApp::publish_events() {
+    for (auto& command : _runtime.take_event_commands()) {
+        events_.publish(to_named_event(std::move(command)));
     }
 }
 

@@ -34,6 +34,7 @@ public:
     void apply_inputs(const std::vector<engine::network::PlayerInput>& inputs);
     void replicate();
     void publish_audio();
+    void publish_events();
 
     [[nodiscard]] engine::core::EntityManager& registry() noexcept { return registry_; }
     [[nodiscard]] engine::core::SystemScheduler& systems() noexcept { return systems_; }
