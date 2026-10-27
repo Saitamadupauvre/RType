@@ -58,6 +58,7 @@ engine_add_module(network
         src/network/StringTable.cpp
         src/network/decoder/EventReader.cpp
         src/network/decoder/PayloadDecoder.cpp
+        src/network/decoder/ValueReader.cpp
         src/network/encoder/PayloadEncoder.cpp
         src/network/event/GameEvents.cpp
         src/network/protocol/FieldWire.cpp
