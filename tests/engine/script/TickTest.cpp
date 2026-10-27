@@ -12,6 +12,7 @@
 #include "engine/core/Vec2.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/physics/Components.hpp"
 #include "engine/script/InputState.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
@@ -23,7 +24,7 @@ using engine::core::Rgba;
 using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::Vec2;
-using engine::core::Velocity;
+using engine::physics::PhysicsBody;
 using engine::script::InputState;
 using engine::script::ScriptRuntime;
 
@@ -252,15 +253,15 @@ TEST_F(TickTest, InputDrivesEntity) {
     _runtime.set_input(
         ship, InputState{.axes = {{"move_x", 1.0F}, {"move_y", -0.5F}}, .pressed = {"fire"}});
     _runtime.update(0.1F);
-    EXPECT_FLOAT_EQ(_world.get<Velocity>(ship).vel.x, 100.0F);
-    EXPECT_FLOAT_EQ(_world.get<Velocity>(ship).vel.y, -50.0F);
+    EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(ship).velocity.x, 100.0F);
+    EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(ship).velocity.y, -50.0F);
     EXPECT_FLOAT_EQ(position(ship).x, 5.0F);
 }
 
 TEST_F(TickTest, MissingInputIsNeutral) {
     const Entity ship = spawn("ship");
     _runtime.update(0.1F);
-    EXPECT_FLOAT_EQ(_world.get<Velocity>(ship).vel.x, 0.0F);
+    EXPECT_FLOAT_EQ(_world.get<PhysicsBody>(ship).velocity.x, 0.0F);
     EXPECT_FLOAT_EQ(position(ship).x, 0.0F);
 }
 

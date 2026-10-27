@@ -344,3 +344,17 @@ TEST(ServerApp, TickDestroysEntitiesWhoseHitboxesOverlap) {
     EXPECT_FALSE(app.registry().alive(*bydo));
     EXPECT_TRUE(app.registry().alive(*far_bydo));
 }
+
+TEST(ServerApp, TickMovesScriptEntitiesByTheirVelocity) {
+    const ManualClock clock;
+    ServerApp app(clock, config,
+                  std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "drift");
+    const auto drifter = app.script().spawn("drifter", engine::core::Vec2{100.F, 100.F});
+    ASSERT_TRUE(drifter);
+
+    app.tick(tick_step);
+
+    const auto position = app.registry().get<engine::core::Position>(*drifter).pos;
+    EXPECT_FLOAT_EQ(position.x, 101.F);
+    EXPECT_FLOAT_EQ(position.y, 99.5F);
+}

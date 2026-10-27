@@ -13,6 +13,7 @@
 #include "engine/core/Vec2.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/physics/Components.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
 namespace logger = engine::core::log;
@@ -20,7 +21,7 @@ using engine::core::Entity;
 using engine::core::EntityManager;
 using engine::core::Position;
 using engine::core::Vec2;
-using engine::core::Velocity;
+using engine::physics::PhysicsBody;
 using engine::script::ScriptRuntime;
 
 namespace {
@@ -76,7 +77,7 @@ TEST_F(EntityHandleTest, SpawnInitialisesComponentsFromPrefab) {
     const Entity bydo = spawn_or_throw("bydo");
 
     EXPECT_EQ(_world.get<Position>(bydo).pos, (Vec2{800.0F, 0.0F}));
-    EXPECT_EQ(_world.get<Velocity>(bydo).vel, (Vec2{-150.0F, 0.0F}));
+    EXPECT_EQ(_world.get<PhysicsBody>(bydo).velocity, (Vec2{-150.0F, 0.0F}));
 }
 
 TEST_F(EntityHandleTest, SpawnPositionOverridesPrefab) {
@@ -103,7 +104,37 @@ TEST_F(EntityHandleTest, WritingNativeFieldUpdatesComponent) {
 
     const Entity bydo = only_entity();
     EXPECT_EQ(_world.get<Position>(bydo).pos, (Vec2{42.0F, 0.0F}));
-    EXPECT_EQ(_world.get<Velocity>(bydo).vel, (Vec2{-150.0F, 7.0F}));
+    EXPECT_EQ(_world.get<PhysicsBody>(bydo).velocity, (Vec2{-150.0F, 7.0F}));
+}
+
+TEST_F(EntityHandleTest, SettingVelocityGivesTheEntityAScriptBody) {
+    ASSERT_TRUE(_runtime.run_string("spawn('patrol').vx = 5", "test"));
+
+    const PhysicsBody& body = _world.get<PhysicsBody>(only_entity());
+    EXPECT_EQ(body.type, PhysicsBody::Type::Dynamic);
+    EXPECT_FALSE(body.affected_by_gravity);
+    EXPECT_FALSE(body.resolve_collisions);
+    EXPECT_EQ(body.velocity, (Vec2{5.0F, 0.0F}));
+}
+
+TEST_F(EntityHandleTest, SettingHitboxKeepsTheVelocity) {
+    ASSERT_TRUE(_runtime.run_string(R"(
+        local patrol = spawn("patrol")
+        patrol.vy = 3
+        patrol.hitbox = { w = 4, h = 2 }
+    )",
+                                    "test"));
+
+    EXPECT_EQ(_world.get<PhysicsBody>(only_entity()).velocity, (Vec2{0.0F, 3.0F}));
+}
+
+TEST_F(EntityHandleTest, VelocityOfAnEntityWithoutBodyIsNil) {
+    EXPECT_TRUE(_runtime.run_string(R"(
+        local patrol = spawn("patrol")
+        assert(patrol.vx == nil and patrol.vy == nil)
+    )",
+                                    "test"));
+    EXPECT_FALSE(_world.has<PhysicsBody>(only_entity()));
 }
 
 TEST_F(EntityHandleTest, ReadOnlyFieldsDescribeTheEntity) {
