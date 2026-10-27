@@ -97,6 +97,14 @@ engine_add_test(audio SOURCES
     engine/audio/NullAudioTest.cpp
     engine/audio/PluginLoaderTest.cpp
 )
+engine_add_test(app SOURCES
+    engine/app/AudioPlayerTest.cpp
+    engine/app/ClientAppTest.cpp
+    engine/app/ServerAppTest.cpp
+    engine/app/SnapshotViewTest.cpp
+    engine/app/WorldDrawTest.cpp
+)
+target_include_directories(engine_app_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/app")
 
 function(engine_add_test_library name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
@@ -179,15 +187,12 @@ plugin_add_test(audio-raylib
     LINKS audio-raylib-mixer
 )
 
-game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
+game_add_test(server SOURCES game/server/CliTest.cpp
     game/server/ShipTest.cpp game/server/MissileTest.cpp game/server/BydoTest.cpp
     game/server/BydoShotTest.cpp game/server/SpawnerTest.cpp game/server/CollisionTest.cpp
     game/server/GameFlowTest.cpp
-    LINKS r-type_server_cli r-type_server_app)
-game_add_test(client SOURCES game/client/CliTest.cpp
-    game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp
-    game/client/SnapshotViewTest.cpp game/client/AudioPlayerTest.cpp
-    LINKS r-type_client_cli r-type_client_draw r-type_client_audio)
+    LINKS r-type_server_cli engine::app engine::physics)
+game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
 
 function(game_add_runtime_data_test folder source)
     add_test(NAME game.runtime_data.${folder}

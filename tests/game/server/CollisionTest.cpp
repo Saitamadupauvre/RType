@@ -1,24 +1,27 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "engine/app/ServerApp.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
-#include "engine/core/event/EventBus.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
-#include "engine/script/AudioCommand.hpp"
+#include "engine/core/time/ManualClock.hpp"
+#include "engine/network/Events.hpp"
+#include "engine/network/StringTable.hpp"
+#include "engine/network/Transport.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 #include "engine/script/ServerApi.hpp"
-
-#include "Collisions.hpp"
 
 namespace logger = engine::core::log;
 using engine::core::Entity;
@@ -26,7 +29,6 @@ using engine::core::EntityManager;
 using engine::core::Tags;
 using engine::core::Vec2;
 using engine::script::ScriptRuntime;
-using engine::script::ServerApi;
 
 namespace {
 
@@ -38,20 +40,34 @@ constexpr float short_tick = 0.01F;
 const std::filesystem::path game_scripts =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
 
+struct HeardSound {
+    std::string name;
+    std::uint32_t source;
+
+    bool operator==(const HeardSound&) const = default;
+};
+
 class CollisionTest : public ::testing::Test {
 protected:
     std::shared_ptr<logger::MemorySink> _sink = std::make_shared<logger::MemorySink>();
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
-    EntityManager _world;
-    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
-    ServerApi& _server = _runtime.api<ServerApi>();
-    engine::core::event::EventBus _events;
-    rtype::server::Collisions _collisions{_world, _events, _runtime};
+    engine::core::time::ManualClock _clock;
+    engine::network::LoopbackNetwork _loopback;
+    engine::app::ServerApp _app{_clock, _loopback.server(), {.scripts = game_scripts}};
+    EntityManager& _world = _app.world();
+    ScriptRuntime& _runtime = _app.script();
+    std::vector<HeardSound> _sounds;
 
     void SetUp() override {
-        _runtime.attach_world(_world);
-        ASSERT_TRUE(_runtime.load_scripts(game_scripts));
+        ASSERT_TRUE(_runtime.find_declaration("ship").has_value());
         ASSERT_TRUE(_runtime.spawn("ship", ship_start).has_value());
+        _app.events().subscribe<engine::network::SoundPlayed>(
+            [this](const engine::network::SoundPlayed& played) {
+                const std::string* name =
+                    _app.strings().name_of(engine::network::StringCategory::sound, played.sound_id);
+                _sounds.push_back(
+                    {.name = name == nullptr ? "" : *name, .source = played.source_entity_id});
+            });
     }
 
     Entity spawn(const std::string& type, Vec2 at) {
@@ -63,9 +79,8 @@ protected:
     }
 
     void tick(float dt = short_tick) {
-        _runtime.update(dt);
-        _collisions.step(dt);
-        _runtime.flush_destroyed();
+        _app.tick(std::chrono::duration_cast<engine::core::time::Duration>(
+            std::chrono::duration<float>(dt)));
     }
 
     [[nodiscard]] std::vector<Entity> tagged(const std::string& label) {
@@ -150,10 +165,8 @@ TEST_F(CollisionTest, DestroyedBydoPlaysAnExplosion) {
     const Entity bydo = spawn("bydo", {1000.F, 290.F});
     tick();
 
-    EXPECT_EQ(_server.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
-                                                 {.kind = engine::script::AudioCommandKind::Sound,
-                                                  .name = "explosion.wav",
-                                                  .source = bydo}}));
+    EXPECT_EQ(_sounds,
+              (std::vector<HeardSound>{{.name = "explosion.wav", .source = bydo.index()}}));
 }
 
 TEST_F(CollisionTest, DestroyedShipPlaysAnExplosion) {
@@ -161,10 +174,8 @@ TEST_F(CollisionTest, DestroyedShipPlaysAnExplosion) {
     spawn("bydo", {ship_start.x + 10.F, ship_start.y + 10.F});
     tick();
 
-    EXPECT_EQ(_server.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
-                                                 {.kind = engine::script::AudioCommandKind::Sound,
-                                                  .name = "explosion.wav",
-                                                  .source = ship}}));
+    EXPECT_EQ(_sounds,
+              (std::vector<HeardSound>{{.name = "explosion.wav", .source = ship.index()}}));
 }
 
 TEST_F(CollisionTest, BydoShotHittingTheShipDestroysBothWithAnExplosion) {
@@ -174,10 +185,8 @@ TEST_F(CollisionTest, BydoShotHittingTheShipDestroysBothWithAnExplosion) {
 
     EXPECT_FALSE(_world.alive(ship));
     EXPECT_FALSE(_world.alive(shot));
-    EXPECT_EQ(_server.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
-                                                 {.kind = engine::script::AudioCommandKind::Sound,
-                                                  .name = "explosion.wav",
-                                                  .source = ship}}));
+    EXPECT_EQ(_sounds,
+              (std::vector<HeardSound>{{.name = "explosion.wav", .source = ship.index()}}));
 }
 
 TEST_F(CollisionTest, BydoShotsIgnoreBydosAndMissiles) {

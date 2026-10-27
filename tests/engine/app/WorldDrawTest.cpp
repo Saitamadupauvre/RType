@@ -11,6 +11,7 @@
 #include "engine/core/EntityManager.hpp"
 #include "engine/graphics/IRenderer.hpp"
 
+using engine::app::WorldDraw;
 using engine::core::EntityManager;
 using engine::core::Position;
 using engine::core::Rgba;
@@ -20,7 +21,6 @@ using engine::graphics::Color;
 using engine::graphics::Rect;
 using engine::graphics::SpriteDraw;
 using engine::graphics::TextureId;
-using rtype::client::WorldDraw;
 
 namespace {
 

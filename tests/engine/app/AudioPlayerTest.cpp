@@ -8,14 +8,15 @@
 #include "engine/audio/IAudio.hpp"
 #include "engine/network/Audio.hpp"
 #include "engine/network/StringTable.hpp"
+#include "engine/script/ClientApi.hpp"
 
+using engine::app::AudioPlayer;
+using engine::app::is_plain_file_name;
 using engine::audio::MusicId;
 using engine::audio::SoundId;
 using engine::network::StringCategory;
 using engine::network::StringTable;
-using rtype::client::AudioPlayer;
-using rtype::client::AudioSettings;
-using rtype::client::is_plain_file_name;
+using engine::script::AudioSettings;
 
 namespace {
 
@@ -72,40 +73,39 @@ const StringTable musics = strings_of(StringCategory::music, {"stage.ogg"});
 
 TEST(AudioPlayer, AppliesTheSettingsVolumes) {
     RecordingAudio audio;
+    AudioPlayer player(audio, "assets");
 
-    const AudioPlayer player(audio, "assets",
-                             AudioSettings{.music_volume = 0.3F, .effects_volume = 0.6F});
+    player.apply(AudioSettings{.music_volume = 0.3F, .effects_volume = 0.6F, .muted = false});
 
     EXPECT_FLOAT_EQ(audio.music_volume, 0.3F);
     EXPECT_FLOAT_EQ(audio.effects_volume, 0.6F);
     EXPECT_FLOAT_EQ(audio.master, 1.F);
-    EXPECT_FALSE(player.muted());
 }
 
-TEST(AudioPlayer, StartsMutedWhenAsked) {
+TEST(AudioPlayer, MutingSilencesTheMasterVolume) {
     RecordingAudio audio;
+    AudioPlayer player(audio, "assets");
 
-    const AudioPlayer player(audio, "assets", AudioSettings{.muted = true});
-
+    player.apply(AudioSettings{.music_volume = 1.F, .effects_volume = 1.F, .muted = true});
     EXPECT_FLOAT_EQ(audio.master, 0.F);
-    EXPECT_TRUE(player.muted());
-}
-
-TEST(AudioPlayer, ToggleMuteSwitchesTheMasterVolume) {
-    RecordingAudio audio;
-    AudioPlayer player(audio, "assets", AudioSettings{});
-
-    player.toggle_mute();
-    EXPECT_TRUE(player.muted());
-    EXPECT_FLOAT_EQ(audio.master, 0.F);
-    player.toggle_mute();
-    EXPECT_FALSE(player.muted());
+    player.apply(AudioSettings{.music_volume = 1.F, .effects_volume = 1.F, .muted = false});
     EXPECT_FLOAT_EQ(audio.master, 1.F);
+}
+
+TEST(AudioPlayer, LeavesTheDeviceAloneWhenTheSettingsDidNotChange) {
+    RecordingAudio audio;
+    AudioPlayer player(audio, "assets");
+    player.apply(AudioSettings{});
+    audio.master = -1.F;
+
+    player.apply(AudioSettings{});
+
+    EXPECT_FLOAT_EQ(audio.master, -1.F);
 }
 
 TEST(AudioPlayer, LoadsASoundFromTheSoundFolderOnceAndPlaysIt) {
     RecordingAudio audio;
-    AudioPlayer player(audio, "assets", AudioSettings{});
+    AudioPlayer player(audio, "assets");
 
     player.play_sound(sounds, 2);
     player.play_sound(sounds, 2);
@@ -116,7 +116,7 @@ TEST(AudioPlayer, LoadsASoundFromTheSoundFolderOnceAndPlaysIt) {
 
 TEST(AudioPlayer, PlaysTheMusicInALoopFromTheMusicFolder) {
     RecordingAudio audio;
-    AudioPlayer player(audio, "assets", AudioSettings{});
+    AudioPlayer player(audio, "assets");
 
     player.change_music(musics, 1);
 
@@ -127,7 +127,7 @@ TEST(AudioPlayer, PlaysTheMusicInALoopFromTheMusicFolder) {
 
 TEST(AudioPlayer, NoMusicStopsTheMusic) {
     RecordingAudio audio;
-    AudioPlayer player(audio, "assets", AudioSettings{});
+    AudioPlayer player(audio, "assets");
 
     player.change_music(musics, engine::network::no_music);
 
@@ -137,7 +137,7 @@ TEST(AudioPlayer, NoMusicStopsTheMusic) {
 
 TEST(AudioPlayer, IgnoresIdsMissingFromTheTable) {
     RecordingAudio audio;
-    AudioPlayer player(audio, "assets", AudioSettings{});
+    AudioPlayer player(audio, "assets");
 
     player.play_sound(sounds, 9);
     player.change_music(musics, 9);
@@ -149,7 +149,7 @@ TEST(AudioPlayer, IgnoresIdsMissingFromTheTable) {
 
 TEST(AudioPlayer, NeverLoadsANameThatLeavesTheAssetFolder) {
     RecordingAudio audio;
-    AudioPlayer player(audio, "assets", AudioSettings{});
+    AudioPlayer player(audio, "assets");
     const StringTable hostile =
         strings_of(StringCategory::sound, {"../../secret.wav", "sub/shot.wav", ".hidden"});
 
@@ -163,7 +163,7 @@ TEST(AudioPlayer, NeverLoadsANameThatLeavesTheAssetFolder) {
 TEST(AudioPlayer, DoesNotRetryAFileThatFailedToLoad) {
     RecordingAudio audio;
     audio.fail_loads = true;
-    AudioPlayer player(audio, "assets", AudioSettings{});
+    AudioPlayer player(audio, "assets");
 
     player.play_sound(sounds, 1);
     player.play_sound(sounds, 1);
@@ -175,7 +175,7 @@ TEST(AudioPlayer, DoesNotRetryAFileThatFailedToLoad) {
 TEST(AudioPlayer, LoadsNothingWhileTheDeviceIsClosed) {
     RecordingAudio audio;
     audio.open_succeeds = false;
-    AudioPlayer player(audio, "assets", AudioSettings{});
+    AudioPlayer player(audio, "assets");
 
     player.play_sound(sounds, 1);
     player.change_music(musics, 1);

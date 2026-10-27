@@ -109,3 +109,18 @@ engine_add_module(audio
         src/audio/PluginLoader.cpp
     DEPENDS engine::core
 )
+
+engine_add_module(app
+    SOURCES
+        src/app/AudioPlayer.cpp
+        src/app/ClientApp.cpp
+        src/app/Collisions.cpp
+        src/app/Fields.cpp
+        src/app/Launch.cpp
+        src/app/ServerApp.cpp
+        src/app/SnapshotView.cpp
+        src/app/WorldDraw.cpp
+    DEPENDS engine::core engine::script engine::network engine::graphics engine::audio
+    PRIVATE_DEPENDS engine::physics
+)
+target_include_directories(engine-app PRIVATE src/app)

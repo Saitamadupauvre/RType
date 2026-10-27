@@ -1,11 +1,11 @@
 #pragma once
 
-#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>
 
 #include "WorldDraw.hpp"
+#include "engine/app/Export.hpp"
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
@@ -13,29 +13,28 @@
 #include "engine/network/Client.hpp"
 #include "engine/network/StringTable.hpp"
 
-namespace rtype::client {
+namespace engine::app {
 
-class SnapshotView {
+class ENGINE_APP_EXPORT SnapshotView {
 public:
-    SnapshotView(engine::graphics::IRenderer& renderer, std::filesystem::path assets,
-                 const engine::core::FieldRegistry& fields);
+    SnapshotView(graphics::IRenderer& renderer, std::filesystem::path assets,
+                 const core::FieldRegistry& fields);
 
-    void draw(const std::vector<engine::network::EntitySnapshot>& entities,
-              const engine::network::StringTable& strings, std::uint32_t local_player);
+    void draw(const std::vector<network::EntitySnapshot>& entities,
+              const network::StringTable& strings);
 
     [[nodiscard]] static std::string sprite_of(const std::string& type_name);
 
 private:
-    void mirror(const std::vector<engine::network::EntitySnapshot>& entities,
-                const engine::network::StringTable& strings);
-    void apply(engine::core::Entity entity, const engine::network::EntitySnapshot& snapshot);
-    void mark_local(std::uint32_t local_player);
+    void mirror(const std::vector<network::EntitySnapshot>& entities,
+                const network::StringTable& strings);
+    void apply(core::Entity entity, const network::EntitySnapshot& snapshot);
 
-    engine::graphics::IRenderer& _renderer;
-    const engine::core::FieldRegistry& _fields;
-    engine::core::EntityManager _world;
+    graphics::IRenderer& _renderer;
+    const core::FieldRegistry& _fields;
+    core::EntityManager _world;
     WorldDraw _draw;
-    std::vector<engine::core::Entity> _mirrored;
+    std::vector<core::Entity> _mirrored;
 };
 
-} // namespace rtype::client
+} // namespace engine::app

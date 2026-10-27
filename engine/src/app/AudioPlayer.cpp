@@ -5,11 +5,11 @@
 
 #include "engine/core/log/Log.hpp"
 
-namespace rtype::client {
+namespace engine::app {
 
 namespace {
 
-namespace log = engine::core::log;
+namespace log = core::log;
 
 constexpr float sound_volume = 1.F;
 constexpr float sound_pitch = 1.F;
@@ -25,51 +25,49 @@ bool is_plain_file_name(const std::string& name) noexcept {
     return !name.empty() && name.front() != '.' && std::ranges::all_of(name, is_name_character);
 }
 
-AudioPlayer::AudioPlayer(engine::audio::IAudio& audio, const std::filesystem::path& assets,
-                         AudioSettings settings)
-    : _audio(audio), _sound_folder(assets / "sounds"), _music_folder(assets / "music"),
-      _muted(settings.muted) {
-    audio.set_music_volume(settings.music_volume);
-    audio.set_effects_volume(settings.effects_volume);
-    audio.set_master_volume(_muted ? 0.F : 1.F);
+AudioPlayer::AudioPlayer(audio::IAudio& audio, const std::filesystem::path& assets)
+    : _audio(audio), _sound_folder(assets / "sounds"), _music_folder(assets / "music") {}
+
+void AudioPlayer::apply(const script::AudioSettings& settings) {
+    if (_applied == settings) {
+        return;
+    }
+    _audio.get().set_music_volume(settings.music_volume);
+    _audio.get().set_effects_volume(settings.effects_volume);
+    _audio.get().set_master_volume(settings.muted ? 0.F : 1.F);
+    _applied = settings;
 }
 
-void AudioPlayer::play_sound(const engine::network::StringTable& strings, std::uint16_t sound_id) {
-    const auto name = name_of(strings, engine::network::StringCategory::sound, sound_id);
+void AudioPlayer::play_sound(const network::StringTable& strings, std::uint16_t sound_id) {
+    const auto name = name_of(strings, network::StringCategory::sound, sound_id);
     if (!name) {
         return;
     }
     const auto id = sound(*name);
-    if (id != engine::audio::SoundId{}) {
+    if (id != audio::SoundId{}) {
         _audio.get().play_sound(id, sound_volume, sound_pitch);
     }
 }
 
-void AudioPlayer::change_music(const engine::network::StringTable& strings,
-                               std::uint16_t music_id) {
-    if (music_id == engine::network::no_music) {
+void AudioPlayer::change_music(const network::StringTable& strings, std::uint16_t music_id) {
+    if (music_id == network::no_music) {
         _audio.get().stop_music();
         return;
     }
-    const auto name = name_of(strings, engine::network::StringCategory::music, music_id);
+    const auto name = name_of(strings, network::StringCategory::music, music_id);
     if (!name) {
         return;
     }
     const auto id = music(*name);
-    if (id != engine::audio::MusicId{}) {
+    if (id != audio::MusicId{}) {
         _audio.get().play_music(id, true);
     }
 }
 
-void AudioPlayer::toggle_mute() {
-    _muted = !_muted;
-    _audio.get().set_master_volume(_muted ? 0.F : 1.F);
-}
-
-std::optional<std::string> AudioPlayer::name_of(const engine::network::StringTable& strings,
-                                                engine::network::StringCategory category,
+std::optional<std::string> AudioPlayer::name_of(const network::StringTable& strings,
+                                                network::StringCategory category,
                                                 std::uint16_t id) {
-    const char* kind = category == engine::network::StringCategory::sound ? "sound" : "music";
+    const char* kind = category == network::StringCategory::sound ? "sound" : "music";
     const std::string* name = strings.name_of(category, id);
     if (name == nullptr) {
         log::warn("client: ignored unknown {} id {}", kind, id);
@@ -82,7 +80,7 @@ std::optional<std::string> AudioPlayer::name_of(const engine::network::StringTab
     return *name;
 }
 
-engine::audio::SoundId AudioPlayer::sound(const std::string& name) {
+audio::SoundId AudioPlayer::sound(const std::string& name) {
     if (const auto loaded = _sounds.find(name); loaded != _sounds.end()) {
         return loaded->second;
     }
@@ -94,7 +92,7 @@ engine::audio::SoundId AudioPlayer::sound(const std::string& name) {
     return id;
 }
 
-engine::audio::MusicId AudioPlayer::music(const std::string& name) {
+audio::MusicId AudioPlayer::music(const std::string& name) {
     if (const auto loaded = _musics.find(name); loaded != _musics.end()) {
         return loaded->second;
     }
@@ -106,4 +104,4 @@ engine::audio::MusicId AudioPlayer::music(const std::string& name) {
     return id;
 }
 
-} // namespace rtype::client
+} // namespace engine::app

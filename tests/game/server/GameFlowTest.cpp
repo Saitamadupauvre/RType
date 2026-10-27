@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -7,16 +8,16 @@
 #include <string>
 #include <vector>
 
+#include "engine/app/ServerApp.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/InputState.hpp"
 #include "engine/core/Vec2.hpp"
-#include "engine/core/event/EventBus.hpp"
+#include "engine/core/time/ManualClock.hpp"
+#include "engine/network/Transport.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 #include "engine/script/ServerApi.hpp"
-
-#include "Collisions.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;
@@ -44,22 +45,18 @@ const std::filesystem::path game_scripts =
 
 class GameFlowTest : public ::testing::Test {
 protected:
-    EntityManager _world;
-    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
-    ServerApi& _server = _runtime.api<ServerApi>();
-    engine::core::event::EventBus _events;
-    rtype::server::Collisions _collisions{_world, _events, _runtime};
+    engine::core::time::ManualClock _clock;
+    engine::network::LoopbackNetwork _loopback;
+    engine::app::ServerApp _app{_clock, _loopback.server(), {.scripts = game_scripts}};
+    EntityManager& _world = _app.world();
+    ScriptRuntime& _runtime = _app.script();
+    ServerApi& _server = _app.script_server();
 
-    void SetUp() override {
-        _runtime.attach_world(_world);
-        ASSERT_TRUE(_runtime.load_scripts(game_scripts));
-        ASSERT_TRUE(_runtime.spawn("game").has_value());
-    }
+    void SetUp() override { ASSERT_TRUE(_runtime.spawn("game").has_value()); }
 
     void tick(float dt = frame) {
-        _runtime.update(dt);
-        _collisions.step(dt);
-        _runtime.flush_destroyed();
+        _app.tick(std::chrono::duration_cast<engine::core::time::Duration>(
+            std::chrono::duration<float>(dt)));
     }
 
     void join(std::uint32_t player_id) { ASSERT_TRUE(_server.player_joined(player_id)); }

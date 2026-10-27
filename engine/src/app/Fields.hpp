@@ -1,9 +1,10 @@
 #pragma once
 
+#include "engine/app/Export.hpp"
 #include "engine/core/FieldRegistry.hpp"
 
-namespace rtype::common {
+namespace engine::app {
 
-[[nodiscard]] engine::core::FieldRegistry game_fields();
+[[nodiscard]] ENGINE_APP_EXPORT core::FieldRegistry replicated_fields();
 
-} // namespace rtype::common
+} // namespace engine::app

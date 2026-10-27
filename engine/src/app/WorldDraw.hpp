@@ -4,23 +4,24 @@
 #include <string>
 #include <unordered_map>
 
+#include "engine/app/Export.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/graphics/IRenderer.hpp"
 
-namespace rtype::client {
+namespace engine::app {
 
-class WorldDraw {
+class ENGINE_APP_EXPORT WorldDraw {
 public:
-    WorldDraw(engine::graphics::IRenderer& renderer, std::filesystem::path assets);
+    WorldDraw(graphics::IRenderer& renderer, std::filesystem::path assets);
 
-    void draw(engine::core::EntityManager& world);
+    void draw(core::EntityManager& world);
 
 private:
-    engine::graphics::TextureId texture(const std::string& path);
+    graphics::TextureId texture(const std::string& path);
 
-    engine::graphics::IRenderer& _renderer;
+    graphics::IRenderer& _renderer;
     std::filesystem::path _assets;
-    std::unordered_map<std::string, engine::graphics::TextureId> _textures;
+    std::unordered_map<std::string, graphics::TextureId> _textures;
 };
 
-} // namespace rtype::client
+} // namespace engine::app

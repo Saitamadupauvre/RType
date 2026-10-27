@@ -7,12 +7,13 @@
 #include <utility>
 #include <vector>
 
-#include "GameFields.hpp"
+#include "Fields.hpp"
 #include "SnapshotView.hpp"
 #include "engine/graphics/IRenderer.hpp"
 #include "engine/network/Client.hpp"
 #include "engine/network/StringTable.hpp"
 
+using engine::app::SnapshotView;
 using engine::core::FieldRegistry;
 using engine::core::FieldValue;
 using engine::core::Rgba;
@@ -25,18 +26,12 @@ using engine::network::EntitySnapshot;
 using engine::network::ReplicatedValue;
 using engine::network::StringCategory;
 using engine::network::StringTable;
-using rtype::client::SnapshotView;
 
 namespace {
 
 constexpr std::uint16_t ship_type = 1;
 constexpr std::uint16_t unknown_type = 9;
 constexpr TextureId ship_texture{.value = 3};
-
-struct DrawnCircle {
-    Vec2 center;
-    float radius;
-};
 
 class RecordingRenderer final : public engine::graphics::IRenderer {
 public:
@@ -58,9 +53,7 @@ public:
         rects.push_back(rect);
         rect_colors.push_back(color);
     }
-    void draw_circle(Vec2 center, float radius, Color) override {
-        circles.push_back({.center = center, .radius = radius});
-    }
+    void draw_circle(Vec2, float, Color) override {}
     void draw_line(Vec2, Vec2, float, Color) override {}
     void draw_text(const std::string&, Vec2, float, Color) override {}
     [[nodiscard]] Vec2 measure_text(const std::string&, float) const override { return {}; }
@@ -69,7 +62,6 @@ public:
     std::vector<SpriteDraw> sprites;
     std::vector<Rect> rects;
     std::vector<Color> rect_colors;
-    std::vector<DrawnCircle> circles;
 };
 
 StringTable ship_strings() {
@@ -79,7 +71,7 @@ StringTable ship_strings() {
 }
 
 const StringTable strings = ship_strings();
-const FieldRegistry fields = rtype::common::game_fields();
+const FieldRegistry fields = engine::app::replicated_fields();
 
 ReplicatedValue value_of(std::string_view component, std::string_view field, FieldValue value) {
     return {.field = fields.find_field(component, field), .value = std::move(value)};
@@ -104,7 +96,7 @@ TEST(SnapshotView, DrawsEachEntityWithTheSpriteOfItsTypeAndItsColor) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
 
-    view.draw({entity(ship_type, 5.F, 2)}, strings, 1);
+    view.draw({entity(ship_type, 5.F, 2)}, strings);
 
     ASSERT_EQ(renderer.loaded.size(), 1U);
     EXPECT_EQ(renderer.loaded.front(),
@@ -118,40 +110,20 @@ TEST(SnapshotView, EntityOfUnknownTypeIsAColoredSquare) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
 
-    view.draw({entity(unknown_type, 5.F, 0)}, strings, 1);
+    view.draw({entity(unknown_type, 5.F, 0)}, strings);
 
     EXPECT_TRUE(renderer.sprites.empty());
     ASSERT_EQ(renderer.rects.size(), 1U);
     EXPECT_EQ(renderer.rect_colors.front(), (Color{.r = 10, .g = 20, .b = 30, .a = 255}));
 }
 
-TEST(SnapshotView, MarksOnlyTheLocalPlayerEntities) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
-
-    view.draw({entity(ship_type, 5.F, 1), entity(ship_type, 200.F, 2)}, strings, 1);
-
-    ASSERT_EQ(renderer.circles.size(), 1U);
-    EXPECT_FLOAT_EQ(renderer.circles.front().center.x, 5.F);
-    EXPECT_LT(renderer.circles.front().center.y, 20.F);
-}
-
-TEST(SnapshotView, UnownedEntitiesAreNeverMarkedBeforeAccept) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
-
-    view.draw({entity(ship_type, 5.F, 0)}, strings, 0);
-
-    EXPECT_TRUE(renderer.circles.empty());
-}
-
 TEST(SnapshotView, DrawsOnlyTheNewestSnapshot) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
-    view.draw({entity(ship_type, 5.F, 0), entity(ship_type, 50.F, 0)}, strings, 0);
+    view.draw({entity(ship_type, 5.F, 0), entity(ship_type, 50.F, 0)}, strings);
     renderer.sprites.clear();
 
-    view.draw({entity(ship_type, 90.F, 0)}, strings, 0);
+    view.draw({entity(ship_type, 90.F, 0)}, strings);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 90.F);
@@ -164,18 +136,18 @@ TEST(SnapshotView, EntityWithoutColorIsDrawnWhite) {
                          .type_id = ship_type,
                          .fields = {value_of("Position", "pos", Vec2{5.F, 20.F})}};
 
-    view.draw({plain}, strings, 0);
+    view.draw({plain}, strings);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_EQ(renderer.sprites.front().tint, (Color{.r = 255, .g = 255, .b = 255, .a = 255}));
 }
 
-TEST(SnapshotView, SkipsAFieldItsComponentCannotHold) {
+TEST(SnapshotView, IgnoresFieldsOfComponentsItDoesNotDraw) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
 
-    view.draw({entity(ship_type, 5.F, 1'000)}, strings, 1);
+    view.draw({entity(ship_type, 5.F, 1'000)}, strings);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
-    EXPECT_TRUE(renderer.circles.empty());
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 5.F);
 }

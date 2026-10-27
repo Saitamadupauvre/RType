@@ -2,18 +2,19 @@
 
 #include <functional>
 
+#include "engine/app/Export.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/event/Subscription.hpp"
 #include "engine/physics/PhysicsSystem.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 
-namespace rtype::server {
+namespace engine::app {
 
-class Collisions {
+class ENGINE_APP_EXPORT Collisions {
 public:
-    Collisions(engine::core::EntityManager& registry, engine::core::event::EventBus& events,
-               engine::script::ScriptRuntime& runtime);
+    Collisions(core::EntityManager& registry, core::event::EventBus& events,
+               script::ScriptRuntime& runtime);
     ~Collisions();
 
     Collisions(const Collisions&) = delete;
@@ -24,9 +25,9 @@ public:
     void step(float dt);
 
 private:
-    std::reference_wrapper<engine::core::event::EventBus> _events;
-    engine::physics::PhysicsSystem _physics;
-    engine::core::event::Subscription _subscription;
+    std::reference_wrapper<core::event::EventBus> _events;
+    physics::PhysicsSystem _physics;
+    core::event::Subscription _subscription;
 };
 
-} // namespace rtype::server
+} // namespace engine::app

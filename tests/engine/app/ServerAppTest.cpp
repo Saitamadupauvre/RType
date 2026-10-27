@@ -6,9 +6,10 @@
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <vector>
 
-#include "ServerApp.hpp"
+#include "engine/app/ServerApp.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/time/ManualClock.hpp"
@@ -16,29 +17,29 @@
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
 #include "engine/network/StringTable.hpp"
+#include "engine/network/Transport.hpp"
 
+using engine::app::ServerApp;
 using engine::core::Entity;
 using engine::core::EntityManager;
 using engine::core::time::Duration;
 using engine::core::time::ManualClock;
-using engine::network::PlayerInput;
+using engine::network::LoopbackNetwork;
 using engine::network::PlayerJoined;
 using engine::network::PlayerLeft;
 using engine::network::StringCategory;
 using engine::network::StringEntry;
-using rtype::server::ServerApp;
-using rtype::server::ServerConfig;
+using engine::network::UdpServerTransport;
 
 namespace {
 
 constexpr Duration tick_step = std::chrono::nanoseconds(1'000'000'000 / 60);
-constexpr ServerConfig config{.port = 4242, .max_players = 4};
 const std::filesystem::path players_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "players";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "players";
 
 std::vector<Entity> owned_by(ServerApp& app, std::uint32_t player_id) {
     std::vector<Entity> owned;
-    app.registry().query<engine::core::Position>().each(
+    app.world().query<engine::core::Position>().each(
         [&](Entity entity, const engine::core::Position&) {
             if (app.script_server().entity_owner(entity) == player_id) {
                 owned.push_back(entity);
@@ -56,28 +57,37 @@ Entity ship_of(ServerApp& app, std::uint32_t player_id) {
 }
 
 engine::core::Vec2 position_of(ServerApp& app, std::uint32_t player_id) {
-    return app.registry().get<engine::core::Position>(ship_of(app, player_id)).pos;
+    return app.world().get<engine::core::Position>(ship_of(app, player_id)).pos;
 }
 
-PlayerInput input_for(std::uint32_t player_id, std::initializer_list<engine::core::Key> keys) {
-    return {.player_id = player_id,
-            .input = engine::core::InputState{.keys = keys, .mouse_buttons = {}, .pointer = {}}};
+void press(ServerApp& app, std::uint32_t player_id, std::initializer_list<engine::core::Key> keys) {
+    app.script_server().set_player_input(
+        player_id, engine::core::InputState{.keys = keys, .mouse_buttons = {}, .pointer = {}});
 }
+
+struct Server {
+    explicit Server(const std::filesystem::path& scripts = {})
+        : app(clock, loopback.server(), {.scripts = scripts, .max_players = 4}) {}
+
+    ManualClock clock;
+    LoopbackNetwork loopback;
+    ServerApp app;
+};
 
 } // namespace
 
 TEST(ServerApp, RegistersTheComponentsSentInSnapshots) {
-    const ManualClock clock;
-    ServerApp app(clock, ServerConfig{.port = 4242, .max_players = 4});
+    Server server;
+    ServerApp& app = server.app;
 
-    EXPECT_TRUE(app.registry().is_registered<engine::network::Replicated>());
-    EXPECT_TRUE(app.registry().is_registered<engine::core::Position>());
-    EXPECT_TRUE(app.registry().is_registered<engine::core::Sprite>());
+    EXPECT_TRUE(app.world().is_registered<engine::network::Replicated>());
+    EXPECT_TRUE(app.world().is_registered<engine::core::Position>());
+    EXPECT_TRUE(app.world().is_registered<engine::core::Sprite>());
 }
 
 TEST(ServerApp, TickRunsSystemsWithTheFixedStep) {
-    const ManualClock clock;
-    ServerApp app(clock, ServerConfig{.port = 4242, .max_players = 4});
+    Server server;
+    ServerApp& app = server.app;
     std::vector<float> steps;
     app.systems().add("record", 0, [&steps](EntityManager&, float dt) { steps.push_back(dt); });
 
@@ -88,34 +98,44 @@ TEST(ServerApp, TickRunsSystemsWithTheFixedStep) {
 }
 
 TEST(ServerApp, RunTicksAtFixedRateUntilAskedToStop) {
-    ManualClock clock;
-    ServerApp app(clock, ServerConfig{.port = 4242, .max_players = 4});
+    Server server;
+    ServerApp& app = server.app;
     int ticks = 0;
     app.systems().add("count", 0, [&ticks](EntityManager&, float) { ++ticks; });
     int checks = 0;
 
     app.run([&] {
-        clock.advance(tick_step * 2);
+        server.clock.advance(tick_step * 2);
         return ++checks > 3;
     });
 
     EXPECT_EQ(ticks, 6);
 }
 
-TEST(ServerApp, StartReportsPortAlreadyInUse) {
+TEST(ServerApp, StartFailsOnAPortAlreadyInUse) {
     const ManualClock clock;
-    ServerApp first(clock, ServerConfig{.port = 0, .max_players = 4});
-    std::string error;
-    ASSERT_TRUE(first.start(error)) << error;
-    ServerApp second(clock, ServerConfig{.port = first.transport().port(), .max_players = 4});
+    UdpServerTransport first_transport(0);
+    ServerApp first(clock, first_transport, {});
+    std::error_code ec;
+    ASSERT_TRUE(first.start(ec)) << ec.message();
+    UdpServerTransport second_transport(first_transport.port());
+    ServerApp second(clock, second_transport, {});
 
-    EXPECT_FALSE(second.start(error));
-    EXPECT_NE(error.find(std::to_string(first.transport().port())), std::string::npos) << error;
+    EXPECT_FALSE(second.start(ec));
+    EXPECT_TRUE(ec);
+}
+
+TEST(ServerApp, StartsOverALoopbackNetwork) {
+    Server server;
+    std::error_code ec;
+
+    EXPECT_TRUE(server.app.start(ec)) << ec.message();
+    server.app.stop();
 }
 
 TEST(ServerApp, StringTableListsDeclaredEntitiesInOrder) {
-    const ManualClock clock;
-    const ServerApp app(clock, config, players_scripts);
+    const Server server(players_scripts);
+    const ServerApp& app = server.app;
 
     EXPECT_EQ(
         app.strings().entries(StringCategory::type),
@@ -124,8 +144,8 @@ TEST(ServerApp, StringTableListsDeclaredEntitiesInOrder) {
 }
 
 TEST(ServerApp, JoiningPlayerGetsTheEntitiesOfOnPlayerJoined) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
+    Server server(players_scripts);
+    ServerApp& app = server.app;
 
     app.events().publish(PlayerJoined{.player_id = 1});
     app.events().publish(PlayerJoined{.player_id = 2});
@@ -134,75 +154,75 @@ TEST(ServerApp, JoiningPlayerGetsTheEntitiesOfOnPlayerJoined) {
     EXPECT_NE(position_of(app, 1).y, position_of(app, 2).y);
 }
 
-TEST(ServerApp, ReplicateTagsScriptEntitiesWithTypeAndOwner) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
+TEST(ServerApp, TickTagsScriptEntitiesWithTypeAndOwner) {
+    Server server(players_scripts);
+    ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 3});
 
-    app.replicate();
+    app.tick(tick_step);
 
-    const auto& replicated = app.registry().get<engine::network::Replicated>(ship_of(app, 3));
+    const auto& replicated = app.world().get<engine::network::Replicated>(ship_of(app, 3));
     EXPECT_EQ(replicated.type_id, 2U);
     EXPECT_EQ(replicated.owner, 3U);
 }
 
-TEST(ServerApp, ReplicateClearsOwnerOnceThePlayerHasLeft) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
+TEST(ServerApp, TickClearsTheOwnerOfDisownedEntities) {
+    Server server(players_scripts);
+    ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 1});
     const Entity ship = ship_of(app, 1);
-    app.replicate();
+    app.tick(tick_step);
     app.script().run_string("for _, e in ipairs(find_player(1):entities()) do e.owner = nil end",
                             "test");
 
-    app.replicate();
+    app.tick(tick_step);
 
-    EXPECT_EQ(app.registry().get<engine::network::Replicated>(ship).owner, 0U);
+    EXPECT_EQ(app.world().get<engine::network::Replicated>(ship).owner, 0U);
 }
 
 TEST(ServerApp, EntitiesNotSpawnedByScriptsAreNotReplicated) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
-    const Entity native = app.registry().spawn();
-    app.registry().add(native, engine::core::Position{});
+    Server server(players_scripts);
+    ServerApp& app = server.app;
+    const Entity native = app.world().spawn();
+    app.world().add(native, engine::core::Position{});
 
-    app.replicate();
+    app.tick(tick_step);
 
-    EXPECT_FALSE(app.registry().has<engine::network::Replicated>(native));
+    EXPECT_FALSE(app.world().has<engine::network::Replicated>(native));
 }
 
 TEST(ServerApp, ScriptEntitiesWithoutSpriteOrColorAreNotReplicated) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
+    Server server(players_scripts);
+    ServerApp& app = server.app;
     const auto scenery = app.script().spawn("scenery");
     ASSERT_TRUE(scenery.has_value());
 
-    app.replicate();
+    app.tick(tick_step);
 
-    EXPECT_FALSE(app.registry().has<engine::network::Replicated>(*scenery));
+    EXPECT_FALSE(app.world().has<engine::network::Replicated>(*scenery));
 }
 
 TEST(ServerApp, LeavingPlayerEntitiesAreDestroyedOnTheNextTick) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
+    Server server(players_scripts);
+    ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 1});
     const Entity ship = ship_of(app, 1);
 
     app.events().publish(PlayerLeft{.player_id = 1});
     app.tick(tick_step);
 
-    EXPECT_FALSE(app.registry().alive(ship));
+    EXPECT_FALSE(app.world().alive(ship));
 }
 
 TEST(ServerApp, InputMovesOnlyThatPlayerEntity) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
+    Server server(players_scripts);
+    ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 1});
     app.events().publish(PlayerJoined{.player_id = 2});
     const auto start_one = position_of(app, 1);
     const auto start_two = position_of(app, 2);
 
-    app.apply_inputs({input_for(1, {engine::core::Key::Right})});
+    press(app, 1, {engine::core::Key::Right});
     app.tick(tick_step);
 
     EXPECT_FLOAT_EQ(position_of(app, 1).x, start_one.x + 1.F);
@@ -211,20 +231,20 @@ TEST(ServerApp, InputMovesOnlyThatPlayerEntity) {
 }
 
 TEST(ServerApp, InputFromUnknownPlayerIsIgnored) {
-    const ManualClock clock;
-    ServerApp app(clock, config, players_scripts);
+    Server server(players_scripts);
+    ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 1});
     const auto start = position_of(app, 1);
 
-    app.apply_inputs({input_for(9, {engine::core::Key::Right})});
+    press(app, 9, {engine::core::Key::Right});
     app.tick(tick_step);
 
     EXPECT_FLOAT_EQ(position_of(app, 1).x, start.x);
 }
 
 TEST(ServerApp, MissingScriptsGiveAnEmptyGame) {
-    const ManualClock clock;
-    ServerApp app(clock, config, std::filesystem::path(RTYPE_FIXTURES_DIR) / "missing");
+    Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "missing");
+    ServerApp& app = server.app;
 
     app.events().publish(PlayerJoined{.player_id = 1});
     app.tick(tick_step);
@@ -236,7 +256,7 @@ TEST(ServerApp, MissingScriptsGiveAnEmptyGame) {
 namespace {
 
 const std::filesystem::path audio_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "audio";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "audio";
 
 struct HeardAudio {
     std::vector<engine::network::SoundPlayed> sounds;
@@ -260,8 +280,8 @@ HeardAudio listen(ServerApp& app) {
 } // namespace
 
 TEST(ServerApp, StringTableListsDeclaredAudioNamesInOrder) {
-    const ManualClock clock;
-    const ServerApp app(clock, config, audio_scripts);
+    const Server server(audio_scripts);
+    const ServerApp& app = server.app;
 
     EXPECT_EQ(app.strings().entries(StringCategory::sound),
               (std::vector<StringEntry>{
@@ -273,16 +293,16 @@ TEST(ServerApp, StringTableListsDeclaredAudioNamesInOrder) {
 }
 
 TEST(ServerApp, ScriptsWithoutAudioHaveNoAudioNames) {
-    const ManualClock clock;
-    const ServerApp app(clock, config, players_scripts);
+    const Server server(players_scripts);
+    const ServerApp& app = server.app;
 
     EXPECT_TRUE(app.strings().entries(StringCategory::sound).empty());
     EXPECT_TRUE(app.strings().entries(StringCategory::music).empty());
 }
 
 TEST(ServerApp, TickPublishesTheMusicStartedByOnStart) {
-    const ManualClock clock;
-    ServerApp app(clock, config, audio_scripts);
+    Server server(audio_scripts);
+    ServerApp& app = server.app;
 
     const auto heard = listen(app);
 
@@ -292,8 +312,8 @@ TEST(ServerApp, TickPublishesTheMusicStartedByOnStart) {
 }
 
 TEST(ServerApp, TickPublishesQueuedSoundsAndMusicStops) {
-    const ManualClock clock;
-    ServerApp app(clock, config, audio_scripts);
+    Server server(audio_scripts);
+    ServerApp& app = server.app;
     app.tick(tick_step);
     ASSERT_TRUE(app.script().run_string(R"(play("boom.wav") music(nil))", "test"));
 
@@ -306,8 +326,8 @@ TEST(ServerApp, TickPublishesQueuedSoundsAndMusicStops) {
 }
 
 TEST(ServerApp, SoundPlayedByAnEntityCarriesItsIndex) {
-    const ManualClock clock;
-    ServerApp app(clock, config, audio_scripts);
+    Server server(audio_scripts);
+    ServerApp& app = server.app;
     const auto speaker = app.script().spawn("speaker");
     ASSERT_TRUE(speaker.has_value());
     ASSERT_TRUE(app.script().call(*speaker, "speak"));
@@ -322,7 +342,7 @@ TEST(ServerApp, SoundPlayedByAnEntityCarriesItsIndex) {
 namespace {
 
 const std::filesystem::path events_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "events";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "events";
 
 std::vector<engine::network::NamedEvent> listen_events(ServerApp& app) {
     std::vector<engine::network::NamedEvent> heard;
@@ -336,8 +356,8 @@ std::vector<engine::network::NamedEvent> listen_events(ServerApp& app) {
 } // namespace
 
 TEST(ServerApp, StringTableListsDeclaredEventNamesAndKeysInOrder) {
-    const ManualClock clock;
-    const ServerApp app(clock, config, events_scripts);
+    const Server server(events_scripts);
+    const ServerApp& app = server.app;
 
     EXPECT_EQ(
         app.strings().entries(StringCategory::event),
@@ -350,16 +370,16 @@ TEST(ServerApp, StringTableListsDeclaredEventNamesAndKeysInOrder) {
 }
 
 TEST(ServerApp, ScriptsWithoutEventsHaveNoEventNames) {
-    const ManualClock clock;
-    const ServerApp app(clock, config, players_scripts);
+    const Server server(players_scripts);
+    const ServerApp& app = server.app;
 
     EXPECT_TRUE(app.strings().entries(StringCategory::event).empty());
     EXPECT_TRUE(app.strings().entries(StringCategory::event_key).empty());
 }
 
 TEST(ServerApp, TickPublishesEmittedEventsInOrder) {
-    const ManualClock clock;
-    ServerApp app(clock, config, events_scripts);
+    Server server(events_scripts);
+    ServerApp& app = server.app;
     ASSERT_TRUE(app.script().run_string(
         R"(emit("explosion", { at = { x = 4, y = 5 }, size = 2 }) emit("ping"))", "test"));
 
@@ -374,31 +394,29 @@ TEST(ServerApp, TickPublishesEmittedEventsInOrder) {
 }
 
 TEST(ServerApp, TickDestroysEntitiesWhoseHitboxesOverlap) {
-    const ManualClock clock;
-    ServerApp app(clock, config,
-                  std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game");
-    const auto missile = app.script().spawn("missile", engine::core::Vec2{1000.F, 300.F});
-    const auto bydo = app.script().spawn("bydo", engine::core::Vec2{1000.F, 290.F});
-    const auto far_bydo = app.script().spawn("bydo", engine::core::Vec2{1000.F, 800.F});
-    ASSERT_TRUE(missile && bydo && far_bydo);
+    Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "collide");
+    ServerApp& app = server.app;
+    const auto bullet = app.script().spawn("bullet", engine::core::Vec2{1000.F, 300.F});
+    const auto target = app.script().spawn("target", engine::core::Vec2{1000.F, 290.F});
+    const auto far_target = app.script().spawn("target", engine::core::Vec2{1000.F, 800.F});
+    ASSERT_TRUE(bullet && target && far_target);
 
     app.tick(tick_step);
 
-    EXPECT_FALSE(app.registry().alive(*missile));
-    EXPECT_FALSE(app.registry().alive(*bydo));
-    EXPECT_TRUE(app.registry().alive(*far_bydo));
+    EXPECT_FALSE(app.world().alive(*bullet));
+    EXPECT_FALSE(app.world().alive(*target));
+    EXPECT_TRUE(app.world().alive(*far_target));
 }
 
 TEST(ServerApp, TickMovesScriptEntitiesByTheirVelocity) {
-    const ManualClock clock;
-    ServerApp app(clock, config,
-                  std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "drift");
+    Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "drift");
+    ServerApp& app = server.app;
     const auto drifter = app.script().spawn("drifter", engine::core::Vec2{100.F, 100.F});
     ASSERT_TRUE(drifter);
 
     app.tick(tick_step);
 
-    const auto position = app.registry().get<engine::core::Position>(*drifter).pos;
+    const auto position = app.world().get<engine::core::Position>(*drifter).pos;
     EXPECT_FLOAT_EQ(position.x, 101.F);
     EXPECT_FLOAT_EQ(position.y, 99.5F);
 }
