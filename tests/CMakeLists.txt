@@ -72,6 +72,7 @@ target_include_directories(engine_network_tests PRIVATE
 engine_add_test(physics SOURCES
     engine/physics/PhysicsSystemTest.cpp
     engine/physics/CollisionsTest.cpp
+    engine/physics/FieldsTest.cpp
 )
 engine_add_test(graphics SOURCES
     engine/graphics/BackendTest.cpp
