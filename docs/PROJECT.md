@@ -383,7 +383,7 @@ This section is the specification of the Lua API. Not everything is implemented 
 | `spawn(type, overrides)`, `players()`, `find_player(id)` | Implemented |
 | `main.lua`: `on_start`, `on_player_joined`, `on_player_left` | Implemented |
 | Entity fields `x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`, `id`, `type`, `age`, `input`, `owner`; free fields | Implemented |
-| Entity methods `destroy()`, `has_tag()`; callbacks `on_spawn`, `update`, `on_collide`, `on_destroy` | Implemented |
+| Entity methods `destroy()`, `has_tag()`, `get_field()`, `set_field()`; callbacks `on_spawn`, `update`, `on_collide`, `on_destroy` | Implemented |
 | Native collisions: `engine-physics` detects `hitbox` overlaps in the server tick and calls `on_collide` (see §10.5) | Implemented |
 | Native movement from `vx` / `vy` in the server tick | Not yet: scripts move entities by writing `x` / `y` |
 | `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
@@ -494,11 +494,13 @@ Both forms produce the same internal representation.
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
 | Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
-| Free fields | `health`, `speed`, `points` | Lua table of the entity | Scripts only |
+| Free fields | `health`, `speed`, `points`, `waypoints` | Lua table of the entity | Scripts only |
 | Callbacks | `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
 
 Methods are not copied into each instance: they stay in the prefab table, so reloading a file updates every live entity.
+
+Free fields holding a table are the exception: each entity gets its own deep copy at spawn, so `self.waypoints[1] = nil` changes only that entity, never the prefab or the other instances. Nested tables and cycles are copied too (at most 64 levels deep, or the spawn fails); functions and metatables stay shared. Data meant to be shared by every instance, such as a module from `require`, belongs in a `local` of the file, not in a prefab field.
 
 ### 10.5 Entity API (`self`)
 
@@ -512,6 +514,8 @@ self.owner          -- player controlling the entity, or nil
 
 self:destroy()                -- deferred to the end of the tick
 self:has_tag("enemy")
+self:get_field("PhysicsBody", "mass")      -- any registered component field, nil if absent
+self:set_field("PhysicsBody", "mass", 2.5) -- adds the component if needed
 self:add_tag("phase2")
 self:remove_tag("phase2")
 self:distance_to(other)
@@ -537,6 +541,20 @@ end
 `self:destroy()` only marks the entity: it stays usable until the end of the tick, is skipped by later `update` calls, then `on_destroy(self)` runs and the entity is removed. Calling it twice has no extra effect. `on_spawn(self)` runs once the entity and its `spawn` overrides are in place.
 
 `owner` takes a player handle or `nil`, also as a `spawn` override (`spawn("ship", { owner = player })`). The entity then reads that player's input through `self.input`, and clients receive the owner so each one can highlight its own entities. Once the player leaves, `owner` reads `nil`.
+
+Native fields are aliases of component fields declared in the engine's field registry: `x` / `y` are the axes of `Position.pos`, `vx` / `vy` of `Velocity.vel`, `sprite` is `Sprite.path`, `color` is `Sprite.color`, `tags` is `Tags.labels`, `hitbox` is `AABBCollider.size` and `collides_with` is `CollidesWith.labels`. `get_field` / `set_field` reach every other registered field by component and field name, with the same conversions:
+
+| Field kind | Lua value |
+|---|---|
+| `float` | finite number |
+| `int` | whole number (`4` or `4.0`, not `4.5`) |
+| `bool`, `string` | boolean, string |
+| `asset` | path string; an empty path reads `nil` |
+| `vec2` | `{ x = .., y = .. }` |
+| `color` | `{ r, g, b, a }`, numbers in [0, 255], `a` defaults to 255 |
+| `list` | array of one kind, e.g. strings; reads an empty array when the component is absent |
+
+Every value read is a new table or a copy: change a field by assigning it. A value of the wrong type, `NaN`, infinity or a value the component rejects raises a Lua error naming the field and the caller's line (`bydo.lua:12: entity field 'hitbox': size must be positive`), and leaves the entity unchanged.
 
 **Performance tip:** prefer setting `vx` / `vy` over moving the entity in `update`; native movement runs entirely in C++.
 
@@ -729,6 +747,7 @@ speed  = 150         -- server only
 Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
 
 - Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
+- Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`.
 - Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
 - Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
 
@@ -749,7 +768,7 @@ Developers must not use these names for their own fields or methods; the engine 
   });
   ```
 
-- **Field access** goes through the entity handle's metatable. `__index` looks up, in order: native components → the entity's Lua data → its prefab table (methods). `__newindex` writes native fields into C++ storage and everything else into the Lua data.
+- **Field access** goes through the entity handle's metatable. `__index` looks up, in order: native field aliases → entity methods → the entity's Lua data → its prefab table (methods). `__newindex` writes native fields into C++ storage and everything else into the Lua data. Aliases are a small data table (`engine/src/script/EntityFields.cpp`) mapping a Lua name to a `core::FieldRegistry` field, resolved to a `FieldRef` once; `sol::object` ↔ `FieldValue` conversion lives in one place (`LuaFieldValue.cpp`). The registry, filled by `register_core_fields` and `register_physics_fields`, is exposed by `ScriptRuntime::fields()`. Setting a collider field also adds the `PhysicsBody` it requires (`FieldRegistry::add(..., required<PhysicsBody>)`); the `hitbox` alias additionally makes a new body dynamic without gravity or collision response, centres the collider (`offset = size / 2`) and adds `Scriptable`.
 - **Callbacks** are called by native systems through `sol::protected_function`.
 - **Coroutines** are `sol::thread` + `sol::coroutine`; `wait(t)` yields and the scheduler resumes the coroutine when `t` has elapsed.
 
