@@ -52,6 +52,7 @@ engine_add_test(network SOURCES
     engine/network/ModuleTest.cpp
     engine/network/ServerTest.cpp
     engine/network/StringTableTest.cpp
+    engine/network/TransportTest.cpp
     engine/network/bytes/ByteReaderTest.cpp
     engine/network/bytes/ByteWriterTest.cpp
     engine/network/decoder/PayloadDecoderTest.cpp
@@ -74,6 +75,8 @@ engine_add_test(network SOURCES
     engine/network/thread/DatagramHandlerTest.cpp
     engine/network/thread/MessageQueueTest.cpp
     engine/network/thread/NetworkIoTest.cpp
+    engine/network/transport/LoopbackLinksTest.cpp
+    engine/network/transport/UdpLinksTest.cpp
 )
 target_include_directories(engine_network_tests PRIVATE
     "${PROJECT_SOURCE_DIR}/engine/src/network"
