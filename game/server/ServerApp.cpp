@@ -87,9 +87,10 @@ ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig
       _runtime(engine::script::ScriptRuntime::builder().with<engine::script::ServerApi>().build()),
       _server(_runtime.api<engine::script::ServerApi>()),
       _strings(load_game(_runtime, registry_, scripts)), _fields(common::game_fields()),
-      network_(clock, events_, _fields,
-               engine::network::ServerOptions{
-                   .port = config.port, .max_players = config.max_players, .strings = _strings}),
+      _transport(config.port),
+      network_(
+          clock, events_, _fields, _transport,
+          engine::network::ServerOptions{.max_players = config.max_players, .strings = _strings}),
       _collisions(registry_, events_, _runtime) {
     register_if_missing<engine::network::Replicated>(registry_);
     register_if_missing<engine::core::Position>(registry_);
@@ -105,7 +106,7 @@ ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig
 bool ServerApp::start(std::string& error) {
     std::error_code ec;
     if (!network_.start(ec)) {
-        error = "cannot listen on port " + std::to_string(network_.port()) + ": " + ec.message();
+        error = "cannot listen on port " + std::to_string(_transport.port()) + ": " + ec.message();
         return false;
     }
     return true;

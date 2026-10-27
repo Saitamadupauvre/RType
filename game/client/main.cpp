@@ -70,7 +70,8 @@ int main(int argc, char** argv) {
     const engine::core::time::SteadyClock clock;
     engine::core::event::EventBus events;
     const auto fields = rtype::common::game_fields();
-    engine::network::NetworkClient network(clock, events, fields);
+    engine::network::UdpClientTransport transport(result.config->host, result.config->port);
+    engine::network::NetworkClient network(clock, events, fields, transport);
     events.subscribe<engine::network::SoundPlayed>([&](const engine::network::SoundPlayed& played) {
         sound.play_sound(network.strings(), played.sound_id);
     });
@@ -79,7 +80,7 @@ int main(int argc, char** argv) {
             sound.change_music(network.strings(), changed.music_id);
         });
     std::error_code ec;
-    if (!network.connect(result.config->host, result.config->port, ec)) {
+    if (!network.connect(ec)) {
         std::cerr << "cannot connect to " << result.config->host << ":" << result.config->port
                   << ": " << ec.message() << "\n";
         return 84;

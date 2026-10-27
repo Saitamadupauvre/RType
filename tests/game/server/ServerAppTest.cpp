@@ -107,10 +107,10 @@ TEST(ServerApp, StartReportsPortAlreadyInUse) {
     ServerApp first(clock, ServerConfig{.port = 0, .max_players = 4});
     std::string error;
     ASSERT_TRUE(first.start(error)) << error;
-    ServerApp second(clock, ServerConfig{.port = first.network().port(), .max_players = 4});
+    ServerApp second(clock, ServerConfig{.port = first.transport().port(), .max_players = 4});
 
     EXPECT_FALSE(second.start(error));
-    EXPECT_NE(error.find(std::to_string(first.network().port())), std::string::npos) << error;
+    EXPECT_NE(error.find(std::to_string(first.transport().port())), std::string::npos) << error;
 }
 
 TEST(ServerApp, StringTableListsDeclaredEntitiesInOrder) {

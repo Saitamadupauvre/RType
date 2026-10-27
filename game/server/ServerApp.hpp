@@ -17,6 +17,7 @@
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
 #include "engine/network/StringTable.hpp"
+#include "engine/network/Transport.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 #include "engine/script/ServerApi.hpp"
 
@@ -41,6 +42,9 @@ public:
     [[nodiscard]] engine::core::SystemScheduler& systems() noexcept { return systems_; }
     [[nodiscard]] engine::core::event::EventBus& events() noexcept { return events_; }
     [[nodiscard]] engine::network::NetworkServer& network() noexcept { return network_; }
+    [[nodiscard]] const engine::network::UdpServerTransport& transport() const noexcept {
+        return _transport;
+    }
     [[nodiscard]] engine::script::ScriptRuntime& script() noexcept { return _runtime; }
     [[nodiscard]] engine::script::ServerApi& script_server() noexcept { return _server; }
     [[nodiscard]] const engine::network::StringTable& strings() const noexcept { return _strings; }
@@ -54,6 +58,7 @@ private:
     engine::script::ServerApi& _server;
     engine::network::StringTable _strings;
     engine::core::FieldRegistry _fields;
+    engine::network::UdpServerTransport _transport;
     engine::network::NetworkServer network_;
     Collisions _collisions;
 };

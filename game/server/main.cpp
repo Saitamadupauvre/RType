@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
 
     std::signal(SIGINT, request_stop);
     std::signal(SIGTERM, request_stop);
-    std::cout << "Listening on UDP port " << app.network().port() << "\n";
+    std::cout << "Listening on UDP port " << app.transport().port() << "\n";
     app.run([] { return stop_requested != 0; });
     return 0;
 }
