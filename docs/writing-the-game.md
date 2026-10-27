@@ -191,11 +191,12 @@ Destruction itself is deferred to the end of the tick; side effects go in
 `on_destroy`. An entity marked this way gets no further `on_collide` in the
 same tick.
 
-### Read input as actions
+### Read input through the bindings
 
-Use `self.input:axis("move_x")`, `self.input:axis("move_y")` and
-`self.input:pressed("fire")`. Never refer to keys: bindings belong to the
-client.
+`self.input` holds raw keys and mouse buttons (`self.input:key("Space")`,
+`self.input:mouse("Left")`, `self.input:pointer()`). Gameplay code reads actions
+through `lib/controls.lua` (`controls.pressed(input, "fire")`,
+`controls.axis(input, "move_x")`), so remapping a key is a one-line change there.
 
 ### Keep data in config and fields
 

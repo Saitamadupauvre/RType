@@ -157,8 +157,8 @@ r-type/
 │   └── graphics-raylib/    the only code that includes raylib.h
 ├── game/
 │   ├── server/             → r-type_server (Cli, ServerApp, main.cpp)
-│   ├── client/             → r-type_client (Cli, Controls, SnapshotView, Starfield, main.cpp)
-│   ├── common/             input encoding shared by both
+│   ├── client/             → r-type_client (Cli, SnapshotView, Starfield, main.cpp)
+│   ├── common/             field registry shared by both
 │   ├── sandbox/            → r-type_sandbox
 │   └── scripts/            Lua game code (free layout, see §10)
 ├── assets/                 sprites
@@ -219,7 +219,7 @@ while (!renderer.should_close()) {
     network.update();                                  // snapshots, retries, heartbeats, server timeout
     loop.run_frame([&](Duration step) {                // fixed 60 Hz
         starfield.update(step);
-        network.send_input(pack_input(read_controls(input)));
+        network.send_input(engine::graphics::capture_input(input));
     });
     starfield.draw(renderer);
     view.draw(network.entities(), network.types(), network.player_id());
@@ -662,20 +662,41 @@ end
 
 ### 10.8 Player input
 
-Clients send **actions**, not keys. The server exposes them on player entities:
+Clients send their **raw keyboard and mouse state** every tick: every key and mouse button held, and the mouse position in virtual units. The engine gives keys no meaning; the game's scripts decide what each key does, so bindings are plain Lua and nothing is declared or kept in sync with the client.
 
 ```lua
 function update(self, dt)
     local input = self.input
-    self.vx = input:axis("move_x") * self.speed
-    self.vy = input:axis("move_y") * self.speed
-    if input:pressed("fire") then
+    if input:key("Space") or input:mouse("Left") then
         spawn("player_missile", { x = self.x + 30, y = self.y, owner = self })
     end
+    local x, y = input:pointer()
 end
 ```
 
-`self.input` is available on every entity and is read-only. `input:axis(name)` returns a value in [-1, 1] (`move_x`: left/right, `move_y`: up/down), `input:pressed(name)` is true while the action is held. An entity reads the input of its `owner`; entities without one read a neutral input (axes 0, nothing pressed).
+`self.input` is available on every entity and is read-only:
+
+| Call | Returns |
+|---|---|
+| `input:key(name)` | `true` while the key is held. Names are the engine's `Key` enumerators: `"A"` to `"Z"`, `"Num0"` to `"Num9"`, `"Space"`, `"Enter"`, `"Left"`, `"Up"`, `"LeftShift"`, `"F1"`... (case-sensitive) |
+| `input:mouse(name)` | `true` while the mouse button is held: `"Left"`, `"Right"` or `"Middle"` |
+| `input:pointer()` | the mouse `x, y` in whole virtual units, or `nil` when the client sends none |
+
+An unknown key or button name (`input:key("Spcae")`) raises a Lua error. An entity reads the input of its `owner`; entities without one read a neutral input (nothing held, no pointer).
+
+Actions are a game-side convenience: R-Type keeps its bindings in `lib/controls.lua` and reads `controls.pressed(input, "fire")` and `controls.axis(input, "move_x")`:
+
+```lua
+-- lib/controls.lua (excerpt)
+local actions = {
+    fire = { keys = { "Space" } },
+}
+
+local axes = {
+    move_x = { negative = { "Left", "Q" }, positive = { "Right", "D" } },
+    move_y = { negative = { "Up", "Z" }, positive = { "Down", "S" } },
+}
+```
 
 Players are handled by two optional callbacks of `main.lua`. The engine calls them when a client connects or leaves; scripts never see the network:
 
@@ -693,20 +714,7 @@ end
 
 A player handle has `id` (stable while connected), `slot` (lowest free index from 0, reused after a departure), `connected`, and `player:entities()` (live entities it owns). Without `on_player_left`, the engine destroys the player's entities itself. Errors in either callback are logged and the game continues.
 
-Button actions travel as bits in the order of the shared action list (`fire` is bit 0), axes as `-1`, `0` or `1` (the protocol rounds them); the server and the client use the same table, so the layout cannot drift.
-
-Key bindings are data, editable by the player (remapping, not implemented yet; the defaults below are built in):
-
-```lua
--- config/input.lua
-actions = {
-    move_up    = { "Up", "Z" },
-    move_down  = { "Down", "S" },
-    move_left  = { "Left", "Q" },
-    move_right = { "Right", "D" },
-    fire       = { "Space" },
-}
-```
+Keys travel as a 128-bit set indexed by `Key` value, mouse buttons as 3 bits, the pointer as two 16-bit ints; see [protocol.md](protocol.md). Remapping is a Lua change on the server; per-player remapping and client-side bindings come with client scripts.
 
 ### 10.9 Coroutines
 

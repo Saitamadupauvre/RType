@@ -5,7 +5,7 @@ what happens when something goes wrong. The wire format itself is specified
 in the [protocol](protocol.md).
 
 Everything here is generic: the module knows players, entities with a type
-id, inputs made of action bits and two axes, but nothing about R-Type.
+id, inputs made of the keys and mouse buttons held and a pointer, but nothing about R-Type.
 
 ## Public API
 
@@ -43,6 +43,7 @@ engine/src/network/
 ├── session/     ServerSessions, ClientConnection
 ├── snapshot/    ReplicatedFields + SnapshotBuilder (server), SnapshotReceiver (client)
 ├── event/       public events <-> protocol events
+├── input/       InputCodec: InputState <-> input payload (key bits, mouse bits, pointer)
 ├── stats/       TrafficMeter
 ├── server/      ServerNetwork: one server tick of networking, without sockets
 ├── Server.cpp   NetworkServer = NetworkIo + ServerNetwork

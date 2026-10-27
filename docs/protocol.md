@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Category | Informational |
-| Protocol version | `6` |
+| Protocol version | `7` |
 | Transport | UDP |
 | Implementation | `engine/src/network/` |
 
@@ -49,7 +49,7 @@ Every datagram consists of a 13-byte header followed by `payload_size` payload b
 | Offset | Size | Field | Encoding | Value |
 |---|---:|---|---|---|
 | 0 | 4 | `magic` | Unsigned 32-bit, big-endian | `0x52545950` (`RTYP`) |
-| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `6` |
+| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `7` |
 | 6 | 1 | `type` | Unsigned 8-bit | Message type |
 | 7 | 4 | `sequence` | Unsigned 32-bit, big-endian | Sender packet sequence |
 | 11 | 2 | `payload_size` | Unsigned 16-bit, big-endian | Number of bytes after the header |
@@ -69,7 +69,7 @@ Receivers must reject a datagram when its size is smaller than 13 bytes, its mag
 | 6 | `heartbeat` | Both directions | Unreliable |
 | 7 | `disconnect` | Both directions | Reliable |
 
-The "Delivery" column states the intended guarantee. In version 6 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
+The "Delivery" column states the intended guarantee. In version 7 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
 
 ## Connection Payloads
 
@@ -140,17 +140,20 @@ Packets from an endpoint without a session, other than `connect_request`, are ig
 
 ## Input Payload
 
-An input message has a three-byte payload. The server identifies the player from the endpoint and session established by the connection flow. The payload contains no client ID or player position.
+An input message carries the raw keyboard and mouse state of the player: every key and mouse button held, and an optional pointer position. The server identifies the player from the endpoint and session established by the connection flow. The payload contains no client ID or player position. It is 18 bytes long, or 22 with a pointer:
 
 | Offset | Size | Field | Encoding | Allowed values |
 |---|---:|---|---|---|
-| 0 | 1 | `action_flags` | Unsigned 8-bit bit set | Bit 0 is `fire`; bits 1-7 must be zero |
-| 1 | 1 | `move_x` | Signed 8-bit | `-1`, `0`, or `1` |
-| 2 | 1 | `move_y` | Signed 8-bit | `-1`, `0`, or `1` |
+| 0 | 16 | `keys` | 128-bit set: key `k` is bit `k % 8` (lowest first) of byte `k / 8` | Bits of keys 1 to 105 only (`A` = 1 … `GraveAccent` = 105); bit 0 (`Unknown`) and bits 106-127 must be zero |
+| 16 | 1 | `mouse_buttons` | Bit set | Bit 0 `Left`, bit 1 `Right`, bit 2 `Middle`; bits 3-7 must be zero |
+| 17 | 1 | `flags` | Bit set | Bit 0: a pointer follows; bits 1-7 must be zero |
+| 18 | 4 | `pointer` | Two signed 16-bit big-endian ints `x`, `y` | Present only with bit 0 of `flags`; virtual units |
 
-The server must reject input payloads that are not exactly three bytes, have reserved action bits set, or contain movement values outside `-1`, `0`, and `1`.
+Key values are those of the engine's `Key` enumeration (`engine/core/Keys.hpp`), physical keys independent of the graphics backend; adding a key there changes the wire format and needs a new protocol version. The engine gives keys no meaning: the server's scripts decide what each one does.
 
-The client sends its current input every tick while connected; an input also counts as a heartbeat. The server keeps only the latest input of each session, starting from an idle input (no action, no movement). An input whose packet sequence is not newer than the last accepted input of that session (duplicated or out of order, with wrap-around) is ignored, but still refreshes the session. Inputs from an endpoint without a session are ignored.
+The receiver rejects input payloads that are truncated or have trailing bytes, hold bit 0 or a bit above the last key, hold an unknown mouse button, or set unknown `flags` bits.
+
+The client sends its current input every tick while connected; an input also counts as a heartbeat. The server keeps only the latest input of each session, starting from an idle input (nothing held, no pointer). An input whose packet sequence is not newer than the last accepted input of that session (duplicated or out of order, with wrap-around) is ignored, but still refreshes the session. Inputs from an endpoint without a session are ignored.
 
 ## Snapshot Payload
 
@@ -275,40 +278,41 @@ All bytes are hexadecimal.
 `connect_request` with nonce `0x01020304`, sequence `0`:
 
 ```
-52 54 59 50  00 06  01  00 00 00 00  00 04  01 02 03 04
+52 54 59 50  00 07  01  00 00 00 00  00 04  01 02 03 04
 magic        ver    type sequence    size   client_nonce
 ```
 
-`input` holding `fire` and moving left, sequence `42`:
+`input` holding `Space` (key 58) and `Left` (key 56), no mouse button, pointer at (640, 360), sequence `42`:
 
 ```
-52 54 59 50  00 06  03  00 00 00 2A  00 03  01  FF  00
-                                            fire x=-1 y=0
+52 54 59 50  00 07  03  00 00 00 2A  00 16
+00 00 00 00  00 00 00 05  00 00 00 00  00 00 00 00   keys: byte 7 = keys 56, 58
+00  01  02 80  01 68                                 mouse, flags, x=640, y=360
 ```
 
 `heartbeat`, sequence `7`:
 
 ```
-52 54 59 50  00 06  06  00 00 00 07  00 00
+52 54 59 50  00 07  06  00 00 00 07  00 00
 ```
 
 `disconnect` with reason `normal`, sequence `8`:
 
 ```
-52 54 59 50  00 06  07  00 00 00 08  00 01  00
+52 54 59 50  00 07  07  00 00 00 08  00 01  00
 ```
 
 `event` `music` playing music id `1`, sequence `9`:
 
 ```
-52 54 59 50  00 06  05  00 00 00 09  00 03  06  00 01
+52 54 59 50  00 07  05  00 00 00 09  00 03  06  00 01
                                             music music_id
 ```
 
 `event` `named` with name id `2` and one `vec2` argument of key id `1` at `(10, -4)`, sequence `10`:
 
 ```
-52 54 59 50  00 06  05  00 00 00 0A  00 0A  07  00 02  01  00 01  04  00 0A FF FC
+52 54 59 50  00 07  05  00 00 00 0A  00 0A  07  00 02  01  00 01  04  00 0A FF FC
                                             named name  n   key   vec2 x     y
 ```
 
@@ -347,7 +351,7 @@ The server and the clients treat every datagram as hostile.
 | Memory exhaustion through announced counts | Counts (`entity_count`, `type_count`, `sound_count`, `music_count`) are checked against the bytes actually present **before** allocating |
 | Path traversal through sound or music names | Names are only used after checking they are plain file names (no `/`, `\`, leading `.`); others are ignored |
 | Flooding the server | The receive queue is bounded (4096 messages); extra messages are dropped. Sessions are limited to `max_players` |
-| Cheating by sending positions | Clients only send inputs (one bit and two values in `{-1, 0, 1}`); the server computes every position |
+| Cheating by sending positions | Clients only send inputs (keys and mouse buttons held, and a pointer); the server computes every position |
 | Replayed or reordered inputs | Inputs older than the last accepted sequence are ignored |
 | Spoofed packets from another endpoint | Messages from an endpoint without a session are ignored. The protocol has no authentication or encryption: an attacker who can spoof a player's IP address and port can inject inputs for that player. This is accepted for a LAN game and listed as future work |
 | Memory disclosure | C++ object memory is never sent; every field is written explicitly in big-endian order |

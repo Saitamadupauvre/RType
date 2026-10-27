@@ -28,7 +28,7 @@ flowchart TB
     subgraph Game["Game layer (game/)"]
         LUA["Lua scripts<br/>game/scripts"]
         SRV["r-type_server<br/>ServerApp"]
-        CLI["r-type_client<br/>SnapshotView, Starfield, Controls"]
+        CLI["r-type_client<br/>SnapshotView, Starfield"]
     end
     subgraph Engine["Engine layer (engine/), shared libraries"]
         CORE["engine-core<br/>ECS, scheduler, event bus,<br/>clock, fixed-step loop, log, DynamicLibrary"]
@@ -185,7 +185,7 @@ classDiagram
         class NetworkClient {
             +connect(ip, port, error_code&) bool
             +update()
-            +send_input(flags, move_x, move_y)
+            +send_input(InputState)
             +disconnect()
             +state() ConnectionState
             +strings() StringTable
@@ -345,8 +345,8 @@ sequenceDiagram
 
 1. `network.update()`: apply received snapshots and events, retry the
    connection, send heartbeats, detect a silent server.
-2. Read the keyboard through `IInput` and turn it into actions
-   (`Controls.cpp`).
+2. Capture every key and mouse button held, and the mouse position, through
+   `IInput` (`engine::graphics::capture_input`).
 3. In fixed 1/60 s steps: scroll the starfield and send the input to the
    server.
 4. Draw the starfield, then every replicated entity with
@@ -377,8 +377,8 @@ The client never runs game rules: it draws what the server sent.
 | CMake helpers (`engine_add_module`, `engine_add_plugin`) | `engine/cmake/EngineModule.cmake` |
 | Raylib backends | `plugins/graphics-raylib/src/`, `plugins/audio-raylib/src/` |
 | Server wiring | `game/server/` (`main.cpp`, `ServerApp`, `Cli`) |
-| Client wiring | `game/client/` (`main.cpp`, `SnapshotView`, `Starfield`, `Controls`, `AudioPlayer`, `Cli`) |
-| Input encoding shared by both | `game/common/ActionCodec` |
+| Client wiring | `game/client/` (`main.cpp`, `SnapshotView`, `Starfield`, `AudioPlayer`, `Cli`) |
+| Field registry shared by both | `game/common/GameFields` |
 | Game rules | `game/scripts/` |
 | Tests | `tests/engine/<module>/`, `tests/game/<target>/`, `tests/plugins/<name>/` |
 

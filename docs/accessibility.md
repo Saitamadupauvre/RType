@@ -14,7 +14,7 @@ Status: ✅ available, 🔜 planned for the next releases.
 | Two key sets at once | ✅ | Arrow keys and `ZQSD` both move the ship, so the game can be played with the right or the left hand only. |
 | No precision timing on menus | ✅ | There are no menus to navigate: launching the client joins the game, and a new round starts automatically. |
 | Generous pace | ✅ | Enemies are spawned at a fixed, moderate rate; the game never speeds up. |
-| Remappable controls | 🔜 | Bindings are already data (an action → keys table in `game/client/Controls.cpp`) and the input interface exposes `last_key_pressed()` for a remapping screen. Next: load the table from a user file and add the screen. Inspired by *Celeste* and *The Last of Us Part II*. |
+| Remappable controls | 🔜 | Bindings are already data (an action → keys table in `game/scripts/lib/controls.lua`, read by the server from the raw keys clients send) and the input interface exposes `last_key_pressed()` for a remapping screen. Next: per-player bindings from a user file and the screen. Inspired by *Celeste* and *The Last of Us Part II*. |
 | Gamepad support | 🔜 | Through the same action table. |
 | Adjustable game speed | 🔜 | A server option scaling the fixed step, like *Celeste*'s assist mode. |
 

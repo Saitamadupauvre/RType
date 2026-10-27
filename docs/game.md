@@ -6,8 +6,8 @@ C++ executables, and the game itself, written in Lua.
 ```
 game/
 ├── server/       r-type_server: Cli, ServerApp, main.cpp
-├── client/       r-type_client: Cli, Controls, SnapshotView, WorldDraw, Starfield, main.cpp
-├── common/       ActionCodec: input encoding shared by both
+├── client/       r-type_client: Cli, SnapshotView, WorldDraw, Starfield, main.cpp
+├── common/       GameFields: the field registry shared by both
 ├── sandbox/      r-type_sandbox: scratch executable to try the engine out (option `RTYPE_BUILD_SANDBOX`, on by default)
 └── scripts/      the Lua game, main.lua is the entry point
 ```
@@ -37,9 +37,8 @@ tests in `tests/game/` link the same code.
 | `r-type_server_cli` | static | `server/Cli.cpp` | clap |
 | `r-type_server_app` | static | `server/ServerApp.cpp` | core, script, network, `r-type_common` |
 | `r-type_server` | executable | `server/main.cpp` | `r-type_server_app` |
-| `r-type_common` | static | `common/ActionCodec.cpp` | script |
+| `r-type_common` | static | `common/GameFields.cpp` | core, network, physics, script |
 | `r-type_client_cli` | static | `client/Cli.cpp` | clap |
-| `r-type_client_controls` | static | `client/Controls.cpp` | graphics, script |
 | `r-type_client_draw` | static | `client/Starfield.cpp`, `WorldDraw.cpp`, `SnapshotView.cpp` | core, graphics, network |
 | `r-type_client` | executable | `client/main.cpp` | the client libraries; builds `graphics-raylib` with it |
 
@@ -78,13 +77,11 @@ server.
 ### Client
 
 `main.cpp` loads the graphics plugin from `plugins/`, connects, opens a
-1280 × 720 window and loops: update the network, read the controls, send the
+1280 × 720 window and loops: update the network, capture the keys and mouse held, send the
 input and scroll the starfield in fixed steps, draw.
 
 | File | Role |
 |---|---|
-| `Controls.cpp` | Keys → actions: arrows or `ZQSD` give `move_x` / `move_y`, `Space` gives `fire` |
-| `common/ActionCodec.cpp` | Actions → protocol input (`fire` is bit 0, axes rounded to -1/0/1) and back on the server |
 | `Starfield.cpp` | Three parallax layers of stars scrolling at 40, 100 and 220 units/s, seeded so it looks the same every run |
 | `SnapshotView.cpp` | Mirrors the received entities into a local ECS and draws each with `assets/sprites/<type>.png` tinted with its colour; unknown sprite → coloured square; a white dot marks the local player's entities |
 | `WorldDraw.cpp` | Draws every `Position` + `Sprite`, caching textures by path |
@@ -103,7 +100,7 @@ game/scripts/
 ├── enemies/bydo.lua      entity "bydo": flies left, shoots after 0.8 s then every 2.5 s
 ├── enemies/bydo_shot.lua entity "bydo_shot": flies left, destroys the ship it hits
 ├── enemies/spawner.lua   entity "bydo_spawner": one Bydo every 1.5 s at a random height
-└── lib/                  config.lua (every tunable value), roster.lua (groups)
+└── lib/                  config.lua (every tunable value), roster.lua (groups), controls.lua (key bindings)
 ```
 
 - Every `.lua` file under `scripts/` is loaded, except `lib/`, reached with
