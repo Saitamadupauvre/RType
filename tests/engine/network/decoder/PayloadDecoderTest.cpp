@@ -89,54 +89,83 @@ engine::network::StringTable sample_strings() {
                        {.category = StringCategory::field, .id = 1, .name = "Position.pos"}});
 }
 
+std::vector<std::uint8_t> raw_input(std::uint8_t first_key_byte, std::uint8_t last_key_byte,
+                                    std::uint8_t mouse_buttons, std::uint8_t flags) {
+    std::vector<std::uint8_t> payload(16, 0x00);
+    payload.front() = first_key_byte;
+    payload.back() = last_key_byte;
+    payload.push_back(mouse_buttons);
+    payload.push_back(flags);
+    return payload;
+}
+
 } // namespace
 
 TEST(InputPayload, DecodesValidPayload) {
-    const std::array<std::uint8_t, 3> payload{0x01, 0xFF, 0x01};
+    auto payload = raw_input(0x06, 0x00, 0x03, 0x01);
+    for (const std::uint8_t byte : {0x00, 0x0A, 0xFF, 0xF6}) {
+        payload.push_back(byte);
+    }
 
-    const InputPayload expected{.action_flags = 0x01, .move_x = -1, .move_y = 1};
-
+    InputPayload expected{};
+    expected.keys[0] = 0x06;
+    expected.mouse_buttons = 0x03;
+    expected.pointer = engine::network::PointerPosition{.x = 10, .y = -10};
     EXPECT_EQ(decode_input(payload), expected);
 }
 
-TEST(InputPayload, RoundTripsEveryValidCombination) {
-    constexpr std::array<std::uint8_t, 2> flag_values{0x00, 0x01};
-    constexpr std::array<std::int8_t, 3> axis_values{-1, 0, 1};
+TEST(InputPayload, RoundTripsBoundaryValues) {
+    InputPayload idle{};
+    InputPayload busy{};
+    busy.keys.fill(0xFF);
+    busy.keys[0] = 0xFE;
+    busy.keys[13] = 0x03;
+    busy.keys[14] = 0x00;
+    busy.keys[15] = 0x00;
+    busy.mouse_buttons = 0x07;
+    busy.pointer = engine::network::PointerPosition{.x = -32768, .y = 32767};
 
-    for (const auto flags : flag_values) {
-        for (const auto move_x : axis_values) {
-            for (const auto move_y : axis_values) {
-                const InputPayload input{.action_flags = flags, .move_x = move_x, .move_y = move_y};
-
-                EXPECT_EQ(decode_input(encoded(input)), input);
-            }
-        }
+    for (const auto& input : {idle, busy}) {
+        EXPECT_EQ(decode_input(encoded(input)), input);
     }
 }
 
-TEST(InputPayload, DecoderRejectsReservedActionBits) {
+TEST(InputPayload, DecoderRejectsTheUnknownKey) {
+    EXPECT_FALSE(decode_input(raw_input(0x01, 0x00, 0x00, 0x00)).has_value());
+}
+
+TEST(InputPayload, DecoderRejectsBitsAfterTheLastKey) {
+    EXPECT_FALSE(decode_input(raw_input(0x00, 0x01, 0x00, 0x00)).has_value());
+}
+
+TEST(InputPayload, DecoderRejectsUnknownMouseButtons) {
+    EXPECT_FALSE(decode_input(raw_input(0x00, 0x00, 0x08, 0x00)).has_value());
+}
+
+TEST(InputPayload, DecoderRejectsUnknownFlags) {
     for (unsigned int bit = 1; bit < 8; ++bit) {
-        const std::array<std::uint8_t, 3> payload{static_cast<std::uint8_t>(1U << bit), 0, 0};
-
-        EXPECT_FALSE(decode_input(payload).has_value()) << "bit " << bit;
+        EXPECT_FALSE(decode_input(raw_input(0x00, 0x00, 0x00, static_cast<std::uint8_t>(1U << bit)))
+                         .has_value())
+            << "bit " << bit;
     }
-}
-
-TEST(InputPayload, DecoderRejectsOutOfRangeMovement) {
-    EXPECT_FALSE(decode_input(std::array<std::uint8_t, 3>{0x00, 0x02, 0x00}).has_value());
-    EXPECT_FALSE(decode_input(std::array<std::uint8_t, 3>{0x00, 0xFE, 0x00}).has_value());
-    EXPECT_FALSE(decode_input(std::array<std::uint8_t, 3>{0x00, 0x00, 0x7F}).has_value());
-    EXPECT_FALSE(decode_input(std::array<std::uint8_t, 3>{0x00, 0x00, 0x80}).has_value());
 }
 
 TEST(InputPayload, DecoderRejectsTruncatedPayload) {
-    EXPECT_FALSE(decode_input(std::vector<std::uint8_t>{}).has_value());
-    EXPECT_FALSE(decode_input(std::vector<std::uint8_t>{0x01}).has_value());
-    EXPECT_FALSE(decode_input(std::vector<std::uint8_t>{0x01, 0x00}).has_value());
+    auto full = raw_input(0x00, 0x00, 0x00, 0x01);
+    full.insert(full.end(), {0x00, 0x01, 0x00, 0x02});
+    for (std::size_t size = 0; size < full.size(); ++size) {
+        const std::vector<std::uint8_t> truncated(full.begin(),
+                                                  full.begin() + static_cast<std::ptrdiff_t>(size));
+
+        EXPECT_FALSE(decode_input(truncated).has_value()) << "size " << size;
+    }
 }
 
 TEST(InputPayload, DecoderRejectsTrailingBytes) {
-    EXPECT_FALSE(decode_input(std::vector<std::uint8_t>{0x01, 0x00, 0x00, 0x00}).has_value());
+    auto payload = raw_input(0x00, 0x00, 0x00, 0x00);
+    payload.push_back(0x00);
+
+    EXPECT_FALSE(decode_input(payload).has_value());
 }
 
 TEST(ConnectRequestPayload, RoundTripsBoundaryNonces) {

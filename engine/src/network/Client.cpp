@@ -11,6 +11,7 @@
 #include "engine/network/Events.hpp"
 
 #include "event/GameEvents.hpp"
+#include "input/InputCodec.hpp"
 #include "session/ClientConnection.hpp"
 #include "snapshot/SnapshotReceiver.hpp"
 #include "socket/UdpSocket.hpp"
@@ -159,10 +160,9 @@ void NetworkClient::update() {
     impl_->report_end();
 }
 
-void NetworkClient::send_input(std::uint8_t action_flags, std::int8_t move_x, std::int8_t move_y) {
+void NetworkClient::send_input(const core::InputState& input) {
     if (auto& connection = impl_->connection) {
-        impl_->send(connection->send_input(
-            InputPayload{.action_flags = action_flags, .move_x = move_x, .move_y = move_y}));
+        impl_->send(connection->send_input(to_payload(input)));
     }
 }
 

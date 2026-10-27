@@ -215,7 +215,7 @@ TEST_F(ClientConnectionTest, SendsHeartbeatsAtFixedIntervalOnceConnected) {
 }
 
 TEST_F(ClientConnectionTest, SendsInputOnlyWhileConnected) {
-    const InputPayload input{.action_flags = 1, .move_x = -1, .move_y = 1};
+    const InputPayload input{.keys = {0x02}, .mouse_buttons = 0x01, .pointer = std::nullopt};
     EXPECT_FALSE(connection.send_input(input).has_value());
 
     connect();

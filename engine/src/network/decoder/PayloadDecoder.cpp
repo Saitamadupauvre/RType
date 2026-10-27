@@ -87,6 +87,22 @@ std::optional<EntityState> read_entity(ByteReader& reader) {
     return entity;
 }
 
+std::optional<std::optional<PointerPosition>> read_pointer(ByteReader& reader) {
+    const auto flags = reader.read_u8();
+    if (!flags || (*flags | input_has_pointer) != input_has_pointer) {
+        return std::nullopt;
+    }
+    if (*flags == 0) {
+        return std::optional<PointerPosition>{};
+    }
+    const auto x = reader.read_i16();
+    const auto y = reader.read_i16();
+    if (!x || !y) {
+        return std::nullopt;
+    }
+    return std::optional<PointerPosition>{PointerPosition{.x = *x, .y = *y}};
+}
+
 } // namespace
 
 std::optional<ConnectRequestPayload> decode_connect_request(std::span<const std::uint8_t> payload) {
@@ -125,14 +141,24 @@ std::optional<ConnectAcceptPayload> decode_connect_accept(std::span<const std::u
 
 std::optional<InputPayload> decode_input(std::span<const std::uint8_t> payload) {
     ByteReader reader(payload);
-    const auto action_flags = reader.read_u8();
-    const auto move_x = reader.read_i8();
-    const auto move_y = reader.read_i8();
-    if (!action_flags || !move_x || !move_y || !reader.at_end()) {
+    InputPayload input{};
+    for (std::uint8_t& byte : input.keys) {
+        const auto read = reader.read_u8();
+        if (!read) {
+            return std::nullopt;
+        }
+        byte = *read;
+    }
+    const auto mouse_buttons = reader.read_u8();
+    if (!mouse_buttons) {
         return std::nullopt;
     }
-
-    const InputPayload input{.action_flags = *action_flags, .move_x = *move_x, .move_y = *move_y};
+    input.mouse_buttons = *mouse_buttons;
+    auto pointer = read_pointer(reader);
+    if (!pointer || !reader.at_end()) {
+        return std::nullopt;
+    }
+    input.pointer = *pointer;
     if (!is_valid(input)) {
         return std::nullopt;
     }

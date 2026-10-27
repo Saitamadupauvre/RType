@@ -34,6 +34,9 @@
 namespace {
 
 using engine::core::EntityManager;
+using engine::core::InputState;
+using engine::core::Key;
+using engine::core::MouseButton;
 using engine::core::Position;
 using engine::core::Vec2;
 using engine::core::event::EventBus;
@@ -183,7 +186,7 @@ protected:
 
 TEST_F(NetworkClientTest, IsDisconnectedAndInertBeforeConnecting) {
     client.update();
-    client.send_input(1, 1, 1);
+    client.send_input(InputState{.keys = {Key::Space}, .mouse_buttons = {}, .pointer = {}});
     client.disconnect();
 
     EXPECT_EQ(client.state(), ConnectionState::disconnected);
@@ -229,11 +232,19 @@ TEST_F(NetworkClientTest, ReceivesTheWorldAndSendsInputs) {
     EXPECT_EQ(strings.id_of(StringCategory::type, "player"), 1U);
     EXPECT_EQ(strings.id_of(StringCategory::type, "enemy"), 2U);
 
-    client.send_input(1, -1, 1);
-    ASSERT_TRUE(wait_until(
-        [this] { server.receive(); },
-        [this] { return !server.inputs().empty() && server.inputs().front().move_x == -1; }));
-    EXPECT_EQ(server.inputs().front().move_y, 1);
+    const InputState held{.keys = {Key::Left, Key::Space},
+                          .mouse_buttons = {MouseButton::Right},
+                          .pointer = engine::core::Vec2{12.4F, -3.6F}};
+    client.send_input(held);
+    ASSERT_TRUE(wait_until([this] { server.receive(); },
+                           [this] {
+                               return !server.inputs().empty() &&
+                                      !server.inputs().front().input.keys.empty();
+                           }));
+    const auto sent = server.inputs().front().input;
+    EXPECT_EQ(sent.keys, held.keys);
+    EXPECT_EQ(sent.mouse_buttons, held.mouse_buttons);
+    EXPECT_EQ(sent.pointer, (engine::core::Vec2{12.F, -4.F}));
 
     server.send_snapshot(registry);
     ASSERT_TRUE(

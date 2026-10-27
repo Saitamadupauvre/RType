@@ -65,8 +65,12 @@ Inbound from(const Endpoint& endpoint, Message message, std::uint32_t sequence =
 }
 
 Inbound input_from(const Endpoint& endpoint, std::uint32_t sequence, std::int8_t move_x) {
-    return from(endpoint, InputPayload{.action_flags = 1, .move_x = move_x, .move_y = 0}, sequence);
+    InputPayload input{};
+    input.keys[1] = static_cast<std::uint8_t>(move_x);
+    return from(endpoint, input, sequence);
 }
+
+std::int8_t move_x_of(const InputPayload& input) { return static_cast<std::int8_t>(input.keys[1]); }
 
 Inbound connect_from(const Endpoint& endpoint, std::uint32_t nonce = sample_nonce) {
     return from(endpoint, ConnectRequestPayload{.client_nonce = nonce});
@@ -291,9 +295,8 @@ TEST_F(ServerSessionsTest, StoresLatestInputOfEachSession) {
     static_cast<void>(sessions.handle(input_from(client(5001), 3, -1)));
     static_cast<void>(sessions.handle(input_from(client(5000), 4, -1)));
 
-    EXPECT_EQ(sessions.sessions()[0].input.move_x, -1);
-    EXPECT_EQ(sessions.sessions()[0].input.action_flags, 1);
-    EXPECT_EQ(sessions.sessions()[1].input.move_x, -1);
+    EXPECT_EQ(move_x_of(sessions.sessions()[0].input), -1);
+    EXPECT_EQ(move_x_of(sessions.sessions()[1].input), -1);
 }
 
 TEST_F(ServerSessionsTest, IgnoresOutOfOrderInput) {
@@ -302,7 +305,7 @@ TEST_F(ServerSessionsTest, IgnoresOutOfOrderInput) {
     static_cast<void>(sessions.handle(input_from(client(5000), 10, 1)));
     static_cast<void>(sessions.handle(input_from(client(5000), 9, -1)));
 
-    EXPECT_EQ(sessions.sessions().front().input.move_x, 1);
+    EXPECT_EQ(move_x_of(sessions.sessions().front().input), 1);
 }
 
 TEST_F(ServerSessionsTest, IgnoresDuplicateInput) {
@@ -311,7 +314,7 @@ TEST_F(ServerSessionsTest, IgnoresDuplicateInput) {
     static_cast<void>(sessions.handle(input_from(client(5000), 10, 1)));
     static_cast<void>(sessions.handle(input_from(client(5000), 10, -1)));
 
-    EXPECT_EQ(sessions.sessions().front().input.move_x, 1);
+    EXPECT_EQ(move_x_of(sessions.sessions().front().input), 1);
 }
 
 TEST_F(ServerSessionsTest, AcceptsInputAcrossSequenceWrap) {
@@ -320,7 +323,7 @@ TEST_F(ServerSessionsTest, AcceptsInputAcrossSequenceWrap) {
     static_cast<void>(sessions.handle(input_from(client(5000), 0xFFFF'FFFF, 1)));
     static_cast<void>(sessions.handle(input_from(client(5000), 0, -1)));
 
-    EXPECT_EQ(sessions.sessions().front().input.move_x, -1);
+    EXPECT_EQ(move_x_of(sessions.sessions().front().input), -1);
 }
 
 TEST_F(ServerSessionsTest, OlderInputStillKeepsSessionAlive) {
@@ -352,7 +355,7 @@ TEST_F(ServerSessionsTest, ReconnectedSessionAcceptsInputWithLowerSequence) {
 
     static_cast<void>(sessions.handle(input_from(client(5000), 2, -1)));
 
-    EXPECT_EQ(sessions.sessions().front().input.move_x, -1);
+    EXPECT_EQ(move_x_of(sessions.sessions().front().input), -1);
 }
 
 TEST_F(ServerSessionsTest, AnswersEveryHeartbeatWithAHeartbeat) {

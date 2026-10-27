@@ -8,6 +8,7 @@
 
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Audio.hpp"
@@ -38,9 +39,9 @@ struct ENGINE_NETWORK_EXPORT ServerOptions {
  */
 struct ENGINE_NETWORK_EXPORT PlayerInput {
     std::uint32_t player_id;
-    std::uint8_t action_flags;
-    std::int8_t move_x;
-    std::int8_t move_y;
+    /** @brief Keys and mouse buttons held, and the pointer with whole coordinates when the
+     * client sent one. */
+    core::InputState input;
 };
 
 #ifdef _MSC_VER

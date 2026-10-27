@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <span>
 #include <string>
 #include <unordered_set>
 #include <variant>
+
+#include "engine/core/Keys.hpp"
 
 #include "FieldWire.hpp"
 #include "Protocol.hpp"
@@ -14,9 +17,24 @@ namespace engine::network {
 
 namespace {
 
-constexpr std::uint8_t known_action_flags = 0x01;
+static_assert(core::key_count <= input_key_bytes * 8);
+static_assert(core::mouse_button_count <= 8);
 
-bool is_unit_axis(std::int8_t value) noexcept { return value >= -1 && value <= 1; }
+bool is_bit_set(std::span<const std::uint8_t> bits, std::size_t index) noexcept {
+    return ((static_cast<unsigned int>(bits[index / 8]) >> (index % 8)) & 1U) != 0;
+}
+
+bool holds_only_known_keys(const InputPayload& payload) noexcept {
+    if (is_bit_set(payload.keys, static_cast<std::size_t>(core::Key::Unknown))) {
+        return false;
+    }
+    for (std::size_t index = core::key_count; index < input_key_bytes * 8; ++index) {
+        if (is_bit_set(payload.keys, index)) {
+            return false;
+        }
+    }
+    return true;
+}
 
 std::size_t encoded_size(const ConnectAcceptPayload& payload) noexcept {
     std::size_t size = connect_accept_prefix_size;
@@ -82,8 +100,8 @@ std::size_t entities_size(const SnapshotPayload& payload) noexcept {
 } // namespace
 
 bool is_valid(const InputPayload& payload) noexcept {
-    return (payload.action_flags | known_action_flags) == known_action_flags &&
-           is_unit_axis(payload.move_x) && is_unit_axis(payload.move_y);
+    return holds_only_known_keys(payload) &&
+           (static_cast<unsigned int>(payload.mouse_buttons) >> core::mouse_button_count) == 0;
 }
 
 bool is_valid(const SnapshotPayload& payload) {

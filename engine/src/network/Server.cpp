@@ -6,6 +6,7 @@
 #include "engine/network/Events.hpp"
 
 #include "event/GameEvents.hpp"
+#include "input/InputCodec.hpp"
 #include "protocol/Validation.hpp"
 #include "server/ServerNetwork.hpp"
 #include "socket/UdpSocket.hpp"
@@ -100,10 +101,8 @@ void NetworkServer::receive() { impl_->send_all(impl_->network.receive(impl_->io
 std::vector<PlayerInput> NetworkServer::inputs() const {
     std::vector<PlayerInput> inputs;
     for (const auto& session : impl_->network.sessions()) {
-        inputs.push_back(PlayerInput{.player_id = session.player_id,
-                                     .action_flags = session.input.action_flags,
-                                     .move_x = session.input.move_x,
-                                     .move_y = session.input.move_y});
+        inputs.push_back(
+            PlayerInput{.player_id = session.player_id, .input = to_input_state(session.input)});
     }
     return inputs;
 }

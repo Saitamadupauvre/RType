@@ -54,6 +54,7 @@ engine_add_test(network SOURCES
     engine/network/decoder/PayloadDecoderTest.cpp
     engine/network/encoder/PayloadEncoderTest.cpp
     engine/network/event/GameEventsTest.cpp
+    engine/network/input/InputCodecTest.cpp
     engine/network/protocol/FieldWireTest.cpp
     engine/network/protocol/ProtocolHandlerTest.cpp
     engine/network/protocol/ReceivedStringsTest.cpp

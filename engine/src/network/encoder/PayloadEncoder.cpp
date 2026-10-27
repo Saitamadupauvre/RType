@@ -140,9 +140,15 @@ EncodedPayload encode_payload(const InputPayload& payload) {
     }
 
     ByteWriter writer;
-    writer.write_u8(payload.action_flags);
-    writer.write_i8(payload.move_x);
-    writer.write_i8(payload.move_y);
+    for (const std::uint8_t byte : payload.keys) {
+        writer.write_u8(byte);
+    }
+    writer.write_u8(payload.mouse_buttons);
+    writer.write_u8(payload.pointer ? input_has_pointer : 0);
+    if (payload.pointer) {
+        writer.write_i16(payload.pointer->x);
+        writer.write_i16(payload.pointer->y);
+    }
     return std::move(writer).take();
 }
 

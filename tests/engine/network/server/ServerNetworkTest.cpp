@@ -112,7 +112,8 @@ TEST_F(ServerNetworkTest, OneTickConnectsStoresInputsAndSendsSnapshots) {
     const auto replies = network.receive({
         from(client(5000), ConnectRequestPayload{.client_nonce = 1}),
         from(client(5001), ConnectRequestPayload{.client_nonce = 2}),
-        from(client(5000), InputPayload{.action_flags = 1, .move_x = 1, .move_y = 0}, 1),
+        from(client(5000),
+             InputPayload{.keys = {0x02}, .mouse_buttons = 0, .pointer = std::nullopt}, 1),
     });
     const auto snapshot = network.snapshot(registry);
 
@@ -120,7 +121,7 @@ TEST_F(ServerNetworkTest, OneTickConnectsStoresInputsAndSendsSnapshots) {
     EXPECT_TRUE(std::holds_alternative<ConnectAcceptPayload>(replies[0].message));
     EXPECT_TRUE(std::holds_alternative<ConnectAcceptPayload>(replies[1].message));
     ASSERT_EQ(network.sessions().size(), 2U);
-    EXPECT_EQ(network.sessions()[0].input.move_x, 1);
+    EXPECT_EQ(network.sessions()[0].input.keys[0], 0x02);
     EXPECT_EQ(network.server_tick(), 1U);
     for (const auto port : {5000, 5001}) {
         const auto received = snapshots_to(snapshot, client(static_cast<std::uint16_t>(port)));
@@ -265,7 +266,8 @@ TEST_F(ServerNetworkTest, MessagesFromStrangersDoNotDisturbTheTick) {
     connect_clients();
 
     const auto outbound = network.receive({
-        from(client(6000), InputPayload{.action_flags = 1, .move_x = 1, .move_y = 1}, 1),
+        from(client(6000),
+             InputPayload{.keys = {0x02}, .mouse_buttons = 0, .pointer = std::nullopt}, 1),
         from(client(6000), DisconnectPayload{.reason = DisconnectReason::normal}),
     });
 

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <set>
 #include <span>
 #include <system_error>
 #include <thread>
@@ -30,6 +31,7 @@
 namespace {
 
 using engine::core::EntityManager;
+using engine::core::Key;
 using engine::core::Position;
 using engine::core::Vec2;
 using engine::core::event::EventBus;
@@ -177,11 +179,19 @@ TEST_F(NetworkServerTest, ServesAClientOverLoopback) {
     EXPECT_EQ(std::get<ConnectAcceptPayload>(accept->message).client_nonce, 7U);
     EXPECT_EQ(joined, (std::vector<std::uint32_t>{1}));
 
-    send_to_server(peer, InputPayload{.action_flags = 1, .move_x = -1, .move_y = 1}, 1,
-                   server.port());
-    ASSERT_TRUE(receive_until(server, [this] { return server.inputs().front().move_x == -1; }));
-    EXPECT_EQ(server.inputs().front().player_id, 1U);
-    EXPECT_EQ(server.inputs().front().move_y, 1);
+    send_to_server(peer,
+                   InputPayload{.keys = {0x02},
+                                .mouse_buttons = 0x01,
+                                .pointer = engine::network::PointerPosition{.x = 5, .y = -6}},
+                   1, server.port());
+    ASSERT_TRUE(receive_until(
+        server, [this] { return server.inputs().front().input.keys.contains(Key::A); }));
+    const auto input = server.inputs().front();
+    EXPECT_EQ(input.player_id, 1U);
+    EXPECT_EQ(input.input.keys, std::set<Key>{Key::A});
+    EXPECT_EQ(input.input.mouse_buttons,
+              std::set<engine::core::MouseButton>{engine::core::MouseButton::Left});
+    EXPECT_EQ(input.input.pointer, (engine::core::Vec2{5.F, -6.F}));
 
     server.send_snapshot(registry);
     const auto snapshot = receive_from_server(peer);

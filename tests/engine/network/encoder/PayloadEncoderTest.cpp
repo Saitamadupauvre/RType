@@ -59,25 +59,49 @@ std::vector<std::uint8_t> encoded_field(FieldValue value) {
 
 } // namespace
 
-TEST(InputPayload, EncodesFieldsInOrder) {
-    const InputPayload input{.action_flags = 0x01, .move_x = -1, .move_y = 1};
+TEST(InputPayload, EncodesKeysMouseButtonsAndFlags) {
+    InputPayload input{};
+    input.keys[0] = 0x02;
+    input.keys[15] = 0x00;
+    input.mouse_buttons = 0x05;
 
-    EXPECT_EQ(encode_payload(input), (std::vector<std::uint8_t>{0x01, 0xFF, 0x01}));
+    std::vector<std::uint8_t> expected(16, 0x00);
+    expected[0] = 0x02;
+    expected.push_back(0x05);
+    expected.push_back(0x00);
+    EXPECT_EQ(encode_payload(input), expected);
 }
 
-TEST(InputPayload, EncoderRejectsReservedActionBits) {
-    for (unsigned int bit = 1; bit < 8; ++bit) {
-        const InputPayload input{.action_flags = static_cast<std::uint8_t>(1U << bit)};
+TEST(InputPayload, EncodesPointerAfterFlag) {
+    InputPayload input{};
+    input.pointer = engine::network::PointerPosition{.x = -2, .y = 300};
 
-        EXPECT_FALSE(encode_payload(input).has_value()) << "bit " << bit;
+    std::vector<std::uint8_t> expected(17, 0x00);
+    for (const std::uint8_t byte : {0x01, 0xFF, 0xFE, 0x01, 0x2C}) {
+        expected.push_back(byte);
     }
+    EXPECT_EQ(encode_payload(input), expected);
 }
 
-TEST(InputPayload, EncoderRejectsOutOfRangeMovement) {
-    EXPECT_FALSE(encode_payload(InputPayload{.move_x = 2}).has_value());
-    EXPECT_FALSE(encode_payload(InputPayload{.move_x = -2}).has_value());
-    EXPECT_FALSE(encode_payload(InputPayload{.move_y = 2}).has_value());
-    EXPECT_FALSE(encode_payload(InputPayload{.move_y = -128}).has_value());
+TEST(InputPayload, EncoderRejectsTheUnknownKey) {
+    InputPayload input{};
+    input.keys[0] = 0x01;
+
+    EXPECT_FALSE(encode_payload(input).has_value());
+}
+
+TEST(InputPayload, EncoderRejectsBitsAfterTheLastKey) {
+    InputPayload input{};
+    input.keys[15] = 0x80;
+
+    EXPECT_FALSE(encode_payload(input).has_value());
+}
+
+TEST(InputPayload, EncoderRejectsUnknownMouseButtons) {
+    InputPayload input{};
+    input.mouse_buttons = 0x08;
+
+    EXPECT_FALSE(encode_payload(input).has_value());
 }
 
 TEST(ConnectRequestPayload, EncodesNonceInBigEndianOrder) {

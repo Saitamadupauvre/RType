@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -8,6 +10,8 @@
 #include "engine/core/FieldRegistry.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/network/StringTable.hpp"
+
+#include "Protocol.hpp"
 
 namespace engine::network {
 
@@ -26,10 +30,17 @@ struct ConnectAcceptPayload {
     bool operator==(const ConnectAcceptPayload&) const = default;
 };
 
+struct PointerPosition {
+    std::int16_t x{};
+    std::int16_t y{};
+
+    bool operator==(const PointerPosition&) const = default;
+};
+
 struct InputPayload {
-    std::uint8_t action_flags{};
-    std::int8_t move_x{};
-    std::int8_t move_y{};
+    std::array<std::uint8_t, input_key_bytes> keys{};
+    std::uint8_t mouse_buttons{};
+    std::optional<PointerPosition> pointer;
 
     bool operator==(const InputPayload&) const = default;
 };

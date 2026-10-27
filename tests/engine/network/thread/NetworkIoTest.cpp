@@ -57,7 +57,9 @@ Endpoint loopback(std::uint16_t port = 0) {
     return endpoint.value_or(Endpoint{});
 }
 
-Message sample_message() { return InputPayload{.action_flags = 0x01, .move_x = -1, .move_y = 1}; }
+Message sample_message() {
+    return InputPayload{.keys = {0x02}, .mouse_buttons = 0x01, .pointer = std::nullopt};
+}
 
 Bytes encoded(const Message& message) {
     const ProtocolHandler handler;

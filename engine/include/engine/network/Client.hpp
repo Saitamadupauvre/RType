@@ -9,6 +9,7 @@
 
 #include "engine/core/Components.hpp"
 #include "engine/core/FieldRegistry.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Audio.hpp"
@@ -134,12 +135,13 @@ public:
     /**
      * @brief Sends the current input of the local player. Does nothing unless connected.
      *
-     * @param action_flags Bit set of actions; only bit 0 (`fire`) is defined.
-     * @param move_x Horizontal direction: `-1`, `0` or `1`.
-     * @param move_y Vertical direction: `-1`, `0` or `1`.
-     * @note An input outside these values is dropped and logged.
+     * Every key and mouse button held is sent; the server's scripts decide what they mean. The
+     * pointer is rounded to whole virtual units and clamped to 16-bit ints; a NaN coordinate is
+     * sent as 0.
+     *
+     * @param input Keys and mouse buttons held, and the optional pointer position.
      */
-    void send_input(std::uint8_t action_flags, std::int8_t move_x, std::int8_t move_y);
+    void send_input(const core::InputState& input);
 
     /**
      * @brief Tells the server the player leaves, then stops the network threads.
