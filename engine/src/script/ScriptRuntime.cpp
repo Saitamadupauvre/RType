@@ -13,6 +13,7 @@
 #include "RuntimeContext.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/physics/Fields.hpp"
+#include "entity/Instances.hpp"
 #include "loading/Declarations.hpp"
 #include "loading/ModuleLoader.hpp"
 #include "loading/ScriptFiles.hpp"
@@ -412,6 +413,30 @@ std::vector<std::string> ScriptRuntime::event_keys() const { return _impl->conte
 
 std::optional<std::string> ScriptRuntime::entity_type(core::Entity entity) const {
     return _impl->context.entities.type_of(entity);
+}
+
+std::optional<std::string> ScriptRuntime::entity_name(core::Entity entity) const {
+    return _impl->context.entities.name_of(entity);
+}
+
+bool ScriptRuntime::set_entity_name(core::Entity entity, std::string name) {
+    return _impl->context.entities.rename(entity, std::move(name));
+}
+
+std::vector<Instance> ScriptRuntime::capture_instances() {
+    return script::capture_instances(_impl->context);
+}
+
+std::vector<InstanceIssue>
+ScriptRuntime::spawn_instances(std::span<const Instance> instances) noexcept {
+    try {
+        return script::spawn_instances(_impl->context, instances);
+    } catch (const std::exception& exception) {
+        log::error("lua: spawn_instances: {}", exception.what());
+    } catch (...) {
+        log::error("lua: spawn_instances: unknown error");
+    }
+    return {};
 }
 
 void ScriptRuntime::update(float dt) noexcept {

@@ -45,6 +45,7 @@ engine_add_module(script
         src/script/audio/Audio.cpp
         src/script/entity/Entities.cpp
         src/script/entity/EntityFields.cpp
+        src/script/entity/Instances.cpp
         src/script/event/Events.cpp
         src/script/input/LuaInput.cpp
         src/script/loading/Declarations.cpp

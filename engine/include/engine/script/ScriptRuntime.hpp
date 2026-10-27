@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <typeinfo>
@@ -17,6 +18,7 @@
 #include "engine/script/ApiSet.hpp"
 #include "engine/script/Declaration.hpp"
 #include "engine/script/Export.hpp"
+#include "engine/script/Instance.hpp"
 #include "engine/script/ScriptRuntimeBuilder.hpp"
 
 namespace engine::script {
@@ -244,6 +246,54 @@ public:
      * released.
      */
     [[nodiscard]] std::optional<std::string> entity_type(core::Entity entity) const;
+
+    /**
+     * @brief Returns the label of an entity spawned by this runtime.
+     *
+     * @return The name, empty if none was given, or std::nullopt for entities this runtime did not
+     * spawn or already released.
+     */
+    [[nodiscard]] std::optional<std::string> entity_name(core::Entity entity) const;
+
+    /**
+     * @brief Labels an entity spawned by this runtime, as the editor names scene entities.
+     *
+     * Names are free text: they need not be unique and scripts never see them.
+     *
+     * @return false, changing nothing, for entities this runtime did not spawn or already released.
+     */
+    bool set_entity_name(core::Entity entity, std::string name);
+
+    /**
+     * @brief Captures the attached world as one Instance per live entity spawned by this runtime.
+     *
+     * Entities marked with `self:destroy()` and entities this runtime did not spawn are left out.
+     * Instances come in ascending entity id order. An instance stores every editable field of the
+     * entity, except `Position.pos` which is its position, whose value differs from the type's
+     * default: the value the field gets from the prefab's component fields (`sprite`, `hitbox`...)
+     * before `on_spawn` runs. A field of a component the prefab does not give is always stored.
+     *
+     * @return The instances, empty if no world is attached.
+     * @note Lua fields such as `self.health` are not captured. An entity spawned by another
+     * entity's `on_spawn` is captured like any other, so spawning the instances back spawns it
+     * twice.
+     */
+    [[nodiscard]] std::vector<Instance> capture_instances();
+
+    /**
+     * @brief Spawns one entity per instance into the attached world.
+     *
+     * Each instance is spawned as spawn() would at its position and named, then `on_spawn` runs,
+     * then its overrides are written through fields(), so they win over what `on_spawn` set.
+     * Entities already in the world are kept.
+     *
+     * @return What was skipped: an instance whose type is unknown or declared as a system, or
+     * that cannot be spawned; an override naming an unknown or non-editable field, or holding a
+     * value of the wrong kind or out of range. The other instances and overrides are still
+     * applied. Every issue is also logged at Level::Warn.
+     * @note Never throws.
+     */
+    std::vector<InstanceIssue> spawn_instances(std::span<const Instance> instances) noexcept;
 
     /**
      * @brief Advances every live entity by one tick.
