@@ -21,44 +21,57 @@ using core::FieldKind;
     throw std::runtime_error(std::format("{}{}", caller_location(state), message));
 }
 
+struct ValueName {
+    std::string_view label;
+    std::string name;
+};
+
+std::string describe(const ValueName& name) {
+    return std::format("{} '{}'", name.label, name.name);
+}
+
+ValueName entity_field(std::string_view name) {
+    return ValueName{.label = "entity field", .name = std::string(name)};
+}
+
 void require_type(sol::this_state state, const sol::object& value, sol::type expected,
-                  std::string_view name) {
+                  const ValueName& name) {
     if (value.get_type() != expected) {
-        fail(state, std::format("entity field '{}' cannot be set to a {}", name,
+        fail(state, std::format("{} cannot be set to a {}", describe(name),
                                 sol::type_name(state, value.get_type())));
     }
 }
 
-float finite_float(sol::this_state state, double number, std::string_view name) {
+float finite_float(sol::this_state state, double number, const ValueName& name) {
     const auto narrowed = static_cast<float>(number);
     if (!std::isfinite(narrowed)) {
-        fail(state, std::format("entity field '{}' must be a finite number", name));
+        fail(state, std::format("{} must be a finite number", describe(name)));
     }
     return narrowed;
 }
 
-std::int64_t whole_number(sol::this_state state, const sol::object& value, std::string_view name) {
+std::int64_t whole_number(sol::this_state state, const sol::object& value, const ValueName& name) {
     lua_State* lua = state;
     value.push(lua);
     int converted = 0;
     const lua_Integer number = lua_tointegerx(lua, -1, &converted);
     lua_pop(lua, 1);
     if (converted == 0) {
-        fail(state, std::format("entity field '{}' must be a whole number", name));
+        fail(state, std::format("{} must be a whole number", describe(name)));
     }
     return number;
 }
 
 double table_number(sol::this_state state, const sol::table& table, std::string_view key,
-                    std::string_view name) {
+                    const ValueName& name) {
     const auto value = table.raw_get<sol::object>(key);
     if (value.get_type() != sol::type::number) {
-        fail(state, std::format("entity field '{}' needs a number '{}'", name, key));
+        fail(state, std::format("{} needs a number '{}'", describe(name), key));
     }
     return value.as<double>();
 }
 
-core::Vec2 vec2_from_lua(sol::this_state state, const sol::object& value, std::string_view name) {
+core::Vec2 vec2_from_lua(sol::this_state state, const sol::object& value, const ValueName& name) {
     require_type(state, value, sol::type::table, name);
     const auto table = value.as<sol::table>();
     return core::Vec2{finite_float(state, table_number(state, table, "x", name), name),
@@ -66,18 +79,18 @@ core::Vec2 vec2_from_lua(sol::this_state state, const sol::object& value, std::s
 }
 
 std::uint8_t color_channel(sol::this_state state, const sol::table& table, std::string_view key,
-                           std::optional<std::uint8_t> fallback, std::string_view name) {
+                           std::optional<std::uint8_t> fallback, const ValueName& name) {
     if (fallback && table.raw_get<sol::object>(key).get_type() == sol::type::lua_nil) {
         return *fallback;
     }
     const double channel = table_number(state, table, key, name);
     if (!(channel >= 0.0 && channel <= 255.0)) {
-        fail(state, std::format("entity field '{}': '{}' must be in [0, 255]", name, key));
+        fail(state, std::format("{}: '{}' must be in [0, 255]", describe(name), key));
     }
     return static_cast<std::uint8_t>(channel);
 }
 
-core::Rgba color_from_lua(sol::this_state state, const sol::object& value, std::string_view name) {
+core::Rgba color_from_lua(sol::this_state state, const sol::object& value, const ValueName& name) {
     require_type(state, value, sol::type::table, name);
     const auto table = value.as<sol::table>();
     return core::Rgba{.r = color_channel(state, table, "r", std::nullopt, name),
@@ -105,7 +118,7 @@ sol::type lua_type_of(FieldKind kind) {
 }
 
 core::ScalarValue scalar_from_lua(sol::this_state state, const sol::object& value, FieldKind kind,
-                                  std::string_view name) {
+                                  const ValueName& name) {
     require_type(state, value, lua_type_of(kind), name);
     switch (kind) {
     case FieldKind::Float:
@@ -125,22 +138,23 @@ core::ScalarValue scalar_from_lua(sol::this_state state, const sol::object& valu
     case FieldKind::List:
         break;
     }
-    fail(state, std::format("entity field '{}' cannot hold a nested list", name));
+    fail(state, std::format("{} cannot hold a nested list", describe(name)));
 }
 
 core::FieldList list_from_lua(sol::this_state state, const sol::object& value, FieldKind element,
-                              std::string_view name) {
+                              const ValueName& name) {
     require_type(state, value, sol::type::table, name);
     const auto table = value.as<sol::table>();
     core::FieldList list{.element = element, .items = {}};
     for (std::size_t index = 1; index <= table.size(); ++index) {
         const auto item = table.raw_get<sol::object>(index);
         if (item.get_type() != lua_type_of(element)) {
-            fail(state, std::format("entity field '{}' must only hold {}s", name,
+            fail(state, std::format("{} must only hold {}s", describe(name),
                                     core::field_kind_name(element)));
         }
-        list.items.push_back(
-            scalar_from_lua(state, item, element, std::format("{}[{}]", name, index)));
+        list.items.push_back(scalar_from_lua(
+            state, item, element,
+            ValueName{.label = name.label, .name = std::format("{}[{}]", name.name, index)}));
     }
     return list;
 }
@@ -187,16 +201,23 @@ sol::object to_lua(sol::this_state state, const core::FieldValue& value) {
 core::FieldValue from_lua(sol::this_state state, const sol::object& value,
                           const core::FieldDescriptor& field, std::string_view name) {
     if (field.kind() == FieldKind::List) {
-        return list_from_lua(state, value, field.element_kind().value_or(FieldKind::String), name);
+        return list_from_lua(state, value, field.element_kind().value_or(FieldKind::String),
+                             entity_field(name));
     }
+    return from_lua(state, value, field.kind(), "entity field", name);
+}
+
+core::FieldValue from_lua(sol::this_state state, const sol::object& value, FieldKind kind,
+                          std::string_view label, std::string_view name) {
     return std::visit(
         []<typename Value>(Value&& held) { return core::FieldValue{std::forward<Value>(held)}; },
-        scalar_from_lua(state, value, field.kind(), name));
+        scalar_from_lua(state, value, kind, ValueName{.label = label, .name = std::string(name)}));
 }
 
 float number_from_lua(sol::this_state state, const sol::object& value, std::string_view name) {
-    require_type(state, value, sol::type::number, name);
-    return finite_float(state, value.as<double>(), name);
+    const ValueName field = entity_field(name);
+    require_type(state, value, sol::type::number, field);
+    return finite_float(state, value.as<double>(), field);
 }
 
 sol::object size_to_lua(sol::this_state state, core::Vec2 size) {
@@ -204,10 +225,11 @@ sol::object size_to_lua(sol::this_state state, core::Vec2 size) {
 }
 
 core::Vec2 size_from_lua(sol::this_state state, const sol::object& value, std::string_view name) {
-    require_type(state, value, sol::type::table, name);
+    const ValueName field = entity_field(name);
+    require_type(state, value, sol::type::table, field);
     const auto table = value.as<sol::table>();
-    return core::Vec2{finite_float(state, table_number(state, table, "w", name), name),
-                      finite_float(state, table_number(state, table, "h", name), name)};
+    return core::Vec2{finite_float(state, table_number(state, table, "w", field), field),
+                      finite_float(state, table_number(state, table, "h", field), field)};
 }
 
 } // namespace engine::script
