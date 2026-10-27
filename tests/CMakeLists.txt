@@ -40,6 +40,7 @@ engine_add_test(script SOURCES
     engine/script/entity/CollisionsTest.cpp
     engine/script/entity/EntityFieldsTest.cpp
     engine/script/entity/EntityHandleTest.cpp
+    engine/script/entity/InstancesTest.cpp
     engine/script/entity/TickTest.cpp
     engine/script/event/EventsTest.cpp
     engine/script/loading/ScriptDeclarationsTest.cpp
