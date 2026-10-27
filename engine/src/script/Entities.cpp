@@ -108,7 +108,6 @@ Entities::Entities(sol::state& lua, const Players& players, const core::FieldReg
 
 void Entities::attach(core::EntityManager& world) {
     register_if_missing<core::Position>(world);
-    register_if_missing<core::Velocity>(world);
     register_if_missing<core::Sprite>(world);
     register_if_missing<core::Tags>(world);
     register_if_missing<physics::CollidesWith>(world);
@@ -132,7 +131,6 @@ std::optional<core::Entity> Entities::spawn(const Declaration& declaration,
     }
     const core::Entity entity = _world->spawn();
     _world->add(entity, core::Position{});
-    _world->add(entity, core::Velocity{});
     sol::table data;
     try {
         apply_prefab_fields(entity, declaration.prefab);

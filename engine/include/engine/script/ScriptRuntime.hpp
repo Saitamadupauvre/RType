@@ -124,12 +124,13 @@ public:
     /**
      * @brief Creates an entity from a declaration registered by load_scripts().
      *
-     * The entity gets a core::Position and a core::Velocity, then every component field its
-     * prefab sets through an alias (`x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`,
-     * `collides_with`), and its own table for custom fields. Table-valued custom fields of the
-     * prefab are deep-copied into that table, so no two entities share one. Scripts reach the
-     * entity through a handle whose fields resolve, in order, to component aliases, methods, the
-     * entity's own fields, then its prefab.
+     * The entity gets a core::Position, then every component field its prefab sets through an
+     * alias (`x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`), and its
+     * own table for custom fields. Setting `vx`, `vy` or `hitbox` on an entity without a
+     * physics::PhysicsBody gives it a dynamic body without gravity or collision response.
+     * Table-valued custom fields of the prefab are deep-copied into that table, so no two entities
+     * share one. Scripts reach the entity through a handle whose fields resolve, in order, to
+     * component aliases, methods, the entity's own fields, then its prefab.
      *
      * @param type Declared entity name.
      * Calls the entity's `on_spawn(self)` callback once it is ready; an error raised by it is

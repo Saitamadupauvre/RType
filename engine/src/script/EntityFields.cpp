@@ -19,9 +19,10 @@ bool lacks_body(const core::EntityManager& world, core::Entity entity) {
 }
 
 void give_script_body(core::EntityManager& world, core::Entity entity) {
-    world.add(entity, physics::PhysicsBody{.type = physics::PhysicsBody::Type::Dynamic,
-                                           .resolve_collisions = false,
-                                           .affected_by_gravity = false});
+    auto& body = world.get<physics::PhysicsBody>(entity);
+    body.type = physics::PhysicsBody::Type::Dynamic;
+    body.resolve_collisions = false;
+    body.affected_by_gravity = false;
 }
 
 void anchor_hitbox(core::EntityManager& world, core::Entity entity) {
@@ -35,8 +36,18 @@ void anchor_hitbox(core::EntityManager& world, core::Entity entity) {
 constexpr std::array aliases{
     FieldAlias{.name = "x", .component = "Position", .field = "pos", .shape = AliasShape::AxisX},
     FieldAlias{.name = "y", .component = "Position", .field = "pos", .shape = AliasShape::AxisY},
-    FieldAlias{.name = "vx", .component = "Velocity", .field = "vel", .shape = AliasShape::AxisX},
-    FieldAlias{.name = "vy", .component = "Velocity", .field = "vel", .shape = AliasShape::AxisY},
+    FieldAlias{.name = "vx",
+               .component = "PhysicsBody",
+               .field = "velocity",
+               .shape = AliasShape::AxisX,
+               .lacks_defaults = &lacks_body,
+               .apply_defaults = &give_script_body},
+    FieldAlias{.name = "vy",
+               .component = "PhysicsBody",
+               .field = "velocity",
+               .shape = AliasShape::AxisY,
+               .lacks_defaults = &lacks_body,
+               .apply_defaults = &give_script_body},
     FieldAlias{.name = "sprite", .component = "Sprite", .field = "path"},
     FieldAlias{.name = "color", .component = "Sprite", .field = "color"},
     FieldAlias{.name = "tags", .component = "Tags", .field = "labels"},
