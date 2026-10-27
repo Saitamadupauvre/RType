@@ -57,6 +57,43 @@ Component types are identified by stable names registered in a `.cpp` of
 - turns overlaps reported by the host (`collide(first, second)`) into
   `on_collide(self, other)` calls, filtered by each entity's `collides_with`
   tags.
+- turns the world into data and back: `capture_instances()` returns one
+  `Instance{name, type, position, overrides}` per scripted entity, and
+  `spawn_instances(instances)` rebuilds them (see below).
+
+### Instances
+
+Scenes, the editor's Play/Stop and undo/redo store the world as **instances**
+rather than raw component memory. An instance holds the entity's type, its
+position, an optional name (`set_entity_name()`, never seen by scripts) and
+its **overrides**: the editable registry fields whose value differs from the
+type's default, keyed `"Component.field"` and sorted.
+
+```cpp
+const std::vector<engine::script::Instance> saved = runtime.capture_instances();
+const std::vector<engine::script::InstanceIssue> issues = runtime.spawn_instances(saved);
+```
+
+An issue gives the index of its instance, the skipped field (empty when the
+whole instance was skipped) and a message.
+
+- **Default** means the value a field gets from the prefab's native fields
+  (`sprite`, `hitbox`, `vx`...) before `on_spawn` runs. What `on_spawn` sets
+  is therefore stored as an override, and a component the prefab does not
+  give has all its editable fields stored. Changing a prefab later updates
+  every instance that did not override that field.
+- **Spawning** an instance spawns its type at its position, names it, runs
+  `on_spawn`, then writes the overrides through the field registry, so they
+  win. Entities already in the world are kept: clearing it is the caller's
+  job.
+- **Failures** never throw: an unknown type or a system skips the instance,
+  an unknown or non-editable field, a wrong kind or an out-of-range value
+  skips that override. Each is returned as an `InstanceIssue` and logged.
+- Not captured: Lua free fields (`self.health`), non-editable fields such as
+  `Replicated.owner`, entities marked with `self:destroy()` and entities the
+  runtime did not spawn. An entity spawned by another one's `on_spawn` is
+  captured too, so spawning the instances back spawns it twice.
+- The format is in memory only; scene files build on it.
 
 The runtime only holds this core API. Everything that belongs to one side is an
 **API set**, chosen once with a builder and owned by the runtime:
