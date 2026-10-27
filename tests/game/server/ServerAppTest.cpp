@@ -40,7 +40,7 @@ std::vector<Entity> owned_by(ServerApp& app, std::uint32_t player_id) {
     std::vector<Entity> owned;
     app.registry().query<engine::core::Position>().each(
         [&](Entity entity, const engine::core::Position&) {
-            if (app.script().entity_owner(entity) == player_id) {
+            if (app.script_server().entity_owner(entity) == player_id) {
                 owned.push_back(entity);
             }
         });

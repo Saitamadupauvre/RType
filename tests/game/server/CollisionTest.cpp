@@ -16,6 +16,7 @@
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/script/AudioCommand.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 #include "Collisions.hpp"
 
@@ -25,6 +26,7 @@ using engine::core::EntityManager;
 using engine::core::Tags;
 using engine::core::Vec2;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -41,7 +43,8 @@ protected:
     std::shared_ptr<logger::MemorySink> _sink = std::make_shared<logger::MemorySink>();
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
     EntityManager _world;
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
     engine::core::event::EventBus _events;
     rtype::server::Collisions _collisions{_world, _events, _runtime};
 
@@ -147,10 +150,10 @@ TEST_F(CollisionTest, DestroyedBydoPlaysAnExplosion) {
     const Entity bydo = spawn("bydo", {1000.F, 290.F});
     tick();
 
-    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
-                                                  {.kind = engine::script::AudioCommandKind::Sound,
-                                                   .name = "explosion.wav",
-                                                   .source = bydo}}));
+    EXPECT_EQ(_server.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                 {.kind = engine::script::AudioCommandKind::Sound,
+                                                  .name = "explosion.wav",
+                                                  .source = bydo}}));
 }
 
 TEST_F(CollisionTest, DestroyedShipPlaysAnExplosion) {
@@ -158,10 +161,10 @@ TEST_F(CollisionTest, DestroyedShipPlaysAnExplosion) {
     spawn("bydo", {ship_start.x + 10.F, ship_start.y + 10.F});
     tick();
 
-    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
-                                                  {.kind = engine::script::AudioCommandKind::Sound,
-                                                   .name = "explosion.wav",
-                                                   .source = ship}}));
+    EXPECT_EQ(_server.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                 {.kind = engine::script::AudioCommandKind::Sound,
+                                                  .name = "explosion.wav",
+                                                  .source = ship}}));
 }
 
 TEST_F(CollisionTest, BydoShotHittingTheShipDestroysBothWithAnExplosion) {
@@ -171,10 +174,10 @@ TEST_F(CollisionTest, BydoShotHittingTheShipDestroysBothWithAnExplosion) {
 
     EXPECT_FALSE(_world.alive(ship));
     EXPECT_FALSE(_world.alive(shot));
-    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
-                                                  {.kind = engine::script::AudioCommandKind::Sound,
-                                                   .name = "explosion.wav",
-                                                   .source = ship}}));
+    EXPECT_EQ(_server.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                 {.kind = engine::script::AudioCommandKind::Sound,
+                                                  .name = "explosion.wav",
+                                                  .source = ship}}));
 }
 
 TEST_F(CollisionTest, BydoShotsIgnoreBydosAndMissiles) {

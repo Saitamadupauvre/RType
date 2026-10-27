@@ -14,6 +14,7 @@
 #include "engine/core/Vec2.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 #include "Collisions.hpp"
 
@@ -26,6 +27,7 @@ using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::Vec2;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -43,7 +45,8 @@ const std::filesystem::path game_scripts =
 class GameFlowTest : public ::testing::Test {
 protected:
     EntityManager _world;
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
     engine::core::event::EventBus _events;
     rtype::server::Collisions _collisions{_world, _events, _runtime};
 
@@ -59,10 +62,10 @@ protected:
         _runtime.flush_destroyed();
     }
 
-    void join(std::uint32_t player_id) { ASSERT_TRUE(_runtime.player_joined(player_id)); }
+    void join(std::uint32_t player_id) { ASSERT_TRUE(_server.player_joined(player_id)); }
 
     void leave(std::uint32_t player_id) {
-        ASSERT_TRUE(_runtime.player_left(player_id));
+        ASSERT_TRUE(_server.player_left(player_id));
         tick();
     }
 
@@ -87,7 +90,7 @@ protected:
 
     [[nodiscard]] Entity ship_of(std::uint32_t player_id) {
         for (const Entity ship : tagged("ship")) {
-            if (_runtime.entity_owner(ship) == player_id) {
+            if (_server.entity_owner(ship) == player_id) {
                 return ship;
             }
         }
@@ -96,7 +99,7 @@ protected:
 
     [[nodiscard]] bool has_ship(std::uint32_t player_id) {
         for (const Entity ship : tagged("ship")) {
-            if (_runtime.entity_owner(ship) == player_id) {
+            if (_server.entity_owner(ship) == player_id) {
                 return true;
             }
         }
@@ -114,7 +117,7 @@ protected:
         } else if (move_x < 0.F) {
             input.keys.insert(engine::core::Key::Left);
         }
-        _runtime.set_player_input(player_id, input);
+        _server.set_player_input(player_id, input);
     }
 
     Entity spawn(const std::string& type, Vec2 at) {

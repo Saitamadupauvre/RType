@@ -13,6 +13,7 @@
 #include "engine/core/Vec2.hpp"
 #include "engine/script/AudioCommand.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;
@@ -23,6 +24,7 @@ using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::Vec2;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -62,7 +64,8 @@ InputState firing() { return holding({Key::Space}); }
 class ShipTest : public ::testing::Test {
 protected:
     EntityManager _world;
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
     Entity _ship{0, 0};
 
     void SetUp() override {
@@ -89,9 +92,9 @@ protected:
 
     void place(Vec2 at) { _world.get<Position>(_ship).pos = at; }
 
-    void steer(float move_x, float move_y) { _runtime.set_input(_ship, moving(move_x, move_y)); }
+    void steer(float move_x, float move_y) { _server.set_input(_ship, moving(move_x, move_y)); }
 
-    void hold_fire() { _runtime.set_input(_ship, firing()); }
+    void hold_fire() { _server.set_input(_ship, firing()); }
 };
 
 } // namespace
@@ -115,21 +118,21 @@ TEST_F(ShipTest, MovesAlongBothAxesAtItsSpeed) {
 }
 
 TEST_F(ShipTest, ZqsdKeysSteerLikeTheArrows) {
-    _runtime.set_input(_ship, holding({Key::D, Key::Z}));
+    _server.set_input(_ship, holding({Key::D, Key::Z}));
     _runtime.update(0.1F);
     EXPECT_FLOAT_EQ(position().x, ship_start.x + (ship_speed * 0.1F));
     EXPECT_FLOAT_EQ(position().y, ship_start.y - (ship_speed * 0.1F));
 }
 
 TEST_F(ShipTest, OppositeKeysCancel) {
-    _runtime.set_input(_ship, holding({Key::Left, Key::D, Key::Up, Key::Down}));
+    _server.set_input(_ship, holding({Key::Left, Key::D, Key::Up, Key::Down}));
     _runtime.update(0.1F);
     EXPECT_FLOAT_EQ(position().x, ship_start.x);
     EXPECT_FLOAT_EQ(position().y, ship_start.y);
 }
 
 TEST_F(ShipTest, IgnoresKeysWithoutABinding) {
-    _runtime.set_input(_ship, holding({Key::A, Key::Enter}));
+    _server.set_input(_ship, holding({Key::A, Key::Enter}));
     _runtime.update(0.1F);
     EXPECT_FLOAT_EQ(position().x, ship_start.x);
     EXPECT_EQ(missiles(), 0U);
@@ -180,14 +183,14 @@ TEST_F(ShipTest, ShootingPlaysTheLaserSoundFromTheShip) {
     hold_fire();
     _runtime.update(half_cooldown);
 
-    EXPECT_EQ(_runtime.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
-                                                  {.kind = engine::script::AudioCommandKind::Sound,
-                                                   .name = "laser_shoot.wav",
-                                                   .source = _ship}}));
+    EXPECT_EQ(_server.take_audio_commands(), (std::vector<engine::script::AudioCommand>{
+                                                 {.kind = engine::script::AudioCommandKind::Sound,
+                                                  .name = "laser_shoot.wav",
+                                                  .source = _ship}}));
 }
 
 TEST_F(ShipTest, NotShootingPlaysNoSound) {
     _runtime.update(1.F);
 
-    EXPECT_TRUE(_runtime.take_audio_commands().empty());
+    EXPECT_TRUE(_server.take_audio_commands().empty());
 }
