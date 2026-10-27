@@ -212,8 +212,9 @@ void ServerApp::tick(Duration step)
 ```cpp
 // game/client/main.cpp
 auto plugin = engine::graphics::load_graphics_plugin(executable_dir / "plugins" / GRAPHICS_PLUGIN_FILE);
-engine::network::NetworkClient network(clock, events);
-network.connect(host, port, ec);                       // exit 84 on failure
+engine::network::UdpClientTransport transport(host, port);
+engine::network::NetworkClient network(clock, events, fields, transport);
+network.connect(ec);                                   // exit 84 on failure
 renderer.open({.width = 1280, .height = 720, .title = "R-Type"});
 while (!renderer.should_close()) {
     network.update();                                  // snapshots, retries, heartbeats, server timeout

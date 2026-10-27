@@ -203,7 +203,7 @@ classDiagram
             +find(component, field) FieldValue
         }
         class NetworkClient {
-            +connect(ip, port, error_code&) bool
+            +connect(error_code&) bool
             +update()
             +send_input(InputState)
             +disconnect()
