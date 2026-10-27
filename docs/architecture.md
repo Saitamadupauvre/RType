@@ -78,7 +78,7 @@ Third-party headers stay private: `raylib.h` appears only in
 | Events | `engine-core` | `EventBus`, `Subscription` | Typed publish/subscribe between subsystems |
 | Time | `engine-core` | `IClock`, `SteadyClock`, `ManualClock`, `FixedStepLoop` | Fixed-step simulation, injectable clock for tests |
 | Logging | `engine-core` | `log::info/warn/error`, `Sink`, `MemorySink` | Levelled logs on stderr; tests capture them |
-| Scripting | `engine-script` | `ScriptRuntime` | Loads and sandboxes Lua, spawns scripted entities, runs callbacks |
+| Scripting | `engine-script` | `ScriptRuntime`, `ScriptRuntimeBuilder`, `ServerApi`, `ClientApi` | Loads and sandboxes Lua, spawns scripted entities, runs callbacks; API sets give each side its own Lua functions |
 | Networking | `engine-network` | `NetworkServer`, `NetworkClient` | UDP transport, protocol, sessions, replication |
 | Physics | `engine-physics` | `PhysicsSystem`, `PhysicsBody`, `AABBCollider` | Integration and collision detection/resolution; the server uses it to find hitbox overlaps |
 | Rendering and input | `engine-graphics` + plugin | `IRenderer`, `IInput`, `load_graphics_plugin` | Backend-independent drawing and keyboard/mouse input |
@@ -154,17 +154,37 @@ classDiagram
 
     namespace script {
         class ScriptRuntime {
+            +builder()$ ScriptRuntimeBuilder
+            +api~Set~() Set&
             +load_scripts(path) bool
             +attach_world(EntityManager&)
             +spawn(type, ...) optional~Entity~
-            +player_joined(id) bool
-            +player_left(id) bool
-            +set_player_input(id, InputState)
             +update(float dt)
             +collide(Entity, Entity)
             +flush_destroyed() size_t
-            +take_audio_commands() vector~AudioCommand~
         }
+        class ScriptRuntimeBuilder {
+            +with~Set~() ScriptRuntimeBuilder&
+            +build() ScriptRuntime
+        }
+        class ApiSet {
+            <<abstract>>
+            +section() string_view
+        }
+        class ServerApi {
+            +player_joined(id) bool
+            +player_left(id) bool
+            +set_player_input(id, InputState)
+            +take_audio_commands() vector~AudioCommand~
+            +take_event_commands() vector~EventCommand~
+        }
+        class ClientApi {
+            +dispatch(EventCommand) bool
+        }
+        ScriptRuntimeBuilder ..> ScriptRuntime : builds
+        ScriptRuntime *-- ApiSet : owns
+        ApiSet <|-- ServerApi
+        ApiSet <|-- ClientApi
     }
 
     namespace network {
@@ -320,7 +340,7 @@ See [Networking internals](networking.md).
 sequenceDiagram
     participant Net as NetworkServer
     participant App as ServerApp
-    participant Lua as ScriptRuntime
+    participant Lua as ScriptRuntime + ServerApi
     participant ECS as EntityManager
     App->>Net: receive()
     Note over Net: sessions, timeouts,<br/>PlayerJoined / PlayerLeft on the event bus

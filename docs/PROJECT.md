@@ -387,6 +387,7 @@ This section is the specification of the Lua API. Not everything is implemented 
 | Native collisions: `engine-physics` detects `hitbox` overlaps in the server tick and calls `on_collide` (see §10.5) | Implemented |
 | Native movement from `vx` / `vy` in the server tick (`engine-physics` integrates the body velocity) | Implemented |
 | `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
+| API sets (`core`, `server`, `client`, `editor`), `server = { ... }` / `client = { ... }` sections, client `on(name, handler)` | Implemented (see §10.10) |
 | `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
 
 [Writing the game](writing-the-game.md) shows how the current game works around what is missing.
@@ -590,6 +591,7 @@ music(nil)                       -- stop the music
 event "explosion" { at = "vec2", size = "float" }   -- declare, while the scripts load
 emit("explosion", { at = { x = self.x, y = self.y }, size = 2 })
 emit("explosion")                -- arguments left out are simply absent
+on("explosion", function(event) ... end)   -- client only: react to a received event
 
 -- utilities
 random(1, 10)
@@ -607,7 +609,8 @@ log("message")
 
 - `event "name" { key = "kind", ... }` declares a game event while the scripts load. A name is 1 to 63 letters, digits, `_`, `-` or `.`, starting with a letter (`boss.died`). Keys are Lua identifiers of 1 to 63 characters; kinds are `float`, `int`, `bool`, `string`, `vec2`, `color` or `asset` (no `list`). An event has at most 16 keys. A bad name, key or kind, a name declared twice or a declaration after loading raises an error.
 - `emit(name, arguments)` queues a declared event. `arguments` is a table or `nil`; keys left out are absent from the event. An undeclared event or key, a value of the wrong kind (same conversions as entity fields), a non-finite number, a fractional `int` or a `string`/`asset` longer than 63 bytes raises an error and emits nothing. At most 64 events are kept per tick.
-- After each tick the server sends the queued events to every client (`named` events, see the [protocol](protocol.md)), after that tick's sounds and musics. Event names and keys are sent once in `connect_accept`; a client publishes each event on its event bus as `engine::network::NamedEvent`. Reacting to events in client-side Lua comes with the client script API.
+- After each tick the server sends the queued events to every client (`named` events, see the [protocol](protocol.md)), after that tick's sounds and musics. Event names and keys are sent once in `connect_accept`; a client publishes each event on its event bus as `engine::network::NamedEvent`.
+- On the client, `on(name, function(event) ... end)` reacts to a declared event: the function gets a table of the event's arguments (same conversions as entity fields), handlers run in registration order, and an error in one is logged without stopping the others. `on` with an undeclared event or a non-function raises an error.
 
 ### 10.7 Systems
 
@@ -753,6 +756,37 @@ speed  = 150         -- server only
 
 - Functions and scripts are never sent over the network, only data.
 
+**Which side has which function.** Every runtime has the **core** API; each side adds its own **API set**, and a function of the other side simply does not exist there, so calling it is an ordinary Lua error (`attempt to call a nil value (global 'spawn')`):
+
+| Set | Globals and fields | Runtime |
+|---|---|---|
+| `core` | `entity`, `system`, `require`, `sounds`, `musics`, `event`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
+| `server` | `spawn`, `players`, `find_player`, `play`, `music`, `emit`, `self.input`, `self.owner`, `on_player_joined`, `on_player_left` | server (`core` + `server`) |
+| `client` | `on` | client (`core` + `client`) |
+| `editor` | nothing yet | editor (`core` + `editor`) |
+
+Top-level code of a file runs on every side, so it may only use `core` functions; side-specific calls belong in callbacks.
+
+**Sections.** A declaration can hold `server = { ... }` and `client = { ... }` tables. Each side merges its own section into the prefab and ignores the other one; neither name is visible as a field afterwards. Logic that must only run on the server goes in `server`:
+
+```lua
+entity "bydo" {
+    sprite = "bydo.png",
+    hitbox = { w = 32, h = 32 },
+
+    server = {
+        health = 3,
+        update = function(self, dt) self.x = self.x - 150 * dt end,
+    },
+
+    client = {
+        trail = "red",
+    },
+}
+```
+
+Short forms work the same way (`server = { ... }` at the top of the file). A section that is not a table, or that sets a name the declaration already sets outside it (`speed = 1` and `server = { speed = 2 }`), rejects the whole file on every side. The same name in both sections is fine.
+
 ### 10.11 Server tick order
 
 1. Apply received inputs.
@@ -768,9 +802,10 @@ speed  = 150         -- server only
 Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
 
 - Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
+- Declaration sections: `server`, `client`.
 - Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`.
 - Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`.
 
 ### 10.13 Error handling and sandbox
 
@@ -781,6 +816,7 @@ Developers must not use these names for their own fields or methods; the engine 
 ### 10.14 How it maps to C++ (for engine developers)
 
 - **Declarations** — every declaration file runs in its own `sol::environment` whose `__index` is the globals table. `entity "name"` / `system "name"` record a pending declaration and return a declarator; calling the declarator with a table (`entity("name")({ ... })`, written `entity "name" { ... }`) stores that table as the prefab. Once the file has run, an uncalled declarator (short form) takes the file environment as its prefab. A file with one short form, or only table forms, is registered as a whole; two short forms, or a short form mixed with table forms, rejects the file. The registry maps each name to its prefab table, kind and source path.
+- **API sets** — `ScriptRuntime` holds the sandbox, the loader and the declarations; `ScriptRuntime::builder().with<ServerApi>().build()` adds a set, which binds its globals and entity handle fields (`Entities::add_handle_field`) on an internal `RuntimeContext` when the runtime is built. The runtime owns its sets; the host reaches one with `runtime.api<ServerApi>()`. Each set's `section()` names the declaration section merged into prefabs (`loading/Sections.cpp`) before they are registered.
 - **Global functions** are C++ lambdas exposed with sol2:
 
   ```cpp

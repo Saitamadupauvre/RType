@@ -50,14 +50,38 @@ Component types are identified by stable names registered in a `.cpp` of
 - calls `update`, `on_spawn`, `on_destroy` and the `main.lua` callbacks
   through protected calls: an error is logged with file and line and the game
   continues;
-- tracks players (`players()`, `find_player()`, `player.slot`) and routes each
-  player's input to the entities they own;
-- registers the sounds and musics declared with `sounds { ... }` and
-  `musics { ... }`, and queues `play(...)` / `music(...)` requests for the
-  host (`sound_names()`, `music_names()`, `take_audio_commands()`);
+- registers the sounds, musics and events declared with `sounds { ... }`,
+  `musics { ... }` and `event "name" { ... }` (`sound_names()`,
+  `music_names()`, `event_names()`);
 - turns overlaps reported by the host (`collide(first, second)`) into
   `on_collide(self, other)` calls, filtered by each entity's `collides_with`
   tags.
+
+The runtime only holds this core API. Everything that belongs to one side is an
+**API set**, chosen once with a builder and owned by the runtime:
+
+```cpp
+auto runtime = engine::script::ScriptRuntime::builder()
+                   .with<engine::script::ServerApi>()
+                   .build();
+auto& server = runtime.api<engine::script::ServerApi>();
+```
+
+- `ServerApi`: `spawn`, `players`, `find_player`, `play`, `music`, `emit`,
+  `self.input`, `self.owner`; tracks players and routes each player's input
+  to the entities they own (`player_joined()`, `set_player_input()`), and
+  queues audio and event requests for the host (`take_audio_commands()`,
+  `take_event_commands()`).
+- `ClientApi`: `on(name, handler)`; `dispatch(event)` calls the handlers of
+  an event received from the server.
+- `EditorApi`: empty for now.
+
+A function of a set that was not added does not exist in the sandbox, so
+calling it is a plain Lua error. Each set names the declaration section it
+reads (`server = { ... }`, `client = { ... }`). Adding a set twice, or both
+`ServerApi` and `ClientApi`, makes `build()` throw. Sources follow the same
+split: public-API implementations at the root of `engine/src/script/`,
+internals in `lua/`, `loading/`, `entity/`, `audio/`, `event/` and `player/`.
 
 The Lua API is specified in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
 
