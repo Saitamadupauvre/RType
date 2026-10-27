@@ -65,6 +65,7 @@ private:
     void set(sol::this_state state, const EntityHandle& handle, const sol::object& key,
              const sol::object& value);
     void apply_prefab_fields(core::Entity entity, const sol::table& prefab);
+    sol::table own_copies(const sol::table& prefab);
     Record& live_record(sol::this_state state, const EntityHandle& handle);
     void destroy(sol::this_state state, const EntityHandle& handle);
     [[nodiscard]] const InputState& input_of(const Record& record) const;

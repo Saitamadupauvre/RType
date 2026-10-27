@@ -5,6 +5,7 @@
 #include <format>
 #include <stdexcept>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 #include "Declarations.hpp"
@@ -42,6 +43,35 @@ float input_axis(const InputState& input, std::string_view name) {
 
 bool input_pressed(const InputState& input, std::string_view name) {
     return input.pressed.contains(name);
+}
+
+constexpr std::size_t max_table_depth = 64;
+
+using TableCopies = std::unordered_map<const void*, sol::table>;
+
+sol::table copy_table(sol::state& lua, const sol::table& source, TableCopies& copies,
+                      std::size_t depth) {
+    if (const auto found = copies.find(source.pointer()); found != copies.end()) {
+        return found->second;
+    }
+    if (depth >= max_table_depth) {
+        throw std::runtime_error(
+            std::format("prefab table nests deeper than {} levels", max_table_depth));
+    }
+    sol::table copy = lua.create_table();
+    copies.emplace(source.pointer(), copy);
+    for (const auto& [key, value] : source) {
+        if (value.get_type() == sol::type::table) {
+            copy.raw_set(key, copy_table(lua, value.as<sol::table>(), copies, depth + 1));
+        } else {
+            copy.raw_set(key, value);
+        }
+    }
+    const sol::optional<sol::table> metatable = source[sol::metatable_key];
+    if (metatable) {
+        copy[sol::metatable_key] = *metatable;
+    }
+    return copy;
 }
 
 } // namespace
@@ -103,8 +133,10 @@ std::optional<core::Entity> Entities::spawn(const Declaration& declaration,
     const core::Entity entity = _world->spawn();
     _world->add(entity, core::Position{});
     _world->add(entity, core::Velocity{});
+    sol::table data;
     try {
         apply_prefab_fields(entity, declaration.prefab);
+        data = own_copies(declaration.prefab);
     } catch (const std::exception& error) {
         _world->kill(entity);
         log::error("lua: cannot spawn '{}': {}", declaration.name, error.what());
@@ -115,7 +147,7 @@ std::optional<core::Entity> Entities::spawn(const Declaration& declaration,
     }
     _records.insert_or_assign(entity.id(),
                               Record{.type = declaration.name,
-                                     .data = _lua.create_table(),
+                                     .data = std::move(data),
                                      .prefab = declaration.prefab,
                                      .handle = sol::make_object(_lua, EntityHandle{entity}),
                                      .input = {},
@@ -306,6 +338,19 @@ void Entities::apply_prefab_fields(core::Entity entity, const sol::table& prefab
             _fields.write_alias(state, *_world, entity, name, value);
         }
     }
+}
+
+sol::table Entities::own_copies(const sol::table& prefab) {
+    sol::table data = _lua.create_table();
+    TableCopies copies;
+    for (const auto& [key, value] : prefab) {
+        const bool alias =
+            key.get_type() == sol::type::string && _fields.has_alias(key.as<std::string_view>());
+        if (!alias && value.get_type() == sol::type::table) {
+            data.raw_set(key, copy_table(_lua, value.as<sol::table>(), copies, 0));
+        }
+    }
+    return data;
 }
 
 Entities::Record& Entities::live_record(sol::this_state state, const EntityHandle& handle) {
