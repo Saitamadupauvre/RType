@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Audio.hpp"
@@ -27,7 +28,8 @@ struct ENGINE_NETWORK_EXPORT ServerOptions {
     std::size_t max_players;
     /** @brief Names sent to every client in `connect_accept`: every `Replicated::type_id` and
      * `EntitySpawned::type_id` (category `type`), `SoundPlayed::sound_id` (`sound`) and
-     * `MusicChanged::music_id` (`music`) the game uses. */
+     * `MusicChanged::music_id` (`music`) the game uses. The server adds the replicated field
+     * names (`field`) itself. */
     StringTable strings = {};
 };
 
@@ -60,17 +62,22 @@ struct ENGINE_NETWORK_EXPORT PlayerInput {
  *    `SoundPlayed` and `MusicChanged` on the event bus. Each one is queued for the players
  *    connected at that moment.
  * 4. send_snapshot(): sends the queued events in the order published, then every entity with
- *    `Replicated` and `Position`, to every player.
+ *    `Replicated`, to every player.
  *
  * Malformed packets are dropped and logged; they never reach the game.
  *
- * @note Not thread-safe: call every member from the same thread. The clock and the event bus
- * must outlive the server.
+ * @note Not thread-safe: call every member from the same thread. The clock, the event bus and
+ * the field registry must outlive the server.
  */
 class ENGINE_NETWORK_EXPORT NetworkServer {
 public:
+    /**
+     * @param fields Fields of the server world. Every field flagged `replicated` is sent in
+     * snapshots under the name `Component.field`, category `field` of the string table. Clients
+     * must know every such name.
+     */
     NetworkServer(const core::time::IClock& clock, core::event::EventBus& events,
-                  ServerOptions options);
+                  const core::FieldRegistry& fields, ServerOptions options);
     ~NetworkServer();
 
     NetworkServer(const NetworkServer&) = delete;
@@ -81,8 +88,10 @@ public:
     /**
      * @brief Binds the UDP port and starts the network threads.
      *
-     * @param ec Set to `std::errc::invalid_argument` when `ServerOptions::strings` does not fit
-     * in one packet; set when the port cannot be bound (for example already in use); cleared
+     * @param ec Set to `std::errc::invalid_argument` when the string table does not fit in one
+     * packet, or when the replicated fields cannot be sent: a list field, a name longer than 63
+     * characters, more than 255 fields, or an entity holding all of them that does not fit in
+     * one snapshot. Set when the port cannot be bound (for example already in use); cleared
      * otherwise.
      * @return `true` when the server is listening.
      */
@@ -114,9 +123,11 @@ public:
      *
      * The game events queued since the last call are sent first.
      *
-     * @param registry The server world. Only entities with `Replicated` and `Position` are sent.
+     * @param world The server world. Only entities with `Replicated` are sent, with the
+     * replicated fields they own. A string longer than 255 bytes or a non-finite float is left
+     * out and logged. Ints are clamped to 32 bits and vec2 components rounded to 16-bit ints.
      */
-    void send_snapshot(core::EntityManager& registry);
+    void send_snapshot(core::EntityManager& world);
 
     /**
      * @return The bound port once started (useful with port `0`), otherwise the requested one.

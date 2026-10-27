@@ -7,6 +7,7 @@
 #include <optional>
 #include <vector>
 
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Client.hpp"
 #include "engine/network/Export.hpp"
@@ -28,8 +29,9 @@ struct ClientConnectionConfig {
 
 class ENGINE_NETWORK_EXPORT ClientConnection {
 public:
-    ClientConnection(const core::time::IClock& clock, const Endpoint& server,
-                     std::uint32_t client_nonce, ClientConnectionConfig config = {});
+    ClientConnection(const core::time::IClock& clock, const core::FieldRegistry& fields,
+                     const Endpoint& server, std::uint32_t client_nonce,
+                     ClientConnectionConfig config = {});
 
     [[nodiscard]] std::optional<Outbound> update();
     bool handle(const Inbound& inbound);
@@ -68,6 +70,7 @@ private:
     std::uint32_t next_sequence_{0};
     std::uint32_t player_id_{0};
     ReceivedStrings _strings;
+    std::optional<Outbound> _farewell;
     TrafficMeter traffic_;
 };
 

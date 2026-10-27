@@ -45,7 +45,10 @@ std::vector<std::pair<Message, MessageType>> sample_messages() {
          MessageType::connect_accept},
         {InputPayload{.action_flags = 0x01, .move_x = -1, .move_y = 1}, MessageType::input},
         {SnapshotPayload{.server_tick = 99,
-                         .entities = {EntityState{.entity_id = 12, .type_id = 1, .x = 10}}},
+                         .entities = {EntityState{
+                             .entity_id = 12,
+                             .type_id = 1,
+                             .fields = {{.field_id = 1, .value = engine::core::Vec2{10, 0}}}}}},
          MessageType::snapshot},
         {EventPayload{SpawnEvent{.entity_id = 12, .type_id = 1, .x = 10, .y = 20}},
          MessageType::event},
@@ -84,7 +87,7 @@ TEST(ProtocolHandler, SerializesPacketInBigEndianOrder) {
 
     const auto packet = handler.serialize(input_header(0x0102'0304, payload.size()), payload);
 
-    const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x04, 0x03, 0x01,
+    const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x05, 0x03, 0x01,
                                              0x02, 0x03, 0x04, 0x00, 0x03, 0x01, 0x00, 0x01};
 
     EXPECT_EQ(packet, expected);

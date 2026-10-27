@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "ActionCodec.hpp"
+#include "GameFields.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/Entity.hpp"
@@ -69,7 +70,8 @@ std::uint8_t wire_owner(std::optional<std::uint32_t> owner) {
 ServerApp::ServerApp(const engine::core::time::IClock& clock, const ServerConfig& config,
                      const std::filesystem::path& scripts)
     : clock_(clock), _strings(load_game(_runtime, registry_, scripts)),
-      network_(clock, events_,
+      _fields(common::game_fields()),
+      network_(clock, events_, _fields,
                engine::network::ServerOptions{
                    .port = config.port, .max_players = config.max_players, .strings = _strings}),
       _collisions(registry_, events_, _runtime) {

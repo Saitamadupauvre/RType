@@ -23,9 +23,9 @@ ServerSessionsConfig sessions_config(const ServerOptions& options) {
 
 struct NetworkServer::ImplNet {
     ImplNet(const core::time::IClock& clock, core::event::EventBus& game_events,
-            ServerOptions server_options)
+            const core::FieldRegistry& fields, ServerOptions server_options)
         : options(std::move(server_options)), events(game_events),
-          network(clock, game_events, sessions_config(options)) {
+          network(clock, game_events, fields, sessions_config(options)) {
         forward<EntitySpawned>();
         forward<EntityDestroyed>();
         forward<ShotFired>();
@@ -65,15 +65,20 @@ struct NetworkServer::ImplNet {
 };
 
 NetworkServer::NetworkServer(const core::time::IClock& clock, core::event::EventBus& events,
-                             ServerOptions options)
-    : impl_(std::make_unique<ImplNet>(clock, events, std::move(options))) {}
+                             const core::FieldRegistry& fields, ServerOptions options)
+    : impl_(std::make_unique<ImplNet>(clock, events, fields, std::move(options))) {}
 
 NetworkServer::~NetworkServer() = default;
 
 bool NetworkServer::start(std::error_code& ec) {
     ec.clear();
-    const auto config = sessions_config(impl_->options);
-    if (!is_valid(ConnectAcceptPayload{.strings = config.strings})) {
+    const auto& replicated = impl_->network.replicated();
+    if (!replicated.error().empty()) {
+        core::log::error("network: {}", replicated.error());
+        ec = std::make_error_code(std::errc::invalid_argument);
+        return false;
+    }
+    if (!is_valid(ConnectAcceptPayload{.strings = impl_->network.strings()})) {
         core::log::error("network: the string table does not fit in one packet");
         ec = std::make_error_code(std::errc::invalid_argument);
         return false;
@@ -101,8 +106,8 @@ std::vector<PlayerInput> NetworkServer::inputs() const {
     return inputs;
 }
 
-void NetworkServer::send_snapshot(core::EntityManager& registry) {
-    impl_->send_all(impl_->network.snapshot(registry));
+void NetworkServer::send_snapshot(core::EntityManager& world) {
+    impl_->send_all(impl_->network.snapshot(world));
 }
 
 std::uint16_t NetworkServer::port() const {

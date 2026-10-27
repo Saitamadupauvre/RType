@@ -1,7 +1,11 @@
 #include "Validation.hpp"
 
+#include <algorithm>
 #include <cstddef>
+#include <limits>
+#include <unordered_set>
 
+#include "FieldWire.hpp"
 #include "Protocol.hpp"
 
 namespace engine::network {
@@ -25,6 +29,28 @@ bool has_known_current_music(const ConnectAcceptPayload& payload) {
            payload.strings.name_of(StringCategory::music, payload.current_music) != nullptr;
 }
 
+bool has_unique_fields(const EntityState& entity) {
+    std::unordered_set<std::uint16_t> ids;
+    return std::ranges::all_of(entity.fields, [&ids](const FieldState& field) {
+        return ids.insert(field.field_id).second;
+    });
+}
+
+bool is_valid(const EntityState& entity) {
+    return entity.fields.size() <= max_entity_fields &&
+           std::ranges::all_of(entity.fields,
+                               [](const FieldState& field) { return fits_wire(field.value); }) &&
+           has_unique_fields(entity);
+}
+
+std::size_t entities_size(const SnapshotPayload& payload) noexcept {
+    std::size_t size = 0;
+    for (const EntityState& entity : payload.entities) {
+        size += wire_size(entity);
+    }
+    return size;
+}
+
 } // namespace
 
 bool is_valid(const InputPayload& payload) noexcept {
@@ -32,8 +58,11 @@ bool is_valid(const InputPayload& payload) noexcept {
            is_unit_axis(payload.move_x) && is_unit_axis(payload.move_y);
 }
 
-bool is_valid(const SnapshotPayload& payload) noexcept {
-    return payload.entities.size() <= max_snapshot_entities;
+bool is_valid(const SnapshotPayload& payload) {
+    return payload.entities.size() <= std::numeric_limits<std::uint16_t>::max() &&
+           std::ranges::all_of(payload.entities,
+                               [](const EntityState& entity) { return is_valid(entity); }) &&
+           entities_size(payload) <= max_snapshot_entity_bytes;
 }
 
 bool is_valid(const ConnectAcceptPayload& payload) {

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "engine/core/Components.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Audio.hpp"
@@ -26,12 +27,23 @@ enum class ConnectionState : std::uint8_t {
     connecting,
     /** @brief Accepted by the server: inputs are sent and snapshots received. */
     connected,
-    /** @brief The server had no free player slot. */
+    /** @brief The server had no free player slot, or replicates a field this client does not
+     * know. */
     rejected,
     /** @brief The server never answered the connect requests. */
     gave_up,
     /** @brief The connection ended once accepted, was closed by the client, or never started. */
     disconnected,
+};
+
+/**
+ * @brief One replicated field of an entity, as last received from the server.
+ */
+struct ENGINE_NETWORK_EXPORT ReplicatedValue {
+    /** @brief The field in the registry given to NetworkClient. */
+    core::FieldRef field;
+    /** @brief A value of the field's kind. Vec2 components are whole numbers. */
+    core::FieldValue value;
 };
 
 /**
@@ -41,15 +53,12 @@ struct ENGINE_NETWORK_EXPORT EntitySnapshot {
     std::uint32_t entity_id;
     /** @brief Type id given by the server to `Replicated::type_id`. */
     std::uint16_t type_id;
-    /** @brief Position and velocity in world units, rounded to whole units by the protocol. */
-    float x;
-    float y;
-    float vx;
-    float vy;
-    /** @brief `Replicated::owner`: compare it with NetworkClient::player_id(). `0` for none. */
-    std::uint8_t owner = 0;
-    /** @brief Sprite color of the entity on the server. */
-    core::Rgba color;
+    /** @brief The replicated fields the entity owns on the server, such as `Position.pos`. */
+    std::vector<ReplicatedValue> fields;
+
+    /** @return The value of field @p field of component @p component, or nullptr if absent. */
+    [[nodiscard]] const core::FieldValue* find(std::string_view component,
+                                               std::string_view field) const;
 };
 
 #ifdef _MSC_VER
@@ -78,12 +87,18 @@ struct ENGINE_NETWORK_EXPORT EntitySnapshot {
  * Snapshots and spawn events are checked against the type table the server sent in
  * `connect_accept`: one with a type id missing from the table is dropped whole and logged.
  *
- * @note Not thread-safe: call every member from the same thread. The clock and the event bus
- * must outlive the client. One client makes at most one connection.
+ * Every field name the server replicates must be known to the client's field registry, or the
+ * connection ends as `rejected` right after `connect_accept`. Snapshot fields with an unknown id
+ * or a kind other than the registry's drop the whole snapshot.
+ *
+ * @note Not thread-safe: call every member from the same thread. The clock, the event bus and
+ * the field registry must outlive the client. One client makes at most one connection.
  */
 class ENGINE_NETWORK_EXPORT NetworkClient {
 public:
-    NetworkClient(const core::time::IClock& clock, core::event::EventBus& events);
+    /** @param fields Fields the server may replicate, matched by `Component.field` name. */
+    NetworkClient(const core::time::IClock& clock, core::event::EventBus& events,
+                  const core::FieldRegistry& fields);
 
     /**
      * @brief Closes the connection like disconnect(), without publishing `Disconnected`.

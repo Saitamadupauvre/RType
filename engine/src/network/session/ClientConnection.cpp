@@ -7,12 +7,16 @@
 
 namespace engine::network {
 
-ClientConnection::ClientConnection(const core::time::IClock& clock, const Endpoint& server,
+ClientConnection::ClientConnection(const core::time::IClock& clock,
+                                   const core::FieldRegistry& fields, const Endpoint& server,
                                    std::uint32_t client_nonce, ClientConnectionConfig config)
     : clock_(clock), server_(server), client_nonce_(client_nonce), config_(config),
-      traffic_(clock.now()) {}
+      _strings(fields), traffic_(clock.now()) {}
 
 std::optional<Outbound> ClientConnection::update() {
+    if (_farewell) {
+        return std::exchange(_farewell, std::nullopt);
+    }
     const auto now = clock_.get().now();
     if (state_ == ConnectionState::connecting) {
         return retry_connect(now);
@@ -114,10 +118,15 @@ void ClientConnection::on_accept(const ConnectAcceptPayload& accept) {
     if (state_ != ConnectionState::connecting || accept.client_nonce != client_nonce_) {
         return;
     }
+    if (!_strings.assign(accept)) {
+        end(ConnectionState::rejected, DisconnectReason::protocol_error);
+        _farewell = to_server(DisconnectPayload{.reason = DisconnectReason::protocol_error});
+        core::log::error("network: cannot use the fields replicated by {}", server_.to_string());
+        return;
+    }
     state_ = ConnectionState::connected;
     last_heartbeat_ = clock_.get().now();
     player_id_ = accept.player_entity_id;
-    _strings.assign(accept);
     core::log::info("network: connected to {} as player {}", server_.to_string(), player_id_);
 }
 

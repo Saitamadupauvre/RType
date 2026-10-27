@@ -1,5 +1,6 @@
 #include "engine/network/Client.hpp"
 
+#include <algorithm>
 #include <functional>
 #include <random>
 #include <string>
@@ -30,22 +31,31 @@ std::uint32_t fresh_nonce() {
     return random();
 }
 
-EntitySnapshot to_entity_snapshot(const EntityState& state) {
-    return EntitySnapshot{.entity_id = state.entity_id,
-                          .type_id = state.type_id,
-                          .x = static_cast<float>(state.x),
-                          .y = static_cast<float>(state.y),
-                          .vx = static_cast<float>(state.vx),
-                          .vy = static_cast<float>(state.vy),
-                          .owner = state.owner,
-                          .color = {.r = state.r, .g = state.g, .b = state.b, .a = state.a}};
+EntitySnapshot to_entity_snapshot(const EntityState& state, const ReceivedStrings& strings) {
+    EntitySnapshot snapshot{.entity_id = state.entity_id, .type_id = state.type_id, .fields = {}};
+    snapshot.fields.reserve(state.fields.size());
+    for (const FieldState& field : state.fields) {
+        snapshot.fields.push_back(
+            ReplicatedValue{.field = strings.field(field.field_id), .value = field.value});
+    }
+    return snapshot;
 }
 
 } // namespace
 
+const core::FieldValue* EntitySnapshot::find(std::string_view component,
+                                             std::string_view field) const {
+    const auto found = std::ranges::find_if(fields, [&](const ReplicatedValue& replicated) {
+        return replicated.field && replicated.field.component->name() == component &&
+               replicated.field.field->name() == field;
+    });
+    return found == fields.end() ? nullptr : &found->value;
+}
+
 struct NetworkClient::ImplNet {
-    ImplNet(const core::time::IClock& game_clock, core::event::EventBus& game_events)
-        : clock(game_clock), events(game_events) {}
+    ImplNet(const core::time::IClock& game_clock, core::event::EventBus& game_events,
+            const core::FieldRegistry& known_fields)
+        : clock(game_clock), events(game_events), fields(known_fields) {}
 
     void send(std::optional<Outbound> outbound) {
         if (outbound) {
@@ -98,6 +108,7 @@ struct NetworkClient::ImplNet {
 
     std::reference_wrapper<const core::time::IClock> clock;
     std::reference_wrapper<core::event::EventBus> events;
+    std::reference_wrapper<const core::FieldRegistry> fields;
     std::optional<ClientConnection> connection;
     SnapshotReceiver snapshots;
     std::string server_label;
@@ -106,8 +117,9 @@ struct NetworkClient::ImplNet {
     NetworkIo io;
 };
 
-NetworkClient::NetworkClient(const core::time::IClock& clock, core::event::EventBus& events)
-    : impl_(std::make_unique<ImplNet>(clock, events)) {}
+NetworkClient::NetworkClient(const core::time::IClock& clock, core::event::EventBus& events,
+                             const core::FieldRegistry& fields)
+    : impl_(std::make_unique<ImplNet>(clock, events, fields)) {}
 
 NetworkClient::~NetworkClient() { impl_->close(); }
 
@@ -127,7 +139,7 @@ bool NetworkClient::connect(std::string_view server_ip, std::uint16_t port, std:
     if (ec) {
         return false;
     }
-    impl_->connection.emplace(impl_->clock.get(), *server, fresh_nonce());
+    impl_->connection.emplace(impl_->clock.get(), impl_->fields.get(), *server, fresh_nonce());
     impl_->server_label = server->to_string();
     impl_->last_report = impl_->clock.get().now();
     return true;
@@ -180,9 +192,13 @@ std::optional<std::uint32_t> NetworkClient::server_tick() const {
 
 std::vector<EntitySnapshot> NetworkClient::entities() const {
     std::vector<EntitySnapshot> entities;
+    const auto& connection = impl_->connection;
+    if (!connection) {
+        return entities;
+    }
     entities.reserve(impl_->snapshots.entities().size());
     for (const auto& state : impl_->snapshots.entities()) {
-        entities.push_back(to_entity_snapshot(state));
+        entities.push_back(to_entity_snapshot(state, connection->strings()));
     }
     return entities;
 }

@@ -52,12 +52,14 @@ engine_add_test(network SOURCES
     engine/network/decoder/PayloadDecoderTest.cpp
     engine/network/encoder/PayloadEncoderTest.cpp
     engine/network/event/GameEventsTest.cpp
+    engine/network/protocol/FieldWireTest.cpp
     engine/network/protocol/ProtocolHandlerTest.cpp
     engine/network/protocol/ReceivedStringsTest.cpp
     engine/network/protocol/SequenceTest.cpp
     engine/network/server/ServerNetworkTest.cpp
     engine/network/session/ClientConnectionTest.cpp
     engine/network/session/ServerSessionsTest.cpp
+    engine/network/snapshot/ReplicatedFieldsTest.cpp
     engine/network/snapshot/SnapshotBuilderTest.cpp
     engine/network/snapshot/SnapshotReceiverTest.cpp
     engine/network/socket/SocketErrorTest.cpp

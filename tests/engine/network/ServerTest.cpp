@@ -11,6 +11,7 @@
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/SteadyClock.hpp"
 #include "engine/network/Events.hpp"
@@ -19,6 +20,7 @@
 #include "engine/network/StringTable.hpp"
 
 #include "PayloadSamples.hpp"
+#include "TestFields.hpp"
 #include "protocol/Messages.hpp"
 #include "protocol/Protocol.hpp"
 #include "protocol/ProtocolHandler.hpp"
@@ -113,9 +115,17 @@ protected:
         ASSERT_TRUE(server.start(ec)) << ec.message();
     }
 
+    static engine::core::FieldRegistry core_fields() {
+        engine::core::FieldRegistry fields;
+        engine::core::register_core_fields(fields);
+        return fields;
+    }
+
     SteadyClock clock;
     EventBus bus;
-    NetworkServer server{clock, bus, ServerOptions{.port = 0, .max_players = 2}};
+    const engine::core::FieldRegistry fields = core_fields();
+    const engine::core::FieldRegistry no_fields;
+    NetworkServer server{clock, bus, fields, ServerOptions{.port = 0, .max_players = 2}};
 };
 
 } // namespace
@@ -131,14 +141,15 @@ TEST_F(NetworkServerTest, StartsOnAFreePortAndStops) {
 }
 
 TEST_F(NetworkServerTest, ReportsTheRequestedPortBeforeStarting) {
-    NetworkServer unstarted(clock, bus, ServerOptions{.port = 4242, .max_players = 1});
+    NetworkServer unstarted(clock, bus, fields, ServerOptions{.port = 4242, .max_players = 1});
 
     EXPECT_EQ(unstarted.port(), 4242);
 }
 
 TEST_F(NetworkServerTest, StartReportsPortAlreadyInUse) {
     start();
-    NetworkServer second(clock, bus, ServerOptions{.port = server.port(), .max_players = 1});
+    NetworkServer second(clock, bus, fields,
+                         ServerOptions{.port = server.port(), .max_players = 1});
     std::error_code ec;
 
     EXPECT_FALSE(second.start(ec));
@@ -177,11 +188,49 @@ TEST_F(NetworkServerTest, ServesAClientOverLoopback) {
     const auto& payload = std::get<SnapshotPayload>(snapshot->message);
     EXPECT_EQ(payload.server_tick, 1U);
     ASSERT_EQ(payload.entities.size(), 1U);
-    EXPECT_EQ(payload.entities.front().y, 4);
+    const auto pos_id = std::get<ConnectAcceptPayload>(accept->message)
+                            .strings.id_of(StringCategory::field, "Position.pos");
+    ASSERT_TRUE(pos_id.has_value());
+    EXPECT_EQ(payload.entities.front().fields,
+              (std::vector<engine::network::FieldState>{
+                  {.field_id = *pos_id, .value = engine::core::Vec2{3.F, 4.F}}}));
+}
+
+TEST_F(NetworkServerTest, StartRejectsAReplicatedListField) {
+    engine::core::FieldRegistry listed;
+    listed.add<engine::core::Tags>(
+        "Tags", {engine::core::list_field<engine::core::Tags>(
+                    "labels", engine::core::FieldKind::String,
+                    engine::core::field_flags::replicated, engine::core::labels_to_list,
+                    [](engine::core::Tags& tags, const engine::core::FieldList& list) {
+                        tags = engine::core::labels_from_list(list);
+                    })});
+    NetworkServer refusing(clock, bus, listed, ServerOptions{.port = 0, .max_players = 1});
+    std::error_code ec;
+
+    EXPECT_FALSE(refusing.start(ec));
+    EXPECT_EQ(ec, std::errc::invalid_argument);
+}
+
+TEST_F(NetworkServerTest, StartRejectsReplicatedFieldNamesTooLargeForOnePacket) {
+    const auto many_fields = test_fields::registry();
+    NetworkServer crowded(clock, bus, many_fields,
+                          ServerOptions{.port = 0,
+                                        .max_players = 1,
+                                        .strings = payload_samples::long_name_strings(17)});
+    NetworkServer roomy(clock, bus, no_fields,
+                        ServerOptions{.port = 0,
+                                      .max_players = 1,
+                                      .strings = payload_samples::long_name_strings(17)});
+    std::error_code ec;
+
+    EXPECT_FALSE(crowded.start(ec));
+    EXPECT_EQ(ec, std::errc::invalid_argument);
+    EXPECT_TRUE(roomy.start(ec)) << ec.message();
 }
 
 TEST_F(NetworkServerTest, StartRejectsAStringTableTooLargeForOnePacket) {
-    NetworkServer crowded(clock, bus,
+    NetworkServer crowded(clock, bus, no_fields,
                           ServerOptions{.port = 0,
                                         .max_players = 1,
                                         .strings = payload_samples::long_name_strings(18)});
@@ -195,7 +244,8 @@ TEST_F(NetworkServerTest, SendsTheStringTableAndTheCurrentMusicToPlayersJoiningL
     const auto strings = payload_samples::strings_of(
         {{.category = StringCategory::sound, .id = 1, .name = "shot.wav"},
          {.category = StringCategory::music, .id = 2, .name = "stage.ogg"}});
-    NetworkServer audio(clock, bus, ServerOptions{.port = 0, .max_players = 1, .strings = strings});
+    NetworkServer audio(clock, bus, no_fields,
+                        ServerOptions{.port = 0, .max_players = 1, .strings = strings});
     std::error_code ec;
     ASSERT_TRUE(audio.start(ec)) << ec.message();
     bus.publish(MusicChanged{.music_id = 2});
@@ -231,7 +281,8 @@ TEST_F(NetworkServerTest, SendsMusicChangesToPlayers) {
 TEST_F(NetworkServerTest, SendsItsStringTableAndPublishedEventsToPlayers) {
     const auto strings =
         payload_samples::strings_of({{.category = StringCategory::type, .id = 3, .name = "bydo"}});
-    NetworkServer typed(clock, bus, ServerOptions{.port = 0, .max_players = 1, .strings = strings});
+    NetworkServer typed(clock, bus, no_fields,
+                        ServerOptions{.port = 0, .max_players = 1, .strings = strings});
     std::error_code ec;
     ASSERT_TRUE(typed.start(ec)) << ec.message();
     auto peer = bound_peer();

@@ -1,75 +1,48 @@
 #include "SnapshotBuilder.hpp"
 
-#include <algorithm>
-#include <cmath>
 #include <cstddef>
-#include <iterator>
-#include <limits>
+#include <utility>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Components.hpp"
 #include "engine/network/Replicated.hpp"
 
+#include "protocol/FieldWire.hpp"
 #include "protocol/Protocol.hpp"
 
 namespace engine::network {
 
 namespace {
 
-core::Rgba color_of(core::EntityManager& registry, core::Entity entity) {
-    if (!registry.is_registered<core::Sprite>() || !registry.has<core::Sprite>(entity)) {
-        return {};
-    }
-    return registry.get<core::Sprite>(entity).color;
-}
-
-std::vector<EntityState> replicated_states(core::EntityManager& registry) {
+std::vector<EntityState> replicated_states(core::EntityManager& world,
+                                           const ReplicatedFields& fields) {
     std::vector<EntityState> states;
-    if (!registry.is_registered<Replicated>() || !registry.is_registered<core::Position>()) {
+    if (!world.is_registered<Replicated>()) {
         return states;
     }
-
-    registry.query<Replicated, core::Position>().each(
-        [&](core::Entity entity, const Replicated& replicated, const core::Position& position) {
-            const auto color = color_of(registry, entity);
-            states.push_back(EntityState{.entity_id = entity.index(),
-                                         .type_id = replicated.type_id,
-                                         .x = to_wire_coordinate(position.pos.x),
-                                         .y = to_wire_coordinate(position.pos.y),
-                                         .owner = replicated.owner,
-                                         .r = color.r,
-                                         .g = color.g,
-                                         .b = color.b,
-                                         .a = color.a});
-        });
+    world.query<Replicated>().each([&](core::Entity entity, const Replicated& replicated) {
+        states.push_back(EntityState{.entity_id = entity.index(),
+                                     .type_id = replicated.type_id,
+                                     .fields = fields.read(world, entity)});
+    });
     return states;
 }
 
 } // namespace
 
-std::int16_t to_wire_coordinate(float value) noexcept {
-    if (std::isnan(value)) {
-        return 0;
-    }
-    constexpr auto lowest = static_cast<float>(std::numeric_limits<std::int16_t>::min());
-    constexpr auto highest = static_cast<float>(std::numeric_limits<std::int16_t>::max());
-    return static_cast<std::int16_t>(std::clamp(std::round(value), lowest, highest));
-}
-
-std::vector<SnapshotPayload> build_snapshots(core::EntityManager& registry,
+std::vector<SnapshotPayload> build_snapshots(core::EntityManager& world,
+                                             const ReplicatedFields& fields,
                                              std::uint32_t server_tick) {
-    const auto states = replicated_states(registry);
-    std::vector<SnapshotPayload> snapshots;
-
-    auto next = states.begin();
-    do {
-        const auto count =
-            std::min<std::ptrdiff_t>(std::distance(next, states.end()), max_snapshot_entities);
-        snapshots.push_back(
-            SnapshotPayload{.server_tick = server_tick, .entities = {next, next + count}});
-        next += count;
-    } while (next != states.end());
-
+    std::vector<SnapshotPayload> snapshots{
+        SnapshotPayload{.server_tick = server_tick, .entities = {}}};
+    std::size_t used = 0;
+    for (auto& state : replicated_states(world, fields)) {
+        const auto size = wire_size(state);
+        if (used + size > max_snapshot_entity_bytes) {
+            snapshots.push_back(SnapshotPayload{.server_tick = server_tick, .entities = {}});
+            used = 0;
+        }
+        used += size;
+        snapshots.back().entities.push_back(std::move(state));
+    }
     return snapshots;
 }
 

@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -9,8 +10,10 @@
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/ManualClock.hpp"
+#include "engine/network/Fields.hpp"
 #include "engine/network/Replicated.hpp"
 
 #include "protocol/Messages.hpp"
@@ -65,6 +68,13 @@ std::vector<const SnapshotPayload*> snapshots_to(const std::vector<Outbound>& ou
     return snapshots;
 }
 
+engine::core::FieldRegistry snapshot_fields() {
+    engine::core::FieldRegistry fields;
+    engine::core::register_core_fields(fields);
+    engine::network::register_network_fields(fields);
+    return fields;
+}
+
 class ServerNetworkTest : public testing::Test {
 protected:
     ServerNetworkTest() {
@@ -89,7 +99,9 @@ protected:
     ManualClock clock;
     EventBus bus;
     EntityManager registry;
-    ServerNetwork network{clock, bus, ServerSessionsConfig{.max_players = 4, .timeout = 5s}};
+    engine::core::FieldRegistry fields = snapshot_fields();
+    ServerNetwork network{clock, bus, fields,
+                          ServerSessionsConfig{.max_players = 4, .timeout = 5s}};
 };
 
 } // namespace
@@ -115,7 +127,10 @@ TEST_F(ServerNetworkTest, OneTickConnectsStoresInputsAndSendsSnapshots) {
         ASSERT_EQ(received.size(), 1U) << port;
         EXPECT_EQ(received.front()->server_tick, 1U);
         ASSERT_EQ(received.front()->entities.size(), 1U);
-        EXPECT_EQ(received.front()->entities.front().x, 12);
+        const auto& entity = received.front()->entities.front();
+        ASSERT_FALSE(entity.fields.empty());
+        const engine::core::FieldValue expected = engine::core::Vec2{12, 0};
+        EXPECT_EQ(entity.fields.front().value, expected);
     }
 }
 
@@ -255,4 +270,19 @@ TEST_F(ServerNetworkTest, MessagesFromStrangersDoNotDisturbTheTick) {
 
     EXPECT_TRUE(outbound.empty());
     EXPECT_EQ(network.sessions().size(), 2U);
+}
+
+TEST_F(ServerNetworkTest, ConnectAcceptNamesEveryReplicatedField) {
+    const auto replies =
+        network.receive({from(client(5000), ConnectRequestPayload{.client_nonce = 1})});
+
+    ASSERT_EQ(replies.size(), 1U);
+    const auto* accept = std::get_if<ConnectAcceptPayload>(&replies.front().message);
+    ASSERT_NE(accept, nullptr);
+    std::vector<std::string> names;
+    for (const auto& entry : accept->strings.entries(engine::network::StringCategory::field)) {
+        names.push_back(entry.name);
+    }
+    EXPECT_EQ(names,
+              (std::vector<std::string>{"Position.pos", "Sprite.color", "Replicated.owner"}));
 }

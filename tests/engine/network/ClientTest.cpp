@@ -15,6 +15,7 @@
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/core/time/SteadyClock.hpp"
@@ -61,6 +62,15 @@ using engine::network::SoundPlayed;
 using engine::network::StringCategory;
 using engine::network::UdpSocket;
 using namespace std::chrono_literals;
+
+const engine::core::FieldRegistry& known_fields() {
+    static const engine::core::FieldRegistry registry = [] {
+        engine::core::FieldRegistry fields;
+        engine::core::register_core_fields(fields);
+        return fields;
+    }();
+    return registry;
+}
 
 constexpr auto delivery_deadline = 2s;
 
@@ -159,13 +169,13 @@ protected:
     EventBus client_bus;
     std::vector<DisconnectReason> reasons;
     NetworkServer server{
-        clock, server_bus,
+        clock, server_bus, known_fields(),
         ServerOptions{.port = 0,
                       .max_players = 1,
                       .strings = payload_samples::strings_of(
                           {{.category = StringCategory::type, .id = 1, .name = "player"},
                            {.category = StringCategory::type, .id = 2, .name = "enemy"}})}};
-    NetworkClient client{clock, client_bus};
+    NetworkClient client{clock, client_bus, known_fields()};
 };
 
 } // namespace
@@ -214,7 +224,7 @@ TEST_F(NetworkClientTest, ReceivesTheWorldAndSendsInputs) {
     ASSERT_EQ(client.state(), ConnectionState::connected);
     EXPECT_EQ(client.player_id(), 1U);
     const auto strings = client.strings();
-    ASSERT_EQ(strings.entries().size(), 2U);
+    ASSERT_EQ(strings.entries(StringCategory::type).size(), 2U);
     EXPECT_EQ(strings.id_of(StringCategory::type, "player"), 1U);
     EXPECT_EQ(strings.id_of(StringCategory::type, "enemy"), 2U);
 
@@ -230,15 +240,20 @@ TEST_F(NetworkClientTest, ReceivesTheWorldAndSendsInputs) {
     EXPECT_EQ(client.server_tick(), 1U);
     const auto received = client.entities().front();
     EXPECT_EQ(received.type_id, 2);
-    EXPECT_FLOAT_EQ(received.x, 30.0F);
-    EXPECT_FLOAT_EQ(received.y, -40.0F);
+    ASSERT_EQ(received.fields.size(), 1U);
+    EXPECT_EQ(received.fields.front().field.field,
+              known_fields().find_field("Position", "pos").field);
+    ASSERT_NE(received.find("Position", "pos"), nullptr);
+    const engine::core::FieldValue expected = engine::core::Vec2{30.0F, -40.0F};
+    EXPECT_EQ(*received.find("Position", "pos"), expected);
+    EXPECT_EQ(received.find("Sprite", "color"), nullptr);
     EXPECT_TRUE(reasons.empty());
 }
 
 TEST_F(NetworkClientTest, ReportsServerFullWhenRejected) {
     start_server();
     connect(client);
-    NetworkClient second(clock, client_bus);
+    NetworkClient second(clock, client_bus, known_fields());
 
     connect(second);
 
@@ -304,7 +319,7 @@ TEST_F(NetworkClientTest, PublishesGameEventsInTheOrderTheServerPublishedThem) {
 
 TEST_F(NetworkClientTest, ReceivesAudioNamesAndTheMusicAlreadyPlaying) {
     NetworkServer audio(
-        clock, server_bus,
+        clock, server_bus, known_fields(),
         ServerOptions{.port = 0,
                       .max_players = 1,
                       .strings = payload_samples::strings_of(
@@ -364,11 +379,12 @@ TEST_F(NetworkClientTest, PublishesMusicChangesFromTheServer) {
 }
 
 TEST_F(NetworkClientTest, PublishesPlayerLeftWhenAnotherPlayerLeaves) {
-    NetworkServer two_players(clock, server_bus, ServerOptions{.port = 0, .max_players = 2});
+    NetworkServer two_players(clock, server_bus, known_fields(),
+                              ServerOptions{.port = 0, .max_players = 2});
     std::error_code ec;
     ASSERT_TRUE(two_players.start(ec)) << ec.message();
     EventBus other_bus;
-    NetworkClient other(clock, other_bus);
+    NetworkClient other(clock, other_bus, known_fields());
     std::vector<std::uint32_t> left;
     client_bus.subscribe<PlayerLeft>(
         [&left](const PlayerLeft& event) { left.push_back(event.player_id); });
@@ -457,7 +473,7 @@ TEST(NetworkClient, GivesUpAndReportsTimeoutWhenNoServerAnswers) {
     bus.subscribe<Disconnected>(
         [&reasons](const Disconnected& event) { reasons.push_back(event.reason); });
     FakeServer silent;
-    NetworkClient client(clock, bus);
+    NetworkClient client(clock, bus, known_fields());
     std::error_code ec;
     ASSERT_TRUE(client.connect("127.0.0.1", silent.port(), ec)) << ec.message();
 
@@ -475,7 +491,7 @@ TEST(NetworkClient, MeasuresTheRoundTripToTheServer) {
     ManualClock clock;
     EventBus bus;
     FakeServer fake;
-    NetworkClient client(clock, bus);
+    NetworkClient client(clock, bus, known_fields());
     EXPECT_FALSE(client.stats().round_trip_time.has_value());
     std::error_code ec;
     ASSERT_TRUE(client.connect("127.0.0.1", fake.port(), ec)) << ec.message();
@@ -507,7 +523,7 @@ TEST(NetworkClient, ReportsTimeoutWhenTheServerGoesSilent) {
     bus.subscribe<Disconnected>(
         [&reasons](const Disconnected& event) { reasons.push_back(event.reason); });
     FakeServer fake;
-    NetworkClient client(clock, bus);
+    NetworkClient client(clock, bus, known_fields());
     std::error_code ec;
     ASSERT_TRUE(client.connect("127.0.0.1", fake.port(), ec)) << ec.message();
     client.update();
@@ -526,4 +542,17 @@ TEST(NetworkClient, ReportsTimeoutWhenTheServerGoesSilent) {
 
     EXPECT_EQ(client.state(), ConnectionState::disconnected);
     EXPECT_EQ(reasons, (std::vector{DisconnectReason::timeout}));
+}
+
+TEST_F(NetworkClientTest, RejectsAServerReplicatingAFieldTheClientDoesNotKnow) {
+    start_server();
+    const engine::core::FieldRegistry no_fields;
+    NetworkClient stranger(clock, client_bus, no_fields);
+
+    connect(stranger);
+
+    EXPECT_EQ(stranger.state(), ConnectionState::rejected);
+    EXPECT_EQ(reasons, (std::vector{DisconnectReason::protocol_error}));
+    ASSERT_TRUE(
+        wait_until([this] { server.receive(); }, [this] { return server.player_count() == 0; }));
 }

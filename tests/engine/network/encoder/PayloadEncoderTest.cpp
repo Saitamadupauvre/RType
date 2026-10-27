@@ -1,5 +1,8 @@
+#include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -7,6 +10,11 @@
 #include "PayloadSamples.hpp"
 #include "encoder/PayloadEncoder.hpp"
 
+using engine::core::AssetName;
+using engine::core::FieldList;
+using engine::core::FieldValue;
+using engine::core::Rgba;
+using engine::core::Vec2;
 using engine::network::ConnectRequestPayload;
 using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
@@ -18,8 +26,8 @@ using engine::network::FireEvent;
 using engine::network::HeartbeatPayload;
 using engine::network::InputPayload;
 using engine::network::max_payload_size;
-using engine::network::max_snapshot_entities;
 using engine::network::PlayerLeftEvent;
+using engine::network::snapshot_prefix_size;
 using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
 using engine::network::SpawnEvent;
@@ -27,8 +35,31 @@ using engine::network::StringCategory;
 using payload_samples::accept_with;
 using payload_samples::encoded;
 using payload_samples::long_name_strings;
+using payload_samples::max_moving_entities;
+using payload_samples::moving_entity_size;
 using payload_samples::snapshot_with;
 using payload_samples::strings_of;
+
+namespace {
+
+constexpr std::size_t first_field_offset = 6 + 7 + 2;
+
+SnapshotPayload snapshot_of_field(FieldValue value) {
+    return {.server_tick = 1,
+            .entities = {EntityState{.entity_id = 1,
+                                     .type_id = 1,
+                                     .fields = {{.field_id = 1, .value = std::move(value)}}}}};
+}
+
+std::vector<std::uint8_t> encoded_field(FieldValue value) {
+    const auto bytes = encoded(snapshot_of_field(std::move(value)));
+    if (bytes.size() < first_field_offset) {
+        return {};
+    }
+    return {bytes.begin() + first_field_offset, bytes.end()};
+}
+
+} // namespace
 
 TEST(InputPayload, EncodesFieldsInOrder) {
     const InputPayload input{.action_flags = 0x01, .move_x = -1, .move_y = 1};
@@ -130,26 +161,62 @@ TEST(SnapshotPayload, EncodesFieldsInOrder) {
         .entities = {EntityState{
             .entity_id = 0x0506'0708,
             .type_id = 0x090A,
-            .x = -1,
-            .y = 2,
-            .vx = -3,
-            .vy = 4,
-            .owner = 0x0B,
-            .r = 0x0C,
-            .g = 0x0D,
-            .b = 0x0E,
-            .a = 0x0F,
+            .fields = {{.field_id = 0x0001, .value = Vec2{-1.F, 2.F}},
+                       {.field_id = 0x0002,
+                        .value = Rgba{.r = 0x0C, .g = 0x0D, .b = 0x0E, .a = 0x0F}}},
         }},
     };
 
     const std::vector<std::uint8_t> prefix{0x01, 0x02, 0x03, 0x04, 0x00, 0x01};
-    const std::vector<std::uint8_t> record{0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0xFF,
-                                           0xFF, 0x00, 0x02, 0xFF, 0xFD, 0x00, 0x04,
-                                           0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    const std::vector<std::uint8_t> record{0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x02,
+                                           0x00, 0x01, 0x04, 0xFF, 0xFF, 0x00, 0x02,
+                                           0x00, 0x02, 0x05, 0x0C, 0x0D, 0x0E, 0x0F};
     std::vector<std::uint8_t> expected = prefix;
     expected.insert(expected.end(), record.begin(), record.end());
 
     EXPECT_EQ(encoded(snapshot), expected);
+}
+
+TEST(SnapshotPayload, EncodesEntityWithoutFields) {
+    const SnapshotPayload snapshot{
+        .server_tick = 1,
+        .entities = {EntityState{.entity_id = 2, .type_id = 3, .fields = {}}},
+    };
+
+    EXPECT_EQ(encoded(snapshot),
+              (std::vector<std::uint8_t>{0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02,
+                                         0x00, 0x03, 0x00}));
+}
+
+TEST(SnapshotPayload, EncodesFloatAsItsBits) {
+    EXPECT_EQ(encoded_field(1.5F), (std::vector<std::uint8_t>{0x00, 0x3F, 0xC0, 0x00, 0x00}));
+}
+
+TEST(SnapshotPayload, EncodesIntAsThirtyTwoBits) {
+    EXPECT_EQ(encoded_field(std::int64_t{-2}),
+              (std::vector<std::uint8_t>{0x01, 0xFF, 0xFF, 0xFF, 0xFE}));
+}
+
+TEST(SnapshotPayload, ClampsIntToThirtyTwoBits) {
+    EXPECT_EQ(encoded_field(std::int64_t{1'099'511'627'776}),
+              (std::vector<std::uint8_t>{0x01, 0x7F, 0xFF, 0xFF, 0xFF}));
+    EXPECT_EQ(encoded_field(std::int64_t{-1'099'511'627'776}),
+              (std::vector<std::uint8_t>{0x01, 0x80, 0x00, 0x00, 0x00}));
+}
+
+TEST(SnapshotPayload, EncodesBoolAsOneByte) {
+    EXPECT_EQ(encoded_field(true), (std::vector<std::uint8_t>{0x02, 0x01}));
+    EXPECT_EQ(encoded_field(false), (std::vector<std::uint8_t>{0x02, 0x00}));
+}
+
+TEST(SnapshotPayload, EncodesStringAndAssetWithTheirLength) {
+    EXPECT_EQ(encoded_field(std::string("ab")), (std::vector<std::uint8_t>{0x03, 0x02, 'a', 'b'}));
+    EXPECT_EQ(encoded_field(AssetName{"c"}), (std::vector<std::uint8_t>{0x06, 0x01, 'c'}));
+}
+
+TEST(SnapshotPayload, RoundsVec2ToWholeCoordinates) {
+    EXPECT_EQ(encoded_field(Vec2{1.6F, -40'000.F}),
+              (std::vector<std::uint8_t>{0x04, 0x00, 0x02, 0x80, 0x00}));
 }
 
 TEST(SnapshotPayload, EncodesEmptySnapshot) {
@@ -158,12 +225,49 @@ TEST(SnapshotPayload, EncodesEmptySnapshot) {
 }
 
 TEST(SnapshotPayload, MaximumSnapshotFitsInOnePayload) {
-    EXPECT_EQ(max_snapshot_entities, 62U);
-    EXPECT_LE(encoded(snapshot_with(max_snapshot_entities)).size(), max_payload_size);
+    EXPECT_EQ(encoded(snapshot_with(max_moving_entities)).size(),
+              snapshot_prefix_size + max_moving_entities * moving_entity_size);
+    EXPECT_LE(encoded(snapshot_with(max_moving_entities)).size(), max_payload_size);
 }
 
-TEST(SnapshotPayload, EncoderRejectsTooManyEntities) {
-    EXPECT_FALSE(encode_payload(snapshot_with(max_snapshot_entities + 1)).has_value());
+TEST(SnapshotPayload, EncoderRejectsTooManyBytes) {
+    EXPECT_FALSE(encode_payload(snapshot_with(max_moving_entities + 1)).has_value());
+}
+
+TEST(SnapshotPayload, EncoderRejectsListField) {
+    EXPECT_FALSE(encode_payload(snapshot_of_field(FieldList{})).has_value());
+}
+
+TEST(SnapshotPayload, EncoderRejectsTooLongText) {
+    EXPECT_TRUE(encode_payload(snapshot_of_field(std::string(255, 'a'))).has_value());
+    EXPECT_FALSE(encode_payload(snapshot_of_field(std::string(256, 'a'))).has_value());
+    EXPECT_FALSE(encode_payload(snapshot_of_field(AssetName{std::string(256, 'a')})).has_value());
+}
+
+TEST(SnapshotPayload, EncoderRejectsNonFiniteFloat) {
+    EXPECT_FALSE(
+        encode_payload(snapshot_of_field(std::numeric_limits<float>::quiet_NaN())).has_value());
+    EXPECT_FALSE(
+        encode_payload(snapshot_of_field(std::numeric_limits<float>::infinity())).has_value());
+}
+
+TEST(SnapshotPayload, EncoderRejectsTheSameFieldTwice) {
+    SnapshotPayload snapshot = snapshot_of_field(true);
+    snapshot.entities.front().fields.push_back(snapshot.entities.front().fields.front());
+
+    EXPECT_FALSE(encode_payload(snapshot).has_value());
+}
+
+TEST(SnapshotPayload, EncoderRejectsMoreThan255Fields) {
+    SnapshotPayload snapshot = snapshot_of_field(true);
+    auto& fields = snapshot.entities.front().fields;
+    for (std::uint16_t id = 2; id <= 256; ++id) {
+        fields.push_back({.field_id = id, .value = true});
+    }
+
+    EXPECT_FALSE(encode_payload(snapshot).has_value());
+    fields.pop_back();
+    EXPECT_TRUE(encode_payload(snapshot).has_value());
 }
 
 TEST(ConnectAcceptPayload, EncodesFieldsInOrder) {

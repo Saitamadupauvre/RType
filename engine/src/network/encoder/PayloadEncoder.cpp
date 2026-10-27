@@ -1,24 +1,31 @@
 #include "PayloadEncoder.hpp"
 
+#include <bit>
 #include <cstdint>
+#include <string>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include "bytes/ByteWriter.hpp"
+#include "protocol/FieldWire.hpp"
 #include "protocol/Validation.hpp"
 
 namespace engine::network {
 
 namespace {
 
+void write_text(ByteWriter& writer, const std::string& text) {
+    writer.write_u8(static_cast<std::uint8_t>(text.size()));
+    for (const char character : text) {
+        writer.write_u8(static_cast<std::uint8_t>(character));
+    }
+}
+
 void write_string_entry(ByteWriter& writer, const StringEntry& entry) {
     writer.write_u8(static_cast<std::uint8_t>(entry.category));
     writer.write_u16(entry.id);
-    writer.write_u8(static_cast<std::uint8_t>(entry.name.size()));
-    for (const char character : entry.name) {
-        writer.write_u8(static_cast<std::uint8_t>(character));
-    }
+    write_text(writer, entry.name);
 }
 
 void write_string_table(ByteWriter& writer, const StringTable& table) {
@@ -28,18 +35,49 @@ void write_string_table(ByteWriter& writer, const StringTable& table) {
     }
 }
 
+void write_value(ByteWriter& writer, float value) {
+    writer.write_u32(std::bit_cast<std::uint32_t>(value));
+}
+
+void write_value(ByteWriter& writer, std::int64_t value) {
+    writer.write_u32(static_cast<std::uint32_t>(to_wire_int(value)));
+}
+
+void write_value(ByteWriter& writer, bool value) { writer.write_u8(value ? 1 : 0); }
+
+void write_value(ByteWriter& writer, const std::string& value) { write_text(writer, value); }
+
+void write_value(ByteWriter& writer, const core::Vec2& value) {
+    writer.write_i16(to_wire_coordinate(value.x));
+    writer.write_i16(to_wire_coordinate(value.y));
+}
+
+void write_value(ByteWriter& writer, const core::Rgba& value) {
+    writer.write_u8(value.r);
+    writer.write_u8(value.g);
+    writer.write_u8(value.b);
+    writer.write_u8(value.a);
+}
+
+void write_value(ByteWriter& writer, const core::AssetName& value) {
+    write_text(writer, value.path);
+}
+
+void write_value(ByteWriter&, const core::FieldList&) {}
+
+void write_field(ByteWriter& writer, const FieldState& field) {
+    writer.write_u16(field.field_id);
+    writer.write_u8(static_cast<std::uint8_t>(core::kind_of(field.value)));
+    std::visit([&writer](const auto& value) { write_value(writer, value); }, field.value);
+}
+
 void write_entity(ByteWriter& writer, const EntityState& entity) {
     writer.write_u32(entity.entity_id);
     writer.write_u16(entity.type_id);
-    writer.write_i16(entity.x);
-    writer.write_i16(entity.y);
-    writer.write_i16(entity.vx);
-    writer.write_i16(entity.vy);
-    writer.write_u8(entity.owner);
-    writer.write_u8(entity.r);
-    writer.write_u8(entity.g);
-    writer.write_u8(entity.b);
-    writer.write_u8(entity.a);
+    writer.write_u8(static_cast<std::uint8_t>(entity.fields.size()));
+    for (const FieldState& field : entity.fields) {
+        write_field(writer, field);
+    }
 }
 
 void write_event_type(ByteWriter& writer, EventType type) {

@@ -10,6 +10,9 @@
 #include "PayloadSamples.hpp"
 #include "decoder/PayloadDecoder.hpp"
 
+using engine::core::AssetName;
+using engine::core::Rgba;
+using engine::core::Vec2;
 using engine::network::ConnectRequestPayload;
 using engine::network::decode_connect_accept;
 using engine::network::decode_connect_request;
@@ -20,14 +23,18 @@ using engine::network::decode_input;
 using engine::network::decode_snapshot;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
+using engine::network::entity_header_size;
+using engine::network::EntityState;
 using engine::network::HeartbeatPayload;
 using engine::network::InputPayload;
-using engine::network::max_snapshot_entities;
+using engine::network::max_snapshot_entity_bytes;
 using engine::network::max_string_name_length;
+using engine::network::SnapshotPayload;
 using engine::network::StringCategory;
 using payload_samples::accept_with;
 using payload_samples::encoded;
 using payload_samples::long_name_strings;
+using payload_samples::max_moving_entities;
 using payload_samples::sample_events;
 using payload_samples::snapshot_with;
 using payload_samples::strings_of;
@@ -35,6 +42,15 @@ using payload_samples::strings_of;
 namespace {
 
 constexpr std::array<std::uint8_t, 2> no_current_music{0xFF, 0xFF};
+constexpr std::size_t snapshot_header_size = 6;
+
+std::vector<std::uint8_t> snapshot_bytes_of_field(std::uint8_t kind,
+                                                  std::vector<std::uint8_t> value) {
+    std::vector<std::uint8_t> bytes{0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+                                    0x00, 0x01, 0x00, 0x01, 0x01, 0x00, 0x05, kind};
+    bytes.insert(bytes.end(), value.begin(), value.end());
+    return bytes;
+}
 
 struct RawEntry {
     std::uint8_t category;
@@ -226,18 +242,27 @@ TEST(EventPayload, DecoderRejectsTrailingBytes) {
     }
 }
 
-TEST(SnapshotPayload, RoundTripsOwnerAndColor) {
-    const engine::network::SnapshotPayload snapshot{
+TEST(SnapshotPayload, RoundTripsEveryFieldKind) {
+    const SnapshotPayload snapshot{
         .server_tick = 9,
-        .entities = {engine::network::EntityState{
-            .entity_id = 1, .type_id = 1, .owner = 3, .r = 1, .g = 2, .b = 3, .a = 4}},
+        .entities = {EntityState{
+            .entity_id = 1,
+            .type_id = 1,
+            .fields = {{.field_id = 1, .value = -1.25F},
+                       {.field_id = 2, .value = std::int64_t{-70'000}},
+                       {.field_id = 3, .value = true},
+                       {.field_id = 4, .value = std::string("hello")},
+                       {.field_id = 5, .value = Vec2{-3.F, 4.F}},
+                       {.field_id = 6, .value = Rgba{.r = 1, .g = 2, .b = 3, .a = 4}},
+                       {.field_id = 7, .value = AssetName{"sprites/ship.png"}},
+                       {.field_id = 8, .value = std::string()}}}},
     };
 
     EXPECT_EQ(decode_snapshot(encoded(snapshot)), snapshot);
 }
 
 TEST(SnapshotPayload, RoundTripsZeroOneAndMaximumEntities) {
-    for (const std::size_t count : {std::size_t{0}, std::size_t{1}, max_snapshot_entities}) {
+    for (const std::size_t count : {std::size_t{0}, std::size_t{1}, max_moving_entities}) {
         const auto snapshot = snapshot_with(count);
 
         EXPECT_EQ(decode_snapshot(encoded(snapshot)), snapshot) << "count " << count;
@@ -254,11 +279,21 @@ TEST(SnapshotPayload, DecoderRejectsTruncatedPrefix) {
     }
 }
 
-TEST(SnapshotPayload, DecoderRejectsTruncatedRecord) {
-    const auto bytes = encoded(snapshot_with(2));
-    const std::span<const std::uint8_t> truncated(bytes.data(), bytes.size() - 1);
+TEST(SnapshotPayload, DecoderRejectsEveryTruncatedEntity) {
+    const SnapshotPayload snapshot{
+        .server_tick = 9,
+        .entities = {EntityState{.entity_id = 1,
+                                 .type_id = 1,
+                                 .fields = {{.field_id = 1, .value = Vec2{1.F, 2.F}},
+                                            {.field_id = 2, .value = std::string("ab")}}}},
+    };
+    const auto bytes = encoded(snapshot);
 
-    EXPECT_FALSE(decode_snapshot(truncated).has_value());
+    for (std::size_t size = 6; size < bytes.size(); ++size) {
+        const std::span<const std::uint8_t> truncated(bytes.data(), size);
+
+        EXPECT_FALSE(decode_snapshot(truncated).has_value()) << "size " << size;
+    }
 }
 
 TEST(SnapshotPayload, DecoderRejectsTrailingBytes) {
@@ -282,6 +317,13 @@ TEST(SnapshotPayload, DecoderRejectsCountSmallerThanRecords) {
     EXPECT_FALSE(decode_snapshot(bytes).has_value());
 }
 
+TEST(SnapshotPayload, DecoderRejectsFieldCountLargerThanFields) {
+    auto bytes = encoded(snapshot_with(1));
+    bytes[snapshot_header_size + 6] = 0x03;
+
+    EXPECT_FALSE(decode_snapshot(bytes).has_value());
+}
+
 TEST(SnapshotPayload, DecoderRejectsHugeCountInShortPayload) {
     const std::array<std::uint8_t, 13> payload{0x00, 0x00, 0x00, 0x01, 0xFF, 0xFF, 0x00,
                                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -289,12 +331,52 @@ TEST(SnapshotPayload, DecoderRejectsHugeCountInShortPayload) {
     EXPECT_FALSE(decode_snapshot(payload).has_value());
 }
 
-TEST(SnapshotPayload, DecoderRejectsMoreThanMaximumEntities) {
-    const std::size_t count = max_snapshot_entities + 1;
-    std::vector<std::uint8_t> bytes{0x00, 0x00, 0x00, 0x01, 0x00, static_cast<std::uint8_t>(count)};
-    bytes.resize(bytes.size() + (count * engine::network::entity_record_size), 0x00);
+TEST(SnapshotPayload, DecoderRejectsMoreBytesThanOneSnapshotHolds) {
+    const std::size_t fitting = max_snapshot_entity_bytes / entity_header_size;
+    for (const std::size_t count : {fitting, fitting + 1}) {
+        std::vector<std::uint8_t> bytes{0x00, 0x00, 0x00,
+                                        0x01, 0x00, static_cast<std::uint8_t>(count)};
+        bytes.resize(bytes.size() + (count * entity_header_size), 0x00);
+
+        EXPECT_EQ(decode_snapshot(bytes).has_value(), count == fitting) << "count " << count;
+    }
+}
+
+TEST(SnapshotPayload, DecoderRejectsUnknownFieldKind) {
+    for (const std::uint8_t kind : {std::uint8_t{0x07}, std::uint8_t{0x08}, std::uint8_t{0xFF}}) {
+        EXPECT_FALSE(
+            decode_snapshot(snapshot_bytes_of_field(kind, {0x00, 0x00, 0x00, 0x00})).has_value())
+            << "kind " << int{kind};
+    }
+}
+
+TEST(SnapshotPayload, DecoderRejectsBoolOtherThanZeroOrOne) {
+    EXPECT_TRUE(decode_snapshot(snapshot_bytes_of_field(0x02, {0x01})).has_value());
+    EXPECT_FALSE(decode_snapshot(snapshot_bytes_of_field(0x02, {0x02})).has_value());
+}
+
+TEST(SnapshotPayload, DecoderRejectsNonFiniteFloat) {
+    EXPECT_TRUE(
+        decode_snapshot(snapshot_bytes_of_field(0x00, {0x3F, 0x80, 0x00, 0x00})).has_value());
+    EXPECT_FALSE(
+        decode_snapshot(snapshot_bytes_of_field(0x00, {0x7F, 0xC0, 0x00, 0x00})).has_value());
+    EXPECT_FALSE(
+        decode_snapshot(snapshot_bytes_of_field(0x00, {0x7F, 0x80, 0x00, 0x00})).has_value());
+}
+
+TEST(SnapshotPayload, DecoderRejectsTextLongerThanItsBytes) {
+    EXPECT_FALSE(decode_snapshot(snapshot_bytes_of_field(0x03, {0x03, 'a', 'b'})).has_value());
+    EXPECT_FALSE(decode_snapshot(snapshot_bytes_of_field(0x06, {0x03, 'a', 'b'})).has_value());
+}
+
+TEST(SnapshotPayload, DecoderRejectsTheSameFieldTwice) {
+    std::vector<std::uint8_t> bytes{0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+                                    0x00, 0x00, 0x01, 0x00, 0x01, 0x02, 0x00,
+                                    0x05, 0x02, 0x01, 0x00, 0x05, 0x02, 0x00};
 
     EXPECT_FALSE(decode_snapshot(bytes).has_value());
+    bytes[18] = 0x06;
+    EXPECT_TRUE(decode_snapshot(bytes).has_value());
 }
 
 TEST(ConnectAcceptPayload, RoundTripsStringTable) {

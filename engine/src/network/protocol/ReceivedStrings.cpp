@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <ranges>
 #include <string_view>
+#include <utility>
 #include <variant>
 
 #include "engine/core/log/Log.hpp"
+
+#include "FieldWire.hpp"
 
 namespace engine::network {
 
@@ -33,9 +36,31 @@ bool admits_type_ids(const ReceivedStrings& table, std::string_view message_name
     return true;
 }
 
+bool admits_field(const ReceivedStrings& table, const FieldState& state) {
+    const core::FieldRef field = table.field(state.field_id);
+    if (!field) {
+        core::log::warn("network: dropped snapshot with unknown field id {}", state.field_id);
+        return false;
+    }
+    if (field.field->kind() != core::kind_of(state.value)) {
+        core::log::warn("network: dropped snapshot: field '{}' expects a {}, not a {}",
+                        wire_field_name(field), core::field_kind_name(field.field->kind()),
+                        core::field_kind_name(core::kind_of(state.value)));
+        return false;
+    }
+    return true;
+}
+
 bool admits_message(const ReceivedStrings& table, const SnapshotPayload& snapshot) {
     const auto type_ids = snapshot.entities | std::views::transform(&EntityState::type_id);
-    return admits_type_ids(table, "snapshot", type_ids);
+    if (!admits_type_ids(table, "snapshot", type_ids)) {
+        return false;
+    }
+    return std::ranges::all_of(snapshot.entities, [&table](const EntityState& entity) {
+        return std::ranges::all_of(entity.fields, [&table](const FieldState& state) {
+            return admits_field(table, state);
+        });
+    });
 }
 
 bool admits_message(const ReceivedStrings& table, const EventPayload& event) {
@@ -49,7 +74,26 @@ bool admits_message(const ReceivedStrings&, const auto&) { return true; }
 
 } // namespace
 
-void ReceivedStrings::assign(const ConnectAcceptPayload& accept) { _table = accept.strings; }
+bool ReceivedStrings::assign(const ConnectAcceptPayload& accept) {
+    std::unordered_map<std::uint16_t, core::FieldRef> fields;
+    for (const StringEntry& entry : accept.strings.entries(StringCategory::field)) {
+        const core::FieldRef field = find_wire_field(_registry.get(), entry.name);
+        if (!field) {
+            core::log::error("network: the server replicates field '{}', unknown to this client",
+                             entry.name);
+            return false;
+        }
+        fields.emplace(entry.id, field);
+    }
+    _table = accept.strings;
+    _fields = std::move(fields);
+    return true;
+}
+
+core::FieldRef ReceivedStrings::field(std::uint16_t field_id) const {
+    const auto found = _fields.find(field_id);
+    return found == _fields.end() ? core::FieldRef{} : found->second;
+}
 
 bool ReceivedStrings::is_known_type(std::uint16_t type_id) const {
     return _table && _table->name_of(StringCategory::type, type_id) != nullptr;

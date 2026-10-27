@@ -54,17 +54,20 @@ engine_add_module(network
         src/network/Client.cpp
         src/network/Module.cpp
         src/network/Server.cpp
+        src/network/Fields.cpp
         src/network/StringTable.cpp
         src/network/decoder/EventReader.cpp
         src/network/decoder/PayloadDecoder.cpp
         src/network/encoder/PayloadEncoder.cpp
         src/network/event/GameEvents.cpp
+        src/network/protocol/FieldWire.cpp
         src/network/protocol/ProtocolHandler.cpp
         src/network/protocol/ReceivedStrings.cpp
         src/network/protocol/Validation.cpp
         src/network/server/ServerNetwork.cpp
         src/network/session/ClientConnection.cpp
         src/network/session/ServerSessions.cpp
+        src/network/snapshot/ReplicatedFields.cpp
         src/network/snapshot/SnapshotBuilder.cpp
         src/network/snapshot/SnapshotReceiver.cpp
         src/network/socket/SocketError.cpp

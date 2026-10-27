@@ -48,6 +48,7 @@ public:
     void set_current_music(std::uint16_t music_id);
 
     [[nodiscard]] const std::vector<Session>& sessions() const noexcept { return sessions_; }
+    [[nodiscard]] const StringTable& strings() const noexcept { return config_.strings; }
     [[nodiscard]] std::vector<PlayerStats> stats() const;
 
 private:

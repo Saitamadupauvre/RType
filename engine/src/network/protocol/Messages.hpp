@@ -5,6 +5,7 @@
 #include <variant>
 #include <vector>
 
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/network/StringTable.hpp"
 
@@ -33,18 +34,17 @@ struct InputPayload {
     bool operator==(const InputPayload&) const = default;
 };
 
+struct FieldState {
+    std::uint16_t field_id{};
+    core::FieldValue value;
+
+    bool operator==(const FieldState&) const = default;
+};
+
 struct EntityState {
     std::uint32_t entity_id{};
     std::uint16_t type_id{};
-    std::int16_t x{};
-    std::int16_t y{};
-    std::int16_t vx{};
-    std::int16_t vy{};
-    std::uint8_t owner{};
-    std::uint8_t r{255};
-    std::uint8_t g{255};
-    std::uint8_t b{255};
-    std::uint8_t a{255};
+    std::vector<FieldState> fields;
 
     bool operator==(const EntityState&) const = default;
 };

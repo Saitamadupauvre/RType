@@ -8,6 +8,7 @@
 #include "AudioPlayer.hpp"
 #include "Cli.hpp"
 #include "Controls.hpp"
+#include "GameFields.hpp"
 #include "SnapshotView.hpp"
 #include "Starfield.hpp"
 #include "engine/audio/IAudio.hpp"
@@ -69,7 +70,8 @@ int main(int argc, char** argv) {
 
     const engine::core::time::SteadyClock clock;
     engine::core::event::EventBus events;
-    engine::network::NetworkClient network(clock, events);
+    const auto fields = rtype::common::game_fields();
+    engine::network::NetworkClient network(clock, events, fields);
     events.subscribe<engine::network::SoundPlayed>([&](const engine::network::SoundPlayed& played) {
         sound.play_sound(network.strings(), played.sound_id);
     });
@@ -92,7 +94,7 @@ int main(int argc, char** argv) {
 
     engine::core::time::FixedStepLoop loop(clock);
     rtype::client::Starfield starfield(starfield_seed, renderer.virtual_size());
-    rtype::client::SnapshotView view(renderer, executable_dir / "assets");
+    rtype::client::SnapshotView view(renderer, executable_dir / "assets", fields);
 
     while (!renderer.should_close()) {
         network.update();

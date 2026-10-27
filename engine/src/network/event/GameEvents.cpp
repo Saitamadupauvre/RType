@@ -2,7 +2,7 @@
 
 #include <variant>
 
-#include "snapshot/SnapshotBuilder.hpp"
+#include "protocol/FieldWire.hpp"
 
 namespace engine::network {
 

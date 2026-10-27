@@ -9,6 +9,7 @@
 #include "Cli.hpp"
 #include "Collisions.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/SystemScheduler.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
@@ -48,6 +49,7 @@ private:
     engine::core::SystemScheduler systems_;
     engine::script::ScriptRuntime _runtime;
     engine::network::StringTable _strings;
+    engine::core::FieldRegistry _fields;
     engine::network::NetworkServer network_;
     Collisions _collisions;
 };
