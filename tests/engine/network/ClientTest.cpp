@@ -35,6 +35,7 @@ namespace {
 
 using engine::core::EntityManager;
 using engine::core::Position;
+using engine::core::Vec2;
 using engine::core::event::EventBus;
 using engine::core::time::ManualClock;
 using engine::core::time::SteadyClock;
@@ -44,12 +45,11 @@ using engine::network::ConnectRequestPayload;
 using engine::network::Disconnected;
 using engine::network::DisconnectReason;
 using engine::network::Endpoint;
-using engine::network::EntityDestroyed;
-using engine::network::EntitySpawned;
 using engine::network::HeartbeatPayload;
 using engine::network::max_datagram_size;
 using engine::network::Message;
 using engine::network::MusicChanged;
+using engine::network::NamedEvent;
 using engine::network::NetworkClient;
 using engine::network::NetworkServer;
 using engine::network::PlayerLeft;
@@ -57,7 +57,6 @@ using engine::network::ProtocolHandler;
 using engine::network::ReceivedMessage;
 using engine::network::Replicated;
 using engine::network::ServerOptions;
-using engine::network::ShotFired;
 using engine::network::SoundPlayed;
 using engine::network::StringCategory;
 using engine::network::UdpSocket;
@@ -174,7 +173,9 @@ protected:
                       .max_players = 1,
                       .strings = payload_samples::strings_of(
                           {{.category = StringCategory::type, .id = 1, .name = "player"},
-                           {.category = StringCategory::type, .id = 2, .name = "enemy"}})}};
+                           {.category = StringCategory::type, .id = 2, .name = "enemy"},
+                           {.category = StringCategory::event, .id = 1, .name = "explosion"},
+                           {.category = StringCategory::event_key, .id = 1, .name = "at"}})}};
     NetworkClient client{clock, client_bus, known_fields()};
 };
 
@@ -287,34 +288,28 @@ TEST_F(NetworkClientTest, ReportsServerShutdownOnceAndKeepsTheLastWorld) {
 
 TEST_F(NetworkClientTest, PublishesGameEventsInTheOrderTheServerPublishedThem) {
     std::vector<std::string> received;
-    client_bus.subscribe<EntitySpawned>([&received](const EntitySpawned& event) {
-        received.push_back("spawn " + std::to_string(event.entity_id) + " type " +
-                           std::to_string(event.type_id) + " at " +
-                           std::to_string(static_cast<int>(event.x)) + "," +
-                           std::to_string(static_cast<int>(event.y)));
+    client_bus.subscribe<NamedEvent>([&received](const NamedEvent& event) {
+        const auto* at = event.find("at");
+        const auto position = at != nullptr ? std::get<Vec2>(*at) : Vec2{};
+        received.push_back(event.name + " at " + std::to_string(static_cast<int>(position.x)) +
+                           "," + std::to_string(static_cast<int>(position.y)));
     });
     client_bus.subscribe<SoundPlayed>([&received](const SoundPlayed& event) {
         received.push_back("sound " + std::to_string(event.sound_id));
-    });
-    client_bus.subscribe<ShotFired>([&received](const ShotFired& event) {
-        received.push_back("shot " + std::to_string(event.projectile_entity_id));
-    });
-    client_bus.subscribe<EntityDestroyed>([&received](const EntityDestroyed& event) {
-        received.push_back("destroy " + std::to_string(event.entity_id));
     });
     EntityManager registry;
     start_server();
     connect(client);
 
-    server_bus.publish(EntitySpawned{.entity_id = 4, .type_id = 2, .x = 10.4F, .y = -3.6F});
+    server_bus.publish(
+        NamedEvent{.name = "explosion", .arguments = {{.key = "at", .value = Vec2{10.4F, -3.6F}}}});
     server_bus.publish(SoundPlayed{.source_entity_id = 4, .sound_id = 7});
-    server_bus.publish(ShotFired{.source_entity_id = 4, .projectile_entity_id = 5});
-    server_bus.publish(EntityDestroyed{.entity_id = 4});
+    server_bus.publish(NamedEvent{.name = "explosion", .arguments = {}});
     server.send_snapshot(registry);
 
-    wait_for_client([&received] { return received.size() == 4; });
-    EXPECT_EQ(received, (std::vector<std::string>{"spawn 4 type 2 at 10,-4", "sound 7", "shot 5",
-                                                  "destroy 4"}));
+    wait_for_client([&received] { return received.size() == 3; });
+    EXPECT_EQ(received,
+              (std::vector<std::string>{"explosion at 10,-4", "sound 7", "explosion at 0,0"}));
 }
 
 TEST_F(NetworkClientTest, ReceivesAudioNamesAndTheMusicAlreadyPlaying) {
@@ -412,9 +407,9 @@ TEST_F(NetworkClientTest, PublishesPlayerLeftWhenAnotherPlayerLeaves) {
 }
 
 TEST_F(NetworkClientTest, DropsASnapshotWithATypeMissingFromTheTable) {
-    std::vector<std::uint32_t> spawned;
-    client_bus.subscribe<EntitySpawned>(
-        [&spawned](const EntitySpawned& event) { spawned.push_back(event.entity_id); });
+    std::vector<std::string> spawned;
+    client_bus.subscribe<NamedEvent>(
+        [&spawned](const NamedEvent& event) { spawned.push_back(event.name); });
     EntityManager registry;
     registry.register_component<Replicated>();
     registry.register_component<Position>();
@@ -426,7 +421,7 @@ TEST_F(NetworkClientTest, DropsASnapshotWithATypeMissingFromTheTable) {
 
     server.send_snapshot(registry);
     registry.get<Replicated>(unknown).type_id = 1;
-    server_bus.publish(EntitySpawned{.entity_id = 3, .type_id = 1, .x = 0.0F, .y = 0.0F});
+    server_bus.publish(NamedEvent{.name = "explosion", .arguments = {}});
     server.send_snapshot(registry);
 
     wait_for_client([&spawned] { return !spawned.empty(); });
@@ -436,20 +431,23 @@ TEST_F(NetworkClientTest, DropsASnapshotWithATypeMissingFromTheTable) {
     EXPECT_EQ(client.entities().front().type_id, 1);
 }
 
-TEST_F(NetworkClientTest, DropsASpawnEventWithATypeMissingFromTheTable) {
-    std::vector<std::uint16_t> spawned;
-    client_bus.subscribe<EntitySpawned>(
-        [&spawned](const EntitySpawned& event) { spawned.push_back(event.type_id); });
+TEST_F(NetworkClientTest, NeverReceivesANamedEventMissingFromTheServerTable) {
+    std::vector<std::string> received;
+    client_bus.subscribe<NamedEvent>([&received](const NamedEvent& event) {
+        received.push_back(event.name + " " + std::to_string(event.arguments.size()));
+    });
     EntityManager registry;
     start_server();
     connect(client);
 
-    server_bus.publish(EntitySpawned{.entity_id = 3, .type_id = 9, .x = 0.0F, .y = 0.0F});
-    server_bus.publish(EntitySpawned{.entity_id = 4, .type_id = 1, .x = 0.0F, .y = 0.0F});
+    server_bus.publish(NamedEvent{.name = "unknown", .arguments = {}});
+    server_bus.publish(
+        NamedEvent{.name = "explosion", .arguments = {{.key = "size", .value = 1.0F}}});
+    server_bus.publish(NamedEvent{.name = "explosion", .arguments = {}});
     server.send_snapshot(registry);
 
     wait_for_client([this] { return client.server_tick().has_value(); });
-    EXPECT_EQ(spawned, (std::vector<std::uint16_t>{1}));
+    EXPECT_EQ(received, (std::vector<std::string>{"explosion 0"}));
 }
 
 TEST_F(NetworkClientTest, DisconnectTellsTheServerAndReportsNormalOnce) {

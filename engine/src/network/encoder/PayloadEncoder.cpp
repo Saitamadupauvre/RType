@@ -65,10 +65,14 @@ void write_value(ByteWriter& writer, const core::AssetName& value) {
 
 void write_value(ByteWriter&, const core::FieldList&) {}
 
+void write_tagged_value(ByteWriter& writer, std::uint16_t id, const core::FieldValue& value) {
+    writer.write_u16(id);
+    writer.write_u8(static_cast<std::uint8_t>(core::kind_of(value)));
+    std::visit([&writer](const auto& held) { write_value(writer, held); }, value);
+}
+
 void write_field(ByteWriter& writer, const FieldState& field) {
-    writer.write_u16(field.field_id);
-    writer.write_u8(static_cast<std::uint8_t>(core::kind_of(field.value)));
-    std::visit([&writer](const auto& value) { write_value(writer, value); }, field.value);
+    write_tagged_value(writer, field.field_id, field.value);
 }
 
 void write_entity(ByteWriter& writer, const EntityState& entity) {
@@ -82,25 +86,6 @@ void write_entity(ByteWriter& writer, const EntityState& entity) {
 
 void write_event_type(ByteWriter& writer, EventType type) {
     writer.write_u8(static_cast<std::uint8_t>(type));
-}
-
-void write_event(ByteWriter& writer, const SpawnEvent& event) {
-    write_event_type(writer, EventType::spawn);
-    writer.write_u32(event.entity_id);
-    writer.write_u16(event.type_id);
-    writer.write_i16(event.x);
-    writer.write_i16(event.y);
-}
-
-void write_event(ByteWriter& writer, const DestroyEvent& event) {
-    write_event_type(writer, EventType::destroy);
-    writer.write_u32(event.entity_id);
-}
-
-void write_event(ByteWriter& writer, const FireEvent& event) {
-    write_event_type(writer, EventType::fire);
-    writer.write_u32(event.source_entity_id);
-    writer.write_u32(event.projectile_entity_id);
 }
 
 void write_event(ByteWriter& writer, const SoundEvent& event) {
@@ -117,6 +102,15 @@ void write_event(ByteWriter& writer, const PlayerLeftEvent& event) {
 void write_event(ByteWriter& writer, const MusicEvent& event) {
     write_event_type(writer, EventType::music);
     writer.write_u16(event.music_id);
+}
+
+void write_event(ByteWriter& writer, const NamedEventState& event) {
+    write_event_type(writer, EventType::named);
+    writer.write_u16(event.name_id);
+    writer.write_u8(static_cast<std::uint8_t>(event.arguments.size()));
+    for (const EventArgumentState& argument : event.arguments) {
+        write_tagged_value(writer, argument.key_id, argument.value);
+    }
 }
 
 } // namespace
@@ -167,6 +161,10 @@ EncodedPayload encode_payload(const SnapshotPayload& payload) {
 }
 
 EncodedPayload encode_payload(const EventPayload& payload) {
+    if (!is_valid(payload)) {
+        return std::nullopt;
+    }
+
     ByteWriter writer;
     std::visit([&writer](const auto& event) { write_event(writer, event); }, payload);
     return std::move(writer).take();

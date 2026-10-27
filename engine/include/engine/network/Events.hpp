@@ -1,7 +1,13 @@
 #pragma once
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
 
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/network/Audio.hpp"
 #include "engine/network/Export.hpp"
 
@@ -44,31 +50,56 @@ struct ENGINE_NETWORK_EXPORT PlayerLeft {
  * @{
  */
 
-/**
- * @brief An entity appeared. `type_id` must be in the server's type table.
- */
-struct ENGINE_NETWORK_EXPORT EntitySpawned {
-    std::uint32_t entity_id;
-    std::uint16_t type_id;
-    /** @brief Position in world units, rounded to whole units on the wire. */
-    float x;
-    float y;
-};
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4251)
+#endif
 
 /**
- * @brief An entity was removed from the world.
+ * @brief A game-defined event, such as an explosion, sent with named, typed arguments.
+ *
+ * On the server, `name` and every `Argument::key` must be in the server's string table
+ * (categories `event` and `event_key`): an event with an unknown name or key, more than
+ * `max_event_arguments` arguments, a repeated key, a list value, a non-finite float or a
+ * string or asset longer than `max_event_text_length` bytes is dropped and logged. The server
+ * checks no schema: what an event carries is up to the game.
+ *
+ * On the client, names and keys are the ones of the received string table. Vec2 values arrive
+ * rounded to whole units and ints are clamped to 32 bits, as in snapshots.
  */
-struct ENGINE_NETWORK_EXPORT EntityDestroyed {
-    std::uint32_t entity_id;
+struct ENGINE_NETWORK_EXPORT NamedEvent {
+    /** @brief One argument of the event. */
+    struct Argument {
+        std::string key;
+        core::FieldValue value;
+
+        bool operator==(const Argument&) const = default;
+    };
+
+    std::string name;
+    std::vector<Argument> arguments;
+
+    /**
+     * @return The value of the argument @p key, or `nullptr` when the event has none. The
+     * pointer stays valid until the event is changed or destroyed.
+     */
+    [[nodiscard]] const core::FieldValue* find(std::string_view key) const noexcept {
+        const auto found = std::ranges::find(arguments, key, &Argument::key);
+        return found == arguments.end() ? nullptr : &found->value;
+    }
+
+    bool operator==(const NamedEvent&) const = default;
 };
 
-/**
- * @brief An entity fired a projectile.
- */
-struct ENGINE_NETWORK_EXPORT ShotFired {
-    std::uint32_t source_entity_id;
-    std::uint32_t projectile_entity_id;
-};
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
+/** @brief Most arguments a NamedEvent may carry. */
+inline constexpr std::size_t max_event_arguments = 16;
+
+/** @brief Longest string or asset value a NamedEvent argument may hold, in bytes. */
+inline constexpr std::size_t max_event_text_length = 63;
 
 /**
  * @brief A sound was played, e.g. from the Lua `play(...)` function.

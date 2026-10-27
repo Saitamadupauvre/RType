@@ -26,10 +26,10 @@ struct ENGINE_NETWORK_EXPORT ServerOptions {
     std::uint16_t port;
     /** @brief Number of player slots. A client arriving when all are taken is rejected. */
     std::size_t max_players;
-    /** @brief Names sent to every client in `connect_accept`: every `Replicated::type_id` and
-     * `EntitySpawned::type_id` (category `type`), `SoundPlayed::sound_id` (`sound`) and
-     * `MusicChanged::music_id` (`music`) the game uses. The server adds the replicated field
-     * names (`field`) itself. */
+    /** @brief Names sent to every client in `connect_accept`: every `Replicated::type_id`
+     * (category `type`), `SoundPlayed::sound_id` (`sound`), `MusicChanged::music_id` (`music`),
+     * `NamedEvent::name` (`event`) and `NamedEvent::Argument::key` (`event_key`) the game uses.
+     * The server adds the replicated field names (`field`) itself. */
     StringTable strings = {};
 };
 
@@ -58,9 +58,9 @@ struct ENGINE_NETWORK_EXPORT PlayerInput {
  *    disconnections, inputs) and removes players silent for longer than the session timeout.
  *    `PlayerJoined` and `PlayerLeft` are published on the event bus during this call.
  * 2. inputs(): the latest input of each connected player, for the game to apply.
- * 3. During the tick, the game publishes `EntitySpawned`, `EntityDestroyed`, `ShotFired`,
- *    `SoundPlayed` and `MusicChanged` on the event bus. Each one is queued for the players
- *    connected at that moment.
+ * 3. During the tick, the game publishes `SoundPlayed`, `MusicChanged` and `NamedEvent` on
+ *    the event bus. Each one is queued for the players connected at that moment; a NamedEvent
+ *    that breaks its rules is dropped and logged instead.
  * 4. send_snapshot(): sends the queued events in the order published, then every entity with
  *    `Replicated`, to every player.
  *

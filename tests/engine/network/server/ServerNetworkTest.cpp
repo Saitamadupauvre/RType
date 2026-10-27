@@ -23,11 +23,11 @@ namespace {
 
 using engine::core::EntityManager;
 using engine::core::Position;
+using engine::core::Vec2;
 using engine::core::event::EventBus;
 using engine::core::time::ManualClock;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
-using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::Endpoint;
@@ -35,6 +35,7 @@ using engine::network::EventPayload;
 using engine::network::Inbound;
 using engine::network::InputPayload;
 using engine::network::Message;
+using engine::network::NamedEventState;
 using engine::network::Outbound;
 using engine::network::PlayerLeftEvent;
 using engine::network::Replicated;
@@ -42,7 +43,6 @@ using engine::network::ServerNetwork;
 using engine::network::ServerSessionsConfig;
 using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
-using engine::network::SpawnEvent;
 using namespace std::chrono_literals;
 
 Endpoint client(std::uint16_t port) {
@@ -180,9 +180,10 @@ TEST_F(ServerNetworkTest, CrashedClientIsDroppedOnALaterTickAndOthersAreTold) {
 
 TEST_F(ServerNetworkTest, QueuedEventsReachEveryPlayerInOrderBeforeTheSnapshot) {
     connect_clients();
-    const EventPayload spawn{SpawnEvent{.entity_id = 1, .type_id = 1, .x = 2, .y = 3}};
+    const EventPayload spawn{
+        NamedEventState{.name_id = 1, .arguments = {{.key_id = 1, .value = Vec2{2.0F, 3.0F}}}}};
     const EventPayload sound{SoundEvent{.source_entity_id = 1, .sound_id = 4}};
-    const EventPayload destroy{DestroyEvent{.entity_id = 1}};
+    const EventPayload destroy{NamedEventState{.name_id = 1, .arguments = {}}};
 
     network.queue_event(spawn);
     network.queue_event(sound);
@@ -206,7 +207,7 @@ TEST_F(ServerNetworkTest, QueuedEventsReachEveryPlayerInOrderBeforeTheSnapshot) 
 
 TEST_F(ServerNetworkTest, EventsAreSentOnce) {
     connect_clients();
-    network.queue_event(DestroyEvent{.entity_id = 1});
+    network.queue_event(NamedEventState{.name_id = 1, .arguments = {}});
     static_cast<void>(network.snapshot(registry));
 
     const auto outbound = network.snapshot(registry);
@@ -217,8 +218,8 @@ TEST_F(ServerNetworkTest, EventsAreSentOnce) {
 }
 
 TEST_F(ServerNetworkTest, APlayerJoiningLaterOnlyGetsLaterEvents) {
-    const EventPayload before{DestroyEvent{.entity_id = 1}};
-    const EventPayload after{DestroyEvent{.entity_id = 2}};
+    const EventPayload before{NamedEventState{.name_id = 1, .arguments = {}}};
+    const EventPayload after{NamedEventState{.name_id = 2, .arguments = {}}};
     static_cast<void>(network.receive({from(client(5000), ConnectRequestPayload{})}));
     network.queue_event(before);
     static_cast<void>(network.receive({from(client(5001), ConnectRequestPayload{})}));
@@ -236,7 +237,7 @@ TEST_F(ServerNetworkTest, APlayerJoiningLaterOnlyGetsLaterEvents) {
 }
 
 TEST_F(ServerNetworkTest, EventsWithoutPlayersAreDropped) {
-    network.queue_event(DestroyEvent{.entity_id = 1});
+    network.queue_event(NamedEventState{.name_id = 1, .arguments = {}});
     static_cast<void>(network.receive({from(client(5000), ConnectRequestPayload{})}));
 
     const auto outbound = network.snapshot(registry);

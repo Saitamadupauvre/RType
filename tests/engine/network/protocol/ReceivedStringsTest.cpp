@@ -18,16 +18,15 @@ namespace {
 
 using engine::core::Vec2;
 using engine::network::ConnectAcceptPayload;
-using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::EntityState;
 using engine::network::EventPayload;
 using engine::network::FieldState;
 using engine::network::HeartbeatPayload;
 using engine::network::Message;
+using engine::network::NamedEventState;
 using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
-using engine::network::SpawnEvent;
 using engine::network::StringCategory;
 
 constexpr std::uint16_t player_type = 1;
@@ -66,10 +65,6 @@ Message snapshot_of(std::uint16_t first_type, std::uint16_t second_type) {
         .server_tick = 1,
         .entities = {EntityState{.entity_id = 1, .type_id = first_type, .fields = {}},
                      EntityState{.entity_id = 2, .type_id = second_type, .fields = {}}}};
-}
-
-Message spawn_of(std::uint16_t type_id) {
-    return EventPayload{SpawnEvent{.entity_id = 3, .type_id = type_id}};
 }
 
 class ReceivedStrings : public testing::Test {
@@ -151,23 +146,10 @@ TEST_F(ReceivedStrings, DropsSnapshotWithOneUnknownType) {
     expect_dropped_and_logged(snapshot_of(player_type, unknown_type), "unknown type id 99");
 }
 
-TEST_F(ReceivedStrings, AdmitsSpawnWithKnownType) {
+TEST_F(ReceivedStrings, AdmitsEventsAfterAccept) {
     table.assign(sample_accept());
 
-    EXPECT_TRUE(table.admits(spawn_of(enemy_type)));
-    EXPECT_TRUE(sink->records().empty());
-}
-
-TEST_F(ReceivedStrings, DropsSpawnWithUnknownType) {
-    table.assign(sample_accept());
-
-    expect_dropped_and_logged(spawn_of(unknown_type), "spawn event with unknown type id 99");
-}
-
-TEST_F(ReceivedStrings, AdmitsOtherEventsAfterAccept) {
-    table.assign(sample_accept());
-
-    EXPECT_TRUE(table.admits(EventPayload{DestroyEvent{.entity_id = 3}}));
+    EXPECT_TRUE(table.admits(EventPayload{NamedEventState{.name_id = 3, .arguments = {}}}));
     EXPECT_TRUE(table.admits(EventPayload{SoundEvent{.source_entity_id = 3, .sound_id = 4}}));
 }
 
@@ -175,12 +157,9 @@ TEST_F(ReceivedStrings, DropsSnapshotBeforeAccept) {
     expect_dropped_and_logged(snapshot_of(player_type, enemy_type), "before connect_accept");
 }
 
-TEST_F(ReceivedStrings, DropsSpawnBeforeAccept) {
-    expect_dropped_and_logged(spawn_of(player_type), "before connect_accept");
-}
-
-TEST_F(ReceivedStrings, DropsOtherEventsBeforeAccept) {
-    expect_dropped_and_logged(EventPayload{DestroyEvent{.entity_id = 3}}, "before connect_accept");
+TEST_F(ReceivedStrings, DropsEventsBeforeAccept) {
+    expect_dropped_and_logged(EventPayload{NamedEventState{.name_id = 3, .arguments = {}}},
+                              "before connect_accept");
 }
 
 TEST_F(ReceivedStrings, AdmitsMessagesWithoutTypeIdsBeforeAccept) {

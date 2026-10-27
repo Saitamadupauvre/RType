@@ -23,9 +23,9 @@ using engine::network::HeartbeatPayload;
 using engine::network::InputPayload;
 using engine::network::Message;
 using engine::network::MessageType;
+using engine::network::NamedEventState;
 using engine::network::ProtocolHandler;
 using engine::network::SnapshotPayload;
-using engine::network::SpawnEvent;
 
 constexpr std::size_t header_type_offset = 6;
 
@@ -50,7 +50,7 @@ std::vector<std::pair<Message, MessageType>> sample_messages() {
                              .type_id = 1,
                              .fields = {{.field_id = 1, .value = engine::core::Vec2{10, 0}}}}}},
          MessageType::snapshot},
-        {EventPayload{SpawnEvent{.entity_id = 12, .type_id = 1, .x = 10, .y = 20}},
+        {EventPayload{NamedEventState{.name_id = 12, .arguments = {{.key_id = 1, .value = 2.5F}}}},
          MessageType::event},
         {HeartbeatPayload{}, MessageType::heartbeat},
         {DisconnectPayload{.reason = DisconnectReason::timeout}, MessageType::disconnect},
@@ -87,7 +87,7 @@ TEST(ProtocolHandler, SerializesPacketInBigEndianOrder) {
 
     const auto packet = handler.serialize(input_header(0x0102'0304, payload.size()), payload);
 
-    const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x05, 0x03, 0x01,
+    const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x06, 0x03, 0x01,
                                              0x02, 0x03, 0x04, 0x00, 0x03, 0x01, 0x00, 0x01};
 
     EXPECT_EQ(packet, expected);

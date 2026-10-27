@@ -24,7 +24,6 @@ using engine::network::ClientConnectionConfig;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectionState;
 using engine::network::ConnectRequestPayload;
-using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::Endpoint;
@@ -34,11 +33,11 @@ using engine::network::HeartbeatPayload;
 using engine::network::Inbound;
 using engine::network::InputPayload;
 using engine::network::Message;
+using engine::network::NamedEventState;
 using engine::network::Outbound;
 using engine::network::ServerSessions;
 using engine::network::ServerSessionsConfig;
 using engine::network::SnapshotPayload;
-using engine::network::SpawnEvent;
 using engine::network::StringCategory;
 using namespace std::chrono_literals;
 
@@ -83,10 +82,6 @@ Message snapshot_of_type(std::uint16_t type_id) {
     return SnapshotPayload{
         .server_tick = 1,
         .entities = {EntityState{.entity_id = 1, .type_id = type_id, .fields = {}}}};
-}
-
-Message spawn_of_type(std::uint16_t type_id) {
-    return EventPayload{SpawnEvent{.entity_id = 1, .type_id = type_id, .x = 0, .y = 0}};
 }
 
 Message connect_request() { return ConnectRequestPayload{.client_nonce = sample_nonce}; }
@@ -157,15 +152,14 @@ TEST_F(ClientConnectionTest, DropsSnapshotsAndEventsBeforeConnectAccept) {
     static_cast<void>(connection.update());
 
     EXPECT_FALSE(connection.handle(from(server_endpoint(), snapshot_of_type(1))));
-    EXPECT_FALSE(connection.handle(from(server_endpoint(), EventPayload{DestroyEvent{}})));
+    EXPECT_FALSE(connection.handle(from(server_endpoint(), EventPayload{NamedEventState{}})));
 }
 
 TEST_F(ClientConnectionTest, AcceptsSnapshotsAndSpawnsWithKnownTypes) {
     connect();
 
     EXPECT_TRUE(connection.handle(from(server_endpoint(), snapshot_of_type(1))));
-    EXPECT_TRUE(connection.handle(from(server_endpoint(), spawn_of_type(1))));
-    EXPECT_TRUE(connection.handle(from(server_endpoint(), EventPayload{DestroyEvent{}})));
+    EXPECT_TRUE(connection.handle(from(server_endpoint(), EventPayload{NamedEventState{}})));
 }
 
 TEST_F(ClientConnectionTest, DropsAWholeSnapshotWithOneUnknownType) {
@@ -175,13 +169,6 @@ TEST_F(ClientConnectionTest, DropsAWholeSnapshotWithOneUnknownType) {
         EntityState{.entity_id = 2, .type_id = 2, .fields = {}});
 
     EXPECT_FALSE(connection.handle(from(server_endpoint(), snapshot)));
-    EXPECT_EQ(connection.state(), ConnectionState::connected);
-}
-
-TEST_F(ClientConnectionTest, DropsASpawnWithAnUnknownType) {
-    connect();
-
-    EXPECT_FALSE(connection.handle(from(server_endpoint(), spawn_of_type(2))));
     EXPECT_EQ(connection.state(), ConnectionState::connected);
 }
 

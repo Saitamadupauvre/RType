@@ -74,10 +74,10 @@ struct ENGINE_NETWORK_EXPORT EntitySnapshot {
  *
  * 1. update(): handles every packet received since the last call, resends the connect request
  *    or a heartbeat when due, and ends the connection when the server stays silent for longer
- *    than the timeout. Game events from the server (`EntitySpawned`, `EntityDestroyed`,
- *    `ShotFired`, `SoundPlayed`, `MusicChanged`, `PlayerLeft`) are published on the event bus
- *    during this call, in the order received. When the connection is accepted while the server
- *    plays a music, `MusicChanged` is published with it.
+ *    than the timeout. Game events from the server (`SoundPlayed`, `MusicChanged`,
+ *    `NamedEvent`, `PlayerLeft`) are published on the event bus during this call, in the order
+ *    received; a NamedEvent naming an id missing from the string table is dropped and logged. When
+ * the connection is accepted while the server plays a music, `MusicChanged` is published with it.
  * 2. send_input(): sends the current input of the local player while connected.
  * 3. entities(): the newest world received from the server, for the game to draw.
  *
@@ -162,7 +162,8 @@ public:
     /**
      * @return The names the server sent in `connect_accept`, to name the
      * `EntitySnapshot::type_id` of each entity (category `type`), `SoundPlayed::sound_id`
-     * (`sound`) and `MusicChanged::music_id` (`music`); empty until accepted. Kept after the
+     * (`sound`) and `MusicChanged::music_id` (`music`); NamedEvent already carries its names.
+     * Empty until accepted. Kept after the
      * connection ends.
      */
     [[nodiscard]] StringTable strings() const;

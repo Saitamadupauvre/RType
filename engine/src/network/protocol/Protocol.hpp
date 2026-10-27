@@ -9,7 +9,7 @@ namespace engine::network {
 using Bytes = std::vector<std::uint8_t>;
 
 inline constexpr std::uint32_t protocol_magic = 0x5254'5950;
-inline constexpr std::uint16_t protocol_version = 5;
+inline constexpr std::uint16_t protocol_version = 6;
 
 inline constexpr std::size_t max_datagram_size = 1200;
 inline constexpr std::size_t encoded_packet_header_size = 13;
@@ -24,6 +24,9 @@ inline constexpr std::size_t max_wire_text_length = 255;
 
 inline constexpr std::size_t connect_accept_prefix_size = 12;
 inline constexpr std::size_t min_string_entry_size = 4;
+
+inline constexpr std::size_t named_event_header_size = 4;
+inline constexpr std::size_t event_argument_header_size = 3;
 
 enum class MessageType : std::uint8_t {
     invalid = 0,

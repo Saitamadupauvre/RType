@@ -63,10 +63,7 @@ bool admits_message(const ReceivedStrings& table, const SnapshotPayload& snapsho
     });
 }
 
-bool admits_message(const ReceivedStrings& table, const EventPayload& event) {
-    if (const auto* spawn = std::get_if<SpawnEvent>(&event)) {
-        return admits_type_ids(table, "spawn event", std::views::single(spawn->type_id));
-    }
+bool admits_message(const ReceivedStrings& table, const EventPayload&) {
     return is_after_accept(table, "event");
 }
 
@@ -88,6 +85,11 @@ bool ReceivedStrings::assign(const ConnectAcceptPayload& accept) {
     _table = accept.strings;
     _fields = std::move(fields);
     return true;
+}
+
+const StringTable& ReceivedStrings::names() const noexcept {
+    static const StringTable empty;
+    return _table ? *_table : empty;
 }
 
 core::FieldRef ReceivedStrings::field(std::uint16_t field_id) const {

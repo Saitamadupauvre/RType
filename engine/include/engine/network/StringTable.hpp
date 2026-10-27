@@ -17,22 +17,24 @@ namespace engine::network {
  * The values are sent on the wire: never reorder them.
  */
 enum class StringCategory : std::uint8_t {
-    /** @brief Entity type: `Replicated::type_id`, `EntitySpawned::type_id`. */
+    /** @brief Entity type: `Replicated::type_id`. */
     type = 0,
     /** @brief Sound: `SoundPlayed::sound_id`. */
     sound = 1,
     /** @brief Music: `MusicChanged::music_id`. */
     music = 2,
-    /** @brief Game event name. */
+    /** @brief Game event name: `NamedEvent::name`. */
     event = 3,
     /** @brief Shader name. */
     shader = 4,
     /** @brief Replicated component field name. */
     field = 5,
+    /** @brief Game event argument key: `NamedEvent::Argument::key`, shared by every event. */
+    event_key = 6,
 };
 
 /** @brief Number of StringCategory values; a category byte at or above it is invalid. */
-inline constexpr std::size_t string_category_count = 6;
+inline constexpr std::size_t string_category_count = 7;
 
 /** @brief Id reserved in every category, never given to a name (`no_music` for musics). */
 inline constexpr std::uint16_t reserved_string_id = 0xFFFF;

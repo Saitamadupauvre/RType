@@ -31,21 +31,22 @@ namespace {
 
 using engine::core::EntityManager;
 using engine::core::Position;
+using engine::core::Vec2;
 using engine::core::event::EventBus;
 using engine::core::time::SteadyClock;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
-using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::Endpoint;
-using engine::network::EntityDestroyed;
 using engine::network::EventPayload;
 using engine::network::InputPayload;
 using engine::network::max_datagram_size;
 using engine::network::Message;
 using engine::network::MusicChanged;
 using engine::network::MusicEvent;
+using engine::network::NamedEvent;
+using engine::network::NamedEventState;
 using engine::network::NetworkServer;
 using engine::network::PlayerJoined;
 using engine::network::ProtocolHandler;
@@ -279,8 +280,10 @@ TEST_F(NetworkServerTest, SendsMusicChangesToPlayers) {
 }
 
 TEST_F(NetworkServerTest, SendsItsStringTableAndPublishedEventsToPlayers) {
-    const auto strings =
-        payload_samples::strings_of({{.category = StringCategory::type, .id = 3, .name = "bydo"}});
+    const auto strings = payload_samples::strings_of(
+        {{.category = StringCategory::type, .id = 3, .name = "bydo"},
+         {.category = StringCategory::event, .id = 2, .name = "boom"},
+         {.category = StringCategory::event_key, .id = 5, .name = "at"}});
     NetworkServer typed(clock, bus, no_fields,
                         ServerOptions{.port = 0, .max_players = 1, .strings = strings});
     std::error_code ec;
@@ -293,12 +296,16 @@ TEST_F(NetworkServerTest, SendsItsStringTableAndPublishedEventsToPlayers) {
     EXPECT_EQ(std::get<ConnectAcceptPayload>(accept->message).strings, strings);
     EntityManager registry;
 
-    bus.publish(EntityDestroyed{.entity_id = 12});
+    bus.publish(NamedEvent{.name = "missing", .arguments = {}});
+    bus.publish(
+        NamedEvent{.name = "boom", .arguments = {{.key = "at", .value = Vec2{1.0F, 2.0F}}}});
     typed.send_snapshot(registry);
 
     const auto event = receive_from_server(peer);
     ASSERT_TRUE(event.has_value());
-    EXPECT_EQ(event->message, Message{EventPayload{DestroyEvent{.entity_id = 12}}});
+    const NamedEventState boom{.name_id = 2,
+                               .arguments = {{.key_id = 5, .value = Vec2{1.0F, 2.0F}}}};
+    EXPECT_EQ(event->message, Message{EventPayload{boom}});
     const auto snapshot = receive_from_server(peer);
     ASSERT_TRUE(snapshot.has_value());
     EXPECT_TRUE(std::holds_alternative<SnapshotPayload>(snapshot->message));

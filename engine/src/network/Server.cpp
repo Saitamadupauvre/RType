@@ -26,13 +26,15 @@ struct NetworkServer::ImplNet {
             const core::FieldRegistry& fields, ServerOptions server_options)
         : options(std::move(server_options)), events(game_events),
           network(clock, game_events, fields, sessions_config(options)) {
-        forward<EntitySpawned>();
-        forward<EntityDestroyed>();
-        forward<ShotFired>();
         forward<SoundPlayed>();
         forward<MusicChanged>();
         subscriptions.push_back(events.get().subscribe<MusicChanged>(
             [this](const MusicChanged& changed) { network.set_current_music(changed.music_id); }));
+        subscriptions.push_back(events.get().subscribe<NamedEvent>([this](const NamedEvent& event) {
+            if (auto payload = to_payload(event, options.strings)) {
+                network.queue_event(*payload);
+            }
+        }));
     }
 
     ~ImplNet() {

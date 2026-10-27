@@ -25,10 +25,14 @@ using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::entity_header_size;
 using engine::network::EntityState;
+using engine::network::EventPayload;
 using engine::network::HeartbeatPayload;
 using engine::network::InputPayload;
+using engine::network::max_event_arguments;
+using engine::network::max_event_text_length;
 using engine::network::max_snapshot_entity_bytes;
 using engine::network::max_string_name_length;
+using engine::network::NamedEventState;
 using engine::network::SnapshotPayload;
 using engine::network::StringCategory;
 using payload_samples::accept_with;
@@ -210,7 +214,7 @@ TEST(EventPayload, DecoderRejectsEmptyPayload) {
 
 TEST(EventPayload, DecoderRejectsUnknownEventTypes) {
     for (unsigned int type = 0; type <= 255; ++type) {
-        if (type >= 1 && type <= 6) {
+        if (type >= 4 && type <= 7) {
             continue;
         }
         std::vector<std::uint8_t> payload(11, 0x00);
@@ -240,6 +244,60 @@ TEST(EventPayload, DecoderRejectsTrailingBytes) {
 
         EXPECT_FALSE(decode_event(bytes).has_value()) << "index " << event.index();
     }
+}
+
+TEST(EventPayload, RoundTripsEveryArgumentKindOfANamedEvent) {
+    const EventPayload event =
+        NamedEventState{.name_id = 2,
+                        .arguments = {{.key_id = 1, .value = -1.25F},
+                                      {.key_id = 2, .value = std::int64_t{-70'000}},
+                                      {.key_id = 3, .value = true},
+                                      {.key_id = 4, .value = std::string("hello")},
+                                      {.key_id = 5, .value = Vec2{-3.F, 4.F}},
+                                      {.key_id = 6, .value = Rgba{.r = 1, .g = 2, .b = 3, .a = 4}},
+                                      {.key_id = 7, .value = AssetName{"sprites/ship.png"}}}};
+
+    EXPECT_EQ(decode_event(encoded(event)), event);
+}
+
+TEST(EventPayload, DecoderRejectsNamedEventsWithTooManyArguments) {
+    std::vector<std::uint8_t> payload{0x07, 0x00, 0x01,
+                                      static_cast<std::uint8_t>(max_event_arguments + 1)};
+    for (std::size_t key = 1; key <= max_event_arguments + 1; ++key) {
+        payload.insert(payload.end(), {0x00, static_cast<std::uint8_t>(key), 0x02, 0x01});
+    }
+
+    EXPECT_FALSE(decode_event(payload).has_value());
+}
+
+TEST(EventPayload, DecoderRejectsNamedEventsWithARepeatedKey) {
+    const std::vector<std::uint8_t> payload{0x07, 0x00, 0x01, 0x02, 0x00, 0x05,
+                                            0x02, 0x01, 0x00, 0x05, 0x02, 0x00};
+
+    EXPECT_FALSE(decode_event(payload).has_value());
+}
+
+TEST(EventPayload, DecoderRejectsNamedEventsWithAListOrUnknownKind) {
+    for (const std::uint8_t kind : {std::uint8_t{7}, std::uint8_t{8}, std::uint8_t{0xFF}}) {
+        const std::vector<std::uint8_t> payload{0x07, 0x00, 0x01, 0x01, 0x00, 0x01, kind, 0x00};
+
+        EXPECT_FALSE(decode_event(payload).has_value()) << "kind " << int{kind};
+    }
+}
+
+TEST(EventPayload, DecoderRejectsNamedEventTextLongerThanTheLimit) {
+    std::vector<std::uint8_t> payload{
+        0x07, 0x00, 0x01, 0x01,
+        0x00, 0x01, 0x03, static_cast<std::uint8_t>(max_event_text_length + 1)};
+    payload.resize(payload.size() + max_event_text_length + 1, 'a');
+
+    EXPECT_FALSE(decode_event(payload).has_value());
+}
+
+TEST(EventPayload, DecoderRejectsNamedEventsWithAnInvalidBool) {
+    const std::vector<std::uint8_t> payload{0x07, 0x00, 0x01, 0x01, 0x00, 0x01, 0x02, 0x02};
+
+    EXPECT_FALSE(decode_event(payload).has_value());
 }
 
 TEST(SnapshotPayload, RoundTripsEveryFieldKind) {
@@ -413,9 +471,9 @@ TEST(ConnectAcceptPayload, AcceptsTheSameIdAndNameInTwoCategories) {
 
 TEST(ConnectAcceptPayload, DecoderRejectsUnknownCategory) {
     EXPECT_TRUE(
-        decode_connect_accept(raw_accept({{.category = 5, .id = 1, .name = "a"}})).has_value());
-    EXPECT_FALSE(
         decode_connect_accept(raw_accept({{.category = 6, .id = 1, .name = "a"}})).has_value());
+    EXPECT_FALSE(
+        decode_connect_accept(raw_accept({{.category = 7, .id = 1, .name = "a"}})).has_value());
     EXPECT_FALSE(
         decode_connect_accept(raw_accept({{.category = 0xFF, .id = 1, .name = "a"}})).has_value());
 }

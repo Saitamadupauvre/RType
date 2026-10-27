@@ -85,7 +85,7 @@ struct NetworkClient::ImplNet {
         } else if (const auto* snapshot = std::get_if<SnapshotPayload>(&message)) {
             snapshots.receive(*snapshot);
         } else if (const auto* event = std::get_if<EventPayload>(&message)) {
-            publish_received(events, *event);
+            publish_received(events, *event, live.strings().names());
         }
     }
 

@@ -22,13 +22,17 @@ template <typename Payload> std::vector<std::uint8_t> encoded(const Payload& pay
     return bytes.value_or(std::vector<std::uint8_t>{});
 }
 
-inline std::array<engine::network::EventPayload, 6> sample_events() {
+inline engine::network::NamedEventState explosion_event() {
+    return {.name_id = 0x0102,
+            .arguments = {{.key_id = 1, .value = engine::core::Vec2{-2.0F, 7.0F}},
+                          {.key_id = 2, .value = 1.5F},
+                          {.key_id = 3, .value = std::string("big")}}};
+}
+
+inline std::array<engine::network::EventPayload, 5> sample_events() {
     return {
-        engine::network::SpawnEvent{
-            .entity_id = 0x0102'0304, .type_id = 0x0506, .x = -2, .y = 0x0708},
-        engine::network::DestroyEvent{.entity_id = 0x0102'0304},
-        engine::network::FireEvent{.source_entity_id = 0x0102'0304,
-                                   .projectile_entity_id = 0x0506'0708},
+        explosion_event(),
+        engine::network::NamedEventState{.name_id = 0x0304, .arguments = {}},
         engine::network::SoundEvent{.source_entity_id = 0x0102'0304, .sound_id = 0x0506},
         engine::network::PlayerLeftEvent{.player_entity_id = 0x0102'0304},
         engine::network::MusicEvent{.music_id = 0x0506},

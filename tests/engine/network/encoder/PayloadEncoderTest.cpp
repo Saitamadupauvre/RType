@@ -16,21 +16,19 @@ using engine::core::FieldValue;
 using engine::core::Rgba;
 using engine::core::Vec2;
 using engine::network::ConnectRequestPayload;
-using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
 using engine::network::encode_payload;
 using engine::network::EntityState;
 using engine::network::EventPayload;
-using engine::network::FireEvent;
 using engine::network::HeartbeatPayload;
 using engine::network::InputPayload;
 using engine::network::max_payload_size;
+using engine::network::NamedEventState;
 using engine::network::PlayerLeftEvent;
 using engine::network::snapshot_prefix_size;
 using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
-using engine::network::SpawnEvent;
 using engine::network::StringCategory;
 using payload_samples::accept_with;
 using payload_samples::encoded;
@@ -112,28 +110,56 @@ TEST(DisconnectPayload, EncoderRejectsUndefinedReasons) {
     }
 }
 
-TEST(EventPayload, EncodesSpawnFieldsInOrder) {
-    const EventPayload event =
-        SpawnEvent{.entity_id = 0x0102'0304, .type_id = 0x0506, .x = -2, .y = 0x0708};
+TEST(EventPayload, EncodesNamedEventArgumentsInOrder) {
+    const EventPayload event = payload_samples::explosion_event();
 
-    const std::vector<std::uint8_t> expected{0x01, 0x01, 0x02, 0x03, 0x04, 0x05,
-                                             0x06, 0xFF, 0xFE, 0x07, 0x08};
+    const std::vector<std::uint8_t> expected{0x07, 0x01, 0x02, 0x03, 0x00, 0x01, 0x04, 0xFF, 0xFE,
+                                             0x00, 0x07, 0x00, 0x02, 0x00, 0x3F, 0xC0, 0x00, 0x00,
+                                             0x00, 0x03, 0x03, 0x03, 'b',  'i',  'g'};
 
     EXPECT_EQ(encoded(event), expected);
 }
 
-TEST(EventPayload, EncodesDestroyFieldsInOrder) {
-    const EventPayload event = DestroyEvent{.entity_id = 0x0102'0304};
+TEST(EventPayload, EncodesNamedEventWithoutArguments) {
+    const EventPayload event = NamedEventState{.name_id = 0x0304, .arguments = {}};
 
-    EXPECT_EQ(encoded(event), (std::vector<std::uint8_t>{0x02, 0x01, 0x02, 0x03, 0x04}));
+    EXPECT_EQ(encoded(event), (std::vector<std::uint8_t>{0x07, 0x03, 0x04, 0x00}));
 }
 
-TEST(EventPayload, EncodesFireFieldsInOrder) {
-    const EventPayload event =
-        FireEvent{.source_entity_id = 0x0102'0304, .projectile_entity_id = 0x0506'0708};
+TEST(EventPayload, EncoderRejectsNamedEventsBreakingTheLimits) {
+    NamedEventState too_many{.name_id = 1, .arguments = {}};
+    for (std::uint16_t key = 1; key <= engine::network::max_event_arguments + 1; ++key) {
+        too_many.arguments.push_back({.key_id = key, .value = true});
+    }
+    const NamedEventState repeated_key{
+        .name_id = 1, .arguments = {{.key_id = 1, .value = true}, {.key_id = 1, .value = false}}};
+    const NamedEventState long_text{
+        .name_id = 1,
+        .arguments = {
+            {.key_id = 1, .value = std::string(engine::network::max_event_text_length + 1, 'a')}}};
+    const NamedEventState long_asset{
+        .name_id = 1,
+        .arguments = {{.key_id = 1,
+                       .value = engine::core::AssetName{
+                           std::string(engine::network::max_event_text_length + 1, 'a')}}}};
+    const NamedEventState infinite{
+        .name_id = 1,
+        .arguments = {{.key_id = 1, .value = std::numeric_limits<float>::infinity()}}};
+    const NamedEventState list{.name_id = 1,
+                               .arguments = {{.key_id = 1, .value = engine::core::FieldList{}}}};
 
-    EXPECT_EQ(encoded(event),
-              (std::vector<std::uint8_t>{0x03, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}));
+    for (const auto& event : {too_many, repeated_key, long_text, long_asset, infinite, list}) {
+        EXPECT_FALSE(encode_payload(EventPayload{event}).has_value());
+    }
+}
+
+TEST(EventPayload, EncodesTheLongestTextAnEventAllows) {
+    const NamedEventState event{
+        .name_id = 1,
+        .arguments = {
+            {.key_id = 1, .value = std::string(engine::network::max_event_text_length, 'a')}}};
+
+    EXPECT_TRUE(encode_payload(EventPayload{event}).has_value());
 }
 
 TEST(EventPayload, EncodesSoundFieldsInOrder) {

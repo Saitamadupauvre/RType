@@ -24,6 +24,7 @@ public:
     [[nodiscard]] core::FieldRef field(std::uint16_t field_id) const;
     [[nodiscard]] bool admits(const Message& message) const;
     [[nodiscard]] StringTable table() const { return _table.value_or(StringTable{}); }
+    [[nodiscard]] const StringTable& names() const noexcept;
 
 private:
     std::reference_wrapper<const core::FieldRegistry> _registry;

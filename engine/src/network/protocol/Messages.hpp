@@ -57,34 +57,10 @@ struct SnapshotPayload {
 };
 
 enum class EventType : std::uint8_t {
-    spawn = 1,
-    destroy = 2,
-    fire = 3,
     sound = 4,
     player_left = 5,
     music = 6,
-};
-
-struct SpawnEvent {
-    std::uint32_t entity_id{};
-    std::uint16_t type_id{};
-    std::int16_t x{};
-    std::int16_t y{};
-
-    bool operator==(const SpawnEvent&) const = default;
-};
-
-struct DestroyEvent {
-    std::uint32_t entity_id{};
-
-    bool operator==(const DestroyEvent&) const = default;
-};
-
-struct FireEvent {
-    std::uint32_t source_entity_id{};
-    std::uint32_t projectile_entity_id{};
-
-    bool operator==(const FireEvent&) const = default;
+    named = 7,
 };
 
 struct SoundEvent {
@@ -106,8 +82,21 @@ struct MusicEvent {
     bool operator==(const MusicEvent&) const = default;
 };
 
-using EventPayload =
-    std::variant<SpawnEvent, DestroyEvent, FireEvent, SoundEvent, PlayerLeftEvent, MusicEvent>;
+struct EventArgumentState {
+    std::uint16_t key_id{};
+    core::FieldValue value;
+
+    bool operator==(const EventArgumentState&) const = default;
+};
+
+struct NamedEventState {
+    std::uint16_t name_id{};
+    std::vector<EventArgumentState> arguments;
+
+    bool operator==(const NamedEventState&) const = default;
+};
+
+using EventPayload = std::variant<SoundEvent, PlayerLeftEvent, MusicEvent, NamedEventState>;
 
 struct HeartbeatPayload {
     bool operator==(const HeartbeatPayload&) const = default;

@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <string>
 #include <unordered_set>
+#include <variant>
 
 #include "FieldWire.hpp"
 #include "Protocol.hpp"
@@ -43,6 +45,32 @@ bool is_valid(const EntityState& entity) {
            has_unique_fields(entity);
 }
 
+bool fits_event(const core::FieldValue& value) {
+    if (!fits_wire(value)) {
+        return false;
+    }
+    if (const auto* text = std::get_if<std::string>(&value)) {
+        return text->size() <= max_event_text_length;
+    }
+    if (const auto* asset = std::get_if<core::AssetName>(&value)) {
+        return asset->path.size() <= max_event_text_length;
+    }
+    return true;
+}
+
+bool has_unique_keys(const NamedEventState& event) {
+    std::unordered_set<std::uint16_t> ids;
+    return std::ranges::all_of(event.arguments, [&ids](const EventArgumentState& argument) {
+        return ids.insert(argument.key_id).second;
+    });
+}
+
+constexpr std::size_t largest_named_event_size =
+    named_event_header_size +
+    (max_event_arguments * (event_argument_header_size + 1 + max_event_text_length));
+
+static_assert(largest_named_event_size <= max_payload_size);
+
 std::size_t entities_size(const SnapshotPayload& payload) noexcept {
     std::size_t size = 0;
     for (const EntityState& entity : payload.entities) {
@@ -67,6 +95,19 @@ bool is_valid(const SnapshotPayload& payload) {
 
 bool is_valid(const ConnectAcceptPayload& payload) {
     return encoded_size(payload) <= max_payload_size && has_known_current_music(payload);
+}
+
+bool is_valid(const NamedEventState& event) {
+    return event.arguments.size() <= max_event_arguments &&
+           std::ranges::all_of(
+               event.arguments,
+               [](const EventArgumentState& argument) { return fits_event(argument.value); }) &&
+           has_unique_keys(event);
+}
+
+bool is_valid(const EventPayload& payload) {
+    const auto* named = std::get_if<NamedEventState>(&payload);
+    return named == nullptr || is_valid(*named);
 }
 
 bool is_valid(const DisconnectPayload& payload) noexcept {
