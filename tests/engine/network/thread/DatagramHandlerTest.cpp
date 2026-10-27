@@ -19,6 +19,7 @@ namespace logger = engine::core::log;
 
 namespace {
 
+using engine::network::AddressedOutbound;
 using engine::network::Bytes;
 using engine::network::encode_outbound;
 using engine::network::Endpoint;
@@ -26,7 +27,6 @@ using engine::network::handle_datagram;
 using engine::network::InputPayload;
 using engine::network::Message;
 using engine::network::MessageType;
-using engine::network::Outbound;
 using engine::network::ProtocolHandler;
 
 constexpr std::size_t header_version_offset = 4;
@@ -151,7 +151,7 @@ TEST_F(DatagramHandler, DropsInputWithWrongPayloadSize) {
 }
 
 TEST_F(DatagramHandler, EncodesValidOutboundWithSequence) {
-    const Outbound outbound{.to = sample_endpoint(), .message = sample_message()};
+    const AddressedOutbound outbound{.to = sample_endpoint(), .message = sample_message()};
 
     const auto bytes = encode_outbound(handler, outbound, sample_sequence);
 
@@ -161,7 +161,7 @@ TEST_F(DatagramHandler, EncodesValidOutboundWithSequence) {
 }
 
 TEST_F(DatagramHandler, DropsAndLogsInvalidOutboundPayload) {
-    const Outbound outbound{
+    const AddressedOutbound outbound{
         .to = sample_endpoint(),
         .message = InputPayload{.keys = {0x01}, .mouse_buttons = 0, .pointer = std::nullopt}};
 

@@ -30,13 +30,13 @@ using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
-using engine::network::Endpoint;
 using engine::network::EventPayload;
 using engine::network::Inbound;
 using engine::network::InputPayload;
 using engine::network::Message;
 using engine::network::NamedEventState;
 using engine::network::Outbound;
+using engine::network::PeerId;
 using engine::network::PlayerLeftEvent;
 using engine::network::Replicated;
 using engine::network::ServerNetwork;
@@ -45,23 +45,19 @@ using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
 using namespace std::chrono_literals;
 
-Endpoint client(std::uint16_t port) {
-    const auto endpoint = Endpoint::from_string("127.0.0.1", port);
-    EXPECT_TRUE(endpoint.has_value());
-    return endpoint.value_or(Endpoint{});
-}
+constexpr PeerId client(std::uint32_t id) { return PeerId{id}; }
 
-Inbound from(const Endpoint& endpoint, Message message, std::uint32_t sequence = 0) {
-    return Inbound{.from = endpoint,
+Inbound from(PeerId peer, Message message, std::uint32_t sequence = 0) {
+    return Inbound{.from = peer,
                    .message = {.header = {.sequence = sequence}, .message = std::move(message)}};
 }
 
 std::vector<const SnapshotPayload*> snapshots_to(const std::vector<Outbound>& outbound,
-                                                 const Endpoint& endpoint) {
+                                                 PeerId peer) {
     std::vector<const SnapshotPayload*> snapshots;
     for (const auto& message : outbound) {
         if (const auto* snapshot = std::get_if<SnapshotPayload>(&message.message);
-            snapshot != nullptr && message.to == endpoint) {
+            snapshot != nullptr && message.to == peer) {
             snapshots.push_back(snapshot);
         }
     }
@@ -124,7 +120,7 @@ TEST_F(ServerNetworkTest, OneTickConnectsStoresInputsAndSendsSnapshots) {
     EXPECT_EQ(network.sessions()[0].input.keys[0], 0x02);
     EXPECT_EQ(network.server_tick(), 1U);
     for (const auto port : {5000, 5001}) {
-        const auto received = snapshots_to(snapshot, client(static_cast<std::uint16_t>(port)));
+        const auto received = snapshots_to(snapshot, client(static_cast<std::uint32_t>(port)));
         ASSERT_EQ(received.size(), 1U) << port;
         EXPECT_EQ(received.front()->server_tick, 1U);
         ASSERT_EQ(received.front()->entities.size(), 1U);
@@ -156,7 +152,7 @@ TEST_F(ServerNetworkTest, EveryPacketOfALargeWorldReachesEveryPlayer) {
     for (const auto port : {5000, 5001}) {
         std::size_t entities = 0;
         for (const auto* snapshot :
-             snapshots_to(outbound, client(static_cast<std::uint16_t>(port)))) {
+             snapshots_to(outbound, client(static_cast<std::uint32_t>(port)))) {
             entities += snapshot->entities.size();
         }
         EXPECT_EQ(entities, 100U) << port;
@@ -194,7 +190,7 @@ TEST_F(ServerNetworkTest, QueuedEventsReachEveryPlayerInOrderBeforeTheSnapshot) 
     for (const auto port : {5000, 5001}) {
         std::vector<Message> received;
         for (const auto& message : outbound) {
-            if (message.to == client(static_cast<std::uint16_t>(port))) {
+            if (message.to == client(static_cast<std::uint32_t>(port))) {
                 received.push_back(message.message);
             }
         }

@@ -23,13 +23,13 @@ using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
-using engine::network::Endpoint;
 using engine::network::EventPayload;
 using engine::network::HeartbeatPayload;
 using engine::network::Inbound;
 using engine::network::InputPayload;
 using engine::network::Message;
 using engine::network::Outbound;
+using engine::network::PeerId;
 using engine::network::PlayerJoined;
 using engine::network::PlayerLeft;
 using engine::network::PlayerLeftEvent;
@@ -53,27 +53,23 @@ StringTable audio_strings() {
          {.category = StringCategory::music, .id = 4, .name = "stage.ogg"}});
 }
 
-Endpoint client(std::uint16_t port) {
-    const auto endpoint = Endpoint::from_string("127.0.0.1", port);
-    EXPECT_TRUE(endpoint.has_value());
-    return endpoint.value_or(Endpoint{});
-}
+constexpr PeerId client(std::uint32_t id) { return PeerId{id}; }
 
-Inbound from(const Endpoint& endpoint, Message message, std::uint32_t sequence = 0) {
-    return Inbound{.from = endpoint,
+Inbound from(PeerId peer, Message message, std::uint32_t sequence = 0) {
+    return Inbound{.from = peer,
                    .message = {.header = {.sequence = sequence}, .message = std::move(message)}};
 }
 
-Inbound input_from(const Endpoint& endpoint, std::uint32_t sequence, std::int8_t move_x) {
+Inbound input_from(PeerId peer, std::uint32_t sequence, std::int8_t move_x) {
     InputPayload input{};
     input.keys[1] = static_cast<std::uint8_t>(move_x);
-    return from(endpoint, input, sequence);
+    return from(peer, input, sequence);
 }
 
 std::int8_t move_x_of(const InputPayload& input) { return static_cast<std::int8_t>(input.keys[1]); }
 
-Inbound connect_from(const Endpoint& endpoint, std::uint32_t nonce = sample_nonce) {
-    return from(endpoint, ConnectRequestPayload{.client_nonce = nonce});
+Inbound connect_from(PeerId peer, std::uint32_t nonce = sample_nonce) {
+    return from(peer, ConnectRequestPayload{.client_nonce = nonce});
 }
 
 Message player_left_notice(std::uint32_t player_id) {
@@ -127,7 +123,7 @@ TEST_F(ServerSessionsTest, AcceptsConnectRequestWithNonceFirstPlayerIdAndTypes) 
         .client_nonce = sample_nonce, .player_entity_id = 1, .strings = player_strings()};
     EXPECT_EQ(replies.front().message, Message{expected});
     ASSERT_EQ(sessions.sessions().size(), 1U);
-    EXPECT_EQ(sessions.sessions().front().endpoint, client(5000));
+    EXPECT_EQ(sessions.sessions().front().peer, client(5000));
 }
 
 TEST_F(ServerSessionsTest, PublishesPlayerJoinedOnAccept) {
@@ -137,7 +133,7 @@ TEST_F(ServerSessionsTest, PublishesPlayerJoinedOnAccept) {
     EXPECT_EQ(joined, (std::vector<std::uint32_t>{1, 2}));
 }
 
-TEST_F(ServerSessionsTest, DuplicateConnectFromSameEndpointIsIdempotent) {
+TEST_F(ServerSessionsTest, DuplicateConnectFromSamePeerIsIdempotent) {
     const auto first = connect(5000);
     const auto replies = sessions.handle(connect_from(client(5000), 0xBEEF));
 
@@ -176,7 +172,7 @@ TEST(ServerSessions, UsesMaxPlayersGivenByTheGame) {
     EXPECT_EQ(sessions.sessions().size(), 2U);
 }
 
-TEST_F(ServerSessionsTest, IgnoresMessagesFromUnknownEndpoint) {
+TEST_F(ServerSessionsTest, IgnoresMessagesFromUnknownPeer) {
     connect(5000);
 
     EXPECT_TRUE(sessions.handle(from(client(6000), InputPayload{})).empty());
@@ -337,7 +333,7 @@ TEST_F(ServerSessionsTest, OlderInputStillKeepsSessionAlive) {
     EXPECT_TRUE(sessions.drop_timed_out().empty());
 }
 
-TEST_F(ServerSessionsTest, IgnoresInputFromUnknownEndpoint) {
+TEST_F(ServerSessionsTest, IgnoresInputFromUnknownPeer) {
     connect(5000);
 
     EXPECT_TRUE(sessions.handle(input_from(client(6000), 1, 1)).empty());

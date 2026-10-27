@@ -26,7 +26,6 @@ using engine::network::ConnectionState;
 using engine::network::ConnectRequestPayload;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
-using engine::network::Endpoint;
 using engine::network::EntityState;
 using engine::network::EventPayload;
 using engine::network::HeartbeatPayload;
@@ -35,6 +34,8 @@ using engine::network::InputPayload;
 using engine::network::Message;
 using engine::network::NamedEventState;
 using engine::network::Outbound;
+using engine::network::PeerId;
+using engine::network::server_peer;
 using engine::network::ServerSessions;
 using engine::network::ServerSessionsConfig;
 using engine::network::SnapshotPayload;
@@ -47,27 +48,22 @@ constexpr auto heartbeat_interval = 1s;
 constexpr auto server_timeout = 3s;
 constexpr std::uint32_t sample_nonce = 0xCAFE;
 
-Endpoint endpoint(std::uint16_t port) {
-    const auto parsed = Endpoint::from_string("127.0.0.1", port);
-    EXPECT_TRUE(parsed.has_value());
-    return parsed.value_or(Endpoint{});
-}
-
-Endpoint server_endpoint() { return endpoint(4242); }
+constexpr PeerId other_peer{6000};
+constexpr auto server_label = "127.0.0.1:4242";
 
 const engine::core::FieldRegistry& fields() {
     static const engine::core::FieldRegistry registry = test_fields::registry();
     return registry;
 }
 
-Inbound from(const Endpoint& sender, Message message, std::uint32_t sequence = 0) {
+Inbound from(PeerId sender, Message message, std::uint32_t sequence = 0) {
     return Inbound{.from = sender,
                    .message = {.header = {.sequence = sequence}, .message = std::move(message)}};
 }
 
 Inbound accept_from_server(std::uint32_t nonce = sample_nonce) {
     return from(
-        server_endpoint(),
+        server_peer,
         ConnectAcceptPayload{.client_nonce = nonce,
                              .player_entity_id = 3,
                              .strings = payload_samples::strings_of(
@@ -75,7 +71,7 @@ Inbound accept_from_server(std::uint32_t nonce = sample_nonce) {
 }
 
 Inbound disconnect_from_server(DisconnectReason reason) {
-    return from(server_endpoint(), DisconnectPayload{.reason = reason});
+    return from(server_peer, DisconnectPayload{.reason = reason});
 }
 
 Message snapshot_of_type(std::uint16_t type_id) {
@@ -95,7 +91,7 @@ protected:
     }
 
     ManualClock clock;
-    ClientConnection connection{clock, fields(), server_endpoint(), sample_nonce,
+    ClientConnection connection{clock, fields(), server_label, sample_nonce,
                                 ClientConnectionConfig{.retry_interval = retry_interval,
                                                        .max_attempts = max_attempts,
                                                        .heartbeat_interval = heartbeat_interval,
@@ -108,7 +104,7 @@ TEST_F(ClientConnectionTest, SendsConnectRequestToServerOnFirstUpdate) {
     const auto outbound = connection.update();
 
     ASSERT_TRUE(outbound.has_value());
-    EXPECT_EQ(outbound->to, server_endpoint());
+    EXPECT_EQ(outbound->to, server_peer);
     EXPECT_EQ(outbound->message, connect_request());
     EXPECT_EQ(connection.state(), ConnectionState::connecting);
 }
@@ -151,15 +147,15 @@ TEST_F(ClientConnectionTest, ConnectsOnAcceptWithMatchingNonce) {
 TEST_F(ClientConnectionTest, DropsSnapshotsAndEventsBeforeConnectAccept) {
     static_cast<void>(connection.update());
 
-    EXPECT_FALSE(connection.handle(from(server_endpoint(), snapshot_of_type(1))));
-    EXPECT_FALSE(connection.handle(from(server_endpoint(), EventPayload{NamedEventState{}})));
+    EXPECT_FALSE(connection.handle(from(server_peer, snapshot_of_type(1))));
+    EXPECT_FALSE(connection.handle(from(server_peer, EventPayload{NamedEventState{}})));
 }
 
 TEST_F(ClientConnectionTest, AcceptsSnapshotsAndSpawnsWithKnownTypes) {
     connect();
 
-    EXPECT_TRUE(connection.handle(from(server_endpoint(), snapshot_of_type(1))));
-    EXPECT_TRUE(connection.handle(from(server_endpoint(), EventPayload{NamedEventState{}})));
+    EXPECT_TRUE(connection.handle(from(server_peer, snapshot_of_type(1))));
+    EXPECT_TRUE(connection.handle(from(server_peer, EventPayload{NamedEventState{}})));
 }
 
 TEST_F(ClientConnectionTest, DropsAWholeSnapshotWithOneUnknownType) {
@@ -168,7 +164,7 @@ TEST_F(ClientConnectionTest, DropsAWholeSnapshotWithOneUnknownType) {
     std::get<SnapshotPayload>(snapshot).entities.push_back(
         EntityState{.entity_id = 2, .type_id = 2, .fields = {}});
 
-    EXPECT_FALSE(connection.handle(from(server_endpoint(), snapshot)));
+    EXPECT_FALSE(connection.handle(from(server_peer, snapshot)));
     EXPECT_EQ(connection.state(), ConnectionState::connected);
 }
 
@@ -180,12 +176,11 @@ TEST_F(ClientConnectionTest, IgnoresAcceptWithAnotherNonce) {
     EXPECT_EQ(connection.state(), ConnectionState::connecting);
 }
 
-TEST_F(ClientConnectionTest, IgnoresMessagesFromAnotherEndpoint) {
+TEST_F(ClientConnectionTest, IgnoresMessagesFromAnotherPeer) {
     static_cast<void>(connection.update());
 
-    connection.handle(from(endpoint(6000), accept_from_server().message.message));
-    connection.handle(
-        from(endpoint(6000), DisconnectPayload{.reason = DisconnectReason::server_full}));
+    connection.handle(from(other_peer, accept_from_server().message.message));
+    connection.handle(from(other_peer, DisconnectPayload{.reason = DisconnectReason::server_full}));
 
     EXPECT_EQ(connection.state(), ConnectionState::connecting);
 }
@@ -209,7 +204,7 @@ TEST_F(ClientConnectionTest, SendsHeartbeatsAtFixedIntervalOnceConnected) {
     clock.advance(1ns);
     const auto heartbeat = connection.update();
     ASSERT_TRUE(heartbeat.has_value());
-    EXPECT_EQ(heartbeat->to, server_endpoint());
+    EXPECT_EQ(heartbeat->to, server_peer);
     EXPECT_EQ(heartbeat->message, Message{HeartbeatPayload{}});
     EXPECT_FALSE(connection.update().has_value());
 }
@@ -222,7 +217,7 @@ TEST_F(ClientConnectionTest, SendsInputOnlyWhileConnected) {
     const auto outbound = connection.send_input(input);
 
     ASSERT_TRUE(outbound.has_value());
-    EXPECT_EQ(outbound->to, server_endpoint());
+    EXPECT_EQ(outbound->to, server_peer);
     EXPECT_EQ(outbound->message, Message{input});
     static_cast<void>(connection.disconnect());
     EXPECT_FALSE(connection.send_input(input).has_value());
@@ -259,7 +254,7 @@ TEST_F(ClientConnectionTest, MeasuresRoundTripFromTheHeartbeatAnswer) {
     ASSERT_TRUE(connection.update().has_value());
 
     clock.advance(40ms);
-    connection.handle(from(server_endpoint(), HeartbeatPayload{}));
+    connection.handle(from(server_peer, HeartbeatPayload{}));
 
     EXPECT_EQ(connection.stats().round_trip_time, 40ms);
 }
@@ -267,7 +262,7 @@ TEST_F(ClientConnectionTest, MeasuresRoundTripFromTheHeartbeatAnswer) {
 TEST_F(ClientConnectionTest, IgnoresAHeartbeatAnswerWithoutAPendingHeartbeat) {
     connect();
 
-    connection.handle(from(server_endpoint(), HeartbeatPayload{}));
+    connection.handle(from(server_peer, HeartbeatPayload{}));
 
     EXPECT_FALSE(connection.stats().round_trip_time.has_value());
 }
@@ -276,7 +271,7 @@ TEST_F(ClientConnectionTest, CountsTrafficWithTheServer) {
     connect();
     clock.advance(heartbeat_interval);
     static_cast<void>(connection.update());
-    connection.handle(from(server_endpoint(), HeartbeatPayload{}, 1));
+    connection.handle(from(server_peer, HeartbeatPayload{}, 1));
 
     clock.advance(heartbeat_interval);
     const auto stats = connection.stats();
@@ -304,7 +299,7 @@ TEST_F(ClientConnectionTest, DisconnectSendsNormalDisconnectOnlyOnce) {
     const auto goodbye = connection.disconnect();
 
     ASSERT_TRUE(goodbye.has_value());
-    EXPECT_EQ(goodbye->to, server_endpoint());
+    EXPECT_EQ(goodbye->to, server_peer);
     EXPECT_EQ(goodbye->message, Message{DisconnectPayload{.reason = DisconnectReason::normal}});
     EXPECT_EQ(connection.state(), ConnectionState::disconnected);
     EXPECT_FALSE(connection.disconnect().has_value());
@@ -322,7 +317,7 @@ TEST_F(ClientConnectionTest, ReportsEachReasonSentByTheServer) {
     for (const auto reason :
          {DisconnectReason::normal, DisconnectReason::timeout, DisconnectReason::server_shutdown,
           DisconnectReason::protocol_error, DisconnectReason::server_full}) {
-        ClientConnection client(clock, fields(), server_endpoint(), sample_nonce);
+        ClientConnection client(clock, fields(), server_label, sample_nonce);
         static_cast<void>(client.update());
         client.handle(accept_from_server());
 
@@ -376,20 +371,20 @@ TEST_F(ClientConnectionTest, AnyPacketFromTheServerPostponesTheTimeout) {
     connect();
     clock.advance(server_timeout);
 
-    EXPECT_TRUE(connection.handle(
-        from(server_endpoint(), SnapshotPayload{.server_tick = 1, .entities = {}})));
+    EXPECT_TRUE(
+        connection.handle(from(server_peer, SnapshotPayload{.server_tick = 1, .entities = {}})));
     clock.advance(server_timeout);
     static_cast<void>(connection.update());
 
     EXPECT_EQ(connection.state(), ConnectionState::connected);
 }
 
-TEST_F(ClientConnectionTest, PacketsFromAnotherEndpointDoNotPostponeTheTimeout) {
+TEST_F(ClientConnectionTest, PacketsFromAnotherPeerDoNotPostponeTheTimeout) {
     connect();
     clock.advance(server_timeout);
 
     EXPECT_FALSE(
-        connection.handle(from(endpoint(6000), SnapshotPayload{.server_tick = 1, .entities = {}})));
+        connection.handle(from(other_peer, SnapshotPayload{.server_tick = 1, .entities = {}})));
     clock.advance(1ns);
     static_cast<void>(connection.update());
 
@@ -413,18 +408,18 @@ TEST(ClientConnection, CompletesHandshakeAndDisconnectWithServerSessions) {
     ManualClock clock;
     EventBus bus;
     ServerSessions server(clock, bus, ServerSessionsConfig{.max_players = 1});
-    const auto client_endpoint = endpoint(5000);
-    ClientConnection client(clock, fields(), server_endpoint(), sample_nonce);
+    constexpr PeerId client_peer{5000};
+    ClientConnection client(clock, fields(), server_label, sample_nonce);
     const auto deliver_to_server = [&](const Outbound& outbound) {
-        EXPECT_EQ(outbound.to, server_endpoint());
-        return server.handle(from(client_endpoint, outbound.message));
+        EXPECT_EQ(outbound.to, server_peer);
+        return server.handle(from(client_peer, outbound.message));
     };
 
     const auto request = client.update();
     ASSERT_TRUE(request.has_value());
     for (const auto& reply : deliver_to_server(*request)) {
-        EXPECT_EQ(reply.to, client_endpoint);
-        client.handle(from(server_endpoint(), reply.message));
+        EXPECT_EQ(reply.to, client_peer);
+        client.handle(from(server_peer, reply.message));
     }
     ASSERT_EQ(client.state(), ConnectionState::connected);
     EXPECT_EQ(client.player_id(), 1U);
@@ -438,7 +433,7 @@ TEST(ClientConnection, CompletesHandshakeAndDisconnectWithServerSessions) {
 TEST_F(ClientConnectionTest, RejectsAcceptReplicatingAFieldUnknownToTheClient) {
     static_cast<void>(connection.update());
     connection.handle(
-        from(server_endpoint(),
+        from(server_peer,
              ConnectAcceptPayload{
                  .client_nonce = sample_nonce,
                  .player_entity_id = 3,
@@ -457,13 +452,12 @@ TEST_F(ClientConnectionTest, RejectsAcceptReplicatingAFieldUnknownToTheClient) {
 
 TEST_F(ClientConnectionTest, AcceptsFieldsKnownToTheClient) {
     static_cast<void>(connection.update());
-    connection.handle(
-        from(server_endpoint(),
-             ConnectAcceptPayload{
-                 .client_nonce = sample_nonce,
-                 .player_entity_id = 3,
-                 .strings = payload_samples::strings_of(
-                     {{.category = StringCategory::field, .id = 1, .name = "Body.pos"}})}));
+    connection.handle(from(
+        server_peer, ConnectAcceptPayload{
+                         .client_nonce = sample_nonce,
+                         .player_entity_id = 3,
+                         .strings = payload_samples::strings_of(
+                             {{.category = StringCategory::field, .id = 1, .name = "Body.pos"}})}));
 
     EXPECT_EQ(connection.state(), ConnectionState::connected);
     EXPECT_TRUE(connection.strings().field(1));
