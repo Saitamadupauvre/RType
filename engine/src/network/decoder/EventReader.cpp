@@ -45,7 +45,10 @@ bool can_hold_arguments(const ByteReader& reader, std::size_t count) noexcept {
 std::optional<EventArgumentState> read_argument(ByteReader& reader) {
     const auto key_id = reader.read_u16();
     const auto kind = reader.read_u8();
-    auto value = key_id && kind ? read_value(reader, *kind) : std::nullopt;
+    if (!key_id || !kind) {
+        return std::nullopt;
+    }
+    auto value = read_value(reader, *kind);
     if (!value) {
         return std::nullopt;
     }
