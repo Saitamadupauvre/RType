@@ -7,12 +7,16 @@
 #include <vector>
 
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Audio.hpp"
 #include "engine/network/Export.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Stats.hpp"
+#include "engine/network/StringTable.hpp"
+#include "engine/network/Transport.hpp"
 
 namespace engine::network {
 
@@ -20,18 +24,13 @@ namespace engine::network {
  * @brief Settings of a NetworkServer, chosen by the game.
  */
 struct ENGINE_NETWORK_EXPORT ServerOptions {
-    /** @brief UDP port to listen on, on every IPv4 interface. `0` picks a free port. */
-    std::uint16_t port;
     /** @brief Number of player slots. A client arriving when all are taken is rejected. */
     std::size_t max_players;
-    /** @brief Type table sent to every client in `connect_accept`: every `Replicated::type_id`
-     * and `EntitySpawned::type_id` the game uses. */
-    std::vector<ReplicatedType> types = {};
-    /** @brief Sound table sent in `connect_accept`: every `SoundPlayed::sound_id` the game uses. */
-    std::vector<AudioName> sounds = {};
-    /** @brief Music table sent in `connect_accept`: every `MusicChanged::music_id` the game uses.
-     */
-    std::vector<AudioName> musics = {};
+    /** @brief Names sent to every client in `connect_accept`: every `Replicated::type_id`
+     * (category `type`), `SoundPlayed::sound_id` (`sound`), `MusicChanged::music_id` (`music`),
+     * `NamedEvent::name` (`event`) and `NamedEvent::Argument::key` (`event_key`) the game uses.
+     * The server adds the replicated field names (`field`) itself. */
+    StringTable strings = {};
 };
 
 /**
@@ -39,9 +38,9 @@ struct ENGINE_NETWORK_EXPORT ServerOptions {
  */
 struct ENGINE_NETWORK_EXPORT PlayerInput {
     std::uint32_t player_id;
-    std::uint8_t action_flags;
-    std::int8_t move_x;
-    std::int8_t move_y;
+    /** @brief Keys and mouse buttons held, and the pointer with whole coordinates when the
+     * client sent one. */
+    core::InputState input;
 };
 
 #ifdef _MSC_VER
@@ -50,29 +49,37 @@ struct ENGINE_NETWORK_EXPORT PlayerInput {
 #endif
 
 /**
- * @brief Authoritative game server: player sessions, inputs and world snapshots over UDP.
+ * @brief Authoritative game server: player sessions, inputs and world snapshots.
  *
- * The socket is read and written by two background threads. Everything else happens on the
- * thread that calls receive() and send_snapshot(), once per fixed tick:
+ * Packets travel through a ServerTransport (UDP or in-memory loopback); the server behaves the
+ * same on both. Everything happens on the thread that calls receive() and send_snapshot(), once
+ * per fixed tick:
  *
  * 1. receive(): handles every packet received since the last call (connections,
  *    disconnections, inputs) and removes players silent for longer than the session timeout.
  *    `PlayerJoined` and `PlayerLeft` are published on the event bus during this call.
  * 2. inputs(): the latest input of each connected player, for the game to apply.
- * 3. During the tick, the game publishes `EntitySpawned`, `EntityDestroyed`, `ShotFired`,
- *    `SoundPlayed` and `MusicChanged` on the event bus. Each one is queued for the players
- *    connected at that moment.
+ * 3. During the tick, the game publishes `SoundPlayed`, `MusicChanged` and `NamedEvent` on
+ *    the event bus. Each one is queued for the players connected at that moment; a NamedEvent
+ *    that breaks its rules is dropped and logged instead.
  * 4. send_snapshot(): sends the queued events in the order published, then every entity with
- *    `Replicated` and `Position`, to every player.
+ *    `Replicated`, to every player.
  *
  * Malformed packets are dropped and logged; they never reach the game.
  *
- * @note Not thread-safe: call every member from the same thread. The clock and the event bus
- * must outlive the server.
+ * @note Not thread-safe: call every member from the same thread. The clock, the event bus, the
+ * field registry and the transport must outlive the server.
  */
 class ENGINE_NETWORK_EXPORT NetworkServer {
 public:
+    /**
+     * @param fields Fields of the server world. Every field flagged `replicated` is sent in
+     * snapshots under the name `Component.field`, category `field` of the string table. Clients
+     * must know every such name.
+     * @param transport Carries the packets; opened by start() and closed by stop().
+     */
     NetworkServer(const core::time::IClock& clock, core::event::EventBus& events,
+                  const core::FieldRegistry& fields, ServerTransport& transport,
                   ServerOptions options);
     ~NetworkServer();
 
@@ -82,19 +89,20 @@ public:
     NetworkServer& operator=(NetworkServer&&) = delete;
 
     /**
-     * @brief Binds the UDP port and starts the network threads.
+     * @brief Opens the transport: binds the UDP port and starts its threads, or joins the
+     * loopback network.
      *
-     * @param ec Set to `std::errc::invalid_argument` when `ServerOptions::types`, `sounds` or
-     * `musics` has a duplicate id or name, or a name that is empty or longer than 63 bytes, when
-     * `musics` uses the id `no_music`, or when the tables do not fit in one packet; set when the
-     * port cannot be bound (for example already in use); cleared otherwise.
+     * @param ec Set to `std::errc::invalid_argument` when the string table does not fit in one
+     * packet, or when the replicated fields cannot be sent: a list field, a name longer than 63
+     * characters, more than 255 fields, or an entity holding all of them that does not fit in
+     * one snapshot. Set when the transport cannot open (for example a UDP port already in use);
+     * cleared otherwise.
      * @return `true` when the server is listening.
      */
     bool start(std::error_code& ec);
 
     /**
-     * @brief Ends every session, sends the messages still queued, then closes the socket and
-     * joins the threads.
+     * @brief Ends every session, sends the messages still queued, then closes the transport.
      *
      * Every connected player receives `disconnect` with reason `server_shutdown`. `PlayerLeft`
      * is not published for them.
@@ -118,14 +126,11 @@ public:
      *
      * The game events queued since the last call are sent first.
      *
-     * @param registry The server world. Only entities with `Replicated` and `Position` are sent.
+     * @param world The server world. Only entities with `Replicated` are sent, with the
+     * replicated fields they own. A string longer than 255 bytes or a non-finite float is left
+     * out and logged. Ints are clamped to 32 bits and vec2 components rounded to 16-bit ints.
      */
-    void send_snapshot(core::EntityManager& registry);
-
-    /**
-     * @return The bound port once started (useful with port `0`), otherwise the requested one.
-     */
-    [[nodiscard]] std::uint16_t port() const;
+    void send_snapshot(core::EntityManager& world);
 
     /**
      * @return Number of connected players.

@@ -11,7 +11,7 @@ The engine is an ECS driven by Lua scripts.
 | Concept | What it is | Where it lives |
 |---|---|---|
 | **Entity** | An id. No data, no logic. | `engine::core::EntityManager` |
-| **Component** | Plain data attached to an id: `Position`, `Velocity`, `Sprite`, `Tags`... | C++ component pools |
+| **Component** | Plain data attached to an id: `Position`, `Sprite`, `PhysicsBody`, `Tags`... | C++ component pools |
 | **Native system** | C++ loop over every entity with given components | `engine/` |
 | **Entity script** | Lua callbacks of one entity type (`update`, `on_collide`...) | `game/scripts/` |
 | **Lua system** | Lua logic spanning several entity types (waves, score) | `game/scripts/` |
@@ -53,8 +53,10 @@ Ask in order:
    → A coordinating entity today, a Lua `system` once systems run (see
    [Current state](#current-state)). Examples: spawning waves, rounds.
 
-Never put gameplay in `game/client` or `game/server` C++: those files only wire
-engine modules together.
+Never put gameplay in `game/client` or `game/server` C++: those files only parse
+the command line and pick a mode of `engine-app`. Client-side behaviour such as
+hotkeys goes in the `client = { ... }` table of `main.lua` (see
+[PROJECT §10.10](PROJECT.md#1010-networking-from-the-scripts-point-of-view)).
 
 ## Tutorial: add a new enemy
 
@@ -126,7 +128,7 @@ spawn(kind, { x = config.world.width, y = math.random(0, config.world.height - c
 
 **5. Run it.** Rebuild (the build copies `scripts/` and `assets/` next to the
 executables) and restart the server. No C++ change, no new network message:
-the new type is added to the type table sent at connection.
+the new type is added to the string table sent at connection.
 
 **6. Keep the test fixture in sync** (see [Tests](#tests)).
 
@@ -191,11 +193,12 @@ Destruction itself is deferred to the end of the tick; side effects go in
 `on_destroy`. An entity marked this way gets no further `on_collide` in the
 same tick.
 
-### Read input as actions
+### Read input through the bindings
 
-Use `self.input:axis("move_x")`, `self.input:axis("move_y")` and
-`self.input:pressed("fire")`. Never refer to keys: bindings belong to the
-client.
+`self.input` holds raw keys and mouse buttons (`self.input:key("Space")`,
+`self.input:mouse("Left")`, `self.input:pointer()`). Gameplay code reads actions
+through `lib/controls.lua` (`controls.pressed(input, "fire")`,
+`controls.axis(input, "move_x")`), so remapping a key is a one-line change there.
 
 ### Keep data in config and fields
 
@@ -219,20 +222,20 @@ engine counterpart exists:
 
 | Missing in the engine | Stand-in today | Once it lands |
 |---|---|---|
-| Native movement in the server tick | `update` writes `self.x` / `self.y` | Set `vx` / `vy` and let C++ integrate |
 | `find_all`, `count` | `lib/roster.lua` groups, joined in `on_spawn`, left in `on_destroy` | `find_all("enemy")` |
 | Running Lua `system` declarations | Entities without a sprite: `game`, `bydo_spawner` | `system "waves"` |
 | `after`, `every`, `random` | Time counters in `update`, `math.random` | `every(1.5, ...)`, `random(...)` |
 | `behavior` coroutines, `wait` | Counters in `update` | Sequences written top to bottom |
 
-The target style (velocity, systems, coroutines) is
-described in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
+Setting `vx` / `vy` already moves an entity every server tick. The target style
+(velocity, systems, coroutines) is described in
+[PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
 
 ## Tests
 
 Tests load a copy of the scripts from `tests/fixtures/game/server/game/`,
-identical except for an empty `on_start` in `main.lua`, so each test spawns
-only what it checks. Re-sync it after editing a script:
+identical except for `main.lua`, whose `server` `on_start` is empty and which
+has no `client` table, so each test spawns only what it checks. Re-sync it after editing a script:
 
 ```sh
 rsync -a --delete --exclude /main.lua game/scripts/ tests/fixtures/game/server/game/

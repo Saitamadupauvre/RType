@@ -28,6 +28,8 @@ r-type_client 127.0.0.1 4242 --music-volume 30 --effects-volume 80
 r-type_client 127.0.0.1 4242 --mute
 ```
 
+`M` mutes or unmutes everything in game.
+
 ## Rules
 
 - The game starts as soon as the first player connects. A player who joins a
@@ -55,9 +57,6 @@ r-type_client 127.0.0.1 4242 --mute
 | 4th player | Yellow |
 
 A slot freed by a player who leaves goes to the next one who joins.
-
-A white dot above a ship marks **your** ship, so you never need to tell the
-colours apart to find yourself.
 
 ## Screen
 

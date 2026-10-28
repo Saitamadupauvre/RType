@@ -1,148 +1,142 @@
-#include <array>
-#include <chrono>
 #include <cstdint>
-#include <functional>
-#include <optional>
-#include <span>
+#include <set>
+#include <string>
 #include <system_error>
-#include <thread>
+#include <variant>
+#include <vector>
 
 #include <gtest/gtest.h>
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
-#include "engine/core/time/SteadyClock.hpp"
+#include "engine/core/time/ManualClock.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/Server.hpp"
+#include "engine/network/StringTable.hpp"
 
+#include "LoopbackPeers.hpp"
+#include "PayloadSamples.hpp"
+#include "TestFields.hpp"
 #include "protocol/Messages.hpp"
-#include "protocol/Protocol.hpp"
-#include "protocol/ProtocolHandler.hpp"
-#include "socket/SocketError.hpp"
-#include "socket/UdpSocket.hpp"
+#include "transport/Link.hpp"
+#include "transport/LoopbackLinks.hpp"
 
 namespace {
 
 using engine::core::EntityManager;
+using engine::core::Key;
 using engine::core::Position;
+using engine::core::Vec2;
 using engine::core::event::EventBus;
-using engine::core::time::SteadyClock;
-using engine::network::AudioName;
+using engine::core::time::ManualClock;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
-using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
-using engine::network::Endpoint;
-using engine::network::EntityDestroyed;
 using engine::network::EventPayload;
+using engine::network::Inbound;
 using engine::network::InputPayload;
-using engine::network::max_datagram_size;
+using engine::network::Link;
+using engine::network::LoopbackHub;
+using engine::network::LoopbackLink;
 using engine::network::Message;
 using engine::network::MusicChanged;
 using engine::network::MusicEvent;
+using engine::network::NamedEvent;
+using engine::network::NamedEventState;
 using engine::network::NetworkServer;
+using engine::network::Outbound;
+using engine::network::PeerId;
 using engine::network::PlayerJoined;
-using engine::network::ProtocolHandler;
-using engine::network::ReceivedMessage;
 using engine::network::Replicated;
-using engine::network::ReplicatedType;
+using engine::network::server_peer;
 using engine::network::ServerOptions;
 using engine::network::SnapshotPayload;
-using engine::network::SocketError;
-using engine::network::TypeEntry;
-using engine::network::UdpSocket;
-using namespace std::chrono_literals;
+using engine::network::StringCategory;
+using engine::network::StringTable;
+using loopback_peers::HubServerTransport;
+using loopback_peers::messages;
+using loopback_peers::open;
+using loopback_peers::send;
 
-constexpr auto delivery_deadline = 2s;
-
-Endpoint loopback(std::uint16_t port) {
-    const auto endpoint = Endpoint::from_string("127.0.0.1", port);
-    EXPECT_TRUE(endpoint.has_value());
-    return endpoint.value_or(Endpoint{});
+engine::core::FieldRegistry core_fields() {
+    engine::core::FieldRegistry fields;
+    engine::core::register_core_fields(fields);
+    return fields;
 }
 
-UdpSocket bound_peer() {
-    UdpSocket socket(AF_INET);
-    std::error_code ec;
-    socket.bind(loopback(0), ec);
-    EXPECT_FALSE(ec) << ec.message();
-    return socket;
-}
+struct LoopbackServer {
+    LoopbackServer(ManualClock& clock, EventBus& bus, const engine::core::FieldRegistry& fields,
+                   ServerOptions options)
+        : server(clock, bus, fields, transport, std::move(options)) {}
 
-void send_to_server(UdpSocket& peer, const Message& message, std::uint32_t sequence,
-                    std::uint16_t port) {
-    const ProtocolHandler handler;
-    const auto bytes = handler.encode(message, sequence);
-    ASSERT_TRUE(bytes.has_value());
-    std::error_code ec;
-    peer.send_to(*bytes, loopback(port), ec);
-    ASSERT_FALSE(ec) << ec.message();
-}
-
-std::optional<ReceivedMessage> receive_from_server(UdpSocket& peer) {
-    std::array<std::uint8_t, max_datagram_size> buffer{};
-    Endpoint from;
-    std::error_code ec;
-    const auto size = peer.receive_from(buffer, from, delivery_deadline, ec);
-    if (ec) {
-        return std::nullopt;
+    bool start() {
+        std::error_code ec;
+        const bool started = server.start(ec);
+        EXPECT_FALSE(ec) << ec.message();
+        return started;
     }
-    const ProtocolHandler handler;
-    return handler.decode(std::span(buffer).first(size));
-}
 
-bool receive_until(NetworkServer& server, const std::function<bool()>& done) {
-    const auto deadline = std::chrono::steady_clock::now() + delivery_deadline;
-    while (!done()) {
-        if (std::chrono::steady_clock::now() >= deadline) {
-            return false;
-        }
+    LoopbackLink& join() {
+        auto& peer = open(hub.add_client());
+        send(peer, server_peer, ConnectRequestPayload{.client_nonce = 7});
         server.receive();
-        std::this_thread::yield();
+        return peer;
     }
-    return true;
-}
+
+    LoopbackHub hub;
+    HubServerTransport transport{hub.server()};
+    NetworkServer server;
+};
 
 class NetworkServerTest : public testing::Test {
 protected:
-    void start() {
-        std::error_code ec;
-        ASSERT_TRUE(server.start(ec)) << ec.message();
-    }
-
-    SteadyClock clock;
+    ManualClock clock;
     EventBus bus;
-    NetworkServer server{clock, bus, ServerOptions{.port = 0, .max_players = 2}};
+    const engine::core::FieldRegistry fields = core_fields();
+    const engine::core::FieldRegistry no_fields;
+    LoopbackServer loopback{clock, bus, fields, ServerOptions{.max_players = 2}};
+    NetworkServer& server = loopback.server;
 };
+
+class SpyLink final : public Link {
+public:
+    void open(std::error_code& ec) override { ec.clear(); }
+    void close() override {}
+    [[nodiscard]] std::vector<Inbound> poll() override { return std::exchange(inbox, {}); }
+    void send(Outbound outbound) override { sent.push_back(std::move(outbound)); }
+    void forget(PeerId peer) override { forgotten.push_back(peer); }
+    [[nodiscard]] std::string describe(PeerId) const override { return "spy"; }
+
+    std::vector<Inbound> inbox;
+    std::vector<Outbound> sent;
+    std::vector<PeerId> forgotten;
+};
+
+class SpyTransport final : public engine::network::ServerTransport {
+public:
+    SpyLink spy;
+
+private:
+    [[nodiscard]] Link& link() noexcept override { return spy; }
+};
+
+Inbound inbound(PeerId from, Message message) {
+    return Inbound{.from = from, .message = {.header = {}, .message = std::move(message)}};
+}
 
 } // namespace
 
-TEST_F(NetworkServerTest, StartsOnAFreePortAndStops) {
-    start();
+TEST_F(NetworkServerTest, StartsAndStopsTwice) {
+    ASSERT_TRUE(loopback.start());
 
-    EXPECT_NE(server.port(), 0);
     EXPECT_EQ(server.player_count(), 0U);
     server.receive();
     server.stop();
     server.stop();
-}
-
-TEST_F(NetworkServerTest, ReportsTheRequestedPortBeforeStarting) {
-    NetworkServer unstarted(clock, bus, ServerOptions{.port = 4242, .max_players = 1});
-
-    EXPECT_EQ(unstarted.port(), 4242);
-}
-
-TEST_F(NetworkServerTest, StartReportsPortAlreadyInUse) {
-    start();
-    NetworkServer second(clock, bus, ServerOptions{.port = server.port(), .max_players = 1});
-    std::error_code ec;
-
-    EXPECT_FALSE(second.start(ec));
-    EXPECT_EQ(ec, SocketError::address_in_use);
 }
 
 TEST_F(NetworkServerTest, ServesAClientOverLoopback) {
@@ -155,141 +149,159 @@ TEST_F(NetworkServerTest, ServesAClientOverLoopback) {
     const auto entity = registry.spawn();
     registry.add(entity, Replicated{.type_id = 1});
     registry.add(entity, Position{3.0F, 4.0F});
-    start();
-    auto peer = bound_peer();
+    ASSERT_TRUE(loopback.start());
 
-    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, server.port());
-    ASSERT_TRUE(receive_until(server, [this] { return server.player_count() == 1; }));
-    const auto accept = receive_from_server(peer);
-    ASSERT_TRUE(accept.has_value());
-    EXPECT_EQ(std::get<ConnectAcceptPayload>(accept->message).client_nonce, 7U);
+    auto& peer = loopback.join();
+    ASSERT_EQ(server.player_count(), 1U);
+    const auto accepted = messages(peer);
+    ASSERT_EQ(accepted.size(), 1U);
+    const auto& accept = std::get<ConnectAcceptPayload>(accepted.front());
+    EXPECT_EQ(accept.client_nonce, 7U);
     EXPECT_EQ(joined, (std::vector<std::uint32_t>{1}));
 
-    send_to_server(peer, InputPayload{.action_flags = 1, .move_x = -1, .move_y = 1}, 1,
-                   server.port());
-    ASSERT_TRUE(receive_until(server, [this] { return server.inputs().front().move_x == -1; }));
-    EXPECT_EQ(server.inputs().front().player_id, 1U);
-    EXPECT_EQ(server.inputs().front().move_y, 1);
+    send(peer, server_peer,
+         InputPayload{.keys = {0x02},
+                      .mouse_buttons = 0x01,
+                      .pointer = engine::network::PointerPosition{.x = 5, .y = -6}},
+         1);
+    server.receive();
+    const auto input = server.inputs().front();
+    EXPECT_EQ(input.player_id, 1U);
+    EXPECT_EQ(input.input.keys, std::set<Key>{Key::A});
+    EXPECT_EQ(input.input.mouse_buttons,
+              std::set<engine::core::MouseButton>{engine::core::MouseButton::Left});
+    EXPECT_EQ(input.input.pointer, (engine::core::Vec2{5.F, -6.F}));
 
     server.send_snapshot(registry);
-    const auto snapshot = receive_from_server(peer);
-    ASSERT_TRUE(snapshot.has_value());
-    const auto& payload = std::get<SnapshotPayload>(snapshot->message);
+    const auto snapshots = messages(peer);
+    ASSERT_EQ(snapshots.size(), 1U);
+    const auto& payload = std::get<SnapshotPayload>(snapshots.front());
     EXPECT_EQ(payload.server_tick, 1U);
     ASSERT_EQ(payload.entities.size(), 1U);
-    EXPECT_EQ(payload.entities.front().y, 4);
+    const auto pos_id = accept.strings.id_of(StringCategory::field, "Position.pos");
+    ASSERT_TRUE(pos_id.has_value());
+    EXPECT_EQ(payload.entities.front().fields,
+              (std::vector<engine::network::FieldState>{
+                  {.field_id = *pos_id, .value = engine::core::Vec2{3.F, 4.F}}}));
 }
 
-TEST_F(NetworkServerTest, StartRejectsAnInvalidTypeTable) {
-    NetworkServer duplicated(clock, bus,
-                             ServerOptions{.port = 0,
-                                           .max_players = 1,
-                                           .types = {ReplicatedType{.type_id = 1, .name = "a"},
-                                                     ReplicatedType{.type_id = 1, .name = "b"}}});
-    NetworkServer unnamed(clock, bus,
-                          ServerOptions{.port = 0,
-                                        .max_players = 1,
-                                        .types = {ReplicatedType{.type_id = 1, .name = ""}}});
-    std::error_code ec;
+TEST_F(NetworkServerTest, IgnoresPacketsBeforeStarting) {
+    auto& peer = open(loopback.hub.add_client());
 
-    EXPECT_FALSE(duplicated.start(ec));
-    EXPECT_EQ(ec, std::errc::invalid_argument);
-    EXPECT_FALSE(unnamed.start(ec));
-    EXPECT_EQ(ec, std::errc::invalid_argument);
+    send(peer, server_peer, ConnectRequestPayload{.client_nonce = 7});
+    ASSERT_TRUE(loopback.start());
+    server.receive();
+
+    EXPECT_EQ(server.player_count(), 0U);
+    EXPECT_TRUE(messages(peer).empty());
 }
 
-TEST_F(NetworkServerTest, StartRejectsInvalidSoundOrMusicTables) {
-    NetworkServer duplicated_sound(clock, bus,
-                                   ServerOptions{.port = 0,
-                                                 .max_players = 1,
-                                                 .sounds = {AudioName{.id = 1, .name = "a.wav"},
-                                                            AudioName{.id = 2, .name = "a.wav"}}});
-    NetworkServer reserved_music(
-        clock, bus,
-        ServerOptions{.port = 0,
-                      .max_players = 1,
-                      .musics = {AudioName{.id = engine::network::no_music, .name = "a.ogg"}}});
+TEST_F(NetworkServerTest, StartRejectsAReplicatedListField) {
+    engine::core::FieldRegistry listed;
+    listed.add<engine::core::Tags>(
+        "Tags", {engine::core::list_field<engine::core::Tags>(
+                    "labels", engine::core::FieldKind::String,
+                    engine::core::field_flags::replicated, engine::core::labels_to_list,
+                    [](engine::core::Tags& tags, const engine::core::FieldList& list) {
+                        tags = engine::core::labels_from_list(list);
+                    })});
+    LoopbackServer refusing(clock, bus, listed, ServerOptions{.max_players = 1});
     std::error_code ec;
 
-    EXPECT_FALSE(duplicated_sound.start(ec));
-    EXPECT_EQ(ec, std::errc::invalid_argument);
-    EXPECT_FALSE(reserved_music.start(ec));
+    EXPECT_FALSE(refusing.server.start(ec));
     EXPECT_EQ(ec, std::errc::invalid_argument);
 }
 
-TEST_F(NetworkServerTest, SendsAudioTablesAndTheCurrentMusicToPlayersJoiningLater) {
-    NetworkServer audio(clock, bus,
-                        ServerOptions{.port = 0,
-                                      .max_players = 1,
-                                      .sounds = {AudioName{.id = 1, .name = "shot.wav"}},
-                                      .musics = {AudioName{.id = 2, .name = "stage.ogg"}}});
+TEST_F(NetworkServerTest, StartRejectsReplicatedFieldNamesTooLargeForOnePacket) {
+    const auto many_fields = test_fields::registry();
+    LoopbackServer crowded(
+        clock, bus, many_fields,
+        ServerOptions{.max_players = 1, .strings = payload_samples::long_name_strings(17)});
+    LoopbackServer roomy(
+        clock, bus, no_fields,
+        ServerOptions{.max_players = 1, .strings = payload_samples::long_name_strings(17)});
     std::error_code ec;
-    ASSERT_TRUE(audio.start(ec)) << ec.message();
+
+    EXPECT_FALSE(crowded.server.start(ec));
+    EXPECT_EQ(ec, std::errc::invalid_argument);
+    EXPECT_TRUE(roomy.server.start(ec)) << ec.message();
+}
+
+TEST_F(NetworkServerTest, StartRejectsAStringTableTooLargeForOnePacket) {
+    LoopbackServer crowded(
+        clock, bus, no_fields,
+        ServerOptions{.max_players = 1, .strings = payload_samples::long_name_strings(18)});
+    std::error_code ec;
+
+    EXPECT_FALSE(crowded.server.start(ec));
+    EXPECT_EQ(ec, std::errc::invalid_argument);
+}
+
+TEST_F(NetworkServerTest, SendsTheStringTableAndTheCurrentMusicToPlayersJoiningLater) {
+    const auto strings = payload_samples::strings_of(
+        {{.category = StringCategory::sound, .id = 1, .name = "shot.wav"},
+         {.category = StringCategory::music, .id = 2, .name = "stage.ogg"}});
+    LoopbackServer audio(clock, bus, no_fields,
+                         ServerOptions{.max_players = 1, .strings = strings});
+    ASSERT_TRUE(audio.start());
     bus.publish(MusicChanged{.music_id = 2});
-    auto peer = bound_peer();
 
-    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, audio.port());
-    ASSERT_TRUE(receive_until(audio, [&audio] { return audio.player_count() == 1; }));
-    const auto accept = receive_from_server(peer);
+    auto& peer = audio.join();
+    const auto accepted = messages(peer);
 
-    ASSERT_TRUE(accept.has_value());
-    const auto& payload = std::get<ConnectAcceptPayload>(accept->message);
-    EXPECT_EQ(payload.sounds, (std::vector<TypeEntry>{{.type_id = 1, .name = "shot.wav"}}));
-    EXPECT_EQ(payload.musics, (std::vector<TypeEntry>{{.type_id = 2, .name = "stage.ogg"}}));
+    ASSERT_EQ(accepted.size(), 1U);
+    const auto& payload = std::get<ConnectAcceptPayload>(accepted.front());
+    EXPECT_EQ(payload.strings, strings);
     EXPECT_EQ(payload.current_music, 2);
 }
 
 TEST_F(NetworkServerTest, SendsMusicChangesToPlayers) {
-    start();
-    auto peer = bound_peer();
-    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, server.port());
-    ASSERT_TRUE(receive_until(server, [this] { return server.player_count() == 1; }));
-    ASSERT_TRUE(receive_from_server(peer).has_value());
+    ASSERT_TRUE(loopback.start());
+    auto& peer = loopback.join();
+    ASSERT_EQ(messages(peer).size(), 1U);
     EntityManager registry;
 
     bus.publish(MusicChanged{.music_id = engine::network::no_music});
     server.send_snapshot(registry);
 
-    const auto event = receive_from_server(peer);
-    ASSERT_TRUE(event.has_value());
-    EXPECT_EQ(event->message,
+    const auto events = messages(peer);
+    ASSERT_FALSE(events.empty());
+    EXPECT_EQ(events.front(),
               Message{EventPayload{MusicEvent{.music_id = engine::network::no_music}}});
 }
 
-TEST_F(NetworkServerTest, SendsItsTypeTableAndPublishedEventsToPlayers) {
-    NetworkServer typed(clock, bus,
-                        ServerOptions{.port = 0,
-                                      .max_players = 1,
-                                      .types = {ReplicatedType{.type_id = 3, .name = "bydo"}}});
-    std::error_code ec;
-    ASSERT_TRUE(typed.start(ec)) << ec.message();
-    auto peer = bound_peer();
-    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, typed.port());
-    ASSERT_TRUE(receive_until(typed, [&typed] { return typed.player_count() == 1; }));
-    const auto accept = receive_from_server(peer);
-    ASSERT_TRUE(accept.has_value());
-    EXPECT_EQ(std::get<ConnectAcceptPayload>(accept->message).types,
-              (std::vector<TypeEntry>{{.type_id = 3, .name = "bydo"}}));
+TEST_F(NetworkServerTest, SendsItsStringTableAndPublishedEventsToPlayers) {
+    const auto strings = payload_samples::strings_of(
+        {{.category = StringCategory::type, .id = 3, .name = "bydo"},
+         {.category = StringCategory::event, .id = 2, .name = "boom"},
+         {.category = StringCategory::event_key, .id = 5, .name = "at"}});
+    LoopbackServer typed(clock, bus, no_fields,
+                         ServerOptions{.max_players = 1, .strings = strings});
+    ASSERT_TRUE(typed.start());
+    auto& peer = typed.join();
+    const auto accepted = messages(peer);
+    ASSERT_EQ(accepted.size(), 1U);
+    EXPECT_EQ(std::get<ConnectAcceptPayload>(accepted.front()).strings, strings);
     EntityManager registry;
 
-    bus.publish(EntityDestroyed{.entity_id = 12});
-    typed.send_snapshot(registry);
+    bus.publish(NamedEvent{.name = "missing", .arguments = {}});
+    bus.publish(
+        NamedEvent{.name = "boom", .arguments = {{.key = "at", .value = Vec2{1.0F, 2.0F}}}});
+    typed.server.send_snapshot(registry);
 
-    const auto event = receive_from_server(peer);
-    ASSERT_TRUE(event.has_value());
-    EXPECT_EQ(event->message, Message{EventPayload{DestroyEvent{.entity_id = 12}}});
-    const auto snapshot = receive_from_server(peer);
-    ASSERT_TRUE(snapshot.has_value());
-    EXPECT_TRUE(std::holds_alternative<SnapshotPayload>(snapshot->message));
+    const auto received = messages(peer);
+    ASSERT_EQ(received.size(), 2U);
+    const NamedEventState boom{.name_id = 2,
+                               .arguments = {{.key_id = 5, .value = Vec2{1.0F, 2.0F}}}};
+    EXPECT_EQ(received[0], Message{EventPayload{boom}});
+    EXPECT_TRUE(std::holds_alternative<SnapshotPayload>(received[1]));
 }
 
 TEST_F(NetworkServerTest, ReportsStatsForEachConnectedPlayer) {
-    start();
+    ASSERT_TRUE(loopback.start());
     EXPECT_TRUE(server.stats().empty());
-    auto peer = bound_peer();
 
-    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, server.port());
-    ASSERT_TRUE(receive_until(server, [this] { return server.player_count() == 1; }));
+    static_cast<void>(loopback.join());
 
     const auto stats = server.stats();
     ASSERT_EQ(stats.size(), 1U);
@@ -298,17 +310,55 @@ TEST_F(NetworkServerTest, ReportsStatsForEachConnectedPlayer) {
 }
 
 TEST_F(NetworkServerTest, StopTellsConnectedPlayersTheServerIsShuttingDown) {
-    start();
-    auto peer = bound_peer();
-    send_to_server(peer, ConnectRequestPayload{.client_nonce = 7}, 0, server.port());
-    ASSERT_TRUE(receive_until(server, [this] { return server.player_count() == 1; }));
-    ASSERT_TRUE(receive_from_server(peer).has_value());
+    ASSERT_TRUE(loopback.start());
+    auto& peer = loopback.join();
+    ASSERT_EQ(messages(peer).size(), 1U);
 
     server.stop();
 
-    const auto goodbye = receive_from_server(peer);
-    ASSERT_TRUE(goodbye.has_value());
-    EXPECT_EQ(goodbye->message,
+    const auto goodbye = messages(peer);
+    ASSERT_EQ(goodbye.size(), 1U);
+    EXPECT_EQ(goodbye.front(),
               Message{DisconnectPayload{.reason = DisconnectReason::server_shutdown}});
     EXPECT_EQ(server.player_count(), 0U);
+}
+
+TEST(NetworkServerPeers, ForgetsPeersThatHaveNoSession) {
+    ManualClock clock;
+    EventBus bus;
+    const engine::core::FieldRegistry fields;
+    SpyTransport transport;
+    NetworkServer server(clock, bus, fields, transport, ServerOptions{.max_players = 1});
+    std::error_code ec;
+    ASSERT_TRUE(server.start(ec));
+
+    transport.spy.inbox = {inbound(PeerId{1}, ConnectRequestPayload{.client_nonce = 1}),
+                           inbound(PeerId{2}, ConnectRequestPayload{.client_nonce = 2}),
+                           inbound(PeerId{3}, InputPayload{})};
+    server.receive();
+
+    EXPECT_EQ(server.player_count(), 1U);
+    EXPECT_EQ(transport.spy.forgotten, (std::vector<PeerId>{PeerId{2}, PeerId{3}}));
+    ASSERT_EQ(transport.spy.sent.size(), 2U);
+    EXPECT_EQ(transport.spy.sent[1].to, PeerId{2});
+}
+
+TEST(NetworkServerPeers, ForgetsAPlayerOnceItsSessionEnds) {
+    ManualClock clock;
+    EventBus bus;
+    const engine::core::FieldRegistry fields;
+    SpyTransport transport;
+    NetworkServer server(clock, bus, fields, transport, ServerOptions{.max_players = 1});
+    std::error_code ec;
+    ASSERT_TRUE(server.start(ec));
+    transport.spy.inbox = {inbound(PeerId{1}, ConnectRequestPayload{.client_nonce = 1})};
+    server.receive();
+    ASSERT_TRUE(transport.spy.forgotten.empty());
+
+    transport.spy.inbox = {
+        inbound(PeerId{1}, DisconnectPayload{.reason = DisconnectReason::normal})};
+    server.receive();
+
+    EXPECT_EQ(server.player_count(), 0U);
+    EXPECT_EQ(transport.spy.forgotten, std::vector<PeerId>{PeerId{1}});
 }

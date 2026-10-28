@@ -1,10 +1,9 @@
-#include "Cli.hpp"
-#include "ServerApp.hpp"
-#include "engine/core/time/SteadyClock.hpp"
 #include <csignal>
 #include <filesystem>
 #include <iostream>
-#include <string>
+
+#include "Cli.hpp"
+#include "engine/app/Launch.hpp"
 
 namespace {
 
@@ -22,18 +21,12 @@ int main(int argc, char** argv) {
         return result.exit_code;
     }
 
-    const engine::core::time::SteadyClock clock;
-    const std::filesystem::path scripts = std::filesystem::path(argv[0]).parent_path() / "scripts";
-    rtype::server::ServerApp app(clock, *result.config, scripts);
-    std::string error;
-    if (!app.start(error)) {
-        std::cerr << error << "\n";
-        return 84;
-    }
-
     std::signal(SIGINT, request_stop);
     std::signal(SIGTERM, request_stop);
-    std::cout << "Listening on UDP port " << app.network().port() << "\n";
-    app.run([] { return stop_requested != 0; });
-    return 0;
+    engine::app::LaunchOptions options;
+    options.mode = engine::app::Mode::dedicated;
+    options.game = std::filesystem::path(argv[0]).parent_path();
+    options.port = result.config->port;
+    options.max_players = result.config->max_players;
+    return engine::app::launch(options, [] { return stop_requested != 0; }) ? 0 : 84;
 }

@@ -11,6 +11,7 @@
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;
@@ -18,6 +19,7 @@ using engine::core::Position;
 using engine::core::Tags;
 using engine::core::Vec2;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -80,7 +82,8 @@ public:
 
 private:
     EntityManager _world;
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
     bool _loaded = false;
 };
 

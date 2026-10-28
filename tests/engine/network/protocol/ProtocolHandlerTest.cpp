@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include "PayloadSamples.hpp"
 #include "encoder/PayloadEncoder.hpp"
 #include "protocol/ProtocolHandler.hpp"
 
@@ -22,9 +23,9 @@ using engine::network::HeartbeatPayload;
 using engine::network::InputPayload;
 using engine::network::Message;
 using engine::network::MessageType;
+using engine::network::NamedEventState;
 using engine::network::ProtocolHandler;
 using engine::network::SnapshotPayload;
-using engine::network::SpawnEvent;
 
 constexpr std::size_t header_type_offset = 6;
 
@@ -36,15 +37,21 @@ template <typename T> T value_of(std::optional<T> value) {
 std::vector<std::pair<Message, MessageType>> sample_messages() {
     return {
         {ConnectRequestPayload{.client_nonce = 0xCAFE'F00D}, MessageType::connect_request},
-        {ConnectAcceptPayload{.client_nonce = 0xCAFE'F00D,
-                              .player_entity_id = 12,
-                              .types = {{.type_id = 1, .name = "player"}}},
+        {ConnectAcceptPayload{
+             .client_nonce = 0xCAFE'F00D,
+             .player_entity_id = 12,
+             .strings = payload_samples::strings_of(
+                 {{.category = engine::network::StringCategory::type, .id = 1, .name = "player"}})},
          MessageType::connect_accept},
-        {InputPayload{.action_flags = 0x01, .move_x = -1, .move_y = 1}, MessageType::input},
+        {InputPayload{.keys = {0x02}, .mouse_buttons = 0x01, .pointer = std::nullopt},
+         MessageType::input},
         {SnapshotPayload{.server_tick = 99,
-                         .entities = {EntityState{.entity_id = 12, .type_id = 1, .x = 10}}},
+                         .entities = {EntityState{
+                             .entity_id = 12,
+                             .type_id = 1,
+                             .fields = {{.field_id = 1, .value = engine::core::Vec2{10, 0}}}}}},
          MessageType::snapshot},
-        {EventPayload{SpawnEvent{.entity_id = 12, .type_id = 1, .x = 10, .y = 20}},
+        {EventPayload{NamedEventState{.name_id = 12, .arguments = {{.key_id = 1, .value = 2.5F}}}},
          MessageType::event},
         {HeartbeatPayload{}, MessageType::heartbeat},
         {DisconnectPayload{.reason = DisconnectReason::timeout}, MessageType::disconnect},
@@ -81,7 +88,7 @@ TEST(ProtocolHandler, SerializesPacketInBigEndianOrder) {
 
     const auto packet = handler.serialize(input_header(0x0102'0304, payload.size()), payload);
 
-    const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x03, 0x03, 0x01,
+    const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x07, 0x03, 0x01,
                                              0x02, 0x03, 0x04, 0x00, 0x03, 0x01, 0x00, 0x01};
 
     EXPECT_EQ(packet, expected);
@@ -150,13 +157,16 @@ TEST(ProtocolHandler, EncodeRejectsInvalidPayload) {
     const ProtocolHandler handler;
     const DisconnectPayload undefined_reason{.reason = static_cast<DisconnectReason>(9)};
 
-    EXPECT_FALSE(handler.encode(InputPayload{.move_x = 2}, 0).has_value());
+    EXPECT_FALSE(
+        handler.encode(InputPayload{.keys = {0x01}, .mouse_buttons = 0, .pointer = std::nullopt}, 0)
+            .has_value());
     EXPECT_FALSE(handler.encode(undefined_reason, 0).has_value());
 }
 
 TEST(ProtocolHandler, DecodeRejectsPayloadOfAnotherMessageType) {
     const ProtocolHandler handler;
-    const InputPayload input{.action_flags = 0x01};
+    const InputPayload input{
+        .keys = {0x02, 0x00, 0x00, 0x00, 0x01, 0x01}, .mouse_buttons = 0, .pointer = std::nullopt};
     const ConnectRequestPayload request{.client_nonce = 7};
     const DisconnectPayload disconnect{.reason = DisconnectReason::normal};
     const auto input_bytes = value_of(engine::network::encode_payload(input));

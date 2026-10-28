@@ -1,4 +1,5 @@
 local config = require("config")
+local controls = require("controls")
 local roster = require("roster")
 
 entity "ship"
@@ -29,13 +30,13 @@ end
 
 function steer(self, input, dt)
     local bounds = config.world
-    self.x = clamp(self.x + input:axis("move_x") * self.speed * dt, 0, bounds.width - self.hitbox.w)
-    self.y = clamp(self.y + input:axis("move_y") * self.speed * dt, 0, bounds.height - self.hitbox.h)
+    self.x = clamp(self.x + controls.axis(input, "move_x") * self.speed * dt, 0, bounds.width - self.hitbox.w)
+    self.y = clamp(self.y + controls.axis(input, "move_y") * self.speed * dt, 0, bounds.height - self.hitbox.h)
 end
 
 function shoot(self, input, dt)
     self.cooldown = math.max(0, self.cooldown - dt)
-    if not input:pressed("fire") or self.cooldown > 0 then
+    if not controls.pressed(input, "fire") or self.cooldown > 0 then
         return
     end
     spawn("missile", {

@@ -13,6 +13,7 @@ engine_add_module(core
         src/core/ComponentTypeId.cpp
         src/core/DynamicLibrary.cpp
         src/core/EntityManager.cpp
+        src/core/FieldRegistry.cpp
         src/core/SystemScheduler.cpp
         src/core/event/EventBus.cpp
         src/core/log/Log.cpp
@@ -29,38 +30,58 @@ engine_add_module(physics
     SOURCES
         src/physics/PhysicsSystem.cpp
         src/physics/Collisions.cpp
+        src/physics/Fields.cpp
     DEPENDS engine::core
 )
 
 engine_add_module(script
     SOURCES
-        src/script/Audio.cpp
-        src/script/Declarations.cpp
-        src/script/Entities.cpp
-        src/script/ModuleLoader.cpp
-        src/script/NativeFields.cpp
-        src/script/Players.cpp
-        src/script/ScriptFiles.cpp
+        src/script/ApiSet.cpp
+        src/script/ClientApi.cpp
+        src/script/EditorApi.cpp
         src/script/ScriptRuntime.cpp
+        src/script/ScriptRuntimeBuilder.cpp
+        src/script/ServerApi.cpp
+        src/script/audio/Audio.cpp
+        src/script/entity/Entities.cpp
+        src/script/entity/EntityFields.cpp
+        src/script/entity/Instances.cpp
+        src/script/event/Events.cpp
+        src/script/input/LuaInput.cpp
+        src/script/loading/Declarations.cpp
+        src/script/loading/ModuleLoader.cpp
+        src/script/loading/ScriptFiles.cpp
+        src/script/loading/Sections.cpp
+        src/script/lua/LuaErrors.cpp
+        src/script/lua/LuaFieldValue.cpp
+        src/script/player/Players.cpp
     DEPENDS engine::core
     PRIVATE_DEPENDS engine::physics sol2::sol2 engine_lua
 )
+target_include_directories(engine-script PRIVATE src/script)
 
 engine_add_module(network
     SOURCES
         src/network/Client.cpp
         src/network/Module.cpp
         src/network/Server.cpp
+        src/network/Fields.cpp
+        src/network/StringTable.cpp
+        src/network/Transport.cpp
         src/network/decoder/EventReader.cpp
         src/network/decoder/PayloadDecoder.cpp
+        src/network/decoder/ValueReader.cpp
         src/network/encoder/PayloadEncoder.cpp
         src/network/event/GameEvents.cpp
+        src/network/input/InputCodec.cpp
+        src/network/protocol/FieldWire.cpp
         src/network/protocol/ProtocolHandler.cpp
-        src/network/protocol/TypeTable.cpp
+        src/network/protocol/ReceivedStrings.cpp
         src/network/protocol/Validation.cpp
         src/network/server/ServerNetwork.cpp
         src/network/session/ClientConnection.cpp
         src/network/session/ServerSessions.cpp
+        src/network/snapshot/ReplicatedFields.cpp
         src/network/snapshot/SnapshotBuilder.cpp
         src/network/snapshot/SnapshotReceiver.cpp
         src/network/socket/SocketError.cpp
@@ -68,12 +89,15 @@ engine_add_module(network
         src/network/socket/UdpSocket.cpp
         src/network/thread/DatagramHandler.cpp
         src/network/thread/NetworkIo.cpp
+        src/network/transport/LoopbackLinks.cpp
+        src/network/transport/UdpLinks.cpp
     DEPENDS engine::core
 )
 target_include_directories(engine-network PRIVATE src/network)
 
 engine_add_module(graphics
     SOURCES
+        src/graphics/InputCapture.cpp
         src/graphics/Interfaces.cpp
         src/graphics/PluginLoader.cpp
     DEPENDS engine::core
@@ -86,3 +110,18 @@ engine_add_module(audio
         src/audio/PluginLoader.cpp
     DEPENDS engine::core
 )
+
+engine_add_module(app
+    SOURCES
+        src/app/AudioPlayer.cpp
+        src/app/ClientApp.cpp
+        src/app/Collisions.cpp
+        src/app/Fields.cpp
+        src/app/Launch.cpp
+        src/app/ServerApp.cpp
+        src/app/SnapshotView.cpp
+        src/app/WorldDraw.cpp
+    DEPENDS engine::core engine::script engine::network engine::graphics engine::audio
+    PRIVATE_DEPENDS engine::physics
+)
+target_include_directories(engine-app PRIVATE src/app)

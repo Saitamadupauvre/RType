@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -9,8 +10,10 @@
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/ManualClock.hpp"
+#include "engine/network/Fields.hpp"
 #include "engine/network/Replicated.hpp"
 
 #include "protocol/Messages.hpp"
@@ -20,49 +23,52 @@ namespace {
 
 using engine::core::EntityManager;
 using engine::core::Position;
+using engine::core::Vec2;
 using engine::core::event::EventBus;
 using engine::core::time::ManualClock;
 using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
-using engine::network::DestroyEvent;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
-using engine::network::Endpoint;
 using engine::network::EventPayload;
 using engine::network::Inbound;
 using engine::network::InputPayload;
 using engine::network::Message;
+using engine::network::NamedEventState;
 using engine::network::Outbound;
+using engine::network::PeerId;
 using engine::network::PlayerLeftEvent;
 using engine::network::Replicated;
 using engine::network::ServerNetwork;
 using engine::network::ServerSessionsConfig;
 using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
-using engine::network::SpawnEvent;
 using namespace std::chrono_literals;
 
-Endpoint client(std::uint16_t port) {
-    const auto endpoint = Endpoint::from_string("127.0.0.1", port);
-    EXPECT_TRUE(endpoint.has_value());
-    return endpoint.value_or(Endpoint{});
-}
+constexpr PeerId client(std::uint32_t id) { return PeerId{id}; }
 
-Inbound from(const Endpoint& endpoint, Message message, std::uint32_t sequence = 0) {
-    return Inbound{.from = endpoint,
+Inbound from(PeerId peer, Message message, std::uint32_t sequence = 0) {
+    return Inbound{.from = peer,
                    .message = {.header = {.sequence = sequence}, .message = std::move(message)}};
 }
 
 std::vector<const SnapshotPayload*> snapshots_to(const std::vector<Outbound>& outbound,
-                                                 const Endpoint& endpoint) {
+                                                 PeerId peer) {
     std::vector<const SnapshotPayload*> snapshots;
     for (const auto& message : outbound) {
         if (const auto* snapshot = std::get_if<SnapshotPayload>(&message.message);
-            snapshot != nullptr && message.to == endpoint) {
+            snapshot != nullptr && message.to == peer) {
             snapshots.push_back(snapshot);
         }
     }
     return snapshots;
+}
+
+engine::core::FieldRegistry snapshot_fields() {
+    engine::core::FieldRegistry fields;
+    engine::core::register_core_fields(fields);
+    engine::network::register_network_fields(fields);
+    return fields;
 }
 
 class ServerNetworkTest : public testing::Test {
@@ -89,8 +95,9 @@ protected:
     ManualClock clock;
     EventBus bus;
     EntityManager registry;
-    ServerNetwork network{clock, bus,
-                          ServerSessionsConfig{.max_players = 4, .timeout = 5s, .types = {}}};
+    engine::core::FieldRegistry fields = snapshot_fields();
+    ServerNetwork network{clock, bus, fields,
+                          ServerSessionsConfig{.max_players = 4, .timeout = 5s}};
 };
 
 } // namespace
@@ -101,7 +108,8 @@ TEST_F(ServerNetworkTest, OneTickConnectsStoresInputsAndSendsSnapshots) {
     const auto replies = network.receive({
         from(client(5000), ConnectRequestPayload{.client_nonce = 1}),
         from(client(5001), ConnectRequestPayload{.client_nonce = 2}),
-        from(client(5000), InputPayload{.action_flags = 1, .move_x = 1, .move_y = 0}, 1),
+        from(client(5000),
+             InputPayload{.keys = {0x02}, .mouse_buttons = 0, .pointer = std::nullopt}, 1),
     });
     const auto snapshot = network.snapshot(registry);
 
@@ -109,14 +117,17 @@ TEST_F(ServerNetworkTest, OneTickConnectsStoresInputsAndSendsSnapshots) {
     EXPECT_TRUE(std::holds_alternative<ConnectAcceptPayload>(replies[0].message));
     EXPECT_TRUE(std::holds_alternative<ConnectAcceptPayload>(replies[1].message));
     ASSERT_EQ(network.sessions().size(), 2U);
-    EXPECT_EQ(network.sessions()[0].input.move_x, 1);
+    EXPECT_EQ(network.sessions()[0].input.keys[0], 0x02);
     EXPECT_EQ(network.server_tick(), 1U);
     for (const auto port : {5000, 5001}) {
-        const auto received = snapshots_to(snapshot, client(static_cast<std::uint16_t>(port)));
+        const auto received = snapshots_to(snapshot, client(static_cast<std::uint32_t>(port)));
         ASSERT_EQ(received.size(), 1U) << port;
         EXPECT_EQ(received.front()->server_tick, 1U);
         ASSERT_EQ(received.front()->entities.size(), 1U);
-        EXPECT_EQ(received.front()->entities.front().x, 12);
+        const auto& entity = received.front()->entities.front();
+        ASSERT_FALSE(entity.fields.empty());
+        const engine::core::FieldValue expected = engine::core::Vec2{12, 0};
+        EXPECT_EQ(entity.fields.front().value, expected);
     }
 }
 
@@ -141,7 +152,7 @@ TEST_F(ServerNetworkTest, EveryPacketOfALargeWorldReachesEveryPlayer) {
     for (const auto port : {5000, 5001}) {
         std::size_t entities = 0;
         for (const auto* snapshot :
-             snapshots_to(outbound, client(static_cast<std::uint16_t>(port)))) {
+             snapshots_to(outbound, client(static_cast<std::uint32_t>(port)))) {
             entities += snapshot->entities.size();
         }
         EXPECT_EQ(entities, 100U) << port;
@@ -166,9 +177,10 @@ TEST_F(ServerNetworkTest, CrashedClientIsDroppedOnALaterTickAndOthersAreTold) {
 
 TEST_F(ServerNetworkTest, QueuedEventsReachEveryPlayerInOrderBeforeTheSnapshot) {
     connect_clients();
-    const EventPayload spawn{SpawnEvent{.entity_id = 1, .type_id = 1, .x = 2, .y = 3}};
+    const EventPayload spawn{
+        NamedEventState{.name_id = 1, .arguments = {{.key_id = 1, .value = Vec2{2.0F, 3.0F}}}}};
     const EventPayload sound{SoundEvent{.source_entity_id = 1, .sound_id = 4}};
-    const EventPayload destroy{DestroyEvent{.entity_id = 1}};
+    const EventPayload destroy{NamedEventState{.name_id = 1, .arguments = {}}};
 
     network.queue_event(spawn);
     network.queue_event(sound);
@@ -178,7 +190,7 @@ TEST_F(ServerNetworkTest, QueuedEventsReachEveryPlayerInOrderBeforeTheSnapshot) 
     for (const auto port : {5000, 5001}) {
         std::vector<Message> received;
         for (const auto& message : outbound) {
-            if (message.to == client(static_cast<std::uint16_t>(port))) {
+            if (message.to == client(static_cast<std::uint32_t>(port))) {
                 received.push_back(message.message);
             }
         }
@@ -192,7 +204,7 @@ TEST_F(ServerNetworkTest, QueuedEventsReachEveryPlayerInOrderBeforeTheSnapshot) 
 
 TEST_F(ServerNetworkTest, EventsAreSentOnce) {
     connect_clients();
-    network.queue_event(DestroyEvent{.entity_id = 1});
+    network.queue_event(NamedEventState{.name_id = 1, .arguments = {}});
     static_cast<void>(network.snapshot(registry));
 
     const auto outbound = network.snapshot(registry);
@@ -203,8 +215,8 @@ TEST_F(ServerNetworkTest, EventsAreSentOnce) {
 }
 
 TEST_F(ServerNetworkTest, APlayerJoiningLaterOnlyGetsLaterEvents) {
-    const EventPayload before{DestroyEvent{.entity_id = 1}};
-    const EventPayload after{DestroyEvent{.entity_id = 2}};
+    const EventPayload before{NamedEventState{.name_id = 1, .arguments = {}}};
+    const EventPayload after{NamedEventState{.name_id = 2, .arguments = {}}};
     static_cast<void>(network.receive({from(client(5000), ConnectRequestPayload{})}));
     network.queue_event(before);
     static_cast<void>(network.receive({from(client(5001), ConnectRequestPayload{})}));
@@ -222,7 +234,7 @@ TEST_F(ServerNetworkTest, APlayerJoiningLaterOnlyGetsLaterEvents) {
 }
 
 TEST_F(ServerNetworkTest, EventsWithoutPlayersAreDropped) {
-    network.queue_event(DestroyEvent{.entity_id = 1});
+    network.queue_event(NamedEventState{.name_id = 1, .arguments = {}});
     static_cast<void>(network.receive({from(client(5000), ConnectRequestPayload{})}));
 
     const auto outbound = network.snapshot(registry);
@@ -250,10 +262,26 @@ TEST_F(ServerNetworkTest, MessagesFromStrangersDoNotDisturbTheTick) {
     connect_clients();
 
     const auto outbound = network.receive({
-        from(client(6000), InputPayload{.action_flags = 1, .move_x = 1, .move_y = 1}, 1),
+        from(client(6000),
+             InputPayload{.keys = {0x02}, .mouse_buttons = 0, .pointer = std::nullopt}, 1),
         from(client(6000), DisconnectPayload{.reason = DisconnectReason::normal}),
     });
 
     EXPECT_TRUE(outbound.empty());
     EXPECT_EQ(network.sessions().size(), 2U);
+}
+
+TEST_F(ServerNetworkTest, ConnectAcceptNamesEveryReplicatedField) {
+    const auto replies =
+        network.receive({from(client(5000), ConnectRequestPayload{.client_nonce = 1})});
+
+    ASSERT_EQ(replies.size(), 1U);
+    const auto* accept = std::get_if<ConnectAcceptPayload>(&replies.front().message);
+    ASSERT_NE(accept, nullptr);
+    std::vector<std::string> names;
+    for (const auto& entry : accept->strings.entries(engine::network::StringCategory::field)) {
+        names.push_back(entry.name);
+    }
+    EXPECT_EQ(names,
+              (std::vector<std::string>{"Position.pos", "Sprite.color", "Replicated.owner"}));
 }

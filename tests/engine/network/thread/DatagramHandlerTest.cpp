@@ -19,6 +19,7 @@ namespace logger = engine::core::log;
 
 namespace {
 
+using engine::network::AddressedOutbound;
 using engine::network::Bytes;
 using engine::network::encode_outbound;
 using engine::network::Endpoint;
@@ -26,14 +27,14 @@ using engine::network::handle_datagram;
 using engine::network::InputPayload;
 using engine::network::Message;
 using engine::network::MessageType;
-using engine::network::Outbound;
 using engine::network::ProtocolHandler;
 
 constexpr std::size_t header_version_offset = 4;
 constexpr std::size_t header_payload_size_offset = 11;
-constexpr std::size_t input_payload_size = 3;
-constexpr std::size_t input_action_flags_offset = engine::network::encoded_packet_header_size;
-constexpr std::size_t input_move_x_offset = input_action_flags_offset + 1;
+constexpr std::size_t input_payload_size = 18;
+constexpr std::size_t input_first_key_offset = engine::network::encoded_packet_header_size;
+constexpr std::size_t input_mouse_offset = input_first_key_offset + 16;
+constexpr std::size_t input_flags_offset = input_mouse_offset + 1;
 constexpr std::uint32_t sample_sequence = 7;
 
 Endpoint sample_endpoint() {
@@ -42,7 +43,9 @@ Endpoint sample_endpoint() {
     return endpoint.value_or(Endpoint{});
 }
 
-Message sample_message() { return InputPayload{.action_flags = 0x01, .move_x = -1, .move_y = 1}; }
+Message sample_message() {
+    return InputPayload{.keys = {0x02}, .mouse_buttons = 0x01, .pointer = std::nullopt};
+}
 
 Bytes valid_datagram() {
     const ProtocolHandler handler;
@@ -118,16 +121,23 @@ TEST_F(DatagramHandler, DropsWrongVersion) {
 
 TEST_F(DatagramHandler, DropsRandomBytes) { expect_dropped_and_logged(random_bytes(64)); }
 
-TEST_F(DatagramHandler, DropsInputWithOutOfRangeMovement) {
+TEST_F(DatagramHandler, DropsInputHoldingTheUnknownKey) {
     auto datagram = valid_datagram();
-    datagram[input_move_x_offset] = 2;
+    datagram[input_first_key_offset] = 0x03;
 
     expect_dropped_and_logged(datagram);
 }
 
-TEST_F(DatagramHandler, DropsInputWithReservedActionBits) {
+TEST_F(DatagramHandler, DropsInputWithUnknownMouseButtons) {
     auto datagram = valid_datagram();
-    datagram[input_action_flags_offset] = 0x80;
+    datagram[input_mouse_offset] = 0x80;
+
+    expect_dropped_and_logged(datagram);
+}
+
+TEST_F(DatagramHandler, DropsInputWithUnknownFlags) {
+    auto datagram = valid_datagram();
+    datagram[input_flags_offset] = 0x80;
 
     expect_dropped_and_logged(datagram);
 }
@@ -141,7 +151,7 @@ TEST_F(DatagramHandler, DropsInputWithWrongPayloadSize) {
 }
 
 TEST_F(DatagramHandler, EncodesValidOutboundWithSequence) {
-    const Outbound outbound{.to = sample_endpoint(), .message = sample_message()};
+    const AddressedOutbound outbound{.to = sample_endpoint(), .message = sample_message()};
 
     const auto bytes = encode_outbound(handler, outbound, sample_sequence);
 
@@ -151,7 +161,9 @@ TEST_F(DatagramHandler, EncodesValidOutboundWithSequence) {
 }
 
 TEST_F(DatagramHandler, DropsAndLogsInvalidOutboundPayload) {
-    const Outbound outbound{.to = sample_endpoint(), .message = InputPayload{.move_x = 2}};
+    const AddressedOutbound outbound{
+        .to = sample_endpoint(),
+        .message = InputPayload{.keys = {0x01}, .mouse_buttons = 0, .pointer = std::nullopt}};
 
     const auto bytes = encode_outbound(handler, outbound, sample_sequence);
 

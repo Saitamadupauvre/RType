@@ -9,20 +9,27 @@ namespace engine::network {
 using Bytes = std::vector<std::uint8_t>;
 
 inline constexpr std::uint32_t protocol_magic = 0x5254'5950;
-inline constexpr std::uint16_t protocol_version = 3;
+inline constexpr std::uint16_t protocol_version = 7;
 
 inline constexpr std::size_t max_datagram_size = 1200;
 inline constexpr std::size_t encoded_packet_header_size = 13;
 inline constexpr std::size_t max_payload_size = max_datagram_size - encoded_packet_header_size;
 
 inline constexpr std::size_t snapshot_prefix_size = 6;
-inline constexpr std::size_t entity_record_size = 19;
-inline constexpr std::size_t max_snapshot_entities =
-    (max_payload_size - snapshot_prefix_size) / entity_record_size;
+inline constexpr std::size_t max_snapshot_entity_bytes = max_payload_size - snapshot_prefix_size;
+inline constexpr std::size_t entity_header_size = 7;
+inline constexpr std::size_t field_header_size = 3;
+inline constexpr std::size_t max_entity_fields = 255;
+inline constexpr std::size_t max_wire_text_length = 255;
 
-inline constexpr std::size_t connect_accept_prefix_size = 16;
-inline constexpr std::size_t min_type_entry_size = 3;
-inline constexpr std::size_t max_type_name_length = 63;
+inline constexpr std::size_t connect_accept_prefix_size = 12;
+inline constexpr std::size_t min_string_entry_size = 4;
+
+inline constexpr std::size_t named_event_header_size = 4;
+inline constexpr std::size_t event_argument_header_size = 3;
+
+inline constexpr std::size_t input_key_bytes = 16;
+inline constexpr std::uint8_t input_has_pointer = 0x01;
 
 enum class MessageType : std::uint8_t {
     invalid = 0,

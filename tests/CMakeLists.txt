@@ -14,6 +14,7 @@ endfunction()
 
 engine_add_test(core SOURCES
     engine/core/EntityTest.cpp
+    engine/core/KeysTest.cpp
     engine/core/EntityPoolTest.cpp
     engine/core/ComponentPoolTest.cpp
     engine/core/ComponentTypeIdTest.cpp
@@ -29,32 +30,45 @@ engine_add_test(core SOURCES
     engine/core/ComponentPhysicsTest.cpp
     engine/core/ComponentsTest.cpp
     engine/core/DynamicLibraryTest.cpp
+    engine/core/FieldRegistryTest.cpp
 )
 engine_add_test(script SOURCES
+    engine/script/ApiSetsTest.cpp
+    engine/script/ClientApiTest.cpp
     engine/script/ScriptRuntimeTest.cpp
-    engine/script/ScriptDeclarationsTest.cpp
-    engine/script/ScriptRequireTest.cpp
-    engine/script/EntityHandleTest.cpp
-    engine/script/TickTest.cpp
-    engine/script/PlayersTest.cpp
-    engine/script/AudioTest.cpp
-    engine/script/CollisionsTest.cpp
+    engine/script/audio/AudioTest.cpp
+    engine/script/entity/CollisionsTest.cpp
+    engine/script/entity/EntityFieldsTest.cpp
+    engine/script/entity/EntityHandleTest.cpp
+    engine/script/entity/InstancesTest.cpp
+    engine/script/entity/TickTest.cpp
+    engine/script/event/EventsTest.cpp
+    engine/script/loading/ScriptDeclarationsTest.cpp
+    engine/script/loading/ScriptRequireTest.cpp
+    engine/script/loading/SectionsTest.cpp
+    engine/script/player/PlayersTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
+    engine/network/FieldsTest.cpp
     engine/network/ModuleTest.cpp
     engine/network/ServerTest.cpp
+    engine/network/StringTableTest.cpp
+    engine/network/TransportTest.cpp
     engine/network/bytes/ByteReaderTest.cpp
     engine/network/bytes/ByteWriterTest.cpp
     engine/network/decoder/PayloadDecoderTest.cpp
     engine/network/encoder/PayloadEncoderTest.cpp
     engine/network/event/GameEventsTest.cpp
+    engine/network/input/InputCodecTest.cpp
+    engine/network/protocol/FieldWireTest.cpp
     engine/network/protocol/ProtocolHandlerTest.cpp
+    engine/network/protocol/ReceivedStringsTest.cpp
     engine/network/protocol/SequenceTest.cpp
-    engine/network/protocol/TypeTableTest.cpp
     engine/network/server/ServerNetworkTest.cpp
     engine/network/session/ClientConnectionTest.cpp
     engine/network/session/ServerSessionsTest.cpp
+    engine/network/snapshot/ReplicatedFieldsTest.cpp
     engine/network/snapshot/SnapshotBuilderTest.cpp
     engine/network/snapshot/SnapshotReceiverTest.cpp
     engine/network/socket/SocketErrorTest.cpp
@@ -63,6 +77,8 @@ engine_add_test(network SOURCES
     engine/network/thread/DatagramHandlerTest.cpp
     engine/network/thread/MessageQueueTest.cpp
     engine/network/thread/NetworkIoTest.cpp
+    engine/network/transport/LoopbackLinksTest.cpp
+    engine/network/transport/UdpLinksTest.cpp
 )
 target_include_directories(engine_network_tests PRIVATE
     "${PROJECT_SOURCE_DIR}/engine/src/network"
@@ -71,9 +87,11 @@ target_include_directories(engine_network_tests PRIVATE
 engine_add_test(physics SOURCES
     engine/physics/PhysicsSystemTest.cpp
     engine/physics/CollisionsTest.cpp
+    engine/physics/FieldsTest.cpp
 )
 engine_add_test(graphics SOURCES
     engine/graphics/BackendTest.cpp
+    engine/graphics/InputCaptureTest.cpp
     engine/graphics/TypesTest.cpp
     engine/graphics/PluginLoaderTest.cpp
 )
@@ -81,6 +99,14 @@ engine_add_test(audio SOURCES
     engine/audio/NullAudioTest.cpp
     engine/audio/PluginLoaderTest.cpp
 )
+engine_add_test(app SOURCES
+    engine/app/AudioPlayerTest.cpp
+    engine/app/ClientAppTest.cpp
+    engine/app/ServerAppTest.cpp
+    engine/app/SnapshotViewTest.cpp
+    engine/app/WorldDrawTest.cpp
+)
+target_include_directories(engine_app_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/app")
 
 function(engine_add_test_library name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
@@ -163,16 +189,12 @@ plugin_add_test(audio-raylib
     LINKS audio-raylib-mixer
 )
 
-game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
+game_add_test(server SOURCES game/server/CliTest.cpp
     game/server/ShipTest.cpp game/server/MissileTest.cpp game/server/BydoTest.cpp
     game/server/BydoShotTest.cpp game/server/SpawnerTest.cpp game/server/CollisionTest.cpp
     game/server/GameFlowTest.cpp
-    LINKS r-type_server_cli r-type_server_app)
-game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
-    game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp
-    game/client/SnapshotViewTest.cpp game/client/AudioPlayerTest.cpp
-    LINKS r-type_client_cli r-type_client_controls r-type_client_draw r-type_client_audio)
-game_add_test(common SOURCES game/common/ActionCodecTest.cpp LINKS r-type_common)
+    LINKS r-type_server_cli engine::app engine::physics)
+game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
 
 function(game_add_runtime_data_test folder source)
     add_test(NAME game.runtime_data.${folder}

@@ -8,7 +8,6 @@
 
 namespace engine::network {
 
-[[nodiscard]] std::optional<EventPayload> read_event(ByteReader& reader,
-                                                     std::uint8_t type) noexcept;
+[[nodiscard]] std::optional<EventPayload> read_event(ByteReader& reader, std::uint8_t type);
 
 } // namespace engine::network

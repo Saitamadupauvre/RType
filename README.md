@@ -33,9 +33,10 @@ Epitech *Advanced C++* project (B-CPP-500).
   thread) running the game at a fixed 60 ticks per second.
 - Custom binary protocol over UDP, validated before every read, documented
   RFC-style.
-- Up to 4 players, each with their own colour; your own ship is marked with a
-  dot.
-- Scrolling, timer-based starfield, Bydos spawning at random heights on the
+- Up to 4 players, each with their own colour.
+- Dedicated server, hosted game (`--host`: play and let others join) or solo
+  game (`--solo`: no network at all).
+- Bydos spawning at random heights on the
   right and shooting back, missiles, collisions detected by the engine's
   physics module, game over and automatic restart.
 - Looping music, shot and explosion sounds, with separate music and effects
@@ -144,6 +145,13 @@ then one client per player, each in its own terminal.
 The game starts as soon as the first player connects. Players who join later
 get a ship immediately.
 
+Without a separate server:
+
+```sh
+./build/release/bin/r-type_client --host 4242   # host on UDP 4242 and play; others join with <your-ip> 4242
+./build/release/bin/r-type_client --solo        # play alone, no socket
+```
+
 ### Over a local network
 
 1. On the server machine, find its IPv4 address (`ip addr` on Linux,
@@ -157,6 +165,8 @@ get a ship immediately.
 ```
 r-type_server [-h] [-p <1..4>] <port>
 r-type_client [-h] [--music-volume <0..100>] [--effects-volume <0..100>] [--mute] <server-ip> <port>
+r-type_client [-h] [options] --host <port>
+r-type_client [-h] [options] --solo
 ```
 
 | Executable | Argument | Meaning |
@@ -197,8 +207,7 @@ a single executable out of `bin/`: move the whole folder.
 
 - Shoot the Bydos coming from the right. A Bydo touching your ship destroys
   it.
-- Each player has their own colour (blue, red, green, yellow, by join order);
-  a white dot marks **your** ship.
+- Each player has their own colour (blue, red, green, yellow, by join order).
 - When every ship is destroyed, the game is over and restarts after 3
   seconds with a ship for every connected player.
 
@@ -237,7 +246,7 @@ clang-tidy in one go. Every command is described in
 ## Repository layout
 
 ```
-engine/          C++ engine: one shared library per module (core, script, network, physics, graphics, audio)
+engine/          C++ engine: one shared library per module (core, script, network, physics, graphics, audio, app)
 plugins/         runtime plugins (graphics-raylib: window, rendering, input; audio-raylib: sound and music)
 game/server/     r-type_server entry point
 game/client/     r-type_client entry point

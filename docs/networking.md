@@ -1,27 +1,30 @@
 # Networking internals
 
-How `engine-network` is built: threads, queues, sessions, replication, and
+How `engine-network` is built: transports, threads, queues, sessions, replication, and
 what happens when something goes wrong. The wire format itself is specified
 in the [protocol](protocol.md).
 
 Everything here is generic: the module knows players, entities with a type
-id, inputs made of action bits and two axes, but nothing about R-Type.
+id, inputs made of the keys and mouse buttons held and a pointer, but nothing about R-Type.
 
 ## Public API
 
 | Header | Type | Used by |
 |---|---|---|
 | `engine/network/Server.hpp` | `NetworkServer`, `ServerOptions`, `PlayerInput` | `r-type_server` |
-| `engine/network/Client.hpp` | `NetworkClient`, `EntitySnapshot`, `ConnectionState` | `r-type_client` |
+| `engine/network/Client.hpp` | `NetworkClient`, `EntitySnapshot`, `ReplicatedValue`, `ConnectionState` | `r-type_client` |
+| `engine/network/Transport.hpp` | `ServerTransport`, `ClientTransport`, `UdpServerTransport`, `UdpClientTransport`, `LoopbackNetwork` | Both executables, tests, later self-hosted and solo modes |
 | `engine/network/Replicated.hpp` | `Replicated { type_id, owner }` | Marks the entities sent in snapshots |
-| `engine/network/Events.hpp` | `PlayerJoined`, `PlayerLeft`, `Disconnected`, `EntitySpawned`... | Published on the `EventBus` |
+| `engine/network/Fields.hpp` | `register_network_fields` | Registers `Replicated.owner` in a `FieldRegistry` |
+| `engine/network/Events.hpp` | `PlayerJoined`, `PlayerLeft`, `Disconnected`, `NamedEvent`... | Published on the `EventBus` |
 | `engine/network/Stats.hpp` | `NetworkStats`, `PlayerStats` | Traffic statistics |
 
 Both classes are pimpl wrappers: sockets and protocol types never appear in
-public headers.
+public headers. Each one borrows a transport, which must outlive it.
 
 ```cpp
-engine::network::NetworkServer server(clock, events, {.port = 4242, .max_players = 4, .types = types});
+engine::network::UdpServerTransport transport(4242);
+engine::network::NetworkServer server(clock, events, fields, transport, {.max_players = 4, .strings = strings});
 server.start(ec);                    // binds 0.0.0.0:4242, starts the threads
 // every tick:
 server.receive();                    // sessions, timeouts, inputs
@@ -35,27 +38,67 @@ server.send_snapshot(registry);      // queues snapshots for every session
 engine/src/network/
 ├── socket/      UdpSocket (RAII, POSIX), SocketError (engine error codes)
 ├── bytes/       ByteReader / ByteWriter: bounds-checked big-endian I/O
-├── protocol/    header, messages, validation, ProtocolHandler, TypeTable, Sequence
+├── protocol/    header, messages, validation, FieldWire, ProtocolHandler, ReceivedStrings, Sequence
 ├── encoder/     one encode_payload() per message
 ├── decoder/     one decode_<message>() per message, event reader table
 ├── thread/      MessageQueue, DatagramHandler, NetworkIo
+├── transport/   Link (private transport interface), UdpServerLink / UdpClientLink, LoopbackHub / LoopbackLink
 ├── session/     ServerSessions, ClientConnection
-├── snapshot/    SnapshotBuilder (server), SnapshotReceiver (client)
+├── snapshot/    ReplicatedFields + SnapshotBuilder (server), SnapshotReceiver (client)
 ├── event/       public events <-> protocol events
+├── input/       InputCodec: InputState <-> input payload (key bits, mouse bits, pointer)
 ├── stats/       TrafficMeter
 ├── server/      ServerNetwork: one server tick of networking, without sockets
-├── Server.cpp   NetworkServer = NetworkIo + ServerNetwork
-└── Client.cpp   NetworkClient = NetworkIo + ClientConnection + SnapshotReceiver
+├── Transport.cpp  public transports, wrapping the links
+├── Server.cpp   NetworkServer = Link + ServerNetwork
+└── Client.cpp   NetworkClient = Link + ClientConnection + SnapshotReceiver
 ```
 
-Everything above `thread/` is plain functions and classes on decoded
+Everything above `transport/` is plain functions and classes on decoded
 messages: they take an `Inbound`, return `Outbound`s, read time from an
-injected `IClock`, and never touch a socket. That is what makes them testable
-without a network.
+injected `IClock`, and never touch a socket. Peers are opaque `PeerId`s given
+by the transport, never addresses. That is what makes them testable without a
+network.
+
+## Transports
+
+`NetworkServer` and `NetworkClient` never know how packets travel. They talk
+to a `Link` (`transport/Link.hpp`): `open`, `close`, `poll()` decoded
+`Inbound`s, `send(Outbound)`, `forget(peer)` and `describe(peer)` for logs.
+The public `ServerTransport` / `ClientTransport` classes only hand their link
+to the server or client; the game picks one:
+
+| Transport | Links | Packets | Threads |
+|---|---|---|---|
+| `UdpServerTransport(port)` | `UdpServerLink` | UDP on every IPv4 interface | `NetworkIo`: receive + send |
+| `UdpClientTransport(ip, port)` | `UdpClientLink` | UDP from a free local port to one server | `NetworkIo`: receive + send |
+| `LoopbackNetwork` | `LoopbackHub`: one server link, one link per `add_client()` | In-memory queues, same process | None |
+
+Both transports run the same wire path: every message is encoded and decoded
+by `ProtocolHandler`, so a malformed message behaves the same on loopback and
+on UDP. On loopback, a packet sent is received by the next `poll()` of its
+destination, in order and without loss; packets to or from a link that is not
+open are dropped, like UDP packets to a closed port. `LoopbackNetwork::cut()`
+silently drops everything to and from one client, which makes both ends time
+out. The hub locks a mutex, so the server and the clients may run on different
+threads.
+
+On the server, a peer is `PeerId` 1, 2, 3...; on the client, the server is
+always `server_peer` (0). `UdpServerLink` maps each sender address to a
+`PeerId` on the game thread. The map is bounded (1024 addresses; datagrams
+from new addresses are dropped and logged beyond that), and after every
+`receive()` the server calls `forget()` for each peer that has no session
+(rejected, unknown, disconnected, timed out). `UdpClientLink` ignores packets
+from any address but the server's.
+
+The tests in `tests/engine/network/` run the server and the client on
+loopback with a `ManualClock`: no socket, no waiting. Only the socket, the
+`NetworkIo` threads, the UDP links and the tests that run the same scenario on
+both transports (`TransportTest.cpp`) use real sockets on `127.0.0.1`.
 
 ## Threads and queues
 
-`NetworkIo` (`thread/NetworkIo.hpp`) owns the socket and two threads:
+Over UDP, `NetworkIo` (`thread/NetworkIo.hpp`) owns the socket and two threads:
 
 ```mermaid
 flowchart LR
@@ -92,19 +135,19 @@ The tests run the whole module under ThreadSanitizer (`cmake --workflow
 
 ### Sessions
 
-`ServerSessions` (`session/ServerSessions.hpp`) maps each client endpoint to a
+`ServerSessions` (`session/ServerSessions.hpp`) maps each client peer to a
 session: player id (lowest free, 1 to `max_players`), last time seen, latest
 input and its sequence, packet sequence counter.
 
 | Message from | Result |
 |---|---|
-| New endpoint, `connect_request`, slot free | Session created, `connect_accept` with player id and type table, `PlayerJoined` published |
-| New endpoint, `connect_request`, server full | `disconnect(server_full)`, no session |
-| Known endpoint, `connect_request` | Same `connect_accept` again (idempotent) |
-| Known endpoint, `input` | Stored if its sequence is newer than the last accepted one; older or duplicated inputs are ignored |
-| Known endpoint, `heartbeat` | Answered with a heartbeat (round-trip measurement) |
-| Known endpoint, `disconnect` | Session ended |
-| Unknown endpoint, anything else | Ignored, logged at debug level |
+| New peer, `connect_request`, slot free | Session created, `connect_accept` with player id and string table, `PlayerJoined` published |
+| New peer, `connect_request`, server full | `disconnect(server_full)`, no session |
+| Known peer, `connect_request` | Same `connect_accept` again (idempotent) |
+| Known peer, `input` | Stored if its sequence is newer than the last accepted one; older or duplicated inputs are ignored |
+| Known peer, `heartbeat` | Answered with a heartbeat (round-trip measurement) |
+| Known peer, `disconnect` | Session ended |
+| Unknown peer, anything else | Ignored, logged at debug level |
 
 Any valid packet refreshes the session. `drop_timed_out()` ends sessions silent
 for more than **5 seconds** and sends them `disconnect(timeout)`. Ending a
@@ -114,18 +157,30 @@ every remaining session and publishes `PlayerLeft` on the event bus, which
 
 ### Replication
 
-Each tick, `send_snapshot(registry)` builds snapshots from every entity with
-`Replicated` and `Position` (plus `Velocity` and `Sprite` colour when present),
-split into packets of at most 62 entities that share the same server tick, and
-queues them for every session. Game events published on the bus during the
-tick (`EntitySpawned`, `EntityDestroyed`, `ShotFired`, `SoundPlayed`, `MusicChanged`) are sent
-before the snapshot, in order, to the sessions connected when they happened.
+Snapshots are built from the `core::FieldRegistry` given to `NetworkServer`.
+At construction the server names every field flagged `replicated`
+`Component.field` (e.g. `Position.pos`) in the `field` category of the string
+table (`ReplicatedFields`). Each tick, `send_snapshot(world)` sends every entity
+with `Replicated`: its `type_id`, then each replicated field it owns as
+`[field_id, kind, value]`. Marking a field replicated needs no network code. The
+entities are split into packets of at most 1181 bytes of records that share the
+same server tick, and queued for every session. Game events published on the bus during the
+tick (`SoundPlayed`, `MusicChanged`, `NamedEvent`) are sent before the snapshot, in order, to
+the sessions connected when they happened. A `NamedEvent` is sent with the ids of its name
+(`event` category) and keys (`event_key`); one with a name or key missing from the string table,
+or breaking the limits (16 arguments, 63-byte texts, no list), is dropped and logged. The client
+publishes it back with names.
 
 `ServerApp` decides what is replicated: every scripted entity with a sprite or
-a colour gets `Replicated { type_id, owner }`; the type table is built from
-the Lua declarations and sent in `connect_accept`, with the sound and music
-tables built from `sounds { ... }` / `musics { ... }`. After each tick it turns
-the scripts' `play` / `music` requests into `SoundPlayed` / `MusicChanged`.
+a colour gets `Replicated { type_id, owner }`. Its field registry comes from
+`rtype::common::game_fields()` (core, physics and network fields), which the
+client uses too, so both sides know the same names. One `StringTable` holds the
+names sent in `connect_accept`: entity types from the Lua declarations (category
+`type`), sounds and musics from `sounds { ... }` / `musics { ... }` (`sound`,
+`music`), events and their keys from `event "name" { ... }` (`event`, `event_key`); each
+category numbers its names from 1 in ascending order. After each tick it turns the scripts'
+`play` / `music` requests into `SoundPlayed` / `MusicChanged`, then their `emit` calls into
+`NamedEvent`.
 The server remembers the last music so `connect_accept` gives it to players
 joining later; the client publishes it as a `MusicChanged` on accept.
 
@@ -143,7 +198,7 @@ stateDiagram-v2
 ```
 
 Once connected it sends a heartbeat every second and the input every tick.
-When the connection ends, the network threads stop and `Disconnected { reason }`
+When the connection ends, the transport is closed and `Disconnected { reason }`
 is published once on the client's event bus.
 
 `SnapshotReceiver` keeps the world of the newest server tick: a newer tick
@@ -160,7 +215,7 @@ world units.
 | Payload with out-of-range values (axis 2, reserved bits, undefined reason) | Payload decoders, `is_valid` | Dropped and logged |
 | Packet claiming a huge count (e.g. 65535 entities) | Decoder checks the remaining size **before** allocating | Dropped, no allocation |
 | Snapshot or event before `connect_accept`, or with an unknown type id | `TypeTable` on the client | Dropped and logged |
-| Packet from an unknown endpoint | `ServerSessions` | Ignored |
+| Packet from an unknown peer | `ServerSessions` | Ignored |
 | Duplicated or reordered input | Sequence comparison with wrap-around | Ignored, still refreshes the session |
 | Client crash or network cut | No packet for 5 s | Session ended, other players get `player_left`, their ship is removed by Lua |
 | Server crash or network cut | No packet for 5 s on the client | Connection ended, `Disconnected { timeout }` |

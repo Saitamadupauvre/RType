@@ -11,6 +11,7 @@
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/network/Events.hpp"
 
+#include "PayloadSamples.hpp"
 #include "protocol/Messages.hpp"
 #include "session/ServerSessions.hpp"
 
@@ -22,41 +23,53 @@ using engine::network::ConnectAcceptPayload;
 using engine::network::ConnectRequestPayload;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
-using engine::network::Endpoint;
 using engine::network::EventPayload;
 using engine::network::HeartbeatPayload;
 using engine::network::Inbound;
 using engine::network::InputPayload;
 using engine::network::Message;
 using engine::network::Outbound;
+using engine::network::PeerId;
 using engine::network::PlayerJoined;
 using engine::network::PlayerLeft;
 using engine::network::PlayerLeftEvent;
 using engine::network::ServerSessions;
 using engine::network::ServerSessionsConfig;
-using engine::network::TypeEntry;
+using engine::network::StringCategory;
+using engine::network::StringTable;
 using namespace std::chrono_literals;
 
 constexpr auto session_timeout = 5s;
 constexpr std::uint32_t sample_nonce = 0xCAFE;
 
-Endpoint client(std::uint16_t port) {
-    const auto endpoint = Endpoint::from_string("127.0.0.1", port);
-    EXPECT_TRUE(endpoint.has_value());
-    return endpoint.value_or(Endpoint{});
+StringTable player_strings() {
+    return payload_samples::strings_of(
+        {{.category = StringCategory::type, .id = 1, .name = "player"}});
 }
 
-Inbound from(const Endpoint& endpoint, Message message, std::uint32_t sequence = 0) {
-    return Inbound{.from = endpoint,
+StringTable audio_strings() {
+    return payload_samples::strings_of(
+        {{.category = StringCategory::sound, .id = 1, .name = "shot.wav"},
+         {.category = StringCategory::music, .id = 4, .name = "stage.ogg"}});
+}
+
+constexpr PeerId client(std::uint32_t id) { return PeerId{id}; }
+
+Inbound from(PeerId peer, Message message, std::uint32_t sequence = 0) {
+    return Inbound{.from = peer,
                    .message = {.header = {.sequence = sequence}, .message = std::move(message)}};
 }
 
-Inbound input_from(const Endpoint& endpoint, std::uint32_t sequence, std::int8_t move_x) {
-    return from(endpoint, InputPayload{.action_flags = 1, .move_x = move_x, .move_y = 0}, sequence);
+Inbound input_from(PeerId peer, std::uint32_t sequence, std::int8_t move_x) {
+    InputPayload input{};
+    input.keys[1] = static_cast<std::uint8_t>(move_x);
+    return from(peer, input, sequence);
 }
 
-Inbound connect_from(const Endpoint& endpoint, std::uint32_t nonce = sample_nonce) {
-    return from(endpoint, ConnectRequestPayload{.client_nonce = nonce});
+std::int8_t move_x_of(const InputPayload& input) { return static_cast<std::int8_t>(input.keys[1]); }
+
+Inbound connect_from(PeerId peer, std::uint32_t nonce = sample_nonce) {
+    return from(peer, ConnectRequestPayload{.client_nonce = nonce});
 }
 
 Message player_left_notice(std::uint32_t player_id) {
@@ -96,7 +109,7 @@ protected:
     ServerSessions sessions{clock, bus,
                             ServerSessionsConfig{.max_players = 4,
                                                  .timeout = session_timeout,
-                                                 .types = {{.type_id = 1, .name = "player"}}}};
+                                                 .strings = player_strings()}};
 };
 
 } // namespace
@@ -106,12 +119,11 @@ TEST_F(ServerSessionsTest, AcceptsConnectRequestWithNonceFirstPlayerIdAndTypes) 
 
     ASSERT_EQ(replies.size(), 1U);
     EXPECT_EQ(replies.front().to, client(5000));
-    const ConnectAcceptPayload expected{.client_nonce = sample_nonce,
-                                        .player_entity_id = 1,
-                                        .types = {TypeEntry{.type_id = 1, .name = "player"}}};
+    const ConnectAcceptPayload expected{
+        .client_nonce = sample_nonce, .player_entity_id = 1, .strings = player_strings()};
     EXPECT_EQ(replies.front().message, Message{expected});
     ASSERT_EQ(sessions.sessions().size(), 1U);
-    EXPECT_EQ(sessions.sessions().front().endpoint, client(5000));
+    EXPECT_EQ(sessions.sessions().front().peer, client(5000));
 }
 
 TEST_F(ServerSessionsTest, PublishesPlayerJoinedOnAccept) {
@@ -121,7 +133,7 @@ TEST_F(ServerSessionsTest, PublishesPlayerJoinedOnAccept) {
     EXPECT_EQ(joined, (std::vector<std::uint32_t>{1, 2}));
 }
 
-TEST_F(ServerSessionsTest, DuplicateConnectFromSameEndpointIsIdempotent) {
+TEST_F(ServerSessionsTest, DuplicateConnectFromSamePeerIsIdempotent) {
     const auto first = connect(5000);
     const auto replies = sessions.handle(connect_from(client(5000), 0xBEEF));
 
@@ -160,7 +172,7 @@ TEST(ServerSessions, UsesMaxPlayersGivenByTheGame) {
     EXPECT_EQ(sessions.sessions().size(), 2U);
 }
 
-TEST_F(ServerSessionsTest, IgnoresMessagesFromUnknownEndpoint) {
+TEST_F(ServerSessionsTest, IgnoresMessagesFromUnknownPeer) {
     connect(5000);
 
     EXPECT_TRUE(sessions.handle(from(client(6000), InputPayload{})).empty());
@@ -279,9 +291,8 @@ TEST_F(ServerSessionsTest, StoresLatestInputOfEachSession) {
     static_cast<void>(sessions.handle(input_from(client(5001), 3, -1)));
     static_cast<void>(sessions.handle(input_from(client(5000), 4, -1)));
 
-    EXPECT_EQ(sessions.sessions()[0].input.move_x, -1);
-    EXPECT_EQ(sessions.sessions()[0].input.action_flags, 1);
-    EXPECT_EQ(sessions.sessions()[1].input.move_x, -1);
+    EXPECT_EQ(move_x_of(sessions.sessions()[0].input), -1);
+    EXPECT_EQ(move_x_of(sessions.sessions()[1].input), -1);
 }
 
 TEST_F(ServerSessionsTest, IgnoresOutOfOrderInput) {
@@ -290,7 +301,7 @@ TEST_F(ServerSessionsTest, IgnoresOutOfOrderInput) {
     static_cast<void>(sessions.handle(input_from(client(5000), 10, 1)));
     static_cast<void>(sessions.handle(input_from(client(5000), 9, -1)));
 
-    EXPECT_EQ(sessions.sessions().front().input.move_x, 1);
+    EXPECT_EQ(move_x_of(sessions.sessions().front().input), 1);
 }
 
 TEST_F(ServerSessionsTest, IgnoresDuplicateInput) {
@@ -299,7 +310,7 @@ TEST_F(ServerSessionsTest, IgnoresDuplicateInput) {
     static_cast<void>(sessions.handle(input_from(client(5000), 10, 1)));
     static_cast<void>(sessions.handle(input_from(client(5000), 10, -1)));
 
-    EXPECT_EQ(sessions.sessions().front().input.move_x, 1);
+    EXPECT_EQ(move_x_of(sessions.sessions().front().input), 1);
 }
 
 TEST_F(ServerSessionsTest, AcceptsInputAcrossSequenceWrap) {
@@ -308,7 +319,7 @@ TEST_F(ServerSessionsTest, AcceptsInputAcrossSequenceWrap) {
     static_cast<void>(sessions.handle(input_from(client(5000), 0xFFFF'FFFF, 1)));
     static_cast<void>(sessions.handle(input_from(client(5000), 0, -1)));
 
-    EXPECT_EQ(sessions.sessions().front().input.move_x, -1);
+    EXPECT_EQ(move_x_of(sessions.sessions().front().input), -1);
 }
 
 TEST_F(ServerSessionsTest, OlderInputStillKeepsSessionAlive) {
@@ -322,7 +333,7 @@ TEST_F(ServerSessionsTest, OlderInputStillKeepsSessionAlive) {
     EXPECT_TRUE(sessions.drop_timed_out().empty());
 }
 
-TEST_F(ServerSessionsTest, IgnoresInputFromUnknownEndpoint) {
+TEST_F(ServerSessionsTest, IgnoresInputFromUnknownPeer) {
     connect(5000);
 
     EXPECT_TRUE(sessions.handle(input_from(client(6000), 1, 1)).empty());
@@ -340,7 +351,7 @@ TEST_F(ServerSessionsTest, ReconnectedSessionAcceptsInputWithLowerSequence) {
 
     static_cast<void>(sessions.handle(input_from(client(5000), 2, -1)));
 
-    EXPECT_EQ(sessions.sessions().front().input.move_x, -1);
+    EXPECT_EQ(move_x_of(sessions.sessions().front().input), -1);
 }
 
 TEST_F(ServerSessionsTest, AnswersEveryHeartbeatWithAHeartbeat) {
@@ -389,13 +400,11 @@ TEST_F(ServerSessionsTest, ReportsTrafficOfEachPlayer) {
     EXPECT_FALSE(stats[1].network.round_trip_time.has_value());
 }
 
-TEST(ServerSessionsAudio, AcceptCarriesSoundMusicTablesAndCurrentMusic) {
+TEST(ServerSessionsAudio, AcceptCarriesTheStringTableAndCurrentMusic) {
     ManualClock clock;
     EventBus bus;
     ServerSessions sessions(clock, bus,
-                            ServerSessionsConfig{.max_players = 1,
-                                                 .sounds = {{.type_id = 1, .name = "shot.wav"}},
-                                                 .musics = {{.type_id = 4, .name = "stage.ogg"}}});
+                            ServerSessionsConfig{.max_players = 1, .strings = audio_strings()});
 
     sessions.set_current_music(4);
     const auto replies = sessions.handle(connect_from(client(5000)));
@@ -403,17 +412,15 @@ TEST(ServerSessionsAudio, AcceptCarriesSoundMusicTablesAndCurrentMusic) {
     ASSERT_EQ(replies.size(), 1U);
     const auto* accept = std::get_if<ConnectAcceptPayload>(&replies.front().message);
     ASSERT_NE(accept, nullptr);
-    EXPECT_EQ(accept->sounds, (std::vector<TypeEntry>{{.type_id = 1, .name = "shot.wav"}}));
-    EXPECT_EQ(accept->musics, (std::vector<TypeEntry>{{.type_id = 4, .name = "stage.ogg"}}));
+    EXPECT_EQ(accept->strings, audio_strings());
     EXPECT_EQ(accept->current_music, 4);
 }
 
 TEST(ServerSessionsAudio, IgnoresAnUnknownCurrentMusic) {
     ManualClock clock;
     EventBus bus;
-    ServerSessions sessions(
-        clock, bus,
-        ServerSessionsConfig{.max_players = 1, .musics = {{.type_id = 4, .name = "stage.ogg"}}});
+    ServerSessions sessions(clock, bus,
+                            ServerSessionsConfig{.max_players = 1, .strings = audio_strings()});
 
     sessions.set_current_music(4);
     sessions.set_current_music(9);

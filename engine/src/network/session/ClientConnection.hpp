@@ -5,15 +5,16 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string>
 #include <vector>
 
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Client.hpp"
 #include "engine/network/Export.hpp"
 
 #include "protocol/Messages.hpp"
-#include "protocol/TypeTable.hpp"
-#include "socket/UdpSocket.hpp"
+#include "protocol/ReceivedStrings.hpp"
 #include "stats/TrafficMeter.hpp"
 #include "thread/NetworkMessages.hpp"
 
@@ -28,8 +29,9 @@ struct ClientConnectionConfig {
 
 class ENGINE_NETWORK_EXPORT ClientConnection {
 public:
-    ClientConnection(const core::time::IClock& clock, const Endpoint& server,
-                     std::uint32_t client_nonce, ClientConnectionConfig config = {});
+    ClientConnection(const core::time::IClock& clock, const core::FieldRegistry& fields,
+                     std::string server_label, std::uint32_t client_nonce,
+                     ClientConnectionConfig config = {});
 
     [[nodiscard]] std::optional<Outbound> update();
     bool handle(const Inbound& inbound);
@@ -41,7 +43,7 @@ public:
         return disconnect_reason_;
     }
     [[nodiscard]] std::uint32_t player_id() const noexcept { return player_id_; }
-    [[nodiscard]] const TypeTable& type_table() const noexcept { return type_table_; }
+    [[nodiscard]] const ReceivedStrings& strings() const noexcept { return _strings; }
     [[nodiscard]] NetworkStats stats() const;
 
 private:
@@ -55,7 +57,7 @@ private:
     [[nodiscard]] Outbound to_server(Message message);
 
     std::reference_wrapper<const core::time::IClock> clock_;
-    Endpoint server_;
+    std::string _server_label;
     std::uint32_t client_nonce_;
     ClientConnectionConfig config_;
     ConnectionState state_{ConnectionState::connecting};
@@ -67,7 +69,8 @@ private:
     std::optional<core::time::Duration> unanswered_heartbeat_;
     std::uint32_t next_sequence_{0};
     std::uint32_t player_id_{0};
-    TypeTable type_table_;
+    ReceivedStrings _strings;
+    std::optional<Outbound> _farewell;
     TrafficMeter traffic_;
 };
 
