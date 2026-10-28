@@ -289,8 +289,9 @@ ScriptRuntime& ScriptRuntime::operator=(ScriptRuntime&&) noexcept = default;
 
 ApiSet& ScriptRuntime::find_api(const std::type_info& type) const {
     for (const auto& set : _impl->sets) {
-        if (typeid(*set) == type) {
-            return *set;
+        ApiSet& api = *set;
+        if (typeid(api) == type) {
+            return api;
         }
     }
     throw std::out_of_range(std::format("script API set {} is not installed", type.name()));

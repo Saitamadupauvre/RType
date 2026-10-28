@@ -17,19 +17,20 @@ void check_sets(const std::vector<std::unique_ptr<ApiSet>>& sets) {
     std::unordered_set<std::type_index> added;
     std::string_view section;
     for (const auto& set : sets) {
-        if (!added.insert(typeid(*set)).second) {
+        const ApiSet& api = *set;
+        if (!added.insert(typeid(api)).second) {
             throw std::invalid_argument(
-                std::format("script API set {} is added twice", typeid(*set).name()));
+                std::format("script API set {} is added twice", typeid(api).name()));
         }
-        if (set->section().empty()) {
+        if (api.section().empty()) {
             continue;
         }
         if (!section.empty()) {
             throw std::invalid_argument(
                 std::format("script API sets reading the '{}' and '{}' sections cannot be combined",
-                            section, set->section()));
+                            section, api.section()));
         }
-        section = set->section();
+        section = api.section();
     }
 }
 
