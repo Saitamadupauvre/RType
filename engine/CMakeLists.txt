@@ -9,6 +9,7 @@ target_link_libraries(engine_lua INTERFACE ${LUA_LIBRARIES})
 
 engine_add_module(core
     SOURCES
+        src/core/AssetCache.cpp
         src/core/EntityPool.cpp
         src/core/ComponentTypeId.cpp
         src/core/DynamicLibrary.cpp
@@ -42,6 +43,7 @@ engine_add_module(script
         src/script/ScriptRuntime.cpp
         src/script/ScriptRuntimeBuilder.cpp
         src/script/ServerApi.cpp
+        src/script/assets/Textures.cpp
         src/script/audio/Audio.cpp
         src/script/entity/Entities.cpp
         src/script/entity/EntityFields.cpp
@@ -50,6 +52,7 @@ engine_add_module(script
         src/script/input/LuaInput.cpp
         src/script/loading/Declarations.cpp
         src/script/loading/ModuleLoader.cpp
+        src/script/loading/NameList.cpp
         src/script/loading/ScriptFiles.cpp
         src/script/loading/Sections.cpp
         src/script/lua/LuaErrors.cpp
@@ -78,6 +81,7 @@ engine_add_module(network
         src/network/protocol/ProtocolHandler.cpp
         src/network/protocol/ReceivedStrings.cpp
         src/network/protocol/Validation.cpp
+        src/network/protocol/WireValue.cpp
         src/network/server/ServerNetwork.cpp
         src/network/session/ClientConnection.cpp
         src/network/session/ServerSessions.cpp
@@ -113,11 +117,13 @@ engine_add_module(audio
 
 engine_add_module(app
     SOURCES
+        src/app/AssetPreloader.cpp
         src/app/AudioPlayer.cpp
         src/app/ClientApp.cpp
         src/app/Collisions.cpp
         src/app/Fields.cpp
         src/app/Launch.cpp
+        src/app/LoadingScreen.cpp
         src/app/ServerApp.cpp
         src/app/SnapshotView.cpp
         src/app/WorldDraw.cpp
