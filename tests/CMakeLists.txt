@@ -105,6 +105,7 @@ engine_add_test(audio SOURCES
 engine_add_test(app SOURCES
     engine/app/AudioPlayerTest.cpp
     engine/app/CameraFollowTest.cpp
+    engine/app/CameraRigTest.cpp
     engine/app/ClientAppTest.cpp
     engine/app/ServerAppTest.cpp
     engine/app/SnapshotViewTest.cpp

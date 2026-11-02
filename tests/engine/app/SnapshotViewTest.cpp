@@ -153,3 +153,18 @@ TEST(SnapshotView, IgnoresFieldsOfComponentsItDoesNotDraw) {
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 5.F);
 }
+
+TEST(SnapshotView, CameraEntitiesAreNotDrawn) {
+    RecordingRenderer renderer;
+    SnapshotView view(renderer, "assets", fields);
+    EntitySnapshot camera{
+        .entity_id = 2,
+        .type_id = ship_type,
+        .fields = {value_of("Position", "pos", Vec2{5.F, 20.F}), value_of("Camera", "zoom", 1.F)}};
+
+    view.draw({camera, entity(ship_type, 40.F, 0)}, strings);
+
+    ASSERT_EQ(renderer.sprites.size(), 1U);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 40.F);
+    EXPECT_TRUE(renderer.rects.empty());
+}
