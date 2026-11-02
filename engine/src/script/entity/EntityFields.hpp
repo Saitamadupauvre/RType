@@ -11,7 +11,7 @@
 
 namespace engine::script {
 
-enum class AliasShape : std::uint8_t { Whole, AxisX, AxisY, Size, Area };
+enum class AliasShape : std::uint8_t { Whole, AxisX, AxisY, Size, Area, Factor };
 
 struct FieldAlias {
     std::string_view name;

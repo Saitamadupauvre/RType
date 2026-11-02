@@ -18,6 +18,9 @@ core::FieldValue from_lua(sol::this_state state, const sol::object& value, core:
 
 float number_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
 
+core::Vec2 factor_from_lua(sol::this_state state, const sol::object& value,
+                           std::string_view name);
+
 sol::object size_to_lua(sol::this_state state, core::Vec2 size);
 
 core::Vec2 size_from_lua(sol::this_state state, const sol::object& value, std::string_view name);

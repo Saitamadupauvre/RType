@@ -66,6 +66,9 @@ constexpr std::array aliases{
                .field = "bounds_origin",
                .size_field = "bounds_size",
                .shape = AliasShape::Area},
+    FieldAlias{.name = "rotation", .component = "Rotation", .field = "degrees"},
+    FieldAlias{
+        .name = "scale", .component = "Scale", .field = "factor", .shape = AliasShape::Factor},
 };
 
 core::FieldRef require_alias_field(const core::FieldRegistry& registry, std::string_view component,
@@ -113,7 +116,7 @@ std::vector<std::string_view> EntityFields::alias_names() const {
 sol::object EntityFields::read_alias(sol::this_state state, core::EntityManager& world,
                                      core::Entity entity, std::string_view name) const {
     const Binding& binding = *find(name);
-    if (binding.alias.shape == AliasShape::Whole) {
+    if (binding.alias.shape == AliasShape::Whole || binding.alias.shape == AliasShape::Factor) {
         return read_field(state, world, entity, binding.field);
     }
     if (binding.alias.shape == AliasShape::Area) {
@@ -132,6 +135,7 @@ sol::object EntityFields::read_alias(sol::this_state state, core::EntityManager&
     case AliasShape::Size:
     case AliasShape::Whole:
     case AliasShape::Area:
+    case AliasShape::Factor:
         break;
     }
     return size_to_lua(state, vector);
@@ -237,6 +241,8 @@ core::FieldValue EntityFields::alias_value(sol::this_state state, core::EntityMa
         return from_lua(state, value, *binding.field.field, name);
     case AliasShape::Size:
         return size_from_lua(state, value, name);
+    case AliasShape::Factor:
+        return factor_from_lua(state, value, name);
     case AliasShape::Area:
     case AliasShape::AxisX:
     case AliasShape::AxisY:
