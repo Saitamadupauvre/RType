@@ -32,6 +32,7 @@ engine_add_test(core SOURCES
     engine/core/DynamicLibraryTest.cpp
     engine/core/FieldRegistryTest.cpp
     engine/core/CameraTest.cpp
+    engine/core/TransformTest.cpp
 )
 engine_add_test(script SOURCES
     engine/script/ApiSetsTest.cpp
