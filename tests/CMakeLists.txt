@@ -35,6 +35,7 @@ engine_add_test(core SOURCES
 )
 engine_add_test(script SOURCES
     engine/script/ApiSetsTest.cpp
+    engine/script/CameraApiTest.cpp
     engine/script/ClientApiTest.cpp
     engine/script/ScriptRuntimeTest.cpp
     engine/script/audio/AudioTest.cpp
