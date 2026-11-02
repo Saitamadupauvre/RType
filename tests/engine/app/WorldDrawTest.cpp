@@ -158,3 +158,29 @@ TEST(WorldDraw, EntityWithoutSpriteIsNotDrawn) {
     EXPECT_TRUE(renderer.sprites.empty());
     EXPECT_TRUE(renderer.rects.empty());
 }
+
+TEST(WorldDraw, PreloadedTextureIsNotLoadedAgainWhenDrawn) {
+    RecordingRenderer renderer;
+    EntityManager world;
+    register_components(world);
+    spawn(world, {}, {.path = "ship.png", .color = {}});
+    WorldDraw draw(renderer, "assets");
+
+    EXPECT_TRUE(draw.preload("ship.png"));
+    draw.draw(world);
+
+    EXPECT_EQ(renderer.loaded.size(), 1U);
+    ASSERT_EQ(renderer.sprites.size(), 1U);
+    EXPECT_EQ(renderer.sprites.front().texture, ship);
+}
+
+TEST(WorldDraw, PreloadReportsAMissingOrRejectedTexture) {
+    RecordingRenderer renderer;
+    WorldDraw draw(renderer, "assets");
+
+    EXPECT_FALSE(draw.preload("missing.png"));
+    EXPECT_FALSE(draw.preload("../secret.png"));
+    EXPECT_FALSE(draw.preload("missing.png"));
+
+    EXPECT_EQ(renderer.loaded.size(), 1U);
+}

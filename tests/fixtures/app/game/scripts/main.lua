@@ -1,4 +1,7 @@
 event "ping" { n = "int" }
+textures { "backgrounds/stars.png", "ui/bar.png", "ui/missing.png", "enemies/bug.png", "enemies/boss.png" }
+sounds { "shot.wav" }
+musics { "stage.ogg" }
 
 server = {
     on_start = function() end,
