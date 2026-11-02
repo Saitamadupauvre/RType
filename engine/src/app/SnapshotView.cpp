@@ -12,7 +12,7 @@ namespace engine::app {
 
 SnapshotView::SnapshotView(graphics::IRenderer& renderer, std::filesystem::path assets,
                            const core::FieldRegistry& fields)
-    : _renderer(renderer), _fields(fields), _draw(renderer, std::move(assets)) {
+    : _fields(fields), _draw(renderer, std::move(assets)) {
     _world.register_component<core::Position>();
     _world.register_component<core::Sprite>();
 }

@@ -30,7 +30,6 @@ private:
                 const network::StringTable& strings);
     void apply(core::Entity entity, const network::EntitySnapshot& snapshot);
 
-    graphics::IRenderer& _renderer;
     const core::FieldRegistry& _fields;
     core::EntityManager _world;
     WorldDraw _draw;
