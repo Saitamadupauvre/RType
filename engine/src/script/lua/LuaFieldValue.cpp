@@ -220,8 +220,7 @@ float number_from_lua(sol::this_state state, const sol::object& value, std::stri
     return finite_float(state, value.as<double>(), field);
 }
 
-core::Vec2 factor_from_lua(sol::this_state state, const sol::object& value,
-                           std::string_view name) {
+core::Vec2 factor_from_lua(sol::this_state state, const sol::object& value, std::string_view name) {
     const ValueName field = entity_field(name);
     if (value.get_type() == sol::type::number) {
         const float uniform = finite_float(state, value.as<double>(), field);

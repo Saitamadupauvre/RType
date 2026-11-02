@@ -321,7 +321,8 @@ void register_core_fields(FieldRegistry& registry) {
                           camera_bounds_origin_field(), camera_bounds_size_field()},
                          required<Position>);
     registry.add<Rotation>("Rotation", {rotation_degrees_field()});
-    registry.add<Scale>("Scale", {scale_axis_field<&Vec2::x>("x"), scale_axis_field<&Vec2::y>("y")});
+    registry.add<Scale>("Scale",
+                        {scale_axis_field<&Vec2::x>("x"), scale_axis_field<&Vec2::y>("y")});
 }
 
 } // namespace engine::core

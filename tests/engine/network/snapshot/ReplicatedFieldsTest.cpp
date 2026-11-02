@@ -220,8 +220,8 @@ TEST_F(CoreReplicatedFieldsTest, EntityWithRotationAndScaleSendsBoth) {
 
     const auto states = _fields.read(_world, _entity);
 
-    EXPECT_EQ(sent_names(), (std::vector<std::string>{"Position.pos", "Rotation.degrees",
-                                                      "Scale.x", "Scale.y"}));
+    EXPECT_EQ(sent_names(),
+              (std::vector<std::string>{"Position.pos", "Rotation.degrees", "Scale.x", "Scale.y"}));
     ASSERT_EQ(states.size(), 4U);
     EXPECT_EQ(states[1].value, FieldValue{45.F});
     EXPECT_EQ(states[2].value, FieldValue{-1.F});

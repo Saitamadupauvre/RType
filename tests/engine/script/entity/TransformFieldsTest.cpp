@@ -18,9 +18,9 @@ namespace logger = engine::core::log;
 using engine::core::Entity;
 using engine::core::EntityManager;
 using engine::core::Rotation;
-using engine::core::Vec2;
 using engine::core::rotation_of;
 using engine::core::scale_of;
+using engine::core::Vec2;
 using engine::script::ScriptRuntime;
 using engine::script::ServerApi;
 
