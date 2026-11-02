@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <utility>
 
+#include "CameraRig.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/log/Log.hpp"
@@ -33,6 +34,9 @@ void SnapshotView::mirror(const std::vector<network::EntitySnapshot>& entities,
     }
     _mirrored.clear();
     for (const auto& snapshot : entities) {
+        if (is_camera(snapshot)) {
+            continue;
+        }
         const std::string* name = strings.name_of(network::StringCategory::type, snapshot.type_id);
         const auto entity = _world.spawn();
         _world.add(entity,
