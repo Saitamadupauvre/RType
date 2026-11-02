@@ -130,16 +130,16 @@ FieldDescriptor rotation_degrees_field() {
         });
 }
 
-FieldDescriptor scale_factor_field() {
+template <float Vec2::* Axis> FieldDescriptor scale_axis_field(std::string name) {
     return component_field<Scale>(
-        "factor", FieldKind::Vec2, field_flags::replicated,
-        [](const Scale& scale) { return FieldValue{scale.factor}; },
+        std::move(name), FieldKind::Float, field_flags::replicated,
+        [](const Scale& scale) { return FieldValue{scale.factor.*Axis}; },
         [](Scale& scale, const FieldValue& value) {
-            const auto factor = std::get<Vec2>(value);
-            if (!std::isfinite(factor.x) || !std::isfinite(factor.y)) {
+            const auto factor = std::get<float>(value);
+            if (!std::isfinite(factor)) {
                 throw std::out_of_range("scale must be finite");
             }
-            scale.factor = factor;
+            scale.factor.*Axis = factor;
         });
 }
 
@@ -321,7 +321,7 @@ void register_core_fields(FieldRegistry& registry) {
                           camera_bounds_origin_field(), camera_bounds_size_field()},
                          required<Position>);
     registry.add<Rotation>("Rotation", {rotation_degrees_field()});
-    registry.add<Scale>("Scale", {scale_factor_field()});
+    registry.add<Scale>("Scale", {scale_axis_field<&Vec2::x>("x"), scale_axis_field<&Vec2::y>("y")});
 }
 
 } // namespace engine::core
