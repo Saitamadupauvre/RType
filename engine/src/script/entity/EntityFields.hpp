@@ -11,13 +11,13 @@
 
 namespace engine::script {
 
-enum class AliasShape : std::uint8_t { Whole, AxisX, AxisY, Size, Area };
+enum class AliasShape : std::uint8_t { Whole, AxisX, AxisY, Size, Area, Factor };
 
 struct FieldAlias {
     std::string_view name;
     std::string_view component;
     std::string_view field;
-    std::string_view size_field{};
+    std::string_view paired_field{};
     AliasShape shape = AliasShape::Whole;
     bool (*lacks_defaults)(const core::EntityManager&, core::Entity) = nullptr;
     void (*apply_defaults)(core::EntityManager&, core::Entity) = nullptr;
@@ -45,7 +45,7 @@ private:
     struct Binding {
         FieldAlias alias;
         core::FieldRef field;
-        core::FieldRef size;
+        core::FieldRef paired;
     };
 
     [[nodiscard]] const Binding* find(std::string_view name) const;
@@ -53,6 +53,10 @@ private:
                           const Binding& binding) const;
     void write_area(sol::this_state state, core::EntityManager& world, core::Entity entity,
                     const Binding& binding, const sol::object& value) const;
+    sol::object read_factor(sol::this_state state, core::EntityManager& world, core::Entity entity,
+                            const Binding& binding) const;
+    void write_factor(sol::this_state state, core::EntityManager& world, core::Entity entity,
+                      const Binding& binding, const sol::object& value) const;
     [[nodiscard]] core::FieldRef require(sol::this_state state, std::string_view component,
                                          std::string_view field) const;
     sol::object read_field(sol::this_state state, core::EntityManager& world, core::Entity entity,

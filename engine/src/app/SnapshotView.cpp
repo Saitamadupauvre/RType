@@ -6,6 +6,7 @@
 #include "CameraRig.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
+#include "engine/core/Transform.hpp"
 #include "engine/core/log/Log.hpp"
 
 namespace engine::app {
@@ -15,6 +16,8 @@ SnapshotView::SnapshotView(graphics::IRenderer& renderer, std::filesystem::path 
     : _fields(fields), _draw(renderer, std::move(assets)) {
     _world.register_component<core::Position>();
     _world.register_component<core::Sprite>();
+    _world.register_component<core::Rotation>();
+    _world.register_component<core::Scale>();
 }
 
 std::string SnapshotView::sprite_of(const std::string& type_name) {

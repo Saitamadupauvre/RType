@@ -176,8 +176,8 @@ TEST_F(ClientAppTest, DrawsTheEntitiesOfTheServer) {
     play(session_frames);
 
     ASSERT_EQ(_renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.x, 10.F);
-    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.y, 20.F);
+    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.x - _renderer.sprites.front().origin.x, 10.F);
+    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.y - _renderer.sprites.front().origin.y, 20.F);
     EXPECT_EQ(_renderer.sprites.front().tint, (Color{.r = 10, .g = 20, .b = 30, .a = 255}));
 }
 
@@ -205,7 +205,7 @@ TEST_F(ClientAppTest, SceneCameraIsUsedAndNotDrawn) {
     EXPECT_EQ(_renderer.views.front(),
               (engine::core::CameraView{.center = {400.F, 300.F}, .zoom = 2.F}));
     ASSERT_EQ(_renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.x, 10.F);
+    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.x - _renderer.sprites.front().origin.x, 10.F);
 }
 
 TEST_F(ClientAppTest, ClientCameraOverrideIsLocal) {

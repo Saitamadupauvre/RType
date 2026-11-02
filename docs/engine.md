@@ -25,7 +25,7 @@ The foundation every other module builds on.
 |---|---|---|
 | Entities | `Entity.hpp`, `EntityPool.hpp` | 32-bit ids with a generation counter: a recycled id never matches a destroyed entity |
 | Components | `ComponentPool.hpp`, `ComponentTypeId.hpp`, `EntityManager.hpp`, `ComponentQuery.hpp` | Sparse-set pools, `spawn`/`kill`/`add`/`get`/`has`, `query<A, B>().each(...)` |
-| Common components | `Components.hpp`, `ComponentPhysics.hpp` | `Position`, `Sprite` (path + colour), `Tags` |
+| Common components | `Components.hpp`, `ComponentPhysics.hpp`, `Transform.hpp` | `Position`, `Sprite` (path + colour), `Tags`, optional `Rotation` and `Scale` read with `rotation_of` / `scale_of`, which return 0 and (1, 1) when the entity has none |
 | Systems | `SystemScheduler.hpp` | Named systems run by ascending order; one that throws is disabled and logged, the others keep running |
 | Events | `event/EventBus.hpp` | Typed publish/subscribe; a `Subscription` unsubscribes when destroyed |
 | Time | `time/IClock.hpp`, `SteadyClock.hpp`, `ManualClock.hpp`, `FixedStepLoop.hpp` | Fixed-step loop (60 Hz by default) over an injectable clock, so tests control time |

@@ -104,7 +104,7 @@ TEST(SnapshotView, DrawsEachEntityWithTheSpriteOfItsTypeAndItsColor) {
     EXPECT_EQ(renderer.loaded.front(),
               (std::filesystem::path("assets") / "sprites/ship.png").string());
     ASSERT_EQ(renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 5.F);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 5.F);
     EXPECT_EQ(renderer.sprites.front().tint, (Color{.r = 10, .g = 20, .b = 30, .a = 255}));
 }
 
@@ -128,7 +128,7 @@ TEST(SnapshotView, DrawsOnlyTheNewestSnapshot) {
     view.draw({entity(ship_type, 90.F, 0)}, strings);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 90.F);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 90.F);
 }
 
 TEST(SnapshotView, EntityWithoutColorIsDrawnWhite) {
@@ -151,7 +151,7 @@ TEST(SnapshotView, IgnoresFieldsOfComponentsItDoesNotDraw) {
     view.draw({entity(ship_type, 5.F, 1'000)}, strings);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 5.F);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 5.F);
 }
 
 TEST(SnapshotView, CameraEntitiesAreNotDrawn) {
@@ -165,6 +165,35 @@ TEST(SnapshotView, CameraEntitiesAreNotDrawn) {
     view.draw({camera, entity(ship_type, 40.F, 0)}, strings);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 40.F);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 40.F);
     EXPECT_TRUE(renderer.rects.empty());
+}
+
+TEST(SnapshotView, EntityWithoutRotationOrScaleIsDrawnUpright) {
+    RecordingRenderer renderer;
+    SnapshotView view(renderer, "assets", fields);
+
+    view.draw({entity(ship_type, 5.F, 0)}, strings);
+
+    ASSERT_EQ(renderer.sprites.size(), 1U);
+    EXPECT_EQ(renderer.sprites.front().rotation, 0.F);
+    EXPECT_EQ(renderer.sprites.front().dest,
+              (Rect{.x = 53.F, .y = 38.F, .width = 96.F, .height = 36.F}));
+}
+
+TEST(SnapshotView, ReplicatedRotationAndScaleAreDrawn) {
+    RecordingRenderer renderer;
+    SnapshotView view(renderer, "assets", fields);
+    EntitySnapshot turned = entity(ship_type, 5.F, 0);
+    turned.fields.push_back(value_of("Rotation", "degrees", 30.F));
+    turned.fields.push_back(value_of("Scale", "x", -2.F));
+    turned.fields.push_back(value_of("Scale", "y", 0.5F));
+
+    view.draw({turned}, strings);
+
+    ASSERT_EQ(renderer.sprites.size(), 1U);
+    const SpriteDraw& drawn = renderer.sprites.front();
+    EXPECT_EQ(drawn.rotation, 30.F);
+    EXPECT_EQ(drawn.source, (Rect{.x = 0.F, .y = 0.F, .width = -96.F, .height = 36.F}));
+    EXPECT_EQ(drawn.dest, (Rect{.x = 101.F, .y = 29.F, .width = 192.F, .height = 18.F}));
 }

@@ -220,6 +220,15 @@ float number_from_lua(sol::this_state state, const sol::object& value, std::stri
     return finite_float(state, value.as<double>(), field);
 }
 
+core::Vec2 factor_from_lua(sol::this_state state, const sol::object& value, std::string_view name) {
+    const ValueName field = entity_field(name);
+    if (value.get_type() == sol::type::number) {
+        const float uniform = finite_float(state, value.as<double>(), field);
+        return core::Vec2{uniform, uniform};
+    }
+    return vec2_from_lua(state, value, field);
+}
+
 sol::object size_to_lua(sol::this_state state, core::Vec2 size) {
     return sol::state_view(state).create_table_with("w", size.x, "h", size.y);
 }

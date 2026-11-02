@@ -325,6 +325,15 @@ class IRenderer {
     virtual Vec2 measure_text(const std::string&, float size) const = 0;
 };
 
+struct SpriteDraw {
+    TextureId texture;
+    Rect source;          // texture pixels; a negative width or height mirrors the sprite
+    Rect dest;            // dest.x, dest.y is where origin lands
+    Vec2 origin;          // pivot, relative to the top-left of the drawn rectangle
+    float rotation = 0;   // degrees around origin, clockwise on screen
+    Color tint;
+};
+
 class IInput {   // raw keys; the engine's InputMap turns them into actions
     virtual bool is_key_down(Key) const = 0;
     virtual bool is_key_pressed(Key) const = 0;
@@ -516,7 +525,7 @@ Both forms produce the same internal representation.
 
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds` | C++ component pools | Movement, collisions, rendering, replication |
+| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `rotation`, `scale`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds` | C++ component pools | Movement, collisions, rendering, replication |
 | Free fields | `health`, `speed`, `points`, `waypoints` | Lua table of the entity | Scripts only |
 | Callbacks | `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
@@ -530,6 +539,8 @@ Free fields holding a table are the exception: each entity gets its own deep cop
 ```lua
 self.x, self.y      -- position (native)
 self.vx, self.vy    -- velocity: moved by the C++ engine every tick, nil until set
+self.rotation       -- degrees, clockwise (native), nil until set
+self.scale          -- { x, y } factor (native), nil until set
 self.age            -- seconds since spawn (read-only)
 self.id             -- unique id (read-only)
 self.type           -- declared name, e.g. "bydo" (read-only)
@@ -546,6 +557,16 @@ self:move_to(x, y, duration)  -- inside a coroutine
 ```
 
 `sprite` is a path relative to `assets/`. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a square of that color (temporary, until the renderer API lands). It reads back as a new table.
+
+`rotation` turns the sprite, in degrees clockwise, around its center. `scale` takes a number for both axes (`scale = 2`) or a table `{ x = .., y = .. }`; a negative factor mirrors the sprite (`scale = { x = -1, y = 1 }` faces it the other way) and `0` hides it. The scaled sprite keeps its top-left corner at `x`, `y`. Both are optional: an entity without them is drawn upright at the size of its texture and sends nothing over the network for them. `scale` always reads back as a new `{ x, y }` table. Both are replicated and editable, so the editor, scene files and snapshots carry them; the scale travels as two floats, so fractional factors reach clients exactly. Colliders do not follow them yet: `hitbox` stays exactly as written, whatever the rotation or scale. An entity drawn as a colored square (no `sprite`) is scaled but never rotated.
+
+```lua
+entity "boss" {
+    sprite   = "sprites/boss.png",
+    scale    = 3,
+    rotation = 15,
+}
+```
 
 `hitbox = { w, h }` gives the entity a rectangular collider of positive size, anchored at its top-left `x`, `y` (the same corner the sprite is drawn from). `collides_with` is an array of tags: the entity's `on_collide(self, other)` is called on every tick its hitbox overlaps (strictly, touching edges do not count) the hitbox of an entity carrying one of those tags. Both read back as new tables, and both can change at any time, like `tags`. Collisions are one-sided: a missile with `collides_with = { "enemy" }` and an enemy with `collides_with = { "missile" }` each get their own call; an enemy without `collides_with` is never told. Both calls of a pair run even if the first destroys an entity, but an entity destroyed earlier in the tick gets no further collision. Detection runs in C++ (`engine-physics`) after every `update`, so it costs nothing in Lua.
 
@@ -576,7 +597,7 @@ entity "main_camera" {
 }
 ```
 
-Native fields are aliases of component fields declared in the engine's field registry: `x` / `y` are the axes of `Position.pos`, `vx` / `vy` of `PhysicsBody.velocity`, `sprite` is `Sprite.path`, `color` is `Sprite.color`, `tags` is `Tags.labels`, `hitbox` is `AABBCollider.size`, `collides_with` is `CollidesWith.labels`, `zoom` is `Camera.zoom`, `follow` is `Camera.follow` and `bounds` is `Camera.bounds_origin` with `Camera.bounds_size`. `get_field` / `set_field` reach every other registered field by component and field name, with the same conversions:
+Native fields are aliases of component fields declared in the engine's field registry: `x` / `y` are the axes of `Position.pos`, `vx` / `vy` of `PhysicsBody.velocity`, `sprite` is `Sprite.path`, `color` is `Sprite.color`, `rotation` is `Rotation.degrees`, `scale` is `Scale.x` with `Scale.y`, `tags` is `Tags.labels`, `hitbox` is `AABBCollider.size`, `collides_with` is `CollidesWith.labels`, `zoom` is `Camera.zoom`, `follow` is `Camera.follow` and `bounds` is `Camera.bounds_origin` with `Camera.bounds_size`. `get_field` / `set_field` reach every other registered field by component and field name, with the same conversions:
 
 | Field kind | Lua value |
 |---|---|

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "engine/core/Keys.hpp"
+#include "engine/core/Vec2.hpp"
 
 namespace engine::graphics {
 
@@ -42,10 +43,21 @@ struct TextureId {
 struct SpriteDraw {
     /** @brief Texture to draw; the default value draws the placeholder texture. */
     TextureId texture;
-    /** @brief Region of the texture to draw, in texture pixels. */
+    /** @brief Region of the texture to draw, in texture pixels; a negative size mirrors it. */
     Rect source;
-    /** @brief Where the region is drawn, in virtual units; it is stretched to fit. */
+    /**
+     * @brief Where the region is drawn, in virtual units; it is stretched to fit.
+     *
+     * @note dest.x and dest.y give where @ref origin lands, not the top-left corner.
+     */
     Rect dest;
+    /**
+     * @brief Point of the drawn rectangle, relative to its top-left corner, placed at dest.x and
+     * dest.y and used as the pivot of @ref rotation.
+     */
+    core::Vec2 origin;
+    /** @brief Rotation around @ref origin, in degrees, clockwise on screen. */
+    float rotation{0.F};
     /** @brief Color multiplied with the texture; white keeps it unchanged. */
     Color tint{.r = 255, .g = 255, .b = 255, .a = 255};
 };

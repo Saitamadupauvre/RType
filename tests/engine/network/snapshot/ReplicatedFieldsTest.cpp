@@ -6,8 +6,10 @@
 
 #include <gtest/gtest.h>
 
+#include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
+#include "engine/core/Transform.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/network/StringTable.hpp"
@@ -170,4 +172,62 @@ TEST(ReplicatedFields, LeavesOutAndLogsValuesTheWireCannotCarry) {
     ASSERT_EQ(sink->records().size(), 2U);
     EXPECT_NE(sink->records()[0].message.find("'Body.spin'"), std::string::npos);
     EXPECT_NE(sink->records()[1].message.find("'Label.text'"), std::string::npos);
+}
+
+namespace {
+
+FieldRegistry core_registry() {
+    FieldRegistry registry;
+    engine::core::register_core_fields(registry);
+    return registry;
+}
+
+class CoreReplicatedFieldsTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        _world.register_component<engine::core::Position>();
+        _world.register_component<engine::core::Rotation>();
+        _world.register_component<engine::core::Scale>();
+        _entity = _world.spawn();
+        _world.add(_entity, engine::core::Position{1.F, 2.F});
+    }
+
+    [[nodiscard]] std::vector<std::string> sent_names() {
+        std::vector<std::string> names;
+        for (const FieldState& state : _fields.read(_world, _entity)) {
+            const std::string* name = _strings.name_of(StringCategory::field, state.field_id);
+            names.push_back(name == nullptr ? "" : *name);
+        }
+        return names;
+    }
+
+    FieldRegistry _registry = core_registry();
+    StringTable _strings;
+    ReplicatedFields _fields{_registry, _strings};
+    engine::core::EntityManager _world;
+    engine::core::Entity _entity{0, 0};
+};
+
+} // namespace
+
+TEST_F(CoreReplicatedFieldsTest, EntityWithoutRotationOrScaleSendsNeither) {
+    EXPECT_EQ(sent_names(), std::vector<std::string>{"Position.pos"});
+}
+
+TEST_F(CoreReplicatedFieldsTest, EntityWithRotationAndScaleSendsBoth) {
+    _world.add(_entity, engine::core::Rotation{.degrees = 45.F});
+    _world.add(_entity, engine::core::Scale{.factor = {-1.F, 0.25F}});
+
+    const auto states = _fields.read(_world, _entity);
+
+    EXPECT_EQ(sent_names(),
+              (std::vector<std::string>{"Position.pos", "Rotation.degrees", "Scale.x", "Scale.y"}));
+    ASSERT_EQ(states.size(), 4U);
+    EXPECT_EQ(states[1].value, FieldValue{45.F});
+    EXPECT_EQ(states[2].value, FieldValue{-1.F});
+    EXPECT_EQ(states[3].value, FieldValue{0.25F});
+}
+
+TEST_F(CoreReplicatedFieldsTest, CoreFieldsFitInOneSnapshot) {
+    EXPECT_TRUE(_fields.error().empty()) << _fields.error();
 }

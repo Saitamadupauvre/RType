@@ -284,5 +284,6 @@ TEST_F(ServerNetworkTest, ConnectAcceptNamesEveryReplicatedField) {
     }
     EXPECT_EQ(names, (std::vector<std::string>{"Position.pos", "Sprite.color", "Camera.zoom",
                                                "Camera.bounds_origin", "Camera.bounds_size",
+                                               "Rotation.degrees", "Scale.x", "Scale.y",
                                                "Replicated.owner"}));
 }
