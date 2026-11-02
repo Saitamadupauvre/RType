@@ -216,15 +216,16 @@ TEST_F(CoreReplicatedFieldsTest, EntityWithoutRotationOrScaleSendsNeither) {
 
 TEST_F(CoreReplicatedFieldsTest, EntityWithRotationAndScaleSendsBoth) {
     _world.add(_entity, engine::core::Rotation{.degrees = 45.F});
-    _world.add(_entity, engine::core::Scale{.factor = {-1.F, 2.F}});
+    _world.add(_entity, engine::core::Scale{.factor = {-1.F, 0.25F}});
 
     const auto states = _fields.read(_world, _entity);
 
-    EXPECT_EQ(sent_names(),
-              (std::vector<std::string>{"Position.pos", "Rotation.degrees", "Scale.factor"}));
-    ASSERT_EQ(states.size(), 3U);
+    EXPECT_EQ(sent_names(), (std::vector<std::string>{"Position.pos", "Rotation.degrees",
+                                                      "Scale.x", "Scale.y"}));
+    ASSERT_EQ(states.size(), 4U);
     EXPECT_EQ(states[1].value, FieldValue{45.F});
-    EXPECT_EQ(states[2].value, FieldValue{engine::core::Vec2(-1.F, 2.F)});
+    EXPECT_EQ(states[2].value, FieldValue{-1.F});
+    EXPECT_EQ(states[3].value, FieldValue{0.25F});
 }
 
 TEST_F(CoreReplicatedFieldsTest, CoreFieldsFitInOneSnapshot) {

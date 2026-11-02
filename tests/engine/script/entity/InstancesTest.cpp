@@ -197,12 +197,12 @@ TEST_F(InstancesTest, RoundTripRebuildsTheSameInstances) {
 TEST_F(InstancesTest, RotationAndScaleOverridesRoundTrip) {
     const Entity plain = _scene.spawn("plain");
     _scene.runtime.fields().set(_scene.world, plain, "Rotation", "degrees", FieldValue{90.0F});
-    _scene.runtime.fields().set(_scene.world, plain, "Scale", "factor",
-                                FieldValue{Vec2{-1.0F, 2.0F}});
+    _scene.runtime.fields().set(_scene.world, plain, "Scale", "x", FieldValue{-1.0F});
+    _scene.runtime.fields().set(_scene.world, plain, "Scale", "y", FieldValue{2.0F});
     const std::vector<Instance> captured = _scene.runtime.capture_instances();
     ASSERT_EQ(captured.size(), 1U);
     EXPECT_EQ(override_names(captured[0]),
-              (std::vector<std::string>{"Rotation.degrees", "Scale.factor"}));
+              (std::vector<std::string>{"Rotation.degrees", "Scale.x", "Scale.y"}));
 
     Scene rebuilt;
     const std::vector<InstanceIssue> issues = rebuilt.runtime.spawn_instances(captured);

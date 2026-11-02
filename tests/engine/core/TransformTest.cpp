@@ -72,34 +72,39 @@ protected:
 
 TEST_F(TransformFieldsTest, RegistersReplicatedEditableFields) {
     const FieldRef degrees = registry.find_field("Rotation", "degrees");
-    const FieldRef factor = registry.find_field("Scale", "factor");
     ASSERT_TRUE(degrees);
-    ASSERT_TRUE(factor);
     EXPECT_EQ(degrees.field->kind(), FieldKind::Float);
-    EXPECT_EQ(factor.field->kind(), FieldKind::Vec2);
     EXPECT_TRUE(degrees.field->flags().replicated);
     EXPECT_TRUE(degrees.field->flags().editable);
-    EXPECT_TRUE(factor.field->flags().replicated);
-    EXPECT_TRUE(factor.field->flags().editable);
+    for (const char* axis : {"x", "y"}) {
+        const FieldRef factor = registry.find_field("Scale", axis);
+        ASSERT_TRUE(factor) << axis;
+        EXPECT_EQ(factor.field->kind(), FieldKind::Float);
+        EXPECT_TRUE(factor.field->flags().replicated);
+        EXPECT_TRUE(factor.field->flags().editable);
+    }
 }
 
 TEST_F(TransformFieldsTest, EntityWithoutComponentsCarriesNoField) {
     EXPECT_TRUE(registry.fields_of(world, entity).empty());
     EXPECT_EQ(registry.get(world, entity, "Rotation", "degrees"), std::nullopt);
-    EXPECT_EQ(registry.get(world, entity, "Scale", "factor"), std::nullopt);
+    EXPECT_EQ(registry.get(world, entity, "Scale", "x"), std::nullopt);
 }
 
 TEST_F(TransformFieldsTest, SettingFieldsAddsComponents) {
     registry.set(world, entity, "Rotation", "degrees", 90.F);
-    registry.set(world, entity, "Scale", "factor", Vec2{2.F, 3.F});
+    registry.set(world, entity, "Scale", "x", 2.F);
+    registry.set(world, entity, "Scale", "y", 3.F);
     EXPECT_EQ(world.get<Rotation>(entity).degrees, 90.F);
     EXPECT_EQ(world.get<Scale>(entity).factor, (Vec2{2.F, 3.F}));
     EXPECT_EQ(registry.get(world, entity, "Rotation", "degrees"), FieldValue{90.F});
-    EXPECT_EQ(registry.get(world, entity, "Scale", "factor"), FieldValue{Vec2(2.F, 3.F)});
+    EXPECT_EQ(registry.get(world, entity, "Scale", "x"), FieldValue{2.F});
+    EXPECT_EQ(registry.get(world, entity, "Scale", "y"), FieldValue{3.F});
 }
 
 TEST_F(TransformFieldsTest, AcceptsNegativeAndZeroScale) {
-    registry.set(world, entity, "Scale", "factor", Vec2{-1.F, 0.F});
+    registry.set(world, entity, "Scale", "x", -1.F);
+    registry.set(world, entity, "Scale", "y", 0.F);
     EXPECT_EQ(scale_of(world, entity), (Vec2{-1.F, 0.F}));
 }
 
@@ -112,11 +117,14 @@ TEST_F(TransformFieldsTest, RejectsNonFiniteRotation) {
 }
 
 TEST_F(TransformFieldsTest, RejectsNonFiniteScale) {
-    EXPECT_THROW(registry.set(world, entity, "Scale", "factor", Vec2{not_a_number, 1.F}),
-                 FieldValueOutOfRange);
-    EXPECT_THROW(registry.set(world, entity, "Scale", "factor", Vec2{1.F, infinity}),
-                 FieldValueOutOfRange);
+    EXPECT_THROW(registry.set(world, entity, "Scale", "x", not_a_number), FieldValueOutOfRange);
+    EXPECT_THROW(registry.set(world, entity, "Scale", "y", infinity), FieldValueOutOfRange);
     EXPECT_FALSE(world.has<Scale>(entity));
+}
+
+TEST_F(TransformFieldsTest, SettingOneScaleAxisKeepsTheOtherAtOne) {
+    registry.set(world, entity, "Scale", "x", 0.25F);
+    EXPECT_EQ(scale_of(world, entity), (Vec2{0.25F, 1.F}));
 }
 
 TEST_F(TransformFieldsTest, RejectedValueKeepsPreviousOne) {
