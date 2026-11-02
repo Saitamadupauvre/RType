@@ -63,13 +63,15 @@ SIGTERM, or until the window closes. Everything else is the engine:
   [PROJECT §6](PROJECT.md#6-executables)). Every scripted entity with a
   `sprite` or a `color` is replicated; entities with neither (`game`,
   `bydo_spawner`) stay on the server.
-- `ClientApp` loads the same scripts with the client API, draws each
-  received entity with `assets/sprites/<type>.png` tinted with its colour
-  (unknown sprite → coloured square), plays the sounds and music the server
+- `ClientApp` loads the same scripts with the client API, preloads every
+  texture, sound and music the server lists behind a loading screen, draws each
+  received entity with the `sprite` the server replicates, tinted with its
+  colour (no sprite → coloured square), plays the sounds and music the server
   asks for, and runs the `client = { ... }` code of `main.lua` every tick.
 
-Because the client looks sprites up by type name, **the sprite of a
-replicated entity type must be named `assets/sprites/<type>.png`**.
+The `sprite` of each entity declaration is a path under `assets/` and is
+declared as a texture automatically; a script that switches an entity to
+another image declares it first with `textures { ... }`.
 
 ## Scripts
 

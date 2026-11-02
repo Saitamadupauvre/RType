@@ -62,10 +62,10 @@ hotkeys goes in the `client = { ... }` table of `main.lua` (see
 
 Goal: a "zigzag" Bydo that flies left along a sine wave and takes two hits.
 
-**1. Add its sprite.** The client draws an entity with
-`assets/sprites/<type>.png`, so name the file after the type:
-`assets/sprites/zigzag.png`. Without the file, the client draws the
-placeholder.
+**1. Add its sprite**, e.g. `assets/sprites/zigzag.png`, and set
+`sprite = "sprites/zigzag.png"` in the declaration (step 3): the sprite of a
+declaration is declared as a texture on its own and sent to clients. Without
+the file, the client draws the placeholder.
 
 **2. Add its tunables** to `game/scripts/lib/config.lua`:
 

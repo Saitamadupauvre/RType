@@ -369,13 +369,18 @@ sequenceDiagram
 1. `network.update()`: apply received snapshots and events, retry the
    connection, send heartbeats, detect a silent server. Sounds and musics go to
    the audio backend, named events to the Lua handlers registered with `on`.
-2. Capture every key and mouse button held, and the mouse position, through
+2. Until every asset is loaded: once connected, preload the next 4 textures,
+   sounds and musics of the string table (`AssetPreloader`), apply the audio
+   levels and draw the loading screen (`draw_loading_screen`) instead of
+   steps 3 to 6. See [PROJECT §9.5](PROJECT.md#95-asset-cache).
+3. Capture every key and mouse button held, and the mouse position, through
    `IInput` (`engine::graphics::capture_input`).
-3. In fixed 1/60 s steps: hand the input to Lua (`input`), run the
+4. In fixed 1/60 s steps: hand the input to Lua (`input`), run the
    `client = { ... }` `update(dt)` of `main.lua`, send the input to the server.
-4. Apply the audio levels scripts set with `audio.*`.
-5. Draw every replicated entity with `assets/sprites/<type>.png` tinted with
-   its colour. `SnapshotView` mirrors each entity into a local world by
+5. Apply the audio levels scripts set with `audio.*`.
+6. Draw every replicated entity with its replicated `Sprite.path` (a
+   `texture` id on the wire, loaded once from `assets/`) tinted with its
+   colour. `SnapshotView` mirrors each entity into a local world by
    setting its replicated fields through the field registry, skipping
    components that world does not register (such as `PhysicsBody`).
 
@@ -401,7 +406,7 @@ only handles local concerns such as hotkeys and audio levels.
 | Engine implementation | `engine/src/<module>/` |
 | CMake helpers (`engine_add_module`, `engine_add_plugin`) | `engine/cmake/EngineModule.cmake` |
 | Raylib backends | `plugins/graphics-raylib/src/`, `plugins/audio-raylib/src/` |
-| Generic apps and modes | `engine/src/app/` (`ServerApp`, `ClientApp`, `Launch`, `SnapshotView`, `AudioPlayer`, `Collisions`) |
+| Generic apps and modes | `engine/src/app/` (`ServerApp`, `ClientApp`, `Launch`, `SnapshotView`, `AudioPlayer`, `AssetPreloader`, `LoadingScreen`, `Collisions`) |
 | Entry points | `game/server/`, `game/client/` (`main.cpp`, `Cli`) |
 | Game rules | `game/scripts/` |
 | Tests | `tests/engine/<module>/`, `tests/game/<target>/`, `tests/plugins/<name>/` |
