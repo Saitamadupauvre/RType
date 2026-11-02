@@ -51,9 +51,24 @@ public:
     [[nodiscard]] TextureId load_texture(const std::string&) override { return {.value = 1}; }
     void unload_texture(TextureId) override {}
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {8, 8}; }
-    void begin_frame(Color) override { sprites.clear(); }
-    void end_frame() override { ++frames; }
-    void draw_sprite(const SpriteDraw& sprite) override { sprites.push_back(sprite); }
+    void begin_frame(Color) override {
+        sprites.clear();
+        sprites_in_world.clear();
+        views.clear();
+    }
+    void end_frame() override {
+        in_world = false;
+        ++frames;
+    }
+    void begin_world(const engine::core::CameraView& view) override {
+        views.push_back(view);
+        in_world = true;
+    }
+    void end_world() override { in_world = false; }
+    void draw_sprite(const SpriteDraw& sprite) override {
+        sprites.push_back(sprite);
+        sprites_in_world.push_back(in_world);
+    }
     void draw_rect(const Rect&, Color, bool) override {}
     void draw_circle(Vec2, float, Color) override {}
     void draw_line(Vec2, Vec2, float, Color) override {}
@@ -66,6 +81,9 @@ public:
     int frames{0};
     std::string title;
     std::vector<SpriteDraw> sprites;
+    std::vector<bool> sprites_in_world;
+    std::vector<engine::core::CameraView> views;
+    bool in_world{false};
 };
 
 class FakeInput final : public engine::graphics::IInput {

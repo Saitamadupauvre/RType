@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "engine/core/Camera.hpp"
 #include "engine/core/NonCopyableNonMovable.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/graphics/Export.hpp"
@@ -13,6 +14,8 @@ namespace engine::graphics {
  * @brief Window and frame management provided by a graphics backend.
  *
  * Coordinates are virtual units (see virtual_size()); the backend scales them to the window.
+ * Draw calls are in screen space, unless they happen between begin_world() and end_world(): they
+ * are then in world units, seen through a camera view.
  *
  * @note Every member function must be called from the main thread, the one that called open().
  */
@@ -67,8 +70,34 @@ public:
      */
     virtual void begin_frame(Color clear) = 0;
 
-    /** @brief Presents the frame started by begin_frame(). */
+    /**
+     * @brief Presents the frame started by begin_frame().
+     *
+     * @note Ends world-space drawing first if end_world() was not called.
+     */
     virtual void end_frame() = 0;
+
+    /**
+     * @brief Starts world-space drawing: until end_world(), draw calls take world units and are
+     * transformed by @p view, see world_to_screen().
+     *
+     * @param view Camera view; its zoom must be strictly positive.
+     * @note Calling it again before end_world() replaces the view. Only has an effect between
+     * begin_frame() and end_frame().
+     */
+    virtual void begin_world(const core::CameraView& view) = 0;
+
+    /** @brief Goes back to screen-space drawing. Harmless outside world-space drawing. */
+    virtual void end_world() = 0;
+
+    /**
+     * @return Where the world point @p point is drawn on screen, in virtual units, when drawing
+     * through @p view.
+     */
+    [[nodiscard]] core::Vec2 world_to_screen(const core::CameraView& view, core::Vec2 point) const;
+
+    /** @return The world point drawn at the screen point @p point through @p view. */
+    [[nodiscard]] core::Vec2 screen_to_world(const core::CameraView& view, core::Vec2 point) const;
 
     /**
      * @brief Draws part of a texture.

@@ -28,6 +28,8 @@ public:
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {}; }
     void begin_frame(Color clear) override { last_clear = clear; }
     void end_frame() override { ++frames; }
+    void begin_world(const engine::core::CameraView&) override {}
+    void end_world() override {}
     void draw_sprite(const SpriteDraw&) override {}
     void draw_rect(const Rect&, Color, bool) override {}
     void draw_circle(Vec2, float, Color) override {}
