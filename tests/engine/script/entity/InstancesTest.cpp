@@ -213,8 +213,9 @@ TEST_F(InstancesTest, RotationAndScaleOverridesRoundTrip) {
     rebuilt.world.query<engine::core::Rotation>().each(
         [&](Entity entity, engine::core::Rotation&) { spawned = entity; });
     ASSERT_TRUE(spawned.has_value());
-    EXPECT_FLOAT_EQ(engine::core::rotation_of(rebuilt.world, *spawned), 90.0F);
-    EXPECT_EQ(engine::core::scale_of(rebuilt.world, *spawned), (Vec2{-1.0F, 2.0F}));
+    const Entity entity = spawned.value_or(Entity{0});
+    EXPECT_FLOAT_EQ(engine::core::rotation_of(rebuilt.world, entity), 90.0F);
+    EXPECT_EQ(engine::core::scale_of(rebuilt.world, entity), (Vec2{-1.0F, 2.0F}));
 }
 
 TEST_F(InstancesTest, PrefabRotationAndScaleAreNotOverrides) {
