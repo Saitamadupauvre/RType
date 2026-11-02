@@ -282,6 +282,7 @@ TEST_F(ServerNetworkTest, ConnectAcceptNamesEveryReplicatedField) {
     for (const auto& entry : accept->strings.entries(engine::network::StringCategory::field)) {
         names.push_back(entry.name);
     }
-    EXPECT_EQ(names,
-              (std::vector<std::string>{"Position.pos", "Sprite.color", "Replicated.owner"}));
+    EXPECT_EQ(names, (std::vector<std::string>{"Position.pos", "Sprite.color", "Camera.zoom",
+                                               "Camera.bounds_origin", "Camera.bounds_size",
+                                               "Replicated.owner"}));
 }
