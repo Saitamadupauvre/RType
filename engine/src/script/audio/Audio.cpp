@@ -9,6 +9,7 @@
 
 #include "engine/core/log/Log.hpp"
 #include "entity/Entities.hpp"
+#include "loading/NameList.hpp"
 #include "lua/LuaErrors.hpp"
 
 namespace engine::script {
@@ -42,6 +43,10 @@ std::optional<core::Entity> checked_source(sol::this_state state, const sol::obj
     return source.as<EntityHandle>().entity;
 }
 
+constexpr NameRule audio_name_rule{
+    .is_valid = &is_valid_audio_name,
+    .description = "1 to 63 letters, digits, '_', '-' or '.', not starting with '.'"};
+
 } // namespace
 
 bool is_valid_audio_name(std::string_view name) noexcept {
@@ -64,28 +69,13 @@ void Audio::declare(sol::this_state state, std::string_view label, Names& declar
         throw std::runtime_error(
             std::format("{}{} can only be called while the scripts load", where, label));
     }
-    if (names.get_type() != sol::type::table) {
-        throw std::runtime_error(std::format("{}{} expects a list of file names", where, label));
-    }
-    const auto list = names.as<sol::table>();
     Names added;
-    for (std::size_t index = 1; index <= list.size(); ++index) {
-        const sol::object entry = list[index];
-        if (entry.get_type() != sol::type::string) {
+    for (std::string& name : checked_names(state, label, audio_name_rule, names)) {
+        if (declared.contains(name) || added.contains(name)) {
             throw std::runtime_error(
-                std::format("{}{}: entry {} must be a string", where, label, index));
+                std::format("{}{}: '{}' is already declared", where, label, name));
         }
-        auto name = entry.as<std::string>();
-        if (!is_valid_audio_name(name)) {
-            throw std::runtime_error(std::format(
-                "{}{}: '{}' is not a valid file name: 1 to {} letters, digits, '_', '-' or '.', "
-                "not starting with '.'",
-                where, label, name, max_audio_name_length));
-        }
-        if (declared.contains(name) || !added.insert(std::move(name)).second) {
-            throw std::runtime_error(std::format("{}{}: '{}' is already declared", where, label,
-                                                 entry.as<std::string>()));
-        }
+        added.insert(std::move(name));
     }
     declared.merge(added);
 }

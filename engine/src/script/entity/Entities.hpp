@@ -30,7 +30,7 @@ struct HandleField {
 
 class Entities {
 public:
-    Entities(sol::state& lua, const core::FieldRegistry& fields);
+    Entities(sol::state& lua, const core::FieldRegistry& fields, const Textures& textures);
 
     void add_handle_field(std::string name, HandleField field);
     void on_release(std::function<void(core::Entity)> listener);
