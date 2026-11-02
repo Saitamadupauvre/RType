@@ -86,8 +86,8 @@ sol::table copy_table(sol::state& lua, const sol::table& source, TableCopies& co
 
 } // namespace
 
-Entities::Entities(sol::state& lua, const core::FieldRegistry& fields)
-    : _lua(lua), _fields(fields), _methods(lua.create_table()) {
+Entities::Entities(sol::state& lua, const core::FieldRegistry& fields, const Textures& textures)
+    : _lua(lua), _fields(fields, textures), _methods(lua.create_table()) {
     sol::table types = _lua.create_table();
     types.new_usertype<EntityHandle>(
         "EntityHandle", sol::no_constructor, sol::meta_function::index,

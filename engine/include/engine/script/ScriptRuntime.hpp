@@ -222,6 +222,19 @@ public:
     [[nodiscard]] std::vector<std::string> music_names() const;
 
     /**
+     * @brief Lists the textures declared with `textures { ... }`, in ascending order.
+     *
+     * Scripts declare textures while load_scripts() runs, for example
+     * `textures { "sprites/ship.png", "sprites/boss/core.png" }`. The `sprite` of every declared
+     * entity is declared on its own. A name is 1 to 63 bytes of `/`-separated folders and a file,
+     * each made of letters, digits, `_`, `-` or `.` and not starting with `.`. Declaring a name
+     * twice is allowed; an invalid name raises a Lua error and declares none of its call's names.
+     * Setting an entity field to a texture missing from this list raises a Lua error. The order
+     * is stable for a given set of scripts.
+     */
+    [[nodiscard]] std::vector<std::string> texture_names() const;
+
+    /**
      * @brief Lists the events declared with `event "name" { key = "kind", ... }`, in ascending
      * order.
      *

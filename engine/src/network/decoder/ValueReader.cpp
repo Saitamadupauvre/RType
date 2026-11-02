@@ -9,7 +9,7 @@ namespace engine::network {
 
 namespace {
 
-std::optional<core::FieldValue> read_float(ByteReader& reader) {
+std::optional<WireValue> read_float(ByteReader& reader) {
     const auto bits = reader.read_u32();
     if (!bits) {
         return std::nullopt;
@@ -21,7 +21,7 @@ std::optional<core::FieldValue> read_float(ByteReader& reader) {
     return value;
 }
 
-std::optional<core::FieldValue> read_int(ByteReader& reader) {
+std::optional<WireValue> read_int(ByteReader& reader) {
     const auto bits = reader.read_u32();
     if (!bits) {
         return std::nullopt;
@@ -29,7 +29,7 @@ std::optional<core::FieldValue> read_int(ByteReader& reader) {
     return static_cast<std::int64_t>(static_cast<std::int32_t>(*bits));
 }
 
-std::optional<core::FieldValue> read_bool(ByteReader& reader) {
+std::optional<WireValue> read_bool(ByteReader& reader) {
     const auto byte = reader.read_u8();
     if (!byte || *byte > 1) {
         return std::nullopt;
@@ -37,7 +37,7 @@ std::optional<core::FieldValue> read_bool(ByteReader& reader) {
     return *byte == 1;
 }
 
-std::optional<core::FieldValue> read_vec2(ByteReader& reader) {
+std::optional<WireValue> read_vec2(ByteReader& reader) {
     const auto x = reader.read_i16();
     const auto y = reader.read_i16();
     if (!x || !y) {
@@ -46,7 +46,7 @@ std::optional<core::FieldValue> read_vec2(ByteReader& reader) {
     return core::Vec2{static_cast<float>(*x), static_cast<float>(*y)};
 }
 
-std::optional<core::FieldValue> read_color(ByteReader& reader) {
+std::optional<WireValue> read_color(ByteReader& reader) {
     const auto r = reader.read_u8();
     const auto g = reader.read_u8();
     const auto b = reader.read_u8();
@@ -57,20 +57,20 @@ std::optional<core::FieldValue> read_color(ByteReader& reader) {
     return core::Rgba{.r = *r, .g = *g, .b = *b, .a = *a};
 }
 
-std::optional<core::FieldValue> read_string(ByteReader& reader) {
+std::optional<WireValue> read_string(ByteReader& reader) {
     auto text = read_text(reader);
     if (!text) {
         return std::nullopt;
     }
-    return core::FieldValue{std::move(*text)};
+    return WireValue{std::move(*text)};
 }
 
-std::optional<core::FieldValue> read_asset(ByteReader& reader) {
-    auto path = read_text(reader);
-    if (!path) {
+std::optional<WireValue> read_asset(ByteReader& reader) {
+    const auto id = reader.read_u16();
+    if (!id) {
         return std::nullopt;
     }
-    return core::AssetName{std::move(*path)};
+    return AssetId{*id};
 }
 
 } // namespace
@@ -84,7 +84,7 @@ std::optional<std::string> read_text(ByteReader& reader) {
     return std::string(bytes->begin(), bytes->end());
 }
 
-std::optional<core::FieldValue> read_value(ByteReader& reader, std::uint8_t kind) {
+std::optional<WireValue> read_value(ByteReader& reader, std::uint8_t kind) {
     switch (static_cast<core::FieldKind>(kind)) {
     case core::FieldKind::Float:
         return read_float(reader);

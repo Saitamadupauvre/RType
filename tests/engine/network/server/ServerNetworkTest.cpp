@@ -126,7 +126,7 @@ TEST_F(ServerNetworkTest, OneTickConnectsStoresInputsAndSendsSnapshots) {
         ASSERT_EQ(received.front()->entities.size(), 1U);
         const auto& entity = received.front()->entities.front();
         ASSERT_FALSE(entity.fields.empty());
-        const engine::core::FieldValue expected = engine::core::Vec2{12, 0};
+        const engine::network::WireValue expected = engine::core::Vec2{12, 0};
         EXPECT_EQ(entity.fields.front().value, expected);
     }
 }
@@ -282,8 +282,8 @@ TEST_F(ServerNetworkTest, ConnectAcceptNamesEveryReplicatedField) {
     for (const auto& entry : accept->strings.entries(engine::network::StringCategory::field)) {
         names.push_back(entry.name);
     }
-    EXPECT_EQ(names, (std::vector<std::string>{"Position.pos", "Sprite.color", "Camera.zoom",
-                                               "Camera.bounds_origin", "Camera.bounds_size",
-                                               "Rotation.degrees", "Scale.x", "Scale.y",
-                                               "Replicated.owner"}));
+    EXPECT_EQ(names, (std::vector<std::string>{"Position.pos", "Sprite.path", "Sprite.color",
+                                               "Camera.zoom", "Camera.bounds_origin",
+                                               "Camera.bounds_size", "Rotation.degrees", "Scale.x",
+                                               "Scale.y", "Replicated.owner"}));
 }

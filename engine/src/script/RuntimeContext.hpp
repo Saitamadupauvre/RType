@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 
+#include "assets/Textures.hpp"
 #include "audio/Audio.hpp"
 #include "engine/core/FieldRegistry.hpp"
 #include "entity/Entities.hpp"
@@ -24,6 +25,7 @@ public:
     core::FieldRegistry fields;
     sol::state lua;
     sol::table types;
+    Textures textures;
     Entities entities;
     Audio audio;
     Events events;

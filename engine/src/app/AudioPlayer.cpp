@@ -1,8 +1,5 @@
 #include "AudioPlayer.hpp"
 
-#include <algorithm>
-#include <cctype>
-
 #include "engine/core/log/Log.hpp"
 
 namespace engine::app {
@@ -14,19 +11,18 @@ namespace log = core::log;
 constexpr float sound_volume = 1.F;
 constexpr float sound_pitch = 1.F;
 
-bool is_name_character(char character) noexcept {
-    return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_' ||
-           character == '-' || character == '.';
-}
-
 } // namespace
 
-bool is_plain_file_name(const std::string& name) noexcept {
-    return !name.empty() && name.front() != '.' && std::ranges::all_of(name, is_name_character);
-}
-
-AudioPlayer::AudioPlayer(audio::IAudio& audio, const std::filesystem::path& assets)
-    : _audio(audio), _sound_folder(assets / "sounds"), _music_folder(assets / "music") {}
+AudioPlayer::AudioPlayer(audio::IAudio& speakers, const std::filesystem::path& assets)
+    : _audio(speakers),
+      _sounds(
+          assets / "sounds",
+          [&speakers](const std::filesystem::path& path) { return speakers.load_sound(path); },
+          [&speakers](audio::SoundId sound) { speakers.unload_sound(sound); }),
+      _musics(
+          assets / "music",
+          [&speakers](const std::filesystem::path& path) { return speakers.load_music(path); },
+          [&speakers](audio::MusicId music) { speakers.unload_music(music); }) {}
 
 void AudioPlayer::apply(const script::AudioSettings& settings) {
     if (_applied == settings) {
@@ -64,6 +60,14 @@ void AudioPlayer::change_music(const network::StringTable& strings, std::uint16_
     }
 }
 
+bool AudioPlayer::preload_sound(const std::string& name) {
+    return !_audio.get().is_open() || sound(name) != audio::SoundId{};
+}
+
+bool AudioPlayer::preload_music(const std::string& name) {
+    return !_audio.get().is_open() || music(name) != audio::MusicId{};
+}
+
 std::optional<std::string> AudioPlayer::name_of(const network::StringTable& strings,
                                                 network::StringCategory category,
                                                 std::uint16_t id) {
@@ -73,35 +77,15 @@ std::optional<std::string> AudioPlayer::name_of(const network::StringTable& stri
         log::warn("client: ignored unknown {} id {}", kind, id);
         return std::nullopt;
     }
-    if (!is_plain_file_name(*name)) {
-        log::warn("client: ignored {} '{}': not a plain file name", kind, *name);
-        return std::nullopt;
-    }
     return *name;
 }
 
 audio::SoundId AudioPlayer::sound(const std::string& name) {
-    if (const auto loaded = _sounds.find(name); loaded != _sounds.end()) {
-        return loaded->second;
-    }
-    if (!_audio.get().is_open()) {
-        return {};
-    }
-    const auto id = _audio.get().load_sound(_sound_folder / name);
-    _sounds.emplace(name, id);
-    return id;
+    return _audio.get().is_open() ? _sounds.get(name) : audio::SoundId{};
 }
 
 audio::MusicId AudioPlayer::music(const std::string& name) {
-    if (const auto loaded = _musics.find(name); loaded != _musics.end()) {
-        return loaded->second;
-    }
-    if (!_audio.get().is_open()) {
-        return {};
-    }
-    const auto id = _audio.get().load_music(_music_folder / name);
-    _musics.emplace(name, id);
-    return id;
+    return _audio.get().is_open() ? _musics.get(name) : audio::MusicId{};
 }
 
 } // namespace engine::app

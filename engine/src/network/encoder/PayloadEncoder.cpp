@@ -10,6 +10,7 @@
 #include "bytes/ByteWriter.hpp"
 #include "protocol/FieldWire.hpp"
 #include "protocol/Validation.hpp"
+#include "protocol/WireValue.hpp"
 
 namespace engine::network {
 
@@ -59,15 +60,11 @@ void write_value(ByteWriter& writer, const core::Rgba& value) {
     writer.write_u8(value.a);
 }
 
-void write_value(ByteWriter& writer, const core::AssetName& value) {
-    write_text(writer, value.path);
-}
+void write_value(ByteWriter& writer, AssetId value) { writer.write_u16(value.value); }
 
-void write_value(ByteWriter&, const core::FieldList&) {}
-
-void write_tagged_value(ByteWriter& writer, std::uint16_t id, const core::FieldValue& value) {
+void write_tagged_value(ByteWriter& writer, std::uint16_t id, const WireValue& value) {
     writer.write_u16(id);
-    writer.write_u8(static_cast<std::uint8_t>(core::kind_of(value)));
+    writer.write_u8(static_cast<std::uint8_t>(kind_of(value)));
     std::visit([&writer](const auto& held) { write_value(writer, held); }, value);
 }
 

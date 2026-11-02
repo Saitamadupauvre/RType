@@ -8,6 +8,7 @@
 
 #include "protocol/FieldWire.hpp"
 #include "protocol/Protocol.hpp"
+#include "protocol/WireValue.hpp"
 
 namespace engine::network {
 
@@ -72,20 +73,27 @@ void ReplicatedFields::fail(std::string error) {
     _fields.clear();
 }
 
-std::vector<FieldState> ReplicatedFields::read(core::EntityManager& world,
-                                               core::Entity entity) const {
+std::vector<FieldState> ReplicatedFields::read(core::EntityManager& world, core::Entity entity,
+                                               const StringTable& strings) const {
     std::vector<FieldState> states;
     for (const ReplicatedField& replicated : _fields) {
-        auto value = _registry.get().get(world, entity, replicated.field);
+        const auto value = _registry.get().get(world, entity, replicated.field);
         if (!value) {
             continue;
         }
-        if (!fits_wire(*value)) {
+        auto wire = to_wire(*value, strings);
+        if (!wire) {
+            core::log::warn("network: field '{}' of entity {} cannot be sent: not in the string "
+                            "table",
+                            wire_field_name(replicated.field), entity.index());
+            continue;
+        }
+        if (!fits_wire(*wire)) {
             core::log::warn("network: field '{}' of entity {} cannot be sent: value out of range",
                             wire_field_name(replicated.field), entity.index());
             continue;
         }
-        states.push_back(FieldState{.field_id = replicated.id, .value = std::move(*value)});
+        states.push_back(FieldState{.field_id = replicated.id, .value = std::move(*wire)});
     }
     return states;
 }

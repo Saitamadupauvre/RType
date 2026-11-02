@@ -11,23 +11,19 @@
 #include "engine/core/FieldRegistry.hpp"
 #include "engine/graphics/IRenderer.hpp"
 #include "engine/network/Client.hpp"
-#include "engine/network/StringTable.hpp"
 
 namespace engine::app {
 
 class ENGINE_APP_EXPORT SnapshotView {
 public:
-    SnapshotView(graphics::IRenderer& renderer, std::filesystem::path assets,
+    SnapshotView(graphics::IRenderer& renderer, const std::filesystem::path& assets,
                  const core::FieldRegistry& fields);
 
-    void draw(const std::vector<network::EntitySnapshot>& entities,
-              const network::StringTable& strings);
-
-    [[nodiscard]] static std::string sprite_of(const std::string& type_name);
+    void draw(const std::vector<network::EntitySnapshot>& entities);
+    bool preload_texture(const std::string& texture);
 
 private:
-    void mirror(const std::vector<network::EntitySnapshot>& entities,
-                const network::StringTable& strings);
+    void mirror(const std::vector<network::EntitySnapshot>& entities);
     void apply(core::Entity entity, const network::EntitySnapshot& snapshot);
 
     const core::FieldRegistry& _fields;

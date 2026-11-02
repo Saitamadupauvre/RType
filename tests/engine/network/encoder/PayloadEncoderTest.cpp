@@ -10,11 +10,9 @@
 #include "PayloadSamples.hpp"
 #include "encoder/PayloadEncoder.hpp"
 
-using engine::core::AssetName;
-using engine::core::FieldList;
-using engine::core::FieldValue;
 using engine::core::Rgba;
 using engine::core::Vec2;
+using engine::network::AssetId;
 using engine::network::ConnectRequestPayload;
 using engine::network::DisconnectPayload;
 using engine::network::DisconnectReason;
@@ -30,6 +28,7 @@ using engine::network::snapshot_prefix_size;
 using engine::network::SnapshotPayload;
 using engine::network::SoundEvent;
 using engine::network::StringCategory;
+using engine::network::WireValue;
 using payload_samples::accept_with;
 using payload_samples::encoded;
 using payload_samples::long_name_strings;
@@ -42,14 +41,14 @@ namespace {
 
 constexpr std::size_t first_field_offset = 6 + 7 + 2;
 
-SnapshotPayload snapshot_of_field(FieldValue value) {
+SnapshotPayload snapshot_of_field(WireValue value) {
     return {.server_tick = 1,
             .entities = {EntityState{.entity_id = 1,
                                      .type_id = 1,
                                      .fields = {{.field_id = 1, .value = std::move(value)}}}}};
 }
 
-std::vector<std::uint8_t> encoded_field(FieldValue value) {
+std::vector<std::uint8_t> encoded_field(WireValue value) {
     const auto bytes = encoded(snapshot_of_field(std::move(value)));
     if (bytes.size() < first_field_offset) {
         return {};
@@ -161,18 +160,11 @@ TEST(EventPayload, EncoderRejectsNamedEventsBreakingTheLimits) {
         .name_id = 1,
         .arguments = {
             {.key_id = 1, .value = std::string(engine::network::max_event_text_length + 1, 'a')}}};
-    const NamedEventState long_asset{
-        .name_id = 1,
-        .arguments = {{.key_id = 1,
-                       .value = engine::core::AssetName{
-                           std::string(engine::network::max_event_text_length + 1, 'a')}}}};
     const NamedEventState infinite{
         .name_id = 1,
         .arguments = {{.key_id = 1, .value = std::numeric_limits<float>::infinity()}}};
-    const NamedEventState list{.name_id = 1,
-                               .arguments = {{.key_id = 1, .value = engine::core::FieldList{}}}};
 
-    for (const auto& event : {too_many, repeated_key, long_text, long_asset, infinite, list}) {
+    for (const auto& event : {too_many, repeated_key, long_text, infinite}) {
         EXPECT_FALSE(encode_payload(EventPayload{event}).has_value());
     }
 }
@@ -259,9 +251,13 @@ TEST(SnapshotPayload, EncodesBoolAsOneByte) {
     EXPECT_EQ(encoded_field(false), (std::vector<std::uint8_t>{0x02, 0x00}));
 }
 
-TEST(SnapshotPayload, EncodesStringAndAssetWithTheirLength) {
+TEST(SnapshotPayload, EncodesStringWithItsLength) {
     EXPECT_EQ(encoded_field(std::string("ab")), (std::vector<std::uint8_t>{0x03, 0x02, 'a', 'b'}));
-    EXPECT_EQ(encoded_field(AssetName{"c"}), (std::vector<std::uint8_t>{0x06, 0x01, 'c'}));
+}
+
+TEST(SnapshotPayload, EncodesAssetAsSixteenBitId) {
+    EXPECT_EQ(encoded_field(AssetId{0x0102}), (std::vector<std::uint8_t>{0x06, 0x01, 0x02}));
+    EXPECT_EQ(encoded_field(AssetId{}), (std::vector<std::uint8_t>{0x06, 0xFF, 0xFF}));
 }
 
 TEST(SnapshotPayload, RoundsVec2ToWholeCoordinates) {
@@ -284,14 +280,9 @@ TEST(SnapshotPayload, EncoderRejectsTooManyBytes) {
     EXPECT_FALSE(encode_payload(snapshot_with(max_moving_entities + 1)).has_value());
 }
 
-TEST(SnapshotPayload, EncoderRejectsListField) {
-    EXPECT_FALSE(encode_payload(snapshot_of_field(FieldList{})).has_value());
-}
-
 TEST(SnapshotPayload, EncoderRejectsTooLongText) {
     EXPECT_TRUE(encode_payload(snapshot_of_field(std::string(255, 'a'))).has_value());
     EXPECT_FALSE(encode_payload(snapshot_of_field(std::string(256, 'a'))).has_value());
-    EXPECT_FALSE(encode_payload(snapshot_of_field(AssetName{std::string(256, 'a')})).has_value());
 }
 
 TEST(SnapshotPayload, EncoderRejectsNonFiniteFloat) {

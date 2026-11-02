@@ -31,10 +31,12 @@ enum class StringCategory : std::uint8_t {
     field = 5,
     /** @brief Game event argument key: `NamedEvent::Argument::key`, shared by every event. */
     event_key = 6,
+    /** @brief Texture: the value of an asset field, such as `Sprite.path`. */
+    texture = 7,
 };
 
 /** @brief Number of StringCategory values; a category byte at or above it is invalid. */
-inline constexpr std::size_t string_category_count = 7;
+inline constexpr std::size_t string_category_count = 8;
 
 /** @brief Id reserved in every category, never given to a name (`no_music` for musics). */
 inline constexpr std::uint16_t reserved_string_id = 0xFFFF;

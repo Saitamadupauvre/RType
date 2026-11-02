@@ -27,10 +27,12 @@ using engine::core::FieldList;
 using engine::core::FieldRegistry;
 using engine::core::FieldValue;
 using engine::core::field_flags::replicated;
+using engine::network::AssetId;
 using engine::network::FieldState;
 using engine::network::ReplicatedFields;
 using engine::network::StringCategory;
 using engine::network::StringTable;
+using engine::network::WireValue;
 using test_fields::Body;
 using test_fields::Label;
 
@@ -52,6 +54,16 @@ FieldRegistry wide_registry(std::size_t field_count) {
     }
     FieldRegistry registry;
     registry.add<Wide>("Wide", std::move(fields));
+    return registry;
+}
+
+struct Skin {
+    std::string path;
+};
+
+FieldRegistry skin_registry() {
+    FieldRegistry registry;
+    registry.add<Skin>("Skin", {engine::core::asset_field<&Skin::path>("path", replicated)});
     return registry;
 }
 
@@ -146,10 +158,57 @@ TEST(ReplicatedFields, ReadsOnlyTheComponentsTheEntityOwns) {
     const auto entity = world.spawn();
     world.add(entity, Label{.text = "x", .hidden = false});
 
-    EXPECT_EQ(fields.read(world, entity),
+    EXPECT_EQ(fields.read(world, entity, strings),
               (std::vector<FieldState>{
                   {.field_id = strings.id_of(StringCategory::field, "Label.text").value_or(0),
-                   .value = FieldValue{std::string("x")}}}));
+                   .value = std::string("x")}}));
+}
+
+TEST(ReplicatedFields, SendsAnAssetAsItsTextureId) {
+    const FieldRegistry registry = skin_registry();
+    StringTable strings;
+    const auto ship = strings.add(StringCategory::texture, "sprites/ship.png");
+    const ReplicatedFields fields(registry, strings);
+    engine::core::EntityManager world;
+    world.register_component<Skin>();
+    const auto entity = world.spawn();
+    world.add(entity, Skin{.path = "sprites/ship.png"});
+
+    const auto states = fields.read(world, entity, strings);
+
+    ASSERT_EQ(states.size(), 1U);
+    EXPECT_EQ(states.front().value, WireValue{AssetId{ship.value_or(0)}});
+}
+
+TEST(ReplicatedFields, SendsAnEmptyAssetAsNoAsset) {
+    const FieldRegistry registry = skin_registry();
+    StringTable strings;
+    const ReplicatedFields fields(registry, strings);
+    engine::core::EntityManager world;
+    world.register_component<Skin>();
+    const auto entity = world.spawn();
+    world.add(entity, Skin{});
+
+    const auto states = fields.read(world, entity, strings);
+
+    ASSERT_EQ(states.size(), 1U);
+    EXPECT_EQ(states.front().value, WireValue{AssetId{engine::network::no_asset}});
+}
+
+TEST(ReplicatedFields, LeavesOutAndLogsATextureMissingFromTheTable) {
+    const auto sink = std::make_shared<logger::MemorySink>();
+    const logger::ScopedSink scoped{sink, logger::Level::Trace};
+    const FieldRegistry registry = skin_registry();
+    StringTable strings;
+    const ReplicatedFields fields(registry, strings);
+    engine::core::EntityManager world;
+    world.register_component<Skin>();
+    const auto entity = world.spawn();
+    world.add(entity, Skin{.path = "sprites/unknown.png"});
+
+    EXPECT_TRUE(fields.read(world, entity, strings).empty());
+    ASSERT_EQ(sink->records().size(), 1U);
+    EXPECT_NE(sink->records()[0].message.find("'Skin.path'"), std::string::npos);
 }
 
 TEST(ReplicatedFields, LeavesOutAndLogsValuesTheWireCannotCarry) {
@@ -164,7 +223,7 @@ TEST(ReplicatedFields, LeavesOutAndLogsValuesTheWireCannotCarry) {
     world.add(entity, Label{.text = std::string(256, 'a'), .hidden = false});
     world.add(entity, Body{.pos = {1.F, 2.F}, .spin = std::numeric_limits<float>::quiet_NaN()});
 
-    const auto states = fields.read(world, entity);
+    const auto states = fields.read(world, entity, strings);
 
     ASSERT_EQ(states.size(), 1U);
     EXPECT_EQ(states.front().field_id,
@@ -194,7 +253,7 @@ protected:
 
     [[nodiscard]] std::vector<std::string> sent_names() {
         std::vector<std::string> names;
-        for (const FieldState& state : _fields.read(_world, _entity)) {
+        for (const FieldState& state : _fields.read(_world, _entity, _strings)) {
             const std::string* name = _strings.name_of(StringCategory::field, state.field_id);
             names.push_back(name == nullptr ? "" : *name);
         }
@@ -218,14 +277,14 @@ TEST_F(CoreReplicatedFieldsTest, EntityWithRotationAndScaleSendsBoth) {
     _world.add(_entity, engine::core::Rotation{.degrees = 45.F});
     _world.add(_entity, engine::core::Scale{.factor = {-1.F, 0.25F}});
 
-    const auto states = _fields.read(_world, _entity);
+    const auto states = _fields.read(_world, _entity, _strings);
 
     EXPECT_EQ(sent_names(),
               (std::vector<std::string>{"Position.pos", "Rotation.degrees", "Scale.x", "Scale.y"}));
     ASSERT_EQ(states.size(), 4U);
-    EXPECT_EQ(states[1].value, FieldValue{45.F});
-    EXPECT_EQ(states[2].value, FieldValue{-1.F});
-    EXPECT_EQ(states[3].value, FieldValue{0.25F});
+    EXPECT_EQ(states[1].value, WireValue{45.F});
+    EXPECT_EQ(states[2].value, WireValue{-1.F});
+    EXPECT_EQ(states[3].value, WireValue{0.25F});
 }
 
 TEST_F(CoreReplicatedFieldsTest, CoreFieldsFitInOneSnapshot) {

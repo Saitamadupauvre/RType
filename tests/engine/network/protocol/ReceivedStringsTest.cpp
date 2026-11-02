@@ -17,6 +17,7 @@ namespace logger = engine::core::log;
 namespace {
 
 using engine::core::Vec2;
+using engine::network::AssetId;
 using engine::network::ConnectAcceptPayload;
 using engine::network::DisconnectPayload;
 using engine::network::EntityState;
@@ -58,6 +59,29 @@ Message snapshot_with_field(FieldState field) {
     return SnapshotPayload{
         .server_tick = 1,
         .entities = {EntityState{.entity_id = 1, .type_id = player_type, .fields = {field}}}};
+}
+
+struct Skin {
+    std::string path;
+};
+
+engine::core::FieldRegistry skin_fields() {
+    engine::core::FieldRegistry registry;
+    registry.add<Skin>("Skin", {engine::core::asset_field<&Skin::path>(
+                                   "path", engine::core::field_flags::replicated)});
+    return registry;
+}
+
+ConnectAcceptPayload accept_with_skin() {
+    return ConnectAcceptPayload{
+        .strings = payload_samples::strings_of(
+            {{.category = StringCategory::type, .id = player_type, .name = "player"},
+             {.category = StringCategory::field, .id = pos_field, .name = "Skin.path"},
+             {.category = StringCategory::texture, .id = 4, .name = "ship.png"}})};
+}
+
+Message skin_snapshot(std::uint16_t texture_id) {
+    return snapshot_with_field({.field_id = pos_field, .value = AssetId{texture_id}});
 }
 
 Message snapshot_of(std::uint16_t first_type, std::uint16_t second_type) {
@@ -229,4 +253,24 @@ TEST_F(ReceivedStrings, DropsSnapshotWithFieldOfAnotherKind) {
 
     expect_dropped_and_logged(snapshot_with_field({.field_id = pos_field, .value = 0.5F}),
                               "field 'Body.pos' expects a vec2, not a float");
+}
+
+TEST_F(ReceivedStrings, AdmitsSnapshotWithAKnownTextureOrNoAsset) {
+    const engine::core::FieldRegistry skins = skin_fields();
+    engine::network::ReceivedStrings skin_table{skins};
+    ASSERT_TRUE(skin_table.assign(accept_with_skin()));
+
+    EXPECT_TRUE(skin_table.admits(skin_snapshot(4)));
+    EXPECT_TRUE(skin_table.admits(skin_snapshot(engine::network::no_asset)));
+    EXPECT_TRUE(sink->records().empty());
+}
+
+TEST_F(ReceivedStrings, DropsSnapshotWithAnUnknownTextureId) {
+    const engine::core::FieldRegistry skins = skin_fields();
+    engine::network::ReceivedStrings skin_table{skins};
+    ASSERT_TRUE(skin_table.assign(accept_with_skin()));
+
+    EXPECT_FALSE(skin_table.admits(skin_snapshot(1)));
+    ASSERT_EQ(sink->records().size(), 1U);
+    EXPECT_NE(sink->records().front().message.find("unknown texture id 1"), std::string::npos);
 }

@@ -94,7 +94,8 @@ core::Vec2 with_axis(core::Vec2 vector, AliasShape shape, float value) {
 
 } // namespace
 
-EntityFields::EntityFields(const core::FieldRegistry& registry) : _registry(registry) {
+EntityFields::EntityFields(const core::FieldRegistry& registry, const Textures& textures)
+    : _registry(registry), _textures(textures) {
     for (const FieldAlias& alias : aliases) {
         _bindings.push_back(Binding{
             .alias = alias,
@@ -254,10 +255,20 @@ sol::object EntityFields::read_field(sol::this_state state, core::EntityManager&
 void EntityFields::write_value(sol::this_state state, core::EntityManager& world,
                                core::Entity entity, core::FieldRef field, std::string_view name,
                                const core::FieldValue& value) const {
+    require_declared_texture(state, name, value);
     try {
         _registry.set(world, entity, field, value);
     } catch (const core::FieldValueOutOfRange& error) {
         fail(state, std::format("entity field '{}': {}", name, error.reason()));
+    }
+}
+
+void EntityFields::require_declared_texture(sol::this_state state, std::string_view name,
+                                            const core::FieldValue& value) const {
+    const auto* asset = std::get_if<core::AssetName>(&value);
+    if (asset != nullptr && !_textures.contains(asset->path)) {
+        fail(state, std::format("entity field '{}': unknown texture '{}', declare it with textures",
+                                name, asset->path));
     }
 }
 

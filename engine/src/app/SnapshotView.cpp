@@ -1,7 +1,6 @@
 #include "SnapshotView.hpp"
 
 #include <stdexcept>
-#include <utility>
 
 #include "CameraRig.hpp"
 #include "engine/core/ComponentPhysics.hpp"
@@ -11,27 +10,23 @@
 
 namespace engine::app {
 
-SnapshotView::SnapshotView(graphics::IRenderer& renderer, std::filesystem::path assets,
+SnapshotView::SnapshotView(graphics::IRenderer& renderer, const std::filesystem::path& assets,
                            const core::FieldRegistry& fields)
-    : _fields(fields), _draw(renderer, std::move(assets)) {
+    : _fields(fields), _draw(renderer, assets) {
     _world.register_component<core::Position>();
     _world.register_component<core::Sprite>();
     _world.register_component<core::Rotation>();
     _world.register_component<core::Scale>();
 }
 
-std::string SnapshotView::sprite_of(const std::string& type_name) {
-    return "sprites/" + type_name + ".png";
-}
-
-void SnapshotView::draw(const std::vector<network::EntitySnapshot>& entities,
-                        const network::StringTable& strings) {
-    mirror(entities, strings);
+void SnapshotView::draw(const std::vector<network::EntitySnapshot>& entities) {
+    mirror(entities);
     _draw.draw(_world);
 }
 
-void SnapshotView::mirror(const std::vector<network::EntitySnapshot>& entities,
-                          const network::StringTable& strings) {
+bool SnapshotView::preload_texture(const std::string& texture) { return _draw.preload(texture); }
+
+void SnapshotView::mirror(const std::vector<network::EntitySnapshot>& entities) {
     for (const auto entity : _mirrored) {
         _world.kill(entity);
     }
@@ -40,10 +35,8 @@ void SnapshotView::mirror(const std::vector<network::EntitySnapshot>& entities,
         if (is_camera(snapshot)) {
             continue;
         }
-        const std::string* name = strings.name_of(network::StringCategory::type, snapshot.type_id);
         const auto entity = _world.spawn();
-        _world.add(entity,
-                   core::Sprite{.path = name == nullptr ? "" : sprite_of(*name), .color = {}});
+        _world.add(entity, core::Sprite{});
         apply(entity, snapshot);
         _mirrored.push_back(entity);
     }

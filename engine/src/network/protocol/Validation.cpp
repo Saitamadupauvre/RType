@@ -63,17 +63,12 @@ bool is_valid(const EntityState& entity) {
            has_unique_fields(entity);
 }
 
-bool fits_event(const core::FieldValue& value) {
+bool fits_event(const WireValue& value) {
     if (!fits_wire(value)) {
         return false;
     }
-    if (const auto* text = std::get_if<std::string>(&value)) {
-        return text->size() <= max_event_text_length;
-    }
-    if (const auto* asset = std::get_if<core::AssetName>(&value)) {
-        return asset->path.size() <= max_event_text_length;
-    }
-    return true;
+    const auto* text = std::get_if<std::string>(&value);
+    return text == nullptr || text->size() <= max_event_text_length;
 }
 
 bool has_unique_keys(const NamedEventState& event) {

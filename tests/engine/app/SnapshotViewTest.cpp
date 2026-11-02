@@ -11,9 +11,9 @@
 #include "SnapshotView.hpp"
 #include "engine/graphics/IRenderer.hpp"
 #include "engine/network/Client.hpp"
-#include "engine/network/StringTable.hpp"
 
 using engine::app::SnapshotView;
+using engine::core::AssetName;
 using engine::core::FieldRegistry;
 using engine::core::FieldValue;
 using engine::core::Rgba;
@@ -24,13 +24,10 @@ using engine::graphics::SpriteDraw;
 using engine::graphics::TextureId;
 using engine::network::EntitySnapshot;
 using engine::network::ReplicatedValue;
-using engine::network::StringCategory;
-using engine::network::StringTable;
 
 namespace {
 
 constexpr std::uint16_t ship_type = 1;
-constexpr std::uint16_t unknown_type = 9;
 constexpr TextureId ship_texture{.value = 3};
 
 class RecordingRenderer final : public engine::graphics::IRenderer {
@@ -66,66 +63,68 @@ public:
     std::vector<Color> rect_colors;
 };
 
-StringTable ship_strings() {
-    StringTable strings;
-    strings.insert({.category = StringCategory::type, .id = ship_type, .name = "ship"});
-    return strings;
-}
-
-const StringTable strings = ship_strings();
 const FieldRegistry fields = engine::app::replicated_fields();
 
 ReplicatedValue value_of(std::string_view component, std::string_view field, FieldValue value) {
     return {.field = fields.find_field(component, field), .value = std::move(value)};
 }
 
-EntitySnapshot entity(std::uint16_t type_id, float x, std::int64_t owner) {
+EntitySnapshot entity(std::string sprite, float x, std::int64_t owner) {
     return {.entity_id = 1,
-            .type_id = type_id,
+            .type_id = ship_type,
             .fields = {value_of("Position", "pos", Vec2{x, 20.F}),
                        value_of("PhysicsBody", "velocity", Vec2{3.F, 0.F}),
                        value_of("Replicated", "owner", owner),
+                       value_of("Sprite", "path", AssetName{std::move(sprite)}),
                        value_of("Sprite", "color", Rgba{.r = 10, .g = 20, .b = 30, .a = 255})}};
 }
 
 } // namespace
 
-TEST(SnapshotView, SpriteIsNamedAfterTheEntityType) {
-    EXPECT_EQ(SnapshotView::sprite_of("bydo"), "sprites/bydo.png");
-}
-
-TEST(SnapshotView, DrawsEachEntityWithTheSpriteOfItsTypeAndItsColor) {
+TEST(SnapshotView, DrawsEachEntityWithItsReplicatedSpriteAndColor) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
 
-    view.draw({entity(ship_type, 5.F, 2)}, strings);
+    view.draw({entity("sprites/boss/core.png", 5.F, 2)});
 
     ASSERT_EQ(renderer.loaded.size(), 1U);
     EXPECT_EQ(renderer.loaded.front(),
-              (std::filesystem::path("assets") / "sprites/ship.png").string());
+              (std::filesystem::path("assets") / "sprites/boss/core.png").string());
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 5.F);
     EXPECT_EQ(renderer.sprites.front().tint, (Color{.r = 10, .g = 20, .b = 30, .a = 255}));
 }
 
-TEST(SnapshotView, EntityOfUnknownTypeIsAColoredSquare) {
+TEST(SnapshotView, EntityWithoutSpriteIsAColoredSquare) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
 
-    view.draw({entity(unknown_type, 5.F, 0)}, strings);
+    view.draw({entity("", 5.F, 0)});
 
+    EXPECT_TRUE(renderer.loaded.empty());
     EXPECT_TRUE(renderer.sprites.empty());
     ASSERT_EQ(renderer.rects.size(), 1U);
     EXPECT_EQ(renderer.rect_colors.front(), (Color{.r = 10, .g = 20, .b = 30, .a = 255}));
 }
 
+TEST(SnapshotView, LoadsASpriteSharedByManyEntitiesOnce) {
+    RecordingRenderer renderer;
+    SnapshotView view(renderer, "assets", fields);
+
+    view.draw({entity("sprites/ship.png", 5.F, 0), entity("sprites/ship.png", 50.F, 0)});
+    view.draw({entity("sprites/ship.png", 90.F, 0)});
+
+    EXPECT_EQ(renderer.loaded.size(), 1U);
+    EXPECT_EQ(renderer.sprites.size(), 3U);
+}
+
 TEST(SnapshotView, DrawsOnlyTheNewestSnapshot) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
-    view.draw({entity(ship_type, 5.F, 0), entity(ship_type, 50.F, 0)}, strings);
+    view.draw({entity("sprites/ship.png", 5.F, 0), entity("sprites/ship.png", 50.F, 0)});
     renderer.sprites.clear();
 
-    view.draw({entity(ship_type, 90.F, 0)}, strings);
+    view.draw({entity("sprites/ship.png", 90.F, 0)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 90.F);
@@ -134,11 +133,13 @@ TEST(SnapshotView, DrawsOnlyTheNewestSnapshot) {
 TEST(SnapshotView, EntityWithoutColorIsDrawnWhite) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
-    EntitySnapshot plain{.entity_id = 1,
-                         .type_id = ship_type,
-                         .fields = {value_of("Position", "pos", Vec2{5.F, 20.F})}};
+    const EntitySnapshot plain{
+        .entity_id = 1,
+        .type_id = ship_type,
+        .fields = {value_of("Position", "pos", Vec2{5.F, 20.F}),
+                   value_of("Sprite", "path", AssetName{"sprites/ship.png"})}};
 
-    view.draw({plain}, strings);
+    view.draw({plain});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_EQ(renderer.sprites.front().tint, (Color{.r = 255, .g = 255, .b = 255, .a = 255}));
@@ -148,7 +149,7 @@ TEST(SnapshotView, IgnoresFieldsOfComponentsItDoesNotDraw) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
 
-    view.draw({entity(ship_type, 5.F, 1'000)}, strings);
+    view.draw({entity("sprites/ship.png", 5.F, 1'000)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 5.F);
@@ -162,7 +163,7 @@ TEST(SnapshotView, CameraEntitiesAreNotDrawn) {
         .type_id = ship_type,
         .fields = {value_of("Position", "pos", Vec2{5.F, 20.F}), value_of("Camera", "zoom", 1.F)}};
 
-    view.draw({camera, entity(ship_type, 40.F, 0)}, strings);
+    view.draw({camera, entity("sprites/ship.png", 40.F, 0)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 40.F);
@@ -173,7 +174,7 @@ TEST(SnapshotView, EntityWithoutRotationOrScaleIsDrawnUpright) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
 
-    view.draw({entity(ship_type, 5.F, 0)}, strings);
+    view.draw({entity("sprites/ship.png", 5.F, 0)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_EQ(renderer.sprites.front().rotation, 0.F);
@@ -184,12 +185,12 @@ TEST(SnapshotView, EntityWithoutRotationOrScaleIsDrawnUpright) {
 TEST(SnapshotView, ReplicatedRotationAndScaleAreDrawn) {
     RecordingRenderer renderer;
     SnapshotView view(renderer, "assets", fields);
-    EntitySnapshot turned = entity(ship_type, 5.F, 0);
+    EntitySnapshot turned = entity("sprites/ship.png", 5.F, 0);
     turned.fields.push_back(value_of("Rotation", "degrees", 30.F));
     turned.fields.push_back(value_of("Scale", "x", -2.F));
     turned.fields.push_back(value_of("Scale", "y", 0.5F));
 
-    view.draw({turned}, strings);
+    view.draw({turned});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     const SpriteDraw& drawn = renderer.sprites.front();

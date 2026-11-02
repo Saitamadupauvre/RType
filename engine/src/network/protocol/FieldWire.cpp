@@ -14,6 +14,7 @@ namespace {
 
 constexpr std::size_t number_size = 4;
 constexpr std::size_t bool_size = 1;
+constexpr std::size_t asset_id_size = 2;
 constexpr std::size_t text_length_size = 1;
 constexpr char component_separator = '.';
 
@@ -26,21 +27,8 @@ struct ValueSize {
     std::size_t operator()(const std::string& text) const noexcept { return text_size(text); }
     std::size_t operator()(const core::Vec2&) const noexcept { return number_size; }
     std::size_t operator()(const core::Rgba&) const noexcept { return number_size; }
-    std::size_t operator()(const core::AssetName& asset) const noexcept {
-        return text_size(asset.path);
-    }
-    std::size_t operator()(const core::FieldList&) const noexcept { return 0; }
+    std::size_t operator()(AssetId) const noexcept { return asset_id_size; }
 };
-
-const std::string* text_of(const core::FieldValue& value) noexcept {
-    if (const auto* text = std::get_if<std::string>(&value)) {
-        return text;
-    }
-    if (const auto* asset = std::get_if<core::AssetName>(&value)) {
-        return &asset->path;
-    }
-    return nullptr;
-}
 
 } // namespace
 
@@ -81,27 +69,23 @@ std::size_t max_wire_size(core::FieldKind kind) noexcept {
     case core::FieldKind::Bool:
         return bool_size;
     case core::FieldKind::String:
-    case core::FieldKind::Asset:
         return text_length_size + max_wire_text_length;
+    case core::FieldKind::Asset:
+        return asset_id_size;
     default:
         return number_size;
     }
 }
 
-bool fits_wire(const core::FieldValue& value) noexcept {
-    if (!is_replicable(core::kind_of(value))) {
-        return false;
-    }
+bool fits_wire(const WireValue& value) noexcept {
     if (const auto* number = std::get_if<float>(&value)) {
         return std::isfinite(*number);
     }
-    const std::string* text = text_of(value);
+    const auto* text = std::get_if<std::string>(&value);
     return text == nullptr || text->size() <= max_wire_text_length;
 }
 
-std::size_t wire_size(const core::FieldValue& value) noexcept {
-    return std::visit(ValueSize{}, value);
-}
+std::size_t wire_size(const WireValue& value) noexcept { return std::visit(ValueSize{}, value); }
 
 std::size_t wire_size(const EntityState& entity) noexcept {
     std::size_t size = entity_header_size;

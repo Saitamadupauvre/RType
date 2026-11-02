@@ -228,16 +228,12 @@ void ClientApp::Impl::frame()
 {
     network.update();                                  // snapshots, events, retries, heartbeats
     audio.update();
-    const auto local = graphics::capture_input(input);
-    loop.run_frame([&](Duration step) {                // fixed 60 Hz
-        client.set_input(local);                       // Lua `input`
-        runtime.update(dt);                            // main.lua client update(dt)
-        network.send_input(local);
-    });
+    const bool playing = assets_ready();               // preloads 4 assets per frame (§9.5)
+    if (playing) {
+        run_ticks();                                   // fixed 60 Hz: Lua `input`, update(dt), send input
+    }
     sound.apply(client.audio_settings());              // Lua `audio`
-    renderer.begin_frame(background);
-    view.draw(network.entities(), network.strings());  // assets/sprites/<type>.png
-    renderer.end_frame();
+    draw(playing);                                     // the game, or the loading screen
 }
 ```
 
@@ -400,6 +396,33 @@ class IAudio {   // engine/include/engine/audio/IAudio.hpp
 - `NullAudio` (in `engine-audio`) plays nothing: the client uses it when the plugin cannot be loaded.
 - Main thread only, like graphics.
 
+### 9.5 Asset cache
+
+The game refers to assets by name; `engine::core::AssetCache<Id>` (`engine/core/AssetCache.hpp`) turns a name into a backend handle. It is built with a folder and a load / unload pair, e.g. `IRenderer::load_texture` / `unload_texture`.
+
+```cpp
+core::AssetCache<graphics::TextureId> textures(assets, load, unload);
+graphics::TextureId ship = textures.get("sprites/ship.png");   // loads assets/sprites/ship.png once
+```
+
+- `get(name)` loads a name the first time and returns the same handle afterwards.
+- A name is a relative path of `/`-separated segments; each segment is non-empty, does not start with `.`, and only holds letters, digits, `_`, `-` and `.`. At most 255 bytes (`is_valid_asset_name`). Absolute paths, `..`, backslashes and hidden files are rejected without touching the backend.
+- A rejected name or a failed load gives the placeholder (default id), is logged once and never retried.
+- `clear()` and the destructor unload every loaded handle; the backend must outlive the cache.
+- Main thread only, like the backends. The client uses one cache for textures (`assets/`), one for sounds (`assets/sounds/`) and one for musics (`assets/music/`).
+- Texture names never travel as text: the scripts declare them (`textures { ... }`, §10.6), the server lists them in the `texture` category of the string table and snapshots carry their 16-bit id. The client turns the id back into the name before asking its cache.
+
+#### Preloading and the loading screen
+
+The client does not show the game until every asset it may need is loaded, so the first explosion or the first enemy of a type never stalls a frame:
+
+- Until `connect_accept` arrives, and then until preloading ends, each frame draws the **loading screen** instead of the game: a bar filled with the progress and a `loaded / total` count above it, drawn with `draw_rect` and `draw_text` only (no asset needed).
+- Once connected, every name of the `texture`, `sound` and `music` categories of the string table is queued and loaded through the caches above, **4 assets per frame** on the main thread. The window stays responsive and the backends stay on their thread.
+- Each frame still runs `NetworkClient::update()`, so heartbeats keep the session alive whatever the total loading time; only a single asset taking longer than the 5 s timeout could end it. Events (sounds, music, script events) are handled as usual. Snapshots are received but not drawn, the scripts' `update(dt)` does not run and no input is sent.
+- A missing or rejected asset is logged once by its cache and counted; when the last asset is done the client logs `client: preloaded N assets, M missing` and the game starts, drawing placeholders for the missing ones. Sounds and musics are skipped while the audio device is closed.
+- Loading on first use stays as the fallback for anything not preloaded.
+- The first game frame comes right after the last asset is loaded, in the same frame.
+
 ---
 
 ## 10. Lua scripting API
@@ -417,6 +440,7 @@ This section is the specification of the Lua API. Not everything is implemented 
 | Native collisions: `engine-physics` detects `hitbox` overlaps in the server tick and calls `on_collide` (see §10.5) | Implemented |
 | Native movement from `vx` / `vy` in the server tick (`engine-physics` integrates the body velocity) | Implemented |
 | `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
+| `textures { ... }`, entity `sprite` replicated to clients by texture id | Implemented (see §10.6) |
 | API sets (`core`, `server`, `client`, `editor`), `server = { ... }` / `client = { ... }` sections, client `on(name, handler)` | Implemented (see §10.10) |
 | Client `input` (`key`, `mouse`, `pointer`, `pressed`) and `audio` (`muted`, `set_muted`, `volume`, `set_volume`) | Implemented (see §10.10) |
 | `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
@@ -556,7 +580,7 @@ self:distance_to(other)
 self:move_to(x, y, duration)  -- inside a coroutine
 ```
 
-`sprite` is a path relative to `assets/`. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a square of that color (temporary, until the renderer API lands). It reads back as a new table.
+`sprite` is a path relative to `assets/`, such as `sprites/boss/core.png`. The `sprite` of an entity declaration is declared as a texture on its own; any other value must be declared with `textures { ... }` (§10.6) or be `""` (no sprite), otherwise the assignment raises an error and the sprite does not change. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a square of that color (temporary, until the renderer API lands). It reads back as a new table.
 
 `rotation` turns the sprite, in degrees clockwise, around its center. `scale` takes a number for both axes (`scale = 2`) or a table `{ x = .., y = .. }`; a negative factor mirrors the sprite (`scale = { x = -1, y = 1 }` faces it the other way) and `0` hides it. The scaled sprite keeps its top-left corner at `x`, `y`. Both are optional: an entity without them is drawn upright at the size of its texture and sends nothing over the network for them. `scale` always reads back as a new `{ x, y }` table. Both are replicated and editable, so the editor, scene files and snapshots carry them; the scale travels as two floats, so fractional factors reach clients exactly. Colliders do not follow them yet: `hitbox` stays exactly as written, whatever the rotation or scale. An entity drawn as a colored square (no `sprite`) is scaled but never rotated.
 
@@ -641,6 +665,10 @@ play("explosion.wav", self)      -- with the entity that makes it
 music("stage1.ogg")              -- loop a declared music, replacing the current one
 music(nil)                       -- stop the music
 
+-- textures (replicated to clients by id)
+textures { "sprites/explosion.png", "sprites/boss/core.png" }   -- declare, while the scripts load
+self.sprite = "sprites/boss/core.png"                           -- any declared texture
+
 -- game events (sent to clients)
 event "explosion" { at = "vec2", size = "float" }   -- declare, while the scripts load
 emit("explosion", { at = { x = self.x, y = self.y }, size = 2 })
@@ -665,10 +693,16 @@ log("message")
 - `play` and `music` with an undeclared name, or with arguments of the wrong type, raise an error. Nothing is played on the server: the requests are queued, and after each tick the server sends them to every client (`sound` and `music` events, see the [protocol](protocol.md)). At most 64 requests are kept per tick.
 - The current music is also sent to players who join later.
 
+**Texture rules.**
+
+- `textures` takes a list of paths relative to `assets/` and can only be called while the scripts load. A name is 1 to 63 bytes of `/`-separated folders and a file, each made of letters, digits, `_`, `-` or `.` and not starting with `.` (no absolute path, no `..`). A bad name raises an error and declares none of the names of that call; declaring a name twice is allowed.
+- The `sprite` of every `entity` declaration is declared automatically; an entity whose `sprite` is not a valid name fails the load.
+- The server sends the declared textures once in `connect_accept`; snapshots then carry `sprite` as a 16-bit texture id, so the client only ever loads files the server declared.
+
 **Event rules.**
 
 - `event "name" { key = "kind", ... }` declares a game event while the scripts load. A name is 1 to 63 letters, digits, `_`, `-` or `.`, starting with a letter (`boss.died`). Keys are Lua identifiers of 1 to 63 characters; kinds are `float`, `int`, `bool`, `string`, `vec2`, `color` or `asset` (no `list`). An event has at most 16 keys. A bad name, key or kind, a name declared twice or a declaration after loading raises an error.
-- `emit(name, arguments)` queues a declared event. `arguments` is a table or `nil`; keys left out are absent from the event. An undeclared event or key, a value of the wrong kind (same conversions as entity fields), a non-finite number, a fractional `int` or a `string`/`asset` longer than 63 bytes raises an error and emits nothing. At most 64 events are kept per tick.
+- `emit(name, arguments)` queues a declared event. `arguments` is a table or `nil`; keys left out are absent from the event. An undeclared event or key, a value of the wrong kind (same conversions as entity fields), a non-finite number, a fractional `int` or a `string`/`asset` longer than 63 bytes raises an error and emits nothing. An `asset` argument travels as a texture id: the server drops, with a warning, an event naming a texture that is not declared. At most 64 events are kept per tick.
 - After each tick the server sends the queued events to every client (`named` events, see the [protocol](protocol.md)), after that tick's sounds and musics. Event names and keys are sent once in `connect_accept`; a client publishes each event on its event bus as `engine::network::NamedEvent`.
 - On the client, `on(name, function(event) ... end)` reacts to a declared event: the function gets a table of the event's arguments (same conversions as entity fields), handlers run in registration order, and an error in one is logged without stopping the others. `on` with an undeclared event or a non-function raises an error.
 
@@ -819,7 +853,7 @@ speed  = 150         -- server only
 
 | Set | Globals and fields | Runtime |
 |---|---|---|
-| `core` | `entity`, `system`, `require`, `sounds`, `musics`, `event`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
+| `core` | `entity`, `system`, `require`, `sounds`, `musics`, `textures`, `event`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
 | `server` | `spawn`, `players`, `find_player`, `play`, `music`, `emit`, `self.input`, `self.owner`, `on_player_joined`, `on_player_left` | server (`core` + `server`) |
 | `client` | `on`, `input`, `audio`, `camera` | client (`core` + `client`) |
 | `editor` | nothing yet | editor (`core` + `editor`) |
@@ -892,7 +926,7 @@ Developers must not use these names for their own fields or methods; the engine 
 - Declaration sections: `server`, `client`.
 - Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`.
 - Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `update`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `textures`.
 
 ### 10.13 Error handling and sandbox
 
@@ -925,7 +959,7 @@ Developers must not use these names for their own fields or methods; the engine 
 - Public engine symbols are marked with the export macro generated by CMake; default visibility is hidden on every platform.
 - No global state in headers (no `static` variables in templates): registries and singletons live in a `.cpp` of `engine-core`, behind exported functions. Component identity uses stable names, not per-module counters.
 - Third-party headers are never included in public engine headers.
-- Resources are referenced by name (`"bydo.png"`); the resource manager loads and caches them.
+- Resources are referenced by name (`"bydo.png"`); the asset cache (§9.5) loads and caches them.
 - Every technical choice is written down with its justification in the [comparative study](comparative-study.md).
 
 ---
