@@ -300,6 +300,15 @@ TEST(ServerApp, ScriptsWithoutAudioHaveNoAudioNames) {
     EXPECT_TRUE(app.strings().entries(StringCategory::music).empty());
 }
 
+TEST(ServerApp, StringTableListsDeclaredTexturesAndEntitySpritesInOrder) {
+    const Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "textures");
+
+    EXPECT_EQ(server.app.strings().entries(StringCategory::texture),
+              (std::vector<StringEntry>{
+                  {.category = StringCategory::texture, .id = 1, .name = "sprites/ship.png"},
+                  {.category = StringCategory::texture, .id = 2, .name = "sprites/shot.png"}}));
+}
+
 TEST(ServerApp, TickPublishesTheMusicStartedByOnStart) {
     Server server(audio_scripts);
     ServerApp& app = server.app;

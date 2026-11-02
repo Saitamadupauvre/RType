@@ -41,12 +41,17 @@ struct ClientAppOptions {
  * @brief Shows any game folder served by a ServerApp: draws the replicated entities, plays the
  * sounds and music the server asks for and sends the local input.
  *
+ * Once the server accepts the connection, every texture, sound and music of its string table is
+ * preloaded, a few per frame, while a loading screen shows the progress; until then the network
+ * keeps running but no tick runs and no snapshot is drawn. A missing asset is logged and drawn as
+ * the placeholder.
+ *
  * Loads the scripts with the client API set. Every frame it reads the network, then on each
  * fixed tick of 1/60 s gives the local input to the scripts (`input`), runs their `update(dt)`
  * and sends that input to the server. Events received from the server reach the handlers
  * registered with `on(name, handler)`; audio levels changed with `audio.*` apply on the same
- * frame. Every entity of the latest snapshot is drawn with its sprite
- * `sprites/<type>.png`, from the asset folder.
+ * frame. Every entity of the latest snapshot is drawn with the sprite the server replicates,
+ * loaded once from the asset folder; an entity without one is drawn as a coloured square.
  *
  * @note Not thread safe: every call must come from the thread owning the renderer.
  */
@@ -81,7 +86,10 @@ public:
      */
     bool start(std::string& error);
 
-    /** @brief Runs one frame: network, fixed ticks, audio and drawing. */
+    /**
+     * @brief Runs one frame: network, then either preloading and the loading screen, or the
+     * fixed ticks, audio and drawing of the game.
+     */
     void frame();
 
     /**

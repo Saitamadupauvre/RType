@@ -240,7 +240,7 @@ void register_core_fields(FieldRegistry& registry) {
     registry.add<Position>("Position",
                            {member_field<&Position::pos>("pos", field_flags::replicated)});
     registry.add<Sprite>("Sprite",
-                         {asset_field<&Sprite::path>("path", field_flags::editable),
+                         {asset_field<&Sprite::path>("path", field_flags::replicated),
                           member_field<&Sprite::color>("color", field_flags::replicated)});
     registry.add<Tags>("Tags",
                        {list_field<Tags>("labels", FieldKind::String, field_flags::editable,

@@ -382,7 +382,7 @@ TEST(CoreFields, RegistersPositionSpriteAndTags) {
     EXPECT_EQ(path.field->kind(), FieldKind::Asset);
     EXPECT_EQ(color.field->kind(), FieldKind::Color);
     EXPECT_EQ(pos.field->flags(), (FieldFlags{.replicated = true, .editable = true}));
-    EXPECT_EQ(path.field->flags(), (FieldFlags{.replicated = false, .editable = true}));
+    EXPECT_EQ(path.field->flags(), (FieldFlags{.replicated = true, .editable = true}));
     EXPECT_EQ(color.field->flags(), (FieldFlags{.replicated = true, .editable = true}));
 }
 

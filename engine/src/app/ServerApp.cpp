@@ -59,6 +59,7 @@ network::StringTable strings_of(const script::ScriptRuntime& runtime) {
     add_all(network::StringCategory::music, runtime.music_names(), "music");
     add_all(network::StringCategory::event, runtime.event_names(), "event");
     add_all(network::StringCategory::event_key, runtime.event_keys(), "event key");
+    add_all(network::StringCategory::texture, runtime.texture_names(), "texture");
     return strings;
 }
 
