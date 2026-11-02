@@ -115,6 +115,7 @@ engine_add_module(audio
 engine_add_module(app
     SOURCES
         src/app/AudioPlayer.cpp
+        src/app/CameraFollow.cpp
         src/app/ClientApp.cpp
         src/app/Collisions.cpp
         src/app/Fields.cpp
