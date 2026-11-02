@@ -36,6 +36,18 @@ using engine::network::to_payload;
 constexpr std::uint16_t explosion_id = 3;
 constexpr std::uint16_t at_key = 1;
 constexpr std::uint16_t size_key = 2;
+constexpr std::uint16_t skin_key = 5;
+constexpr std::uint16_t ship_id = 6;
+
+NamedEvent skinned(std::string texture) {
+    return {.name = "explosion",
+            .arguments = {{.key = "skin", .value = engine::core::AssetName{std::move(texture)}}}};
+}
+
+NamedEventState skinned_state(std::uint16_t texture_id) {
+    return {.name_id = explosion_id,
+            .arguments = {{.key_id = skin_key, .value = engine::network::AssetId{texture_id}}}};
+}
 
 StringTable event_strings() {
     StringTable table;
@@ -45,6 +57,10 @@ StringTable event_strings() {
     EXPECT_TRUE(
         table.insert({.category = StringCategory::event_key, .id = size_key, .name = "size"}));
     EXPECT_TRUE(table.insert({.category = StringCategory::sound, .id = 4, .name = "unrelated"}));
+    EXPECT_TRUE(
+        table.insert({.category = StringCategory::event_key, .id = skin_key, .name = "skin"}));
+    EXPECT_TRUE(
+        table.insert({.category = StringCategory::texture, .id = ship_id, .name = "ship.png"}));
     return table;
 }
 
@@ -161,4 +177,36 @@ TEST_F(GameEventsTest, DropsAReceivedNamedEventWithAnUnknownNameOrKey) {
     EXPECT_TRUE(received.empty());
     EXPECT_TRUE(logged("dropped event with unknown name id 4"));
     EXPECT_TRUE(logged("dropped event 'explosion' with unknown key id 9"));
+}
+
+TEST_F(GameEventsTest, TextureArgumentIsSentAsItsId) {
+    EXPECT_EQ(to_payload(skinned("ship.png"), event_strings()),
+              EventPayload{skinned_state(ship_id)});
+}
+
+TEST_F(GameEventsTest, DropsANamedEventWithAnUndeclaredTexture) {
+    EXPECT_FALSE(to_payload(skinned("boss.png"), event_strings()));
+    EXPECT_TRUE(logged("argument 'skin' is a list or an undeclared texture"));
+}
+
+TEST_F(GameEventsTest, PublishesAReceivedTextureArgumentByName) {
+    EventBus bus;
+    std::vector<NamedEvent> received;
+    bus.subscribe<NamedEvent>([&](const NamedEvent& event) { received.push_back(event); });
+
+    publish_received(bus, skinned_state(ship_id), event_strings());
+
+    ASSERT_EQ(received.size(), 1U);
+    EXPECT_EQ(received.front(), skinned("ship.png"));
+}
+
+TEST_F(GameEventsTest, DropsAReceivedNamedEventWithAnUnknownTextureId) {
+    EventBus bus;
+    std::vector<NamedEvent> received;
+    bus.subscribe<NamedEvent>([&](const NamedEvent& event) { received.push_back(event); });
+
+    publish_received(bus, skinned_state(4), event_strings());
+
+    EXPECT_TRUE(received.empty());
+    EXPECT_TRUE(logged("argument 'skin' names an unknown texture"));
 }

@@ -45,9 +45,20 @@ struct InputPayload {
     bool operator==(const InputPayload&) const = default;
 };
 
+inline constexpr std::uint16_t no_asset = reserved_string_id;
+
+struct AssetId {
+    std::uint16_t value{no_asset};
+
+    bool operator==(const AssetId&) const = default;
+};
+
+using WireValue =
+    std::variant<float, std::int64_t, bool, std::string, core::Vec2, core::Rgba, AssetId>;
+
 struct FieldState {
     std::uint16_t field_id{};
-    core::FieldValue value;
+    WireValue value;
 
     bool operator==(const FieldState&) const = default;
 };
@@ -95,7 +106,7 @@ struct MusicEvent {
 
 struct EventArgumentState {
     std::uint16_t key_id{};
-    core::FieldValue value;
+    WireValue value;
 
     bool operator==(const EventArgumentState&) const = default;
 };

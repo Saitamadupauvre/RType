@@ -10,9 +10,9 @@
 #include "PayloadSamples.hpp"
 #include "decoder/PayloadDecoder.hpp"
 
-using engine::core::AssetName;
 using engine::core::Rgba;
 using engine::core::Vec2;
+using engine::network::AssetId;
 using engine::network::ConnectRequestPayload;
 using engine::network::decode_connect_accept;
 using engine::network::decode_connect_request;
@@ -284,9 +284,15 @@ TEST(EventPayload, RoundTripsEveryArgumentKindOfANamedEvent) {
                                       {.key_id = 4, .value = std::string("hello")},
                                       {.key_id = 5, .value = Vec2{-3.F, 4.F}},
                                       {.key_id = 6, .value = Rgba{.r = 1, .g = 2, .b = 3, .a = 4}},
-                                      {.key_id = 7, .value = AssetName{"sprites/ship.png"}}}};
+                                      {.key_id = 7, .value = AssetId{3}}}};
 
     EXPECT_EQ(decode_event(encoded(event)), event);
+}
+
+TEST(EventPayload, DecoderRejectsATruncatedAssetId) {
+    const std::vector<std::uint8_t> payload{0x07, 0x00, 0x01, 0x01, 0x00, 0x01, 0x06, 0x00};
+
+    EXPECT_FALSE(decode_event(payload).has_value());
 }
 
 TEST(EventPayload, DecoderRejectsNamedEventsWithTooManyArguments) {
@@ -341,8 +347,9 @@ TEST(SnapshotPayload, RoundTripsEveryFieldKind) {
                        {.field_id = 4, .value = std::string("hello")},
                        {.field_id = 5, .value = Vec2{-3.F, 4.F}},
                        {.field_id = 6, .value = Rgba{.r = 1, .g = 2, .b = 3, .a = 4}},
-                       {.field_id = 7, .value = AssetName{"sprites/ship.png"}},
-                       {.field_id = 8, .value = std::string()}}}},
+                       {.field_id = 7, .value = AssetId{3}},
+                       {.field_id = 8, .value = std::string()},
+                       {.field_id = 9, .value = AssetId{}}}}},
     };
 
     EXPECT_EQ(decode_snapshot(encoded(snapshot)), snapshot);
@@ -500,9 +507,9 @@ TEST(ConnectAcceptPayload, AcceptsTheSameIdAndNameInTwoCategories) {
 
 TEST(ConnectAcceptPayload, DecoderRejectsUnknownCategory) {
     EXPECT_TRUE(
-        decode_connect_accept(raw_accept({{.category = 6, .id = 1, .name = "a"}})).has_value());
-    EXPECT_FALSE(
         decode_connect_accept(raw_accept({{.category = 7, .id = 1, .name = "a"}})).has_value());
+    EXPECT_FALSE(
+        decode_connect_accept(raw_accept({{.category = 8, .id = 1, .name = "a"}})).has_value());
     EXPECT_FALSE(
         decode_connect_accept(raw_accept({{.category = 0xFF, .id = 1, .name = "a"}})).has_value());
 }

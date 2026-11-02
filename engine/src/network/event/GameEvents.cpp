@@ -1,11 +1,13 @@
 #include "GameEvents.hpp"
 
 #include <string>
+#include <utility>
 #include <variant>
 
 #include "engine/core/log/Log.hpp"
 
 #include "protocol/Validation.hpp"
+#include "protocol/WireValue.hpp"
 
 namespace engine::network {
 
@@ -40,7 +42,13 @@ void publish(core::event::EventBus& events, const NamedEventState& event,
                             argument.key_id);
             return;
         }
-        received.arguments.push_back({.key = *key, .value = argument.value});
+        auto value = from_wire(argument.value, strings);
+        if (!value) {
+            core::log::warn("network: dropped event '{}': argument '{}' names an unknown texture",
+                            *name, *key);
+            return;
+        }
+        received.arguments.push_back({.key = *key, .value = std::move(*value)});
     }
     events.publish(received);
 }
@@ -70,7 +78,14 @@ std::optional<EventPayload> to_payload(const NamedEvent& event, const StringTabl
                             event.name, argument.key);
             return std::nullopt;
         }
-        state.arguments.push_back({.key_id = *key_id, .value = argument.value});
+        auto value = to_wire(argument.value, strings);
+        if (!value) {
+            core::log::warn("network: dropped event '{}': argument '{}' is a list or an "
+                            "undeclared texture",
+                            event.name, argument.key);
+            return std::nullopt;
+        }
+        state.arguments.push_back({.key_id = *key_id, .value = std::move(*value)});
     }
     if (!is_valid(state)) {
         core::log::warn("network: dropped event '{}': more than {} arguments, a repeated key, a "

@@ -9,6 +9,7 @@
 #include "engine/core/log/Log.hpp"
 
 #include "FieldWire.hpp"
+#include "WireValue.hpp"
 
 namespace engine::network {
 
@@ -36,19 +37,29 @@ bool admits_type_ids(const ReceivedStrings& table, std::string_view message_name
     return true;
 }
 
+bool names_known_texture(const ReceivedStrings& table, const FieldState& state) {
+    const auto* asset = std::get_if<AssetId>(&state.value);
+    if (asset == nullptr || asset->value == no_asset ||
+        table.names().name_of(StringCategory::texture, asset->value) != nullptr) {
+        return true;
+    }
+    core::log::warn("network: dropped snapshot with unknown texture id {}", asset->value);
+    return false;
+}
+
 bool admits_field(const ReceivedStrings& table, const FieldState& state) {
     const core::FieldRef field = table.field(state.field_id);
     if (!field) {
         core::log::warn("network: dropped snapshot with unknown field id {}", state.field_id);
         return false;
     }
-    if (field.field->kind() != core::kind_of(state.value)) {
+    if (field.field->kind() != kind_of(state.value)) {
         core::log::warn("network: dropped snapshot: field '{}' expects a {}, not a {}",
                         wire_field_name(field), core::field_kind_name(field.field->kind()),
-                        core::field_kind_name(core::kind_of(state.value)));
+                        core::field_kind_name(kind_of(state.value)));
         return false;
     }
-    return true;
+    return names_known_texture(table, state);
 }
 
 bool admits_message(const ReceivedStrings& table, const SnapshotPayload& snapshot) {
