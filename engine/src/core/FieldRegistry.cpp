@@ -9,6 +9,7 @@
 
 #include "engine/core/Camera.hpp"
 #include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/Transform.hpp"
 
 namespace engine::core {
 
@@ -113,6 +114,32 @@ FieldDescriptor camera_bounds_size_field() {
                 throw std::out_of_range("bounds size must be zero or positive");
             }
             camera.bounds_size = size;
+        });
+}
+
+FieldDescriptor rotation_degrees_field() {
+    return component_field<Rotation>(
+        "degrees", FieldKind::Float, field_flags::replicated,
+        [](const Rotation& rotation) { return FieldValue{rotation.degrees}; },
+        [](Rotation& rotation, const FieldValue& value) {
+            const auto degrees = std::get<float>(value);
+            if (!std::isfinite(degrees)) {
+                throw std::out_of_range("rotation must be finite");
+            }
+            rotation.degrees = degrees;
+        });
+}
+
+FieldDescriptor scale_factor_field() {
+    return component_field<Scale>(
+        "factor", FieldKind::Vec2, field_flags::replicated,
+        [](const Scale& scale) { return FieldValue{scale.factor}; },
+        [](Scale& scale, const FieldValue& value) {
+            const auto factor = std::get<Vec2>(value);
+            if (!std::isfinite(factor.x) || !std::isfinite(factor.y)) {
+                throw std::out_of_range("scale must be finite");
+            }
+            scale.factor = factor;
         });
 }
 
@@ -293,6 +320,8 @@ void register_core_fields(FieldRegistry& registry) {
                           member_field<&Camera::follow>("follow", field_flags::editable),
                           camera_bounds_origin_field(), camera_bounds_size_field()},
                          required<Position>);
+    registry.add<Rotation>("Rotation", {rotation_degrees_field()});
+    registry.add<Scale>("Scale", {scale_factor_field()});
 }
 
 } // namespace engine::core
