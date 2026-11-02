@@ -165,7 +165,8 @@ void RaylibRenderer::draw_sprite(const engine::graphics::SpriteDraw& sprite) {
         found == nullptr ? engine::graphics::Rect{.width = static_cast<float>(texture.width),
                                                   .height = static_cast<float>(texture.height)}
                          : sprite.source;
-    DrawTexturePro(texture, to_raylib(source), to_raylib(sprite.dest), {.x = 0.F, .y = 0.F}, 0.F,
+    DrawTexturePro(texture, to_raylib(source), to_raylib(sprite.dest),
+                   {.x = sprite.origin.x, .y = sprite.origin.y}, sprite.rotation,
                    to_raylib(sprite.tint));
 }
 
