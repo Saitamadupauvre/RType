@@ -30,19 +30,19 @@ namespace logger = engine::core::log;
 
 namespace {
 
+using engine::network::AddressedInbound;
+using engine::network::AddressedOutbound;
 using engine::network::Bytes;
 using engine::network::connect_accept_prefix_size;
 using engine::network::Endpoint;
 using engine::network::HeartbeatPayload;
-using engine::network::Inbound;
 using engine::network::InputPayload;
 using engine::network::max_datagram_size;
 using engine::network::max_payload_size;
-using engine::network::max_type_name_length;
+using engine::network::max_string_name_length;
 using engine::network::Message;
-using engine::network::min_type_entry_size;
+using engine::network::min_string_entry_size;
 using engine::network::NetworkIo;
-using engine::network::Outbound;
 using engine::network::ProtocolHandler;
 using engine::network::ReceivedMessage;
 using engine::network::SocketError;
@@ -57,7 +57,9 @@ Endpoint loopback(std::uint16_t port = 0) {
     return endpoint.value_or(Endpoint{});
 }
 
-Message sample_message() { return InputPayload{.action_flags = 0x01, .move_x = -1, .move_y = 1}; }
+Message sample_message() {
+    return InputPayload{.keys = {0x02}, .mouse_buttons = 0x01, .pointer = std::nullopt};
+}
 
 Bytes encoded(const Message& message) {
     const ProtocolHandler handler;
@@ -100,9 +102,9 @@ void send_raw(UdpSocket& peer, const Bytes& datagram, const Endpoint& to) {
     ASSERT_FALSE(ec) << ec.message();
 }
 
-std::vector<Inbound> poll_until_received(NetworkIo& io) {
+std::vector<AddressedInbound> poll_until_received(NetworkIo& io) {
     const auto deadline = std::chrono::steady_clock::now() + delivery_deadline;
-    std::vector<Inbound> received = io.poll();
+    std::vector<AddressedInbound> received = io.poll();
     while (received.empty() && std::chrono::steady_clock::now() < deadline) {
         std::this_thread::yield();
         received = io.poll();
@@ -126,13 +128,16 @@ bool wait_for_log_containing(const logger::MemorySink& sink, std::string_view te
 
 Bytes max_size_datagram() {
     constexpr std::size_t full_entries = 17;
-    constexpr std::size_t full_entry_size = min_type_entry_size + max_type_name_length;
+    constexpr std::size_t full_entry_size = min_string_entry_size + max_string_name_length;
     constexpr std::size_t last_name_length = max_payload_size - connect_accept_prefix_size -
-                                             (full_entries * full_entry_size) - min_type_entry_size;
-    auto types = payload_samples::long_name_types(full_entries);
-    types.push_back({.type_id = full_entries, .name = std::string(last_name_length, 'z')});
+                                             (full_entries * full_entry_size) -
+                                             min_string_entry_size;
+    auto strings = payload_samples::long_name_strings(full_entries);
+    EXPECT_TRUE(strings.insert({.category = engine::network::StringCategory::type,
+                                .id = full_entries,
+                                .name = std::string(last_name_length, 'z')}));
 
-    auto datagram = encoded(payload_samples::accept_with(std::move(types)));
+    auto datagram = encoded(payload_samples::accept_with(std::move(strings)));
     EXPECT_EQ(datagram.size(), max_datagram_size);
     return datagram;
 }
@@ -196,7 +201,7 @@ TEST(NetworkIo, RestartsAfterStop) {
     auto peer = bound_peer();
 
     send_raw(peer, encoded(sample_message()), local_endpoint_of(io));
-    io.send(Outbound{.to = local_endpoint_of(peer), .message = sample_message()});
+    io.send(AddressedOutbound{.to = local_endpoint_of(peer), .message = sample_message()});
 
     EXPECT_EQ(poll_until_received(io).size(), 1U);
     const auto received = receive_decoded(peer);
@@ -282,7 +287,8 @@ TEST(NetworkIo, SendReachesPeerAndDecodesToSameMessage) {
     start_on_loopback(io);
     auto peer = bound_peer();
 
-    io.send(Outbound{.to = local_endpoint_of(peer), .message = sample_message(), .sequence = 41});
+    io.send(AddressedOutbound{
+        .to = local_endpoint_of(peer), .message = sample_message(), .sequence = 41});
     const auto received = receive_decoded(peer);
 
     ASSERT_TRUE(received.has_value());
@@ -298,7 +304,7 @@ TEST(NetworkIo, StopFlushesQueuedSendsBeforeJoining) {
     constexpr std::uint32_t queued = 3;
 
     for (std::uint32_t sequence = 0; sequence < queued; ++sequence) {
-        io.send(Outbound{.to = to, .message = sample_message(), .sequence = sequence});
+        io.send(AddressedOutbound{.to = to, .message = sample_message(), .sequence = sequence});
     }
     io.stop();
 
@@ -317,7 +323,7 @@ TEST(NetworkIo, SendIsDeliveredWhileNoDatagramArrives) {
     const auto to = local_endpoint_of(peer);
 
     for (std::uint32_t sequence = 0; sequence < 3; ++sequence) {
-        io.send(Outbound{.to = to, .message = HeartbeatPayload{}, .sequence = sequence});
+        io.send(AddressedOutbound{.to = to, .message = HeartbeatPayload{}, .sequence = sequence});
         const auto received = receive_decoded(peer);
         ASSERT_TRUE(received.has_value());
         EXPECT_EQ(received->header.sequence, sequence);

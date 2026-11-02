@@ -7,15 +7,25 @@ local function game()
     return roster.list("game")[1]
 end
 
-function on_start()
-    spawn("game")
-    music("bit_space.mp3")
-end
+server = {
+    on_start = function()
+        spawn("game")
+        music("bit_space.mp3")
+    end,
 
-function on_player_joined(player)
-    game():join(player)
-end
+    on_player_joined = function(player)
+        game():join(player)
+    end,
 
-function on_player_left(player)
-    game():leave(player)
-end
+    on_player_left = function(player)
+        game():leave(player)
+    end,
+}
+
+client = {
+    update = function(dt)
+        if input:pressed("M") then
+            audio.set_muted(not audio.muted())
+        end
+    end,
+}

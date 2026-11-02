@@ -114,3 +114,37 @@ TEST(ClientCli, RejectsNonNumericVolume) {
     expect_rejected(args({"127.0.0.1", "4242", "--music-volume", "loud"}));
     expect_rejected(args({"127.0.0.1", "4242", "--effects-volume", "-1"}));
 }
+
+TEST(ClientCli, ConnectingToAServerIsTheClientMode) {
+    const auto result = parse_cli(args({"127.0.0.1", "4242"}));
+
+    ASSERT_TRUE(result.config.has_value());
+    EXPECT_EQ(result.config->mode, engine::app::Mode::client);
+}
+
+TEST(ClientCli, HostTakesThePortToListenOn) {
+    const auto result = parse_cli(args({"--host", "4242", "--mute"}));
+
+    EXPECT_EQ(
+        result.config,
+        (ClientConfig{.mode = engine::app::Mode::host, .host = "", .port = 4242, .muted = true}));
+}
+
+TEST(ClientCli, SoloNeedsNoAddress) {
+    const auto result = parse_cli(args({"--solo"}));
+
+    EXPECT_EQ(result.config,
+              (ClientConfig{.mode = engine::app::Mode::solo, .host = "", .port = 0}));
+}
+
+TEST(ClientCli, RejectsSeveralModesAtOnce) {
+    expect_rejected(args({"127.0.0.1", "4242", "--solo"}));
+    expect_rejected(args({"127.0.0.1", "4242", "--host", "4243"}));
+    expect_rejected(args({"--host", "4242", "--solo"}));
+}
+
+TEST(ClientCli, RejectsHostWithoutAValidPort) {
+    expect_rejected(args({"--host"}));
+    expect_rejected(args({"--host", "0"}));
+    expect_rejected(args({"--host", "70000"}));
+}

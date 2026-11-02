@@ -15,6 +15,7 @@ The [architecture](architecture.md) page shows how they fit together.
 | physics | `engine::physics` | core | — |
 | graphics | `engine::graphics` | core | — (backends are [plugins](plugins.md)) |
 | audio | `engine::audio` | core | — (backends are [plugins](plugins.md)) |
+| app | `engine::app` | core, script, network, graphics, audio (physics privately) | — |
 
 ### core
 
@@ -24,7 +25,7 @@ The foundation every other module builds on.
 |---|---|---|
 | Entities | `Entity.hpp`, `EntityPool.hpp` | 32-bit ids with a generation counter: a recycled id never matches a destroyed entity |
 | Components | `ComponentPool.hpp`, `ComponentTypeId.hpp`, `EntityManager.hpp`, `ComponentQuery.hpp` | Sparse-set pools, `spawn`/`kill`/`add`/`get`/`has`, `query<A, B>().each(...)` |
-| Common components | `Components.hpp`, `ComponentPhysics.hpp` | `Position`, `Velocity`, `Sprite` (path + colour), `Tags` |
+| Common components | `Components.hpp`, `ComponentPhysics.hpp` | `Position`, `Sprite` (path + colour), `Tags` |
 | Systems | `SystemScheduler.hpp` | Named systems run by ascending order; one that throws is disabled and logged, the others keep running |
 | Events | `event/EventBus.hpp` | Typed publish/subscribe; a `Subscription` unsubscribes when destroyed |
 | Time | `time/IClock.hpp`, `SteadyClock.hpp`, `ManualClock.hpp`, `FixedStepLoop.hpp` | Fixed-step loop (60 Hz by default) over an injectable clock, so tests control time |
@@ -44,19 +45,81 @@ Component types are identified by stable names registered in a `.cpp` of
   `loadfile` and bytecode loading; `require` only reaches `lib/`;
 - spawns scripted entities, maps native fields (`x`, `y`, `vx`, `vy`,
   `sprite`, `color`, `tags`, `hitbox`, `collides_with`) to C++ components and
-  keeps free fields in Lua; `hitbox` becomes a non-resolving `PhysicsBody` +
-  `AABBCollider` of `engine-physics`;
+  keeps free fields in Lua; `vx` / `vy` are the velocity of the entity's
+  `PhysicsBody` and `hitbox` its `AABBCollider` (`engine-physics`); setting
+  one of them gives the entity a dynamic, non-resolving body without gravity;
 - calls `update`, `on_spawn`, `on_destroy` and the `main.lua` callbacks
   through protected calls: an error is logged with file and line and the game
   continues;
-- tracks players (`players()`, `find_player()`, `player.slot`) and routes each
-  player's input to the entities they own;
-- registers the sounds and musics declared with `sounds { ... }` and
-  `musics { ... }`, and queues `play(...)` / `music(...)` requests for the
-  host (`sound_names()`, `music_names()`, `take_audio_commands()`);
+- registers the sounds, musics and events declared with `sounds { ... }`,
+  `musics { ... }` and `event "name" { ... }` (`sound_names()`,
+  `music_names()`, `event_names()`);
 - turns overlaps reported by the host (`collide(first, second)`) into
   `on_collide(self, other)` calls, filtered by each entity's `collides_with`
   tags.
+- turns the world into data and back: `capture_instances()` returns one
+  `Instance{name, type, position, overrides}` per scripted entity, and
+  `spawn_instances(instances)` rebuilds them (see below).
+
+### Instances
+
+Scenes, the editor's Play/Stop and undo/redo store the world as **instances**
+rather than raw component memory. An instance holds the entity's type, its
+position, an optional name (`set_entity_name()`, never seen by scripts) and
+its **overrides**: the editable registry fields whose value differs from the
+type's default, keyed `"Component.field"` and sorted.
+
+```cpp
+const std::vector<engine::script::Instance> saved = runtime.capture_instances();
+const std::vector<engine::script::InstanceIssue> issues = runtime.spawn_instances(saved);
+```
+
+An issue gives the index of its instance, the skipped field (empty when the
+whole instance was skipped) and a message.
+
+- **Default** means the value a field gets from the prefab's native fields
+  (`sprite`, `hitbox`, `vx`...) before `on_spawn` runs. What `on_spawn` sets
+  is therefore stored as an override, and a component the prefab does not
+  give has all its editable fields stored. Changing a prefab later updates
+  every instance that did not override that field.
+- **Spawning** an instance spawns its type at its position, names it, runs
+  `on_spawn`, then writes the overrides through the field registry, so they
+  win. Entities already in the world are kept: clearing it is the caller's
+  job.
+- **Failures** never throw: an unknown type or a system skips the instance,
+  an unknown or non-editable field, a wrong kind or an out-of-range value
+  skips that override. Each is returned as an `InstanceIssue` and logged.
+- Not captured: Lua free fields (`self.health`), non-editable fields such as
+  `Replicated.owner`, entities marked with `self:destroy()` and entities the
+  runtime did not spawn. An entity spawned by another one's `on_spawn` is
+  captured too, so spawning the instances back spawns it twice.
+- The format is in memory only; scene files build on it.
+
+The runtime only holds this core API. Everything that belongs to one side is an
+**API set**, chosen once with a builder and owned by the runtime:
+
+```cpp
+auto runtime = engine::script::ScriptRuntime::builder()
+                   .with<engine::script::ServerApi>()
+                   .build();
+auto& server = runtime.api<engine::script::ServerApi>();
+```
+
+- `ServerApi`: `spawn`, `players`, `find_player`, `play`, `music`, `emit`,
+  `self.input`, `self.owner`; tracks players and routes each player's input
+  to the entities they own (`player_joined()`, `set_player_input()`), and
+  queues audio and event requests for the host (`take_audio_commands()`,
+  `take_event_commands()`).
+- `ClientApi`: `on(name, handler)`; `dispatch(event)` calls the handlers of
+  an event received from the server.
+- `EditorApi`: empty for now.
+
+A function of a set that was not added does not exist in the sandbox, so
+calling it is a plain Lua error. Each set names the declaration section it
+reads (`server = { ... }`, `client = { ... }`). Adding a set twice, or both
+`ServerApi` and `ClientApi`, makes `build()` throw. Sources follow the same
+split: public-API implementations at the root of `engine/src/script/`,
+internals in `lua/`, `loading/`, `entity/`, `audio/`, `event/` and `player/`.
 
 The Lua API is specified in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
 
@@ -89,6 +152,21 @@ Backend-independent `IAudio` interface (sound effects, streamed music, master,
 music and effects volumes), `SoundId` / `MusicId`, `NullAudio` (a silent
 backend) and `load_audio_plugin()`, which loads a backend at runtime. See
 [Plugins](plugins.md#audio-raylib).
+
+### app
+
+The composition root: the only module that depends on most of the others. It
+runs any game folder (`scripts/` and `assets/`) without knowing the game.
+
+| Header | What it gives |
+|---|---|
+| `ServerApp.hpp` | Authoritative server over any `ServerTransport`: Lua with the server API, string table, 60 Hz tick (scripts, physics, collisions, systems, replication, audio and events) |
+| `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, snapshot drawing, audio, local input to Lua and to the server |
+| `Launch.hpp` | `Mode` (`dedicated`, `client`, `host`, `solo`), `LaunchOptions` and `launch()`: picks the transports, loads the plugins and runs the apps; `host` runs the server on a background thread, `solo` runs both in one thread over a `LoopbackNetwork` |
+
+Its private helpers (`SnapshotView`, `WorldDraw`, `AudioPlayer`,
+`Collisions`) are tested in `tests/engine/app/`, with a fixture game in
+`tests/fixtures/app/game/` played over a `LoopbackNetwork`.
 
 ## The contract
 

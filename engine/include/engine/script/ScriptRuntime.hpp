@@ -1,21 +1,25 @@
 #pragma once
 
+#include <concepts>
 #include <cstddef>
-#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 #include <vector>
 
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/core/Vec2.hpp"
-#include "engine/script/AudioCommand.hpp"
+#include "engine/script/ApiSet.hpp"
 #include "engine/script/Declaration.hpp"
 #include "engine/script/Export.hpp"
-#include "engine/script/InputState.hpp"
+#include "engine/script/Instance.hpp"
+#include "engine/script/ScriptRuntimeBuilder.hpp"
 
 namespace engine::script {
 
@@ -31,22 +35,40 @@ namespace engine::script {
  * the chunk name and line (for example "scripts/bydo.lua:14: attempt to index a nil value") and
  * the runtime stays usable.
  *
- * @note Not thread safe. Not copyable or movable.
+ * The runtime itself only holds the core API: the sandbox, `entity`, `system`, `require` and the
+ * declarations `sounds`, `musics` and `event`. Everything else comes from the API sets chosen
+ * with builder(), such as ServerApi or ClientApi; the functions of a set that was not added do
+ * not exist in the sandbox.
+ *
+ * @note Not thread safe. Not copyable. A moved-from runtime can only be destroyed or assigned.
  */
 class ENGINE_SCRIPT_EXPORT ScriptRuntime {
 public:
     /**
-     * @brief Creates a fresh Lua state with the safe libraries opened.
+     * @brief Starts building a runtime.
      *
-     * @throws std::bad_alloc If the Lua state cannot be allocated.
+     * `ScriptRuntime::builder().build()` creates a runtime with the core API only.
      */
-    ScriptRuntime();
+    [[nodiscard]] static ScriptRuntimeBuilder builder();
+
     ~ScriptRuntime();
 
     ScriptRuntime(const ScriptRuntime&) = delete;
     ScriptRuntime& operator=(const ScriptRuntime&) = delete;
-    ScriptRuntime(ScriptRuntime&&) = delete;
-    ScriptRuntime& operator=(ScriptRuntime&&) = delete;
+    ScriptRuntime(ScriptRuntime&&) noexcept;
+    ScriptRuntime& operator=(ScriptRuntime&&) noexcept;
+
+    /**
+     * @brief Returns an API set added with ScriptRuntimeBuilder::with().
+     *
+     * The reference stays valid until the runtime is destroyed, even if the runtime is moved.
+     *
+     * @tparam Set ServerApi, ClientApi or EditorApi.
+     * @throws std::out_of_range If @p Set was not added to this runtime.
+     */
+    template <std::derived_from<ApiSet> Set> [[nodiscard]] Set& api() {
+        return static_cast<Set&>(find_api(typeid(Set)));
+    }
 
     /**
      * @brief Loads and runs a Lua file.
@@ -85,6 +107,12 @@ public:
      * duplicate. Other files keep loading. Files declaring nothing and reserved names are logged at
      * Level::Warn.
      *
+     * A declaration may hold `server = { ... }` and `client = { ... }` tables. The section read by
+     * an API set of this runtime is merged into the prefab; both are then removed from it, so a
+     * core-only runtime reads neither. A section that is not a table, or that sets a name the
+     * declaration already sets, rejects the file. `main.lua` follows the same rule with its
+     * globals: `server = { on_start = ... }` defines `on_start()` on the server only.
+     *
      * @param root Script folder. Paths in messages and in DeclarationInfo are relative to it.
      * @return true if every file loaded, `main.lua` exists and `on_start()` did not fail; false
      * otherwise. Every failure is logged.
@@ -103,19 +131,33 @@ public:
     /**
      * @brief Connects the runtime to the world whose entities scripts read and write.
      *
-     * Registers core::Position and core::Velocity in @p world if they are not registered yet.
+     * Registers in @p world every component scripts can reach and that is not registered yet:
+     * the engine-core components, physics::PhysicsBody, physics::AABBCollider,
+     * physics::CollidesWith and physics::Scriptable.
      *
      * @param world Entity storage. It must outlive this runtime, or be replaced by another call.
      */
     void attach_world(core::EntityManager& world);
 
     /**
+     * @brief The component fields scripts read and write, filled with the engine-core and
+     * physics fields.
+     *
+     * Every entity field seen by Lua goes through this registry, so other consumers such as
+     * snapshots can share it.
+     */
+    [[nodiscard]] const core::FieldRegistry& fields() const noexcept;
+
+    /**
      * @brief Creates an entity from a declaration registered by load_scripts().
      *
-     * The entity gets a core::Position and a core::Velocity, initialised from the native fields
-     * of its prefab (`x`, `y`, `vx`, `vy`, 0 when absent), and its own table for custom fields.
-     * Scripts reach it through a handle whose fields resolve, in order, to native components,
-     * the entity's own fields, then its prefab.
+     * The entity gets a core::Position, then every component field its prefab sets through an
+     * alias (`x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`), and its
+     * own table for custom fields. Setting `vx`, `vy` or `hitbox` on an entity without a
+     * physics::PhysicsBody gives it a dynamic body without gravity or collision response.
+     * Table-valued custom fields of the prefab are deep-copied into that table, so no two entities
+     * share one. Scripts reach the entity through a handle whose fields resolve, in order, to
+     * component aliases, methods, the entity's own fields, then its prefab.
      *
      * @param type Declared entity name.
      * Calls the entity's `on_spawn(self)` callback once it is ready; an error raised by it is
@@ -123,7 +165,7 @@ public:
      *
      * @param position Starting position. Overrides the prefab's `x` and `y` when given.
      * @return The new entity, or std::nullopt if no world is attached, @p type is unknown or
-     * declared as a system, or a prefab native field has the wrong type. The error is logged.
+     * declared as a system, or a prefab component field is invalid. The error is logged.
      * @note Never throws.
      */
     std::optional<core::Entity> spawn(std::string_view type,
@@ -154,53 +196,6 @@ public:
     bool call(core::Entity entity, std::string_view method) noexcept;
 
     /**
-     * @brief Sets the actions an entity reads through `self.input` until the next call.
-     *
-     * Entities never given an input read a neutral one: every axis is 0, nothing is pressed.
-     *
-     * @param entity Entity returned by spawn(). Unknown entities are ignored.
-     * @param input Actions for the coming ticks.
-     */
-    void set_input(core::Entity entity, InputState input) noexcept;
-
-    /**
-     * @brief Registers a connected player and calls `on_player_joined(player)` from `main.lua`.
-     *
-     * The player gets the lowest free slot, starting at 0, and a neutral input. Scripts give it
-     * entities by setting their `owner` field; those entities then read the player's input
-     * through `self.input`. The callback is optional and protected: an error is logged.
-     *
-     * @param player_id Identifier chosen by the caller, unique among connected players.
-     * @return true if the player was added and the callback, when defined, ran to completion;
-     * false if @p player_id is already connected (logged, nothing changes) or the callback failed.
-     * @note Never throws.
-     */
-    bool player_joined(std::uint32_t player_id) noexcept;
-
-    /**
-     * @brief Calls `on_player_left(player)` from `main.lua`, then forgets the player.
-     *
-     * Without that callback, every entity the player owns is marked for destruction and removed
-     * by the next flush_destroyed(). With it, the script decides; entities still owned afterwards
-     * read a nil `owner` and a neutral input.
-     *
-     * @param player_id Player registered by player_joined().
-     * @return true if the player was removed and the callback, when defined, ran to completion;
-     * false if @p player_id is unknown (logged) or the callback failed. The player is removed
-     * even when the callback fails.
-     * @note Never throws.
-     */
-    bool player_left(std::uint32_t player_id) noexcept;
-
-    /**
-     * @brief Sets the actions read by every entity owned by a player until the next call.
-     *
-     * @param player_id Player registered by player_joined(). Unknown players are ignored.
-     * @param input Actions for the coming ticks.
-     */
-    void set_player_input(std::uint32_t player_id, InputState input) noexcept;
-
-    /**
      * @brief Lists the names of the declared entity types, in ascending order.
      *
      * The order is stable for a given set of scripts, so two processes loading the same scripts
@@ -227,18 +222,22 @@ public:
     [[nodiscard]] std::vector<std::string> music_names() const;
 
     /**
-     * @brief Returns the audio requests queued by scripts since the last call, in call order,
-     * and empties the queue.
+     * @brief Lists the events declared with `event "name" { key = "kind", ... }`, in ascending
+     * order.
      *
-     * Scripts queue them with `play(name)`, `play(name, entity)`, `music(name)` and
-     * `music(nil)`. The runtime plays nothing itself: the host plays the commands or sends them
-     * to clients, typically once per tick. An undeclared name or an argument of the wrong type
-     * raises a Lua error, logged by the protected call that runs the script. At most
-     * 64 commands are kept between two calls; later ones are dropped and logged once.
-     *
-     * @note Never throws.
+     * Events are declared while the scripts load, e.g. `event "explosion" { at = "vec2",
+     * size = "float" }`. A name is 1 to 63 letters, digits, `_`, `-` or `.`, starting with a
+     * letter. Keys are Lua identifiers of 1 to 63 characters; kinds are `float`, `int`, `bool`,
+     * `string`, `vec2`, `color` or `asset`; an event has at most `max_event_arguments` keys. An
+     * invalid declaration, a name declared twice or a declaration made after loading raises a
+     * Lua error.
      */
-    [[nodiscard]] std::vector<AudioCommand> take_audio_commands() noexcept;
+    [[nodiscard]] std::vector<std::string> event_names() const;
+
+    /**
+     * @brief Lists every argument key of every declared event, once each, in ascending order.
+     */
+    [[nodiscard]] std::vector<std::string> event_keys() const;
 
     /**
      * @brief Returns the declared type of an entity spawned by this runtime.
@@ -249,20 +248,61 @@ public:
     [[nodiscard]] std::optional<std::string> entity_type(core::Entity entity) const;
 
     /**
-     * @brief Returns the connected player that owns an entity.
+     * @brief Returns the label of an entity spawned by this runtime.
      *
-     * @return The owner's id, or std::nullopt if the entity is unknown, has no owner, or its
-     * owner has left.
+     * @return The name, empty if none was given, or std::nullopt for entities this runtime did not
+     * spawn or already released.
      */
-    [[nodiscard]] std::optional<std::uint32_t> entity_owner(core::Entity entity) const;
+    [[nodiscard]] std::optional<std::string> entity_name(core::Entity entity) const;
+
+    /**
+     * @brief Labels an entity spawned by this runtime, as the editor names scene entities.
+     *
+     * Names are free text: they need not be unique and scripts never see them.
+     *
+     * @return false, changing nothing, for entities this runtime did not spawn or already released.
+     */
+    bool set_entity_name(core::Entity entity, std::string name);
+
+    /**
+     * @brief Captures the attached world as one Instance per live entity spawned by this runtime.
+     *
+     * Entities marked with `self:destroy()` and entities this runtime did not spawn are left out.
+     * Instances come in ascending entity id order. An instance stores every editable field of the
+     * entity, except `Position.pos` which is its position, whose value differs from the type's
+     * default: the value the field gets from the prefab's component fields (`sprite`, `hitbox`...)
+     * before `on_spawn` runs. A field of a component the prefab does not give is always stored.
+     *
+     * @return The instances, empty if no world is attached.
+     * @note Lua fields such as `self.health` are not captured. An entity spawned by another
+     * entity's `on_spawn` is captured like any other, so spawning the instances back spawns it
+     * twice.
+     */
+    [[nodiscard]] std::vector<Instance> capture_instances();
+
+    /**
+     * @brief Spawns one entity per instance into the attached world.
+     *
+     * Each instance is spawned as spawn() would at its position and named, then `on_spawn` runs,
+     * then its overrides are written through fields(), so they win over what `on_spawn` set.
+     * Entities already in the world are kept.
+     *
+     * @return What was skipped: an instance whose type is unknown or declared as a system, or
+     * that cannot be spawned; an override naming an unknown or non-editable field, or holding a
+     * value of the wrong kind or out of range. The other instances and overrides are still
+     * applied. Every issue is also logged at Level::Warn.
+     * @note Never throws.
+     */
+    std::vector<InstanceIssue> spawn_instances(std::span<const Instance> instances) noexcept;
 
     /**
      * @brief Advances every live entity by one tick.
      *
      * In ascending id order, adds @p dt to each entity's `age`, then calls its `update(self, dt)`
      * callback if it has one. Entities marked with `self:destroy()` are skipped. Entities spawned
-     * during the pass are first updated on the next call. An error raised by a callback is logged
-     * with its file and line and the other entities still run.
+     * during the pass are first updated on the next call. Then calls `update(dt)` from
+     * `main.lua` if it defines one. An error raised by a callback is logged with its file and line
+     * and the other callbacks still run.
      *
      * @param dt Fixed time step in seconds.
      * @note Never throws.
@@ -299,7 +339,13 @@ public:
     std::size_t flush_destroyed() noexcept;
 
 private:
+    friend class ScriptRuntimeBuilder;
+
     struct Impl;
+
+    explicit ScriptRuntime(std::vector<std::unique_ptr<ApiSet>> sets);
+    [[nodiscard]] ApiSet& find_api(const std::type_info& type) const;
+
     std::unique_ptr<Impl> _impl;
 };
 

@@ -1,5 +1,6 @@
 #include "engine/network/Client.hpp"
 
+#include <algorithm>
 #include <functional>
 #include <random>
 #include <string>
@@ -10,46 +11,50 @@
 #include "engine/network/Events.hpp"
 
 #include "event/GameEvents.hpp"
+#include "input/InputCodec.hpp"
 #include "session/ClientConnection.hpp"
 #include "snapshot/SnapshotReceiver.hpp"
-#include "socket/UdpSocket.hpp"
 #include "stats/TrafficMeter.hpp"
-#include "thread/NetworkIo.hpp"
+#include "transport/Link.hpp"
 
 namespace engine::network {
 
 namespace {
-
-Endpoint any_local_endpoint(const Endpoint& server) {
-    const auto any_address = server.addr()->sa_family == AF_INET6 ? "::" : "0.0.0.0";
-    return Endpoint::from_string(any_address, 0).value_or(Endpoint{});
-}
 
 std::uint32_t fresh_nonce() {
     std::random_device random;
     return random();
 }
 
-EntitySnapshot to_entity_snapshot(const EntityState& state) {
-    return EntitySnapshot{.entity_id = state.entity_id,
-                          .type_id = state.type_id,
-                          .x = static_cast<float>(state.x),
-                          .y = static_cast<float>(state.y),
-                          .vx = static_cast<float>(state.vx),
-                          .vy = static_cast<float>(state.vy),
-                          .owner = state.owner,
-                          .color = {.r = state.r, .g = state.g, .b = state.b, .a = state.a}};
+EntitySnapshot to_entity_snapshot(const EntityState& state, const ReceivedStrings& strings) {
+    EntitySnapshot snapshot{.entity_id = state.entity_id, .type_id = state.type_id, .fields = {}};
+    snapshot.fields.reserve(state.fields.size());
+    for (const FieldState& field : state.fields) {
+        snapshot.fields.push_back(
+            ReplicatedValue{.field = strings.field(field.field_id), .value = field.value});
+    }
+    return snapshot;
 }
 
 } // namespace
 
+const core::FieldValue* EntitySnapshot::find(std::string_view component,
+                                             std::string_view field) const {
+    const auto found = std::ranges::find_if(fields, [&](const ReplicatedValue& replicated) {
+        return replicated.field && replicated.field.component->name() == component &&
+               replicated.field.field->name() == field;
+    });
+    return found == fields.end() ? nullptr : &found->value;
+}
+
 struct NetworkClient::ImplNet {
-    ImplNet(const core::time::IClock& game_clock, core::event::EventBus& game_events)
-        : clock(game_clock), events(game_events) {}
+    ImplNet(const core::time::IClock& game_clock, core::event::EventBus& game_events,
+            const core::FieldRegistry& known_fields, Link& transport)
+        : clock(game_clock), events(game_events), fields(known_fields), link(transport) {}
 
     void send(std::optional<Outbound> outbound) {
         if (outbound) {
-            io.send(std::move(*outbound));
+            link.get().send(std::move(*outbound));
         }
     }
 
@@ -75,15 +80,23 @@ struct NetworkClient::ImplNet {
         } else if (const auto* snapshot = std::get_if<SnapshotPayload>(&message)) {
             snapshots.receive(*snapshot);
         } else if (const auto* event = std::get_if<EventPayload>(&message)) {
-            publish_received(events, *event);
+            publish_received(events, *event, live.strings().names());
         }
     }
 
     void close() {
-        if (connection) {
-            send(connection->disconnect());
+        if (!connection || closed) {
+            return;
         }
-        io.stop();
+        send(connection->disconnect());
+        close_link();
+    }
+
+    void close_link() {
+        if (!closed) {
+            closed = true;
+            link.get().close();
+        }
     }
 
     void report_end() {
@@ -92,43 +105,43 @@ struct NetworkClient::ImplNet {
             return;
         }
         reported = true;
-        io.stop();
+        close_link();
         events.get().publish(Disconnected{.reason = *reason});
     }
 
     std::reference_wrapper<const core::time::IClock> clock;
     std::reference_wrapper<core::event::EventBus> events;
+    std::reference_wrapper<const core::FieldRegistry> fields;
+    std::reference_wrapper<Link> link;
     std::optional<ClientConnection> connection;
     SnapshotReceiver snapshots;
     std::string server_label;
     core::time::Duration last_report{};
     bool reported{false};
-    NetworkIo io;
+    bool closed{false};
 };
 
-NetworkClient::NetworkClient(const core::time::IClock& clock, core::event::EventBus& events)
-    : impl_(std::make_unique<ImplNet>(clock, events)) {}
+NetworkClient::NetworkClient(const core::time::IClock& clock, core::event::EventBus& events,
+                             const core::FieldRegistry& fields, ClientTransport& transport)
+    : impl_(std::make_unique<ImplNet>(clock, events, fields, transport.link())) {}
 
 NetworkClient::~NetworkClient() { impl_->close(); }
 
-bool NetworkClient::connect(std::string_view server_ip, std::uint16_t port, std::error_code& ec) {
+bool NetworkClient::connect(std::error_code& ec) {
     ec.clear();
     if (impl_->connection) {
         ec = std::make_error_code(std::errc::already_connected);
         return false;
     }
-    const auto server = Endpoint::from_string(server_ip, port);
-    if (!server) {
-        ec = std::make_error_code(std::errc::invalid_argument);
-        return false;
-    }
 
-    impl_->io.start(any_local_endpoint(*server), ec);
+    auto& link = impl_->link.get();
+    link.open(ec);
     if (ec) {
         return false;
     }
-    impl_->connection.emplace(impl_->clock.get(), *server, fresh_nonce());
-    impl_->server_label = server->to_string();
+    impl_->server_label = link.describe(server_peer);
+    impl_->connection.emplace(impl_->clock.get(), impl_->fields.get(), impl_->server_label,
+                              fresh_nonce());
     impl_->last_report = impl_->clock.get().now();
     return true;
 }
@@ -139,7 +152,7 @@ void NetworkClient::update() {
         return;
     }
     auto& live = *connection;
-    for (const auto& inbound : impl_->io.poll()) {
+    for (const auto& inbound : impl_->link.get().poll()) {
         impl_->handle(live, inbound);
     }
     impl_->send(live.update());
@@ -147,10 +160,9 @@ void NetworkClient::update() {
     impl_->report_end();
 }
 
-void NetworkClient::send_input(std::uint8_t action_flags, std::int8_t move_x, std::int8_t move_y) {
+void NetworkClient::send_input(const core::InputState& input) {
     if (auto& connection = impl_->connection) {
-        impl_->send(connection->send_input(
-            InputPayload{.action_flags = action_flags, .move_x = move_x, .move_y = move_y}));
+        impl_->send(connection->send_input(to_payload(input)));
     }
 }
 
@@ -169,36 +181,9 @@ std::uint32_t NetworkClient::player_id() const {
     return connection ? connection->player_id() : 0;
 }
 
-std::vector<ReplicatedType> NetworkClient::types() const {
-    std::vector<ReplicatedType> types;
+StringTable NetworkClient::strings() const {
     const auto& connection = impl_->connection;
-    if (!connection.has_value()) {
-        return types;
-    }
-    for (const auto& entry : connection.value().type_table().entries()) {
-        types.push_back({.type_id = entry.type_id, .name = entry.name});
-    }
-    return types;
-}
-
-std::vector<AudioName> NetworkClient::sounds() const {
-    std::vector<AudioName> sounds;
-    if (const auto& connection = impl_->connection) {
-        for (const auto& entry : connection->type_table().sounds()) {
-            sounds.push_back({.id = entry.type_id, .name = entry.name});
-        }
-    }
-    return sounds;
-}
-
-std::vector<AudioName> NetworkClient::musics() const {
-    std::vector<AudioName> musics;
-    if (const auto& connection = impl_->connection) {
-        for (const auto& entry : connection->type_table().musics()) {
-            musics.push_back({.id = entry.type_id, .name = entry.name});
-        }
-    }
-    return musics;
+    return connection ? connection->strings().table() : StringTable{};
 }
 
 std::optional<std::uint32_t> NetworkClient::server_tick() const {
@@ -207,9 +192,13 @@ std::optional<std::uint32_t> NetworkClient::server_tick() const {
 
 std::vector<EntitySnapshot> NetworkClient::entities() const {
     std::vector<EntitySnapshot> entities;
+    const auto& connection = impl_->connection;
+    if (!connection) {
+        return entities;
+    }
     entities.reserve(impl_->snapshots.entities().size());
     for (const auto& state : impl_->snapshots.entities()) {
-        entities.push_back(to_entity_snapshot(state));
+        entities.push_back(to_entity_snapshot(state, connection->strings()));
     }
     return entities;
 }

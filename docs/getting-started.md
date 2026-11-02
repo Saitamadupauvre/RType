@@ -97,6 +97,13 @@ Start the server, then one client per player:
 ./build/release/bin/r-type_client 127.0.0.1 4242
 ```
 
+Or, without a separate server:
+
+```sh
+./build/release/bin/r-type_client --host 4242   # host a game others can join, and play on it
+./build/release/bin/r-type_client --solo        # play alone, no network
+```
+
 | Command | Effect |
 |---|---|
 | `r-type_server <port>` | Listens on UDP `<port>` for up to 4 players |
@@ -104,6 +111,8 @@ Start the server, then one client per player:
 | `r-type_client <server-ip> <port>` | Opens a 1280 × 720 window and joins the server |
 | `r-type_client <server-ip> <port> --music-volume 30 --effects-volume 80` | Same, with quieter sounds (`0`–`100`) |
 | `r-type_client <server-ip> <port> --mute` | Same, muted (`M` toggles it in game) |
+| `r-type_client --host <port>` | Hosts a game on UDP `<port>` for up to 4 players and joins it; others connect with `r-type_client <your-ip> <port>` |
+| `r-type_client --solo` | Plays alone: server and client in one process, no socket opened |
 | `--help` on either | Prints the usage |
 
 Playing over a network: start the server on one machine, open its UDP port in

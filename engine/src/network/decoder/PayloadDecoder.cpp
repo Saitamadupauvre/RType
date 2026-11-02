@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "EventReader.hpp"
+#include "ValueReader.hpp"
 #include "bytes/ByteReader.hpp"
 #include "protocol/Protocol.hpp"
 #include "protocol/Validation.hpp"
@@ -14,14 +15,15 @@ namespace engine::network {
 
 namespace {
 
-bool can_hold_type_entries(const ByteReader& reader, std::size_t count) noexcept {
-    return count * min_type_entry_size <= reader.remaining();
+bool can_hold_string_entries(const ByteReader& reader, std::size_t count) noexcept {
+    return count * min_string_entry_size <= reader.remaining();
 }
 
-std::optional<TypeEntry> read_type_entry(ByteReader& reader) {
-    const auto type_id = reader.read_u16();
+std::optional<StringEntry> read_string_entry(ByteReader& reader) {
+    const auto category = reader.read_u8();
+    const auto id = reader.read_u16();
     const auto name_length = reader.read_u8();
-    if (!type_id || !name_length) {
+    if (!category || *category >= string_category_count || !id || !name_length) {
         return std::nullopt;
     }
 
@@ -29,58 +31,76 @@ std::optional<TypeEntry> read_type_entry(ByteReader& reader) {
     if (!name) {
         return std::nullopt;
     }
-    return TypeEntry{.type_id = *type_id, .name = std::string(name->begin(), name->end())};
+    return StringEntry{.category = static_cast<StringCategory>(*category),
+                       .id = *id,
+                       .name = std::string(name->begin(), name->end())};
 }
 
-std::optional<std::vector<TypeEntry>> read_type_table(ByteReader& reader) {
+std::optional<StringTable> read_string_table(ByteReader& reader) {
     const auto count = reader.read_u16();
-    if (!count || !can_hold_type_entries(reader, *count)) {
+    if (!count || !can_hold_string_entries(reader, *count)) {
         return std::nullopt;
     }
-    std::vector<TypeEntry> entries;
-    entries.reserve(*count);
+    StringTable table;
     for (std::size_t index = 0; index < *count; ++index) {
-        auto entry = read_type_entry(reader);
-        if (!entry) {
+        auto entry = read_string_entry(reader);
+        if (!entry || !table.insert(std::move(*entry))) {
             return std::nullopt;
         }
-        entries.push_back(std::move(*entry));
     }
-    return entries;
+    return table;
 }
 
-bool has_exact_entity_records(const ByteReader& reader, std::size_t count) noexcept {
-    return count <= max_snapshot_entities && reader.remaining() == count * entity_record_size;
+bool can_hold_entities(const ByteReader& reader, std::size_t count) noexcept {
+    return count * entity_header_size <= reader.remaining();
 }
 
-std::optional<EntityState> read_entity(ByteReader& reader) noexcept {
-    const auto entity_id = reader.read_u32();
-    const auto type_id = reader.read_u16();
-    const auto x = reader.read_i16();
-    const auto y = reader.read_i16();
-    const auto vx = reader.read_i16();
-    const auto vy = reader.read_i16();
-    const auto owner = reader.read_u8();
-    const auto r = reader.read_u8();
-    const auto g = reader.read_u8();
-    const auto b = reader.read_u8();
-    const auto a = reader.read_u8();
-    if (!entity_id || !type_id || !x || !y || !vx || !vy || !owner || !r || !g || !b || !a) {
+std::optional<FieldState> read_field(ByteReader& reader) {
+    const auto field_id = reader.read_u16();
+    const auto kind = reader.read_u8();
+    if (!field_id || !kind) {
         return std::nullopt;
     }
-    return EntityState{
-        .entity_id = *entity_id,
-        .type_id = *type_id,
-        .x = *x,
-        .y = *y,
-        .vx = *vx,
-        .vy = *vy,
-        .owner = *owner,
-        .r = *r,
-        .g = *g,
-        .b = *b,
-        .a = *a,
-    };
+    auto value = read_value(reader, *kind);
+    if (!value) {
+        return std::nullopt;
+    }
+    return FieldState{.field_id = *field_id, .value = std::move(*value)};
+}
+
+std::optional<EntityState> read_entity(ByteReader& reader) {
+    const auto entity_id = reader.read_u32();
+    const auto type_id = reader.read_u16();
+    const auto field_count = reader.read_u8();
+    if (!entity_id || !type_id || !field_count) {
+        return std::nullopt;
+    }
+    EntityState entity{.entity_id = *entity_id, .type_id = *type_id, .fields = {}};
+    entity.fields.reserve(*field_count);
+    for (std::size_t index = 0; index < *field_count; ++index) {
+        auto field = read_field(reader);
+        if (!field) {
+            return std::nullopt;
+        }
+        entity.fields.push_back(std::move(*field));
+    }
+    return entity;
+}
+
+std::optional<std::optional<PointerPosition>> read_pointer(ByteReader& reader) {
+    const auto flags = reader.read_u8();
+    if (!flags || (*flags | input_has_pointer) != input_has_pointer) {
+        return std::nullopt;
+    }
+    if (*flags == 0) {
+        return std::optional<PointerPosition>{};
+    }
+    const auto x = reader.read_i16();
+    const auto y = reader.read_i16();
+    if (!x || !y) {
+        return std::nullopt;
+    }
+    return std::optional<PointerPosition>{PointerPosition{.x = *x, .y = *y}};
 }
 
 } // namespace
@@ -101,20 +121,16 @@ std::optional<ConnectAcceptPayload> decode_connect_accept(std::span<const std::u
     if (!client_nonce || !player_entity_id) {
         return std::nullopt;
     }
-    auto types = read_type_table(reader);
-    auto sounds = types ? read_type_table(reader) : std::nullopt;
-    auto musics = sounds ? read_type_table(reader) : std::nullopt;
-    const auto current_music = musics ? reader.read_u16() : std::nullopt;
-    if (!types || !sounds || !musics || !current_music) {
+    auto strings = read_string_table(reader);
+    const auto current_music = strings ? reader.read_u16() : std::nullopt;
+    if (!strings || !current_music) {
         return std::nullopt;
     }
 
     ConnectAcceptPayload accept{
         .client_nonce = *client_nonce,
         .player_entity_id = *player_entity_id,
-        .types = std::move(*types),
-        .sounds = std::move(*sounds),
-        .musics = std::move(*musics),
+        .strings = std::move(*strings),
         .current_music = *current_music,
     };
     if (!reader.at_end() || !is_valid(accept)) {
@@ -125,14 +141,24 @@ std::optional<ConnectAcceptPayload> decode_connect_accept(std::span<const std::u
 
 std::optional<InputPayload> decode_input(std::span<const std::uint8_t> payload) {
     ByteReader reader(payload);
-    const auto action_flags = reader.read_u8();
-    const auto move_x = reader.read_i8();
-    const auto move_y = reader.read_i8();
-    if (!action_flags || !move_x || !move_y || !reader.at_end()) {
+    InputPayload input{};
+    for (std::uint8_t& byte : input.keys) {
+        const auto read = reader.read_u8();
+        if (!read) {
+            return std::nullopt;
+        }
+        byte = *read;
+    }
+    const auto mouse_buttons = reader.read_u8();
+    if (!mouse_buttons) {
         return std::nullopt;
     }
-
-    const InputPayload input{.action_flags = *action_flags, .move_x = *move_x, .move_y = *move_y};
+    input.mouse_buttons = *mouse_buttons;
+    auto pointer = read_pointer(reader);
+    if (!pointer || !reader.at_end()) {
+        return std::nullopt;
+    }
+    input.pointer = *pointer;
     if (!is_valid(input)) {
         return std::nullopt;
     }
@@ -143,18 +169,21 @@ std::optional<SnapshotPayload> decode_snapshot(std::span<const std::uint8_t> pay
     ByteReader reader(payload);
     const auto server_tick = reader.read_u32();
     const auto count = reader.read_u16();
-    if (!server_tick || !count || !has_exact_entity_records(reader, *count)) {
+    if (!server_tick || !count || !can_hold_entities(reader, *count)) {
         return std::nullopt;
     }
 
     SnapshotPayload snapshot{.server_tick = *server_tick, .entities = {}};
     snapshot.entities.reserve(*count);
     for (std::size_t index = 0; index < *count; ++index) {
-        const auto entity = read_entity(reader);
+        auto entity = read_entity(reader);
         if (!entity) {
             return std::nullopt;
         }
-        snapshot.entities.push_back(*entity);
+        snapshot.entities.push_back(std::move(*entity));
+    }
+    if (!reader.at_end() || !is_valid(snapshot)) {
+        return std::nullopt;
     }
     return snapshot;
 }

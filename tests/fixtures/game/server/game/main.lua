@@ -7,13 +7,15 @@ local function game()
     return roster.list("game")[1]
 end
 
-function on_start()
-end
+server = {
+    on_start = function()
+    end,
 
-function on_player_joined(player)
-    game():join(player)
-end
+    on_player_joined = function(player)
+        game():join(player)
+    end,
 
-function on_player_left(player)
-    game():leave(player)
-end
+    on_player_left = function(player)
+        game():leave(player)
+    end,
+}

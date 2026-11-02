@@ -27,10 +27,11 @@ each part are in [Engine modules](engine.md),
 flowchart TB
     subgraph Game["Game layer (game/)"]
         LUA["Lua scripts<br/>game/scripts"]
-        SRV["r-type_server<br/>ServerApp"]
-        CLI["r-type_client<br/>SnapshotView, Starfield, Controls"]
+        SRV["r-type_server<br/>dedicated"]
+        CLI["r-type_client<br/>client, host, solo"]
     end
     subgraph Engine["Engine layer (engine/), shared libraries"]
+        APP["engine-app<br/>ServerApp, ClientApp,<br/>launch modes"]
         CORE["engine-core<br/>ECS, scheduler, event bus,<br/>clock, fixed-step loop, log, DynamicLibrary"]
         SCRIPT["engine-script<br/>Lua runtime, declarations,<br/>entity handles, players"]
         NET["engine-network<br/>UDP sockets, protocol, threads,<br/>sessions, snapshots, stats"]
@@ -43,13 +44,14 @@ flowchart TB
         RAU["audio-raylib<br/>sound effects, music"]
     end
     LUA -. loaded by .-> SCRIPT
-    SRV --> SCRIPT
-    SRV --> NET
-    SRV --> CORE
-    CLI --> NET
-    CLI --> GFX
-    CLI --> AUD
-    CLI --> CORE
+    SRV --> APP
+    CLI --> APP
+    APP --> SCRIPT
+    APP --> NET
+    APP --> PHYS
+    APP --> GFX
+    APP --> AUD
+    APP --> CORE
     SCRIPT --> CORE
     NET --> CORE
     PHYS --> CORE
@@ -78,7 +80,7 @@ Third-party headers stay private: `raylib.h` appears only in
 | Events | `engine-core` | `EventBus`, `Subscription` | Typed publish/subscribe between subsystems |
 | Time | `engine-core` | `IClock`, `SteadyClock`, `ManualClock`, `FixedStepLoop` | Fixed-step simulation, injectable clock for tests |
 | Logging | `engine-core` | `log::info/warn/error`, `Sink`, `MemorySink` | Levelled logs on stderr; tests capture them |
-| Scripting | `engine-script` | `ScriptRuntime` | Loads and sandboxes Lua, spawns scripted entities, runs callbacks |
+| Scripting | `engine-script` | `ScriptRuntime`, `ScriptRuntimeBuilder`, `ServerApi`, `ClientApi` | Loads and sandboxes Lua, spawns scripted entities, runs callbacks; API sets give each side its own Lua functions |
 | Networking | `engine-network` | `NetworkServer`, `NetworkClient` | UDP transport, protocol, sessions, replication |
 | Physics | `engine-physics` | `PhysicsSystem`, `PhysicsBody`, `AABBCollider` | Integration and collision detection/resolution; the server uses it to find hitbox overlaps |
 | Rendering and input | `engine-graphics` + plugin | `IRenderer`, `IInput`, `load_graphics_plugin` | Backend-independent drawing and keyboard/mouse input |
@@ -154,17 +156,37 @@ classDiagram
 
     namespace script {
         class ScriptRuntime {
+            +builder()$ ScriptRuntimeBuilder
+            +api~Set~() Set&
             +load_scripts(path) bool
             +attach_world(EntityManager&)
             +spawn(type, ...) optional~Entity~
-            +player_joined(id) bool
-            +player_left(id) bool
-            +set_player_input(id, InputState)
             +update(float dt)
             +collide(Entity, Entity)
             +flush_destroyed() size_t
-            +take_audio_commands() vector~AudioCommand~
         }
+        class ScriptRuntimeBuilder {
+            +with~Set~() ScriptRuntimeBuilder&
+            +build() ScriptRuntime
+        }
+        class ApiSet {
+            <<abstract>>
+            +section() string_view
+        }
+        class ServerApi {
+            +player_joined(id) bool
+            +player_left(id) bool
+            +set_player_input(id, InputState)
+            +take_audio_commands() vector~AudioCommand~
+            +take_event_commands() vector~EventCommand~
+        }
+        class ClientApi {
+            +dispatch(EventCommand) bool
+        }
+        ScriptRuntimeBuilder ..> ScriptRuntime : builds
+        ScriptRuntime *-- ApiSet : owns
+        ApiSet <|-- ServerApi
+        ApiSet <|-- ClientApi
     }
 
     namespace network {
@@ -176,12 +198,19 @@ classDiagram
             +send_snapshot(EntityManager&)
             +stats() vector~PlayerStats~
         }
+        class EntitySnapshot {
+            +entity_id uint32
+            +type_id uint16
+            +fields vector~ReplicatedValue~
+            +find(component, field) FieldValue
+        }
         class NetworkClient {
-            +connect(ip, port, error_code&) bool
+            +connect(error_code&) bool
             +update()
-            +send_input(flags, move_x, move_y)
+            +send_input(InputState)
             +disconnect()
             +state() ConnectionState
+            +strings() StringTable
             +entities() vector~EntitySnapshot~
             +stats() NetworkStats
         }
@@ -260,6 +289,8 @@ classDiagram
     NetworkServer --> IClock
     NetworkServer --> EventBus : PlayerJoined / PlayerLeft
     NetworkServer ..> Replicated : reads to build snapshots
+    NetworkServer ..> FieldRegistry : reads replicated fields
+    NetworkClient ..> FieldRegistry : resolves field names
     NetworkClient --> IClock
     NetworkClient --> EventBus
     PhysicsSystem --> EntityManager
@@ -305,13 +336,13 @@ See [Networking internals](networking.md).
 
 ### One server tick (60 Hz)
 
-`ServerApp::tick` in `game/server/ServerApp.cpp`:
+`ServerApp::Impl::tick` in `engine/src/app/ServerApp.cpp`:
 
 ```mermaid
 sequenceDiagram
     participant Net as NetworkServer
     participant App as ServerApp
-    participant Lua as ScriptRuntime
+    participant Lua as ScriptRuntime + ServerApi
     participant ECS as EntityManager
     App->>Net: receive()
     Note over Net: sessions, timeouts,<br/>PlayerJoined / PlayerLeft on the event bus
@@ -319,39 +350,44 @@ sequenceDiagram
     App->>Net: inputs()
     App->>Lua: set_player_input(player, input)
     App->>Lua: update(dt)
-    Note over Lua: every entity's update(self, dt), spawns
+    Note over Lua: every entity's update(self, dt), then main.lua update(dt)
     App->>ECS: Collisions::step(dt): PhysicsSystem
     Note over ECS: CollisionEvent on the event bus
     ECS-->>Lua: collide(a, b) → on_collide(self, other)
     App->>Lua: flush_destroyed()
     Note over Lua: on_destroy, entities removed
-    App->>ECS: systems_.run(dt)
+    App->>ECS: systems.run(dt)
     App->>ECS: replicate(): Replicated{type, owner}
-    App->>Net: send_snapshot(registry)
+    App->>Net: SoundPlayed, MusicChanged, NamedEvent
+    App->>Net: send_snapshot(world)
 ```
 
 ### One client frame
 
-`game/client/main.cpp`:
+`ClientApp::Impl::frame` in `engine/src/app/ClientApp.cpp`:
 
 1. `network.update()`: apply received snapshots and events, retry the
-   connection, send heartbeats, detect a silent server.
-2. Read the keyboard through `IInput` and turn it into actions
-   (`Controls.cpp`).
-3. In fixed 1/60 s steps: scroll the starfield and send the input to the
-   server.
-4. Draw the starfield, then every replicated entity with
-   `assets/sprites/<type>.png` tinted with its colour, then the marker above
-   the local player's ship.
+   connection, send heartbeats, detect a silent server. Sounds and musics go to
+   the audio backend, named events to the Lua handlers registered with `on`.
+2. Capture every key and mouse button held, and the mouse position, through
+   `IInput` (`engine::graphics::capture_input`).
+3. In fixed 1/60 s steps: hand the input to Lua (`input`), run the
+   `client = { ... }` `update(dt)` of `main.lua`, send the input to the server.
+4. Apply the audio levels scripts set with `audio.*`.
+5. Draw every replicated entity with `assets/sprites/<type>.png` tinted with
+   its colour. `SnapshotView` mirrors each entity into a local world by
+   setting its replicated fields through the field registry, skipping
+   components that world does not register (such as `PhysicsBody`).
 
-The client never runs game rules: it draws what the server sent.
+The client never runs game rules: it draws what the server sent, and its Lua
+only handles local concerns such as hotkeys and audio levels.
 
 ## Data ownership
 
 | Data | Owner | Who reads it |
 |---|---|---|
 | World state (entities, components) | Server game thread | Snapshot builder, on the same thread |
-| Lua state | Server game thread | Nobody else: Lua is single-threaded |
+| Lua state | Server game thread / client main thread, one state each | Nobody else: Lua is single-threaded; in `host` mode the two states live on different threads and never meet |
 | Sessions, sequences, statistics | Game thread (server) / main thread (client) | Same thread only, no lock |
 | Inbox / outbox | `MessageQueue`, mutex-protected | Receive thread pushes, game thread drains; game thread pushes, send thread drains |
 | Socket | `NetworkIo` | Receive thread reads, send thread writes |
@@ -365,15 +401,13 @@ The client never runs game rules: it draws what the server sent.
 | Engine implementation | `engine/src/<module>/` |
 | CMake helpers (`engine_add_module`, `engine_add_plugin`) | `engine/cmake/EngineModule.cmake` |
 | Raylib backends | `plugins/graphics-raylib/src/`, `plugins/audio-raylib/src/` |
-| Server wiring | `game/server/` (`main.cpp`, `ServerApp`, `Cli`) |
-| Client wiring | `game/client/` (`main.cpp`, `SnapshotView`, `Starfield`, `Controls`, `AudioPlayer`, `Cli`) |
-| Input encoding shared by both | `game/common/ActionCodec` |
+| Generic apps and modes | `engine/src/app/` (`ServerApp`, `ClientApp`, `Launch`, `SnapshotView`, `AudioPlayer`, `Collisions`) |
+| Entry points | `game/server/`, `game/client/` (`main.cpp`, `Cli`) |
 | Game rules | `game/scripts/` |
 | Tests | `tests/engine/<module>/`, `tests/game/<target>/`, `tests/plugins/<name>/` |
 
 ## Where this is going (Part 2)
 
-The `main` functions become generic `ServerApp` / `ClientApp` classes in the
-engine, the engine moves to its own repository consumed through vcpkg, and a
-second game written only in Lua proves it is generic. See the
+The engine moves to its own repository consumed through vcpkg, a launcher runs
+any game folder, and a second game written only in Lua proves it is generic. See the
 [roadmap](PROJECT.md#15-roadmap).

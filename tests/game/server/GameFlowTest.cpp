@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -7,25 +8,27 @@
 #include <string>
 #include <vector>
 
+#include "engine/app/ServerApp.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
+#include "engine/core/InputState.hpp"
 #include "engine/core/Vec2.hpp"
-#include "engine/core/event/EventBus.hpp"
-#include "engine/script/InputState.hpp"
+#include "engine/core/time/ManualClock.hpp"
+#include "engine/network/Transport.hpp"
 #include "engine/script/ScriptRuntime.hpp"
-
-#include "Collisions.hpp"
+#include "engine/script/ServerApi.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;
+using engine::core::InputState;
 using engine::core::Position;
 using engine::core::Rgba;
 using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::Vec2;
-using engine::script::InputState;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -42,27 +45,24 @@ const std::filesystem::path game_scripts =
 
 class GameFlowTest : public ::testing::Test {
 protected:
-    EntityManager _world;
-    ScriptRuntime _runtime;
-    engine::core::event::EventBus _events;
-    rtype::server::Collisions _collisions{_world, _events, _runtime};
+    engine::core::time::ManualClock _clock;
+    engine::network::LoopbackNetwork _loopback;
+    engine::app::ServerApp _app{_clock, _loopback.server(), {.scripts = game_scripts}};
+    EntityManager& _world = _app.world();
+    ScriptRuntime& _runtime = _app.script();
+    ServerApi& _server = _app.script_server();
 
-    void SetUp() override {
-        _runtime.attach_world(_world);
-        ASSERT_TRUE(_runtime.load_scripts(game_scripts));
-        ASSERT_TRUE(_runtime.spawn("game").has_value());
-    }
+    void SetUp() override { ASSERT_TRUE(_runtime.spawn("game").has_value()); }
 
     void tick(float dt = frame) {
-        _runtime.update(dt);
-        _collisions.step(dt);
-        _runtime.flush_destroyed();
+        _app.tick(std::chrono::duration_cast<engine::core::time::Duration>(
+            std::chrono::duration<float>(dt)));
     }
 
-    void join(std::uint32_t player_id) { ASSERT_TRUE(_runtime.player_joined(player_id)); }
+    void join(std::uint32_t player_id) { ASSERT_TRUE(_server.player_joined(player_id)); }
 
     void leave(std::uint32_t player_id) {
-        ASSERT_TRUE(_runtime.player_left(player_id));
+        ASSERT_TRUE(_server.player_left(player_id));
         tick();
     }
 
@@ -87,7 +87,7 @@ protected:
 
     [[nodiscard]] Entity ship_of(std::uint32_t player_id) {
         for (const Entity ship : tagged("ship")) {
-            if (_runtime.entity_owner(ship) == player_id) {
+            if (_server.entity_owner(ship) == player_id) {
                 return ship;
             }
         }
@@ -96,7 +96,7 @@ protected:
 
     [[nodiscard]] bool has_ship(std::uint32_t player_id) {
         for (const Entity ship : tagged("ship")) {
-            if (_runtime.entity_owner(ship) == player_id) {
+            if (_server.entity_owner(ship) == player_id) {
                 return true;
             }
         }
@@ -109,8 +109,12 @@ protected:
 
     void steer(std::uint32_t player_id, float move_x) {
         InputState input;
-        input.axes.emplace("move_x", move_x);
-        _runtime.set_player_input(player_id, input);
+        if (move_x > 0.F) {
+            input.keys.insert(engine::core::Key::Right);
+        } else if (move_x < 0.F) {
+            input.keys.insert(engine::core::Key::Left);
+        }
+        _server.set_player_input(player_id, input);
     }
 
     Entity spawn(const std::string& type, Vec2 at) {

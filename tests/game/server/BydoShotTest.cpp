@@ -8,6 +8,7 @@
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/script/ScriptRuntime.hpp"
+#include "engine/script/ServerApi.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;
@@ -16,6 +17,7 @@ using engine::core::Sprite;
 using engine::core::Tags;
 using engine::core::Vec2;
 using engine::script::ScriptRuntime;
+using engine::script::ServerApi;
 
 namespace {
 
@@ -28,7 +30,8 @@ const std::filesystem::path game_scripts =
 class BydoShotTest : public ::testing::Test {
 protected:
     EntityManager _world;
-    ScriptRuntime _runtime;
+    ScriptRuntime _runtime = ScriptRuntime::builder().with<ServerApi>().build();
+    ServerApi& _server = _runtime.api<ServerApi>();
 
     void SetUp() override {
         _runtime.attach_world(_world);

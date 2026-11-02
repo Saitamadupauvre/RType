@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/core/Components.hpp"
 #include "engine/core/Vec2.hpp"
 
 #include <cstdint>
@@ -52,6 +53,15 @@ struct AABBCollider {
 struct CircleCollider {
     engine::core::Vec2 offset;
     float radius = 1.0f;
+};
+
+/**
+ * @brief Tags of the entities this one wants to hear about when they collide with it.
+ *
+ * Read by collision consumers such as the script runtime; the physics simulation ignores it.
+ */
+struct CollidesWith {
+    core::Tags tags;
 };
 
 /**

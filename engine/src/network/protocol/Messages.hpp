@@ -1,11 +1,17 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
 
+#include "engine/core/FieldRegistry.hpp"
 #include "engine/network/Events.hpp"
+#include "engine/network/StringTable.hpp"
+
+#include "Protocol.hpp"
 
 namespace engine::network {
 
@@ -15,44 +21,41 @@ struct ConnectRequestPayload {
     bool operator==(const ConnectRequestPayload&) const = default;
 };
 
-struct TypeEntry {
-    std::uint16_t type_id{};
-    std::string name;
-
-    bool operator==(const TypeEntry&) const = default;
-};
-
 struct ConnectAcceptPayload {
     std::uint32_t client_nonce{};
     std::uint32_t player_entity_id{};
-    std::vector<TypeEntry> types;
-    std::vector<TypeEntry> sounds{};
-    std::vector<TypeEntry> musics{};
+    StringTable strings{};
     std::uint16_t current_music{no_music};
 
     bool operator==(const ConnectAcceptPayload&) const = default;
 };
 
+struct PointerPosition {
+    std::int16_t x{};
+    std::int16_t y{};
+
+    bool operator==(const PointerPosition&) const = default;
+};
+
 struct InputPayload {
-    std::uint8_t action_flags{};
-    std::int8_t move_x{};
-    std::int8_t move_y{};
+    std::array<std::uint8_t, input_key_bytes> keys{};
+    std::uint8_t mouse_buttons{};
+    std::optional<PointerPosition> pointer;
 
     bool operator==(const InputPayload&) const = default;
+};
+
+struct FieldState {
+    std::uint16_t field_id{};
+    core::FieldValue value;
+
+    bool operator==(const FieldState&) const = default;
 };
 
 struct EntityState {
     std::uint32_t entity_id{};
     std::uint16_t type_id{};
-    std::int16_t x{};
-    std::int16_t y{};
-    std::int16_t vx{};
-    std::int16_t vy{};
-    std::uint8_t owner{};
-    std::uint8_t r{255};
-    std::uint8_t g{255};
-    std::uint8_t b{255};
-    std::uint8_t a{255};
+    std::vector<FieldState> fields;
 
     bool operator==(const EntityState&) const = default;
 };
@@ -65,34 +68,10 @@ struct SnapshotPayload {
 };
 
 enum class EventType : std::uint8_t {
-    spawn = 1,
-    destroy = 2,
-    fire = 3,
     sound = 4,
     player_left = 5,
     music = 6,
-};
-
-struct SpawnEvent {
-    std::uint32_t entity_id{};
-    std::uint16_t type_id{};
-    std::int16_t x{};
-    std::int16_t y{};
-
-    bool operator==(const SpawnEvent&) const = default;
-};
-
-struct DestroyEvent {
-    std::uint32_t entity_id{};
-
-    bool operator==(const DestroyEvent&) const = default;
-};
-
-struct FireEvent {
-    std::uint32_t source_entity_id{};
-    std::uint32_t projectile_entity_id{};
-
-    bool operator==(const FireEvent&) const = default;
+    named = 7,
 };
 
 struct SoundEvent {
@@ -114,8 +93,21 @@ struct MusicEvent {
     bool operator==(const MusicEvent&) const = default;
 };
 
-using EventPayload =
-    std::variant<SpawnEvent, DestroyEvent, FireEvent, SoundEvent, PlayerLeftEvent, MusicEvent>;
+struct EventArgumentState {
+    std::uint16_t key_id{};
+    core::FieldValue value;
+
+    bool operator==(const EventArgumentState&) const = default;
+};
+
+struct NamedEventState {
+    std::uint16_t name_id{};
+    std::vector<EventArgumentState> arguments;
+
+    bool operator==(const NamedEventState&) const = default;
+};
+
+using EventPayload = std::variant<SoundEvent, PlayerLeftEvent, MusicEvent, NamedEventState>;
 
 struct HeartbeatPayload {
     bool operator==(const HeartbeatPayload&) const = default;

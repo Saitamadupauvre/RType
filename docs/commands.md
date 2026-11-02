@@ -44,6 +44,8 @@ CMake options:
 ./build/ninja-debug/bin/r-type_server 4242
 ./build/ninja-debug/bin/r-type_client 127.0.0.1 4242
 ./build/ninja-debug/bin/r-type_client 127.0.0.1 4242 --music-volume 30 --mute
+./build/ninja-debug/bin/r-type_client --host 4242   # server thread + client
+./build/ninja-debug/bin/r-type_client --solo        # no socket
 ./build/ninja-debug/bin/r-type_sandbox           # tries the graphics plugin alone
 ```
 

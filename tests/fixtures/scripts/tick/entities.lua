@@ -61,9 +61,9 @@ entity "ship" {
     speed  = 100,
 
     update = function(self, dt)
-        self.vx = self.input:axis("move_x") * self.speed
-        self.vy = self.input:axis("move_y") * self.speed
-        self.x = self.input:pressed("fire") and 5 or 0
+        self.vx = (self.input:key("Right") and 1 or 0) * self.speed
+        self.vy = (self.input:key("Up") and -1 or 0) * self.speed
+        self.x = self.input:key("Space") and 5 or 0
         self.y = self:has_tag("player") and 1 or 0
     end,
 
@@ -105,4 +105,28 @@ entity "painted" {
 
 entity "bad_tags" {
     tags = { "ok", 5 },
+}
+
+entity "cursor" {
+    update = function(self, dt)
+        local x, y = self.input:pointer()
+        self.x = x or -1
+        self.y = y or -1
+    end,
+
+    read_click = function(self)
+        self.x = self.input:mouse("Left") and 1 or 0
+    end,
+
+    read_unknown_key = function(self)
+        return self.input:key("Spcae")
+    end,
+
+    read_unknown_button = function(self)
+        return self.input:mouse("Back")
+    end,
+
+    read_key_of_wrong_type = function(self)
+        return self.input:key(32)
+    end,
 }
