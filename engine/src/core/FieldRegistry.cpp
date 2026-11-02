@@ -1,12 +1,15 @@
 #include "engine/core/FieldRegistry.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <optional>
 #include <string>
 #include <unordered_set>
 
+#include "engine/core/Camera.hpp"
 #include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/Transform.hpp"
 
 namespace engine::core {
 
@@ -73,6 +76,71 @@ void require_list_items(std::string_view component, const FieldDescriptor& field
                                                 field_kind_name(kind_of(item))));
         }
     }
+}
+
+FieldDescriptor camera_zoom_field() {
+    return component_field<Camera>(
+        "zoom", FieldKind::Float, field_flags::replicated,
+        [](const Camera& camera) { return FieldValue{camera.zoom}; },
+        [](Camera& camera, const FieldValue& value) {
+            const auto zoom = std::get<float>(value);
+            if (!std::isfinite(zoom) || zoom <= 0.F) {
+                throw std::out_of_range("zoom must be positive");
+            }
+            camera.zoom = zoom;
+        });
+}
+
+FieldDescriptor camera_bounds_origin_field() {
+    return component_field<Camera>(
+        "bounds_origin", FieldKind::Vec2, field_flags::replicated,
+        [](const Camera& camera) { return FieldValue{camera.bounds_origin}; },
+        [](Camera& camera, const FieldValue& value) {
+            const auto origin = std::get<Vec2>(value);
+            if (!std::isfinite(origin.x) || !std::isfinite(origin.y)) {
+                throw std::out_of_range("bounds origin must be finite");
+            }
+            camera.bounds_origin = origin;
+        });
+}
+
+FieldDescriptor camera_bounds_size_field() {
+    return component_field<Camera>(
+        "bounds_size", FieldKind::Vec2, field_flags::replicated,
+        [](const Camera& camera) { return FieldValue{camera.bounds_size}; },
+        [](Camera& camera, const FieldValue& value) {
+            const auto size = std::get<Vec2>(value);
+            if (!std::isfinite(size.x) || !std::isfinite(size.y) || size.x < 0.F || size.y < 0.F) {
+                throw std::out_of_range("bounds size must be zero or positive");
+            }
+            camera.bounds_size = size;
+        });
+}
+
+FieldDescriptor rotation_degrees_field() {
+    return component_field<Rotation>(
+        "degrees", FieldKind::Float, field_flags::replicated,
+        [](const Rotation& rotation) { return FieldValue{rotation.degrees}; },
+        [](Rotation& rotation, const FieldValue& value) {
+            const auto degrees = std::get<float>(value);
+            if (!std::isfinite(degrees)) {
+                throw std::out_of_range("rotation must be finite");
+            }
+            rotation.degrees = degrees;
+        });
+}
+
+template <float Vec2::* Axis> FieldDescriptor scale_axis_field(std::string name) {
+    return component_field<Scale>(
+        std::move(name), FieldKind::Float, field_flags::replicated,
+        [](const Scale& scale) { return FieldValue{scale.factor.*Axis}; },
+        [](Scale& scale, const FieldValue& value) {
+            const auto factor = std::get<float>(value);
+            if (!std::isfinite(factor)) {
+                throw std::out_of_range("scale must be finite");
+            }
+            scale.factor.*Axis = factor;
+        });
 }
 
 } // namespace
@@ -247,6 +315,14 @@ void register_core_fields(FieldRegistry& registry) {
                                          &labels_to_list, [](Tags& tags, const FieldList& list) {
                                              tags = labels_from_list(list);
                                          })});
+    registry.add<Camera>("Camera",
+                         {camera_zoom_field(),
+                          member_field<&Camera::follow>("follow", field_flags::editable),
+                          camera_bounds_origin_field(), camera_bounds_size_field()},
+                         required<Position>);
+    registry.add<Rotation>("Rotation", {rotation_degrees_field()});
+    registry.add<Scale>("Scale",
+                        {scale_axis_field<&Vec2::x>("x"), scale_axis_field<&Vec2::y>("y")});
 }
 
 } // namespace engine::core

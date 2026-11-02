@@ -116,11 +116,14 @@ const Texture2D& RaylibRenderer::texture_or_placeholder(engine::graphics::Textur
 
 void RaylibRenderer::begin_frame(engine::graphics::Color clear) {
     _clear = clear;
+    _in_frame = true;
     BeginTextureMode(_target);
     ClearBackground(to_raylib(clear));
 }
 
 void RaylibRenderer::end_frame() {
+    end_world();
+    _in_frame = false;
     EndTextureMode();
     BeginDrawing();
     ClearBackground(to_raylib(_clear));
@@ -136,6 +139,25 @@ void RaylibRenderer::end_frame() {
     EndDrawing();
 }
 
+void RaylibRenderer::begin_world(const engine::core::CameraView& view) {
+    if (!_in_frame) {
+        return;
+    }
+    _in_world = true;
+    BeginMode2D(Camera2D{.offset = to_raylib(virtual_resolution / 2.F),
+                         .target = to_raylib(view.center),
+                         .rotation = 0.F,
+                         .zoom = view.zoom});
+}
+
+void RaylibRenderer::end_world() {
+    if (!_in_world) {
+        return;
+    }
+    _in_world = false;
+    EndMode2D();
+}
+
 void RaylibRenderer::draw_sprite(const engine::graphics::SpriteDraw& sprite) {
     const Texture2D* found = _textures.find(sprite.texture);
     const Texture2D& texture = found == nullptr ? _placeholder : *found;
@@ -143,7 +165,8 @@ void RaylibRenderer::draw_sprite(const engine::graphics::SpriteDraw& sprite) {
         found == nullptr ? engine::graphics::Rect{.width = static_cast<float>(texture.width),
                                                   .height = static_cast<float>(texture.height)}
                          : sprite.source;
-    DrawTexturePro(texture, to_raylib(source), to_raylib(sprite.dest), {.x = 0.F, .y = 0.F}, 0.F,
+    DrawTexturePro(texture, to_raylib(source), to_raylib(sprite.dest),
+                   {.x = sprite.origin.x, .y = sprite.origin.y}, sprite.rotation,
                    to_raylib(sprite.tint));
 }
 

@@ -26,3 +26,10 @@ TEST(GraphicsTypes, DefaultWindowIsWindowed) {
 }
 
 TEST(GraphicsTypes, UnknownKeyIsTheDefault) { EXPECT_EQ(Key{}, Key::Unknown); }
+
+TEST(GraphicsTypes, DefaultSpriteDrawIsUprightFromTopLeft) {
+    const SpriteDraw sprite;
+
+    EXPECT_EQ(sprite.rotation, 0.F);
+    EXPECT_EQ(sprite.origin, (engine::core::Vec2{0.F, 0.F}));
+}

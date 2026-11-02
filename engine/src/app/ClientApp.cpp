@@ -8,6 +8,7 @@
 
 #include "AssetPreloader.hpp"
 #include "AudioPlayer.hpp"
+#include "CameraRig.hpp"
 #include "Fields.hpp"
 #include "LoadingScreen.hpp"
 #include "SnapshotView.hpp"
@@ -82,6 +83,7 @@ private:
     void queue_preload();
     void run_ticks();
     void draw(bool playing);
+    void draw_world();
 };
 
 ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport& transport,
@@ -157,6 +159,9 @@ void ClientApp::Impl::queue_preload() {
 
 void ClientApp::Impl::run_ticks() {
     const auto local = graphics::capture_input(input.get());
+    const core::Vec2 viewport = renderer.get().virtual_size();
+    const auto entities = network.entities();
+    client.set_camera_view(resolve_camera(entities, client.camera_override(), viewport), viewport);
     loop.run_frame([&](core::time::Duration step) {
         client.set_input(local);
         runtime.update(std::chrono::duration<float>(step).count());
@@ -167,11 +172,21 @@ void ClientApp::Impl::run_ticks() {
 void ClientApp::Impl::draw(bool playing) {
     renderer.get().begin_frame(options.background);
     if (playing) {
-        view.draw(network.entities());
+        draw_world();
     } else {
         draw_loading_screen(renderer.get(), preloader.loaded(), preloader.total());
     }
     renderer.get().end_frame();
+}
+
+void ClientApp::Impl::draw_world() {
+    const core::Vec2 viewport = renderer.get().virtual_size();
+    const auto entities = network.entities();
+    const core::CameraView camera = resolve_camera(entities, client.camera_override(), viewport);
+    client.set_camera_view(camera, viewport);
+    renderer.get().begin_world(camera);
+    view.draw(entities);
+    renderer.get().end_world();
 }
 
 void ClientApp::Impl::stop() {

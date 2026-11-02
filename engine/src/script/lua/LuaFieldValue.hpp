@@ -18,8 +18,19 @@ core::FieldValue from_lua(sol::this_state state, const sol::object& value, core:
 
 float number_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
 
+core::Vec2 factor_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
+
 sol::object size_to_lua(sol::this_state state, core::Vec2 size);
 
 core::Vec2 size_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
+
+struct Area {
+    core::Vec2 origin;
+    core::Vec2 size;
+};
+
+sol::object area_to_lua(sol::this_state state, const Area& area);
+
+Area area_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
 
 } // namespace engine::script

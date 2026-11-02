@@ -32,13 +32,18 @@ engine_add_test(core SOURCES
     engine/core/ComponentsTest.cpp
     engine/core/DynamicLibraryTest.cpp
     engine/core/FieldRegistryTest.cpp
+    engine/core/CameraTest.cpp
+    engine/core/TransformTest.cpp
 )
 engine_add_test(script SOURCES
     engine/script/ApiSetsTest.cpp
+    engine/script/CameraApiTest.cpp
     engine/script/ClientApiTest.cpp
     engine/script/ScriptRuntimeTest.cpp
     engine/script/assets/TexturesTest.cpp
     engine/script/audio/AudioTest.cpp
+    engine/script/entity/CameraFieldsTest.cpp
+    engine/script/entity/TransformFieldsTest.cpp
     engine/script/entity/CollisionsTest.cpp
     engine/script/entity/EntityFieldsTest.cpp
     engine/script/entity/EntityHandleTest.cpp
@@ -105,6 +110,8 @@ engine_add_test(audio SOURCES
 engine_add_test(app SOURCES
     engine/app/AssetPreloaderTest.cpp
     engine/app/AudioPlayerTest.cpp
+    engine/app/CameraFollowTest.cpp
+    engine/app/CameraRigTest.cpp
     engine/app/ClientAppTest.cpp
     engine/app/LoadingScreenTest.cpp
     engine/app/ServerAppTest.cpp

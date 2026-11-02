@@ -28,6 +28,8 @@ public:
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {}; }
     void begin_frame(Color clear) override { last_clear = clear; }
     void end_frame() override { ++frames; }
+    void begin_world(const engine::core::CameraView&) override {}
+    void end_world() override {}
     void draw_sprite(const SpriteDraw&) override {}
     void draw_rect(const Rect&, Color, bool) override {}
     void draw_circle(Vec2, float, Color) override {}
@@ -104,6 +106,27 @@ TEST(GraphicsBackend, ExposesRendererAndInputThroughInterfaces) {
     EXPECT_FALSE(backend.renderer().should_close());
     EXPECT_EQ(backend.renderer().virtual_size(), (Vec2{1920, 1080}));
     EXPECT_FALSE(backend.input().is_key_down(Key::Space));
+}
+
+TEST(GraphicsBackend, ConvertsThroughViewInVirtualSpace) {
+    bool destroyed = false;
+    FakeBackend fake(destroyed);
+    const IRenderer& renderer = fake.renderer();
+    const CameraView view{.center = {100.F, 200.F}, .zoom = 2.F};
+
+    EXPECT_EQ(renderer.world_to_screen(view, {100.F, 200.F}), (Vec2{960.F, 540.F}));
+    EXPECT_EQ(renderer.world_to_screen(view, {110.F, 200.F}), (Vec2{980.F, 540.F}));
+    EXPECT_EQ(renderer.screen_to_world(view, {980.F, 540.F}), (Vec2{110.F, 200.F}));
+}
+
+TEST(GraphicsBackend, DefaultViewConvertsToSamePoint) {
+    bool destroyed = false;
+    FakeBackend fake(destroyed);
+    const IRenderer& renderer = fake.renderer();
+    const CameraView view = default_view(renderer.virtual_size());
+
+    EXPECT_EQ(renderer.world_to_screen(view, {37.F, 1000.F}), (Vec2{37.F, 1000.F}));
+    EXPECT_EQ(renderer.screen_to_world(view, {37.F, 1000.F}), (Vec2{37.F, 1000.F}));
 }
 
 TEST(GraphicsBackend, InterfacesAreNotCopyableOrMovable) {

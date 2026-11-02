@@ -10,8 +10,10 @@
 #include <unordered_map>
 #include <utility>
 
+#include "engine/core/Camera.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
+#include "engine/core/Transform.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/physics/Components.hpp"
 #include "loading/Declarations.hpp"
@@ -43,6 +45,9 @@ void register_script_components(core::EntityManager& world) {
     register_if_missing<core::Position>(world);
     register_if_missing<core::Sprite>(world);
     register_if_missing<core::Tags>(world);
+    register_if_missing<core::Camera>(world);
+    register_if_missing<core::Rotation>(world);
+    register_if_missing<core::Scale>(world);
     register_if_missing<physics::CollidesWith>(world);
     register_if_missing<physics::AABBCollider>(world);
     register_if_missing<physics::PhysicsBody>(world);

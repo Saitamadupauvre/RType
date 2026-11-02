@@ -11,11 +11,13 @@ engine_add_module(core
     SOURCES
         src/core/AssetCache.cpp
         src/core/EntityPool.cpp
+        src/core/Camera.cpp
         src/core/ComponentTypeId.cpp
         src/core/DynamicLibrary.cpp
         src/core/EntityManager.cpp
         src/core/FieldRegistry.cpp
         src/core/SystemScheduler.cpp
+        src/core/Transform.cpp
         src/core/event/EventBus.cpp
         src/core/log/Log.cpp
         src/core/log/MemorySink.cpp
@@ -119,6 +121,8 @@ engine_add_module(app
     SOURCES
         src/app/AssetPreloader.cpp
         src/app/AudioPlayer.cpp
+        src/app/CameraFollow.cpp
+        src/app/CameraRig.cpp
         src/app/ClientApp.cpp
         src/app/Collisions.cpp
         src/app/Fields.cpp

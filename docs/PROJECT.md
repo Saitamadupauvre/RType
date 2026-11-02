@@ -307,13 +307,27 @@ class IRenderer {
     // frame
     virtual void begin_frame(Color clear) = 0;
     virtual void end_frame() = 0;
-    // drawing, in virtual units
+    // world space: draw calls in between take world units, seen through a camera view
+    virtual void begin_world(const CameraView&) = 0;
+    virtual void end_world() = 0;
+    Vec2 world_to_screen(const CameraView&, Vec2 world) const;   // non-virtual helpers
+    Vec2 screen_to_world(const CameraView&, Vec2 screen) const;
+    // drawing, in virtual units (screen space outside begin_world / end_world)
     virtual void draw_sprite(const SpriteDraw&) = 0;
     virtual void draw_rect(const Rect&, Color, bool filled = true) = 0;
     virtual void draw_circle(Vec2 center, float radius, Color) = 0;
     virtual void draw_line(Vec2 from, Vec2 to, float thickness, Color) = 0;
     virtual void draw_text(const std::string&, Vec2 pos, float size, Color) = 0;
     virtual Vec2 measure_text(const std::string&, float size) const = 0;
+};
+
+struct SpriteDraw {
+    TextureId texture;
+    Rect source;          // texture pixels; a negative width or height mirrors the sprite
+    Rect dest;            // dest.x, dest.y is where origin lands
+    Vec2 origin;          // pivot, relative to the top-left of the drawn rectangle
+    float rotation = 0;   // degrees around origin, clockwise on screen
+    Color tint;
 };
 
 class IInput {   // raw keys; the engine's InputMap turns them into actions
@@ -350,6 +364,8 @@ The loader refuses a plugin built for another API version, and the backend is al
 - All graphics calls happen on the **main thread** (the OpenGL context lives there). Network threads push data into queues read by the main thread.
 - Timing comes from the engine clock, not from the backend.
 - The client draws in virtual units; the backend handles scaling and letterboxing.
+- **World space and screen space.** Between `begin_world(view)` and `end_world()`, draw calls take world units: a `CameraView` (`center`, the world point shown at the middle of the screen, and `zoom`) turns them into virtual units, `screen = (world - center) * zoom + virtual_size / 2`. Everything else, such as a HUD, is drawn in screen space and does not move with the camera. `end_frame()` ends world space if needed. The client draws the replicated entities in world space every frame.
+- **Camera.** The view comes from, in this order: the local override of the client scripts (`camera.*`, §10.10), the scene camera (the replicated entity with a `Camera` component and the lowest id, clamped to its bounds), or the default view (`center = virtual_size / 2`, `zoom = 1`), which draws exactly as without a camera. Camera entities are never drawn. The conversion math lives in `engine-core` (`engine/core/Camera.hpp`), so the script module uses it without depending on graphics.
 
 ### 9.4 Audio plugin
 
@@ -533,7 +549,7 @@ Both forms produce the same internal representation.
 
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
+| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `rotation`, `scale`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds` | C++ component pools | Movement, collisions, rendering, replication |
 | Free fields | `health`, `speed`, `points`, `waypoints` | Lua table of the entity | Scripts only |
 | Callbacks | `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
@@ -547,6 +563,8 @@ Free fields holding a table are the exception: each entity gets its own deep cop
 ```lua
 self.x, self.y      -- position (native)
 self.vx, self.vy    -- velocity: moved by the C++ engine every tick, nil until set
+self.rotation       -- degrees, clockwise (native), nil until set
+self.scale          -- { x, y } factor (native), nil until set
 self.age            -- seconds since spawn (read-only)
 self.id             -- unique id (read-only)
 self.type           -- declared name, e.g. "bydo" (read-only)
@@ -563,6 +581,16 @@ self:move_to(x, y, duration)  -- inside a coroutine
 ```
 
 `sprite` is a path relative to `assets/`, such as `sprites/boss/core.png`. The `sprite` of an entity declaration is declared as a texture on its own; any other value must be declared with `textures { ... }` (§10.6) or be `""` (no sprite), otherwise the assignment raises an error and the sprite does not change. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a square of that color (temporary, until the renderer API lands). It reads back as a new table.
+
+`rotation` turns the sprite, in degrees clockwise, around its center. `scale` takes a number for both axes (`scale = 2`) or a table `{ x = .., y = .. }`; a negative factor mirrors the sprite (`scale = { x = -1, y = 1 }` faces it the other way) and `0` hides it. The scaled sprite keeps its top-left corner at `x`, `y`. Both are optional: an entity without them is drawn upright at the size of its texture and sends nothing over the network for them. `scale` always reads back as a new `{ x, y }` table. Both are replicated and editable, so the editor, scene files and snapshots carry them; the scale travels as two floats, so fractional factors reach clients exactly. Colliders do not follow them yet: `hitbox` stays exactly as written, whatever the rotation or scale. An entity drawn as a colored square (no `sprite`) is scaled but never rotated.
+
+```lua
+entity "boss" {
+    sprite   = "sprites/boss.png",
+    scale    = 3,
+    rotation = 15,
+}
+```
 
 `hitbox = { w, h }` gives the entity a rectangular collider of positive size, anchored at its top-left `x`, `y` (the same corner the sprite is drawn from). `collides_with` is an array of tags: the entity's `on_collide(self, other)` is called on every tick its hitbox overlaps (strictly, touching edges do not count) the hitbox of an entity carrying one of those tags. Both read back as new tables, and both can change at any time, like `tags`. Collisions are one-sided: a missile with `collides_with = { "enemy" }` and an enemy with `collides_with = { "missile" }` each get their own call; an enemy without `collides_with` is never told. Both calls of a pair run even if the first destroys an entity, but an entity destroyed earlier in the tick gets no further collision. Detection runs in C++ (`engine-physics`) after every `update`, so it costs nothing in Lua.
 
@@ -582,7 +610,18 @@ end
 
 `owner` takes a player handle or `nil`, also as a `spawn` override (`spawn("ship", { owner = player })`). The entity then reads that player's input through `self.input`, and clients receive the owner so each one can highlight its own entities. Once the player leaves, `owner` reads `nil`.
 
-Native fields are aliases of component fields declared in the engine's field registry: `x` / `y` are the axes of `Position.pos`, `vx` / `vy` of `PhysicsBody.velocity`, `sprite` is `Sprite.path`, `color` is `Sprite.color`, `tags` is `Tags.labels`, `hitbox` is `AABBCollider.size` and `collides_with` is `CollidesWith.labels`. `get_field` / `set_field` reach every other registered field by component and field name, with the same conversions:
+**Cameras.** `zoom`, `follow` and `bounds` make an entity a camera (a `Camera` component): its `x`, `y` is the world point shown at the center of the screen. `zoom` is a positive number (default 1, 2 shows the world twice as big), `follow` a tag: every tick, after the systems, the server moves the camera onto the entity with that tag and the lowest id (an empty string, the default, or no such entity leaves it in place). `bounds = { x, y, w, h }` is a world area the view never leaves; on an axis where the view is larger than the area it is centered on it, and `w = 0, h = 0` (the default) means no bounds. `zoom` and `bounds` are replicated, `follow` stays on the server. A scene without camera keeps the default view, and camera entities are never drawn. A camera entity cannot be called `camera`, which is a reserved global (§10.12).
+
+```lua
+entity "main_camera" {
+    x = 960, y = 540,
+    zoom   = 1,
+    follow = "player",
+    bounds = { x = 0, y = 0, w = 8000, h = 1080 },
+}
+```
+
+Native fields are aliases of component fields declared in the engine's field registry: `x` / `y` are the axes of `Position.pos`, `vx` / `vy` of `PhysicsBody.velocity`, `sprite` is `Sprite.path`, `color` is `Sprite.color`, `rotation` is `Rotation.degrees`, `scale` is `Scale.x` with `Scale.y`, `tags` is `Tags.labels`, `hitbox` is `AABBCollider.size`, `collides_with` is `CollidesWith.labels`, `zoom` is `Camera.zoom`, `follow` is `Camera.follow` and `bounds` is `Camera.bounds_origin` with `Camera.bounds_size`. `get_field` / `set_field` reach every other registered field by component and field name, with the same conversions:
 
 | Field kind | Lua value |
 |---|---|
@@ -816,7 +855,7 @@ speed  = 150         -- server only
 |---|---|---|
 | `core` | `entity`, `system`, `require`, `sounds`, `musics`, `textures`, `event`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
 | `server` | `spawn`, `players`, `find_player`, `play`, `music`, `emit`, `self.input`, `self.owner`, `on_player_joined`, `on_player_left` | server (`core` + `server`) |
-| `client` | `on`, `input`, `audio` | client (`core` + `client`) |
+| `client` | `on`, `input`, `audio`, `camera` | client (`core` + `client`) |
 | `editor` | nothing yet | editor (`core` + `editor`) |
 
 Top-level code of a file runs on every side, so it may only use `core` functions; side-specific calls belong in callbacks.
@@ -858,6 +897,17 @@ client = {
 
 **Client input and audio.** `input` is the local keyboard and mouse of the current tick. `input:key(name)`, `input:mouse(name)` and `input:pointer()` read it like `self.input` on the server; `input:pressed(name)` is true only on the tick the key goes down, for toggles. An unknown key or button name raises an error. `audio.muted()`, `audio.set_muted(bool)`, `audio.volume(kind)` and `audio.set_volume(kind, volume)` read and change the client's audio levels; `kind` is `"music"` or `"effects"`, `volume` a number from 0 to 1, and anything else raises an error and changes nothing. The levels start from the command line (`--music-volume`, `--effects-volume`, `--mute`).
 
+**Client camera.** By default the client draws through the scene camera (§10.5). Its scripts can override it **locally**, without affecting the server or the other clients:
+
+```lua
+camera.set(x, y [, zoom])          -- show the world point (x, y) at the center of the screen
+camera.follow(id [, zoom])         -- center on the replicated entity whose self.id is id
+camera.reset()                     -- back to the scene camera (or the default view)
+local wx, wy = camera.screen_to_world(input:pointer())   -- world point under the mouse
+```
+
+A missing `zoom` keeps the zoom of the current view. `camera.follow` keeps the scene camera's bounds and falls back to the scene camera while the entity is not replicated; the server sends ids to clients through events, e.g. `emit("you_are", { id = self.id })`. `input:pointer()` stays in screen units; `camera.screen_to_world` converts through the view drawn this frame. A coordinate that is not a finite number, a `zoom` that is not positive or an `id` that is not a non-negative integer raises an error and changes nothing.
+
 ### 10.11 Server tick order
 
 1. Apply received inputs.
@@ -872,11 +922,11 @@ client = {
 
 Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
 
-- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
+- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds`, `layer`, `age`, `id`, `type`, `input`, `owner`.
 - Declaration sections: `server`, `client`.
 - Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`.
 - Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `update`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `textures`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `textures`.
 
 ### 10.13 Error handling and sandbox
 

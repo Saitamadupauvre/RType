@@ -220,6 +220,15 @@ float number_from_lua(sol::this_state state, const sol::object& value, std::stri
     return finite_float(state, value.as<double>(), field);
 }
 
+core::Vec2 factor_from_lua(sol::this_state state, const sol::object& value, std::string_view name) {
+    const ValueName field = entity_field(name);
+    if (value.get_type() == sol::type::number) {
+        const float uniform = finite_float(state, value.as<double>(), field);
+        return core::Vec2{uniform, uniform};
+    }
+    return vec2_from_lua(state, value, field);
+}
+
 sol::object size_to_lua(sol::this_state state, core::Vec2 size) {
     return sol::state_view(state).create_table_with("w", size.x, "h", size.y);
 }
@@ -230,6 +239,21 @@ core::Vec2 size_from_lua(sol::this_state state, const sol::object& value, std::s
     const auto table = value.as<sol::table>();
     return core::Vec2{finite_float(state, table_number(state, table, "w", field), field),
                       finite_float(state, table_number(state, table, "h", field), field)};
+}
+
+sol::object area_to_lua(sol::this_state state, const Area& area) {
+    return sol::state_view(state).create_table_with("x", area.origin.x, "y", area.origin.y, "w",
+                                                    area.size.x, "h", area.size.y);
+}
+
+Area area_from_lua(sol::this_state state, const sol::object& value, std::string_view name) {
+    const ValueName field = entity_field(name);
+    require_type(state, value, sol::type::table, field);
+    const auto table = value.as<sol::table>();
+    const auto number = [&](std::string_view key) {
+        return finite_float(state, table_number(state, table, key, field), field);
+    };
+    return Area{.origin = {number("x"), number("y")}, .size = {number("w"), number("h")}};
 }
 
 } // namespace engine::script

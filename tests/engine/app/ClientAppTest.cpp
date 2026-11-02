@@ -12,6 +12,7 @@
 #include "engine/app/ClientApp.hpp"
 #include "engine/app/ServerApp.hpp"
 #include "engine/audio/IAudio.hpp"
+#include "engine/core/Camera.hpp"
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/graphics/IInput.hpp"
 #include "engine/graphics/IRenderer.hpp"
@@ -62,9 +63,22 @@ public:
     void begin_frame(Color) override {
         sprites.clear();
         texts.clear();
+        sprites_in_world.clear();
+        views.clear();
     }
-    void end_frame() override { ++frames; }
-    void draw_sprite(const SpriteDraw& sprite) override { sprites.push_back(sprite); }
+    void end_frame() override {
+        in_world = false;
+        ++frames;
+    }
+    void begin_world(const engine::core::CameraView& view) override {
+        views.push_back(view);
+        in_world = true;
+    }
+    void end_world() override { in_world = false; }
+    void draw_sprite(const SpriteDraw& sprite) override {
+        sprites.push_back(sprite);
+        sprites_in_world.push_back(in_world);
+    }
     void draw_rect(const Rect&, Color, bool) override {}
     void draw_circle(Vec2, float, Color) override {}
     void draw_line(Vec2, Vec2, float, Color) override {}
@@ -80,6 +94,9 @@ public:
     std::vector<std::string> loaded;
     std::vector<SpriteDraw> sprites;
     std::vector<std::string> texts;
+    std::vector<bool> sprites_in_world;
+    std::vector<engine::core::CameraView> views;
+    bool in_world{false};
 };
 
 class FakeInput final : public engine::graphics::IInput {
@@ -185,8 +202,8 @@ TEST_F(ClientAppTest, DrawsTheEntitiesOfTheServer) {
     play(session_frames);
 
     ASSERT_EQ(_renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.x, 10.F);
-    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.y, 20.F);
+    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.x - _renderer.sprites.front().origin.x, 10.F);
+    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.y - _renderer.sprites.front().origin.y, 20.F);
     EXPECT_EQ(_renderer.sprites.front().tint, (Color{.r = 10, .g = 20, .b = 30, .a = 255}));
 }
 
@@ -244,6 +261,78 @@ TEST_F(ClientAppTest, StaysConnectedWhileSlowAssetsLoad) {
     EXPECT_EQ(_client.network().state(), ConnectionState::connected);
     EXPECT_EQ(_server.network().player_count(), 1U);
     EXPECT_EQ(_renderer.sprites.size(), 1U);
+}
+
+TEST_F(ClientAppTest, WithoutCameraTheWorldIsDrawnThroughTheDefaultView) {
+    start_client();
+
+    play(session_frames);
+
+    ASSERT_EQ(_renderer.views.size(), 1U);
+    EXPECT_EQ(_renderer.views.front(), engine::core::default_view({1920.F, 1080.F}));
+    ASSERT_EQ(_renderer.sprites_in_world.size(), _renderer.sprites.size());
+    for (const bool in_world : _renderer.sprites_in_world) {
+        EXPECT_TRUE(in_world);
+    }
+    EXPECT_FALSE(_renderer.in_world);
+}
+
+TEST_F(ClientAppTest, SceneCameraIsUsedAndNotDrawn) {
+    start_client();
+    ASSERT_TRUE(_server.script().spawn("view").has_value());
+
+    play(session_frames);
+
+    ASSERT_EQ(_renderer.views.size(), 1U);
+    EXPECT_EQ(_renderer.views.front(),
+              (engine::core::CameraView{.center = {400.F, 300.F}, .zoom = 2.F}));
+    ASSERT_EQ(_renderer.sprites.size(), 1U);
+    EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.x - _renderer.sprites.front().origin.x, 10.F);
+}
+
+TEST_F(ClientAppTest, ClientCameraOverrideIsLocal) {
+    FakeRenderer other_renderer;
+    ClientApp other{_clock,
+                    _loopback.add_client(),
+                    other_renderer,
+                    _input,
+                    _audio,
+                    ClientAppOptions{.scripts = game / "scripts",
+                                     .assets = game / "assets",
+                                     .window = {},
+                                     .background = {},
+                                     .audio = {}}};
+    std::string error;
+    ASSERT_TRUE(other.start(error)) << error;
+    start_client();
+    ASSERT_TRUE(_server.script().spawn("view").has_value());
+    ASSERT_TRUE(_client.script().run_string("camera.set(50, 60, 0.5)", "override"));
+
+    for (int frame = 0; frame < session_frames; ++frame) {
+        _clock.advance(std::chrono::milliseconds(17));
+        _server.update();
+        _client.frame();
+        other.frame();
+    }
+
+    EXPECT_EQ(_renderer.views.front(),
+              (engine::core::CameraView{.center = {50.F, 60.F}, .zoom = 0.5F}));
+    EXPECT_EQ(other_renderer.views.front(),
+              (engine::core::CameraView{.center = {400.F, 300.F}, .zoom = 2.F}));
+    other.stop();
+}
+
+TEST_F(ClientAppTest, CameraResetGoesBackToTheSceneCamera) {
+    start_client();
+    ASSERT_TRUE(_server.script().spawn("view").has_value());
+    ASSERT_TRUE(_client.script().run_string("camera.set(50, 60, 0.5)", "override"));
+    play(session_frames);
+
+    ASSERT_TRUE(_client.script().run_string("camera.reset()", "reset"));
+    play(1);
+
+    EXPECT_EQ(_renderer.views.front(),
+              (engine::core::CameraView{.center = {400.F, 300.F}, .zoom = 2.F}));
 }
 
 TEST_F(ClientAppTest, ServerEventsReachTheClientScripts) {

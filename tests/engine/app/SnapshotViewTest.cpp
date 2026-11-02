@@ -45,6 +45,8 @@ public:
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {96, 36}; }
     void begin_frame(Color) override {}
     void end_frame() override {}
+    void begin_world(const engine::core::CameraView&) override {}
+    void end_world() override {}
     void draw_sprite(const SpriteDraw& sprite) override { sprites.push_back(sprite); }
     void draw_rect(const Rect& rect, Color color, bool) override {
         rects.push_back(rect);
@@ -89,7 +91,7 @@ TEST(SnapshotView, DrawsEachEntityWithItsReplicatedSpriteAndColor) {
     EXPECT_EQ(renderer.loaded.front(),
               (std::filesystem::path("assets") / "sprites/boss/core.png").string());
     ASSERT_EQ(renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 5.F);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 5.F);
     EXPECT_EQ(renderer.sprites.front().tint, (Color{.r = 10, .g = 20, .b = 30, .a = 255}));
 }
 
@@ -125,7 +127,7 @@ TEST(SnapshotView, DrawsOnlyTheNewestSnapshot) {
     view.draw({entity("sprites/ship.png", 90.F, 0)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 90.F);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 90.F);
 }
 
 TEST(SnapshotView, EntityWithoutColorIsDrawnWhite) {
@@ -150,5 +152,49 @@ TEST(SnapshotView, IgnoresFieldsOfComponentsItDoesNotDraw) {
     view.draw({entity("sprites/ship.png", 5.F, 1'000)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
-    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 5.F);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 5.F);
+}
+
+TEST(SnapshotView, CameraEntitiesAreNotDrawn) {
+    RecordingRenderer renderer;
+    SnapshotView view(renderer, "assets", fields);
+    EntitySnapshot camera{
+        .entity_id = 2,
+        .type_id = ship_type,
+        .fields = {value_of("Position", "pos", Vec2{5.F, 20.F}), value_of("Camera", "zoom", 1.F)}};
+
+    view.draw({camera, entity("sprites/ship.png", 40.F, 0)});
+
+    ASSERT_EQ(renderer.sprites.size(), 1U);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 40.F);
+    EXPECT_TRUE(renderer.rects.empty());
+}
+
+TEST(SnapshotView, EntityWithoutRotationOrScaleIsDrawnUpright) {
+    RecordingRenderer renderer;
+    SnapshotView view(renderer, "assets", fields);
+
+    view.draw({entity("sprites/ship.png", 5.F, 0)});
+
+    ASSERT_EQ(renderer.sprites.size(), 1U);
+    EXPECT_EQ(renderer.sprites.front().rotation, 0.F);
+    EXPECT_EQ(renderer.sprites.front().dest,
+              (Rect{.x = 53.F, .y = 38.F, .width = 96.F, .height = 36.F}));
+}
+
+TEST(SnapshotView, ReplicatedRotationAndScaleAreDrawn) {
+    RecordingRenderer renderer;
+    SnapshotView view(renderer, "assets", fields);
+    EntitySnapshot turned = entity("sprites/ship.png", 5.F, 0);
+    turned.fields.push_back(value_of("Rotation", "degrees", 30.F));
+    turned.fields.push_back(value_of("Scale", "x", -2.F));
+    turned.fields.push_back(value_of("Scale", "y", 0.5F));
+
+    view.draw({turned});
+
+    ASSERT_EQ(renderer.sprites.size(), 1U);
+    const SpriteDraw& drawn = renderer.sprites.front();
+    EXPECT_EQ(drawn.rotation, 30.F);
+    EXPECT_EQ(drawn.source, (Rect{.x = 0.F, .y = 0.F, .width = -96.F, .height = 36.F}));
+    EXPECT_EQ(drawn.dest, (Rect{.x = 101.F, .y = 29.F, .width = 192.F, .height = 18.F}));
 }

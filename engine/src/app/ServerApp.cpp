@@ -10,8 +10,10 @@
 #include <utility>
 #include <vector>
 
+#include "CameraFollow.hpp"
 #include "Collisions.hpp"
 #include "Fields.hpp"
+#include "engine/core/Camera.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/Entity.hpp"
@@ -133,6 +135,7 @@ void ServerApp::Impl::tick(core::time::Duration step) {
     collisions.step(dt);
     runtime.flush_destroyed();
     systems.run(world, dt);
+    follow_cameras(world);
     replicate();
     publish_audio();
     publish_events();
@@ -147,8 +150,7 @@ void ServerApp::Impl::apply_inputs() {
 
 void ServerApp::Impl::replicate() {
     std::vector<std::pair<core::Entity, network::Replicated>> updates;
-    world.query<core::Position, core::Sprite>().each([&](core::Entity entity, const core::Position&,
-                                                         const core::Sprite&) {
+    const auto mark = [&](core::Entity entity) {
         const auto type = runtime.entity_type(entity);
         if (!type) {
             return;
@@ -160,7 +162,15 @@ void ServerApp::Impl::replicate() {
         updates.emplace_back(entity,
                              network::Replicated{.type_id = *type_id,
                                                  .owner = wire_owner(server.entity_owner(entity))});
-    });
+    };
+    world.query<core::Position, core::Sprite>().each(
+        [&](core::Entity entity, const core::Position&, const core::Sprite&) { mark(entity); });
+    world.query<core::Position, core::Camera>().each(
+        [&](core::Entity entity, const core::Position&, const core::Camera&) {
+            if (!world.has<core::Sprite>(entity)) {
+                mark(entity);
+            }
+        });
     for (const auto& [entity, replicated] : updates) {
         if (world.has<network::Replicated>(entity)) {
             world.get<network::Replicated>(entity) = replicated;

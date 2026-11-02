@@ -2,17 +2,21 @@
 
 #include <stdexcept>
 
+#include "CameraRig.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
+#include "engine/core/Transform.hpp"
 #include "engine/core/log/Log.hpp"
 
 namespace engine::app {
 
 SnapshotView::SnapshotView(graphics::IRenderer& renderer, const std::filesystem::path& assets,
                            const core::FieldRegistry& fields)
-    : _renderer(renderer), _fields(fields), _draw(renderer, assets) {
+    : _fields(fields), _draw(renderer, assets) {
     _world.register_component<core::Position>();
     _world.register_component<core::Sprite>();
+    _world.register_component<core::Rotation>();
+    _world.register_component<core::Scale>();
 }
 
 void SnapshotView::draw(const std::vector<network::EntitySnapshot>& entities) {
@@ -28,6 +32,9 @@ void SnapshotView::mirror(const std::vector<network::EntitySnapshot>& entities) 
     }
     _mirrored.clear();
     for (const auto& snapshot : entities) {
+        if (is_camera(snapshot)) {
+            continue;
+        }
         const auto entity = _world.spawn();
         _world.add(entity, core::Sprite{});
         apply(entity, snapshot);

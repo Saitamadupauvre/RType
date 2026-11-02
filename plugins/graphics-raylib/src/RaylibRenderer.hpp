@@ -24,6 +24,8 @@ public:
     texture_size(engine::graphics::TextureId texture) const override;
     void begin_frame(engine::graphics::Color clear) override;
     void end_frame() override;
+    void begin_world(const engine::core::CameraView& view) override;
+    void end_world() override;
     void draw_sprite(const engine::graphics::SpriteDraw& sprite) override;
     void draw_rect(const engine::graphics::Rect& rect, engine::graphics::Color color,
                    bool filled) override;
@@ -40,6 +42,8 @@ private:
     [[nodiscard]] const Texture2D& texture_or_placeholder(engine::graphics::TextureId id) const;
 
     bool _open{false};
+    bool _in_frame{false};
+    bool _in_world{false};
     RenderTexture2D _target{};
     Texture2D _placeholder{};
     TextureTable<Texture2D> _textures;

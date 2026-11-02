@@ -558,7 +558,12 @@ private:
 [[nodiscard]] ENGINE_CORE_EXPORT Tags labels_from_list(const FieldList& list);
 
 /**
- * @brief Registers the fields of the engine-core components: Position, Sprite and Tags.
+ * @brief Registers the fields of the engine-core components: Position, Sprite, Tags, Camera,
+ * Rotation and Scale.
+ *
+ * Camera requires Position: setting a Camera field gives the entity a Position too. Rotation and
+ * Scale reject non-finite values. Scale is exposed as two float fields, x and y, so that snapshots
+ * carry fractional factors exactly.
  *
  * @throws DuplicateComponentName If one of them is already registered.
  */

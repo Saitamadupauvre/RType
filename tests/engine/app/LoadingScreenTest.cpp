@@ -40,6 +40,8 @@ public:
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {}; }
     void begin_frame(Color) override {}
     void end_frame() override {}
+    void begin_world(const engine::core::CameraView&) override {}
+    void end_world() override {}
     void draw_sprite(const SpriteDraw&) override { ++sprites; }
     void draw_rect(const Rect& rect, Color, bool filled) override {
         rects.push_back({.rect = rect, .filled = filled});
