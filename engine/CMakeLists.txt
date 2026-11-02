@@ -10,6 +10,7 @@ target_link_libraries(engine_lua INTERFACE ${LUA_LIBRARIES})
 engine_add_module(core
     SOURCES
         src/core/EntityPool.cpp
+        src/core/Camera.cpp
         src/core/ComponentTypeId.cpp
         src/core/DynamicLibrary.cpp
         src/core/EntityManager.cpp
