@@ -1,7 +1,5 @@
 #include "WorldDraw.hpp"
 
-#include <utility>
-
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
 
@@ -17,8 +15,18 @@ graphics::Color to_color(core::Rgba color) {
 
 } // namespace
 
-WorldDraw::WorldDraw(graphics::IRenderer& renderer, std::filesystem::path assets)
-    : _renderer(renderer), _assets(std::move(assets)) {}
+WorldDraw::WorldDraw(graphics::IRenderer& renderer, const std::filesystem::path& assets)
+    : _renderer(renderer),
+      _textures(
+          assets,
+          [&renderer](const std::filesystem::path& path) {
+              return renderer.load_texture(path.string());
+          },
+          [&renderer](graphics::TextureId texture) { renderer.unload_texture(texture); }) {}
+
+bool WorldDraw::preload(const std::string& texture) {
+    return _textures.get(texture) != graphics::TextureId{};
+}
 
 void WorldDraw::draw(core::EntityManager& world) {
     world.query<core::Position, core::Sprite>().each(
@@ -29,23 +37,13 @@ void WorldDraw::draw(core::EntityManager& world) {
                                     to_color(sprite.color));
                 return;
             }
-            const graphics::TextureId id = texture(sprite.path);
+            const graphics::TextureId id = _textures.get(sprite.path);
             const core::Vec2 size = _renderer.texture_size(id);
             _renderer.draw_sprite({.texture = id,
                                    .source = {.width = size.x, .height = size.y},
                                    .dest = {.x = x, .y = y, .width = size.x, .height = size.y},
                                    .tint = to_color(sprite.color)});
         });
-}
-
-graphics::TextureId WorldDraw::texture(const std::string& path) {
-    const auto found = _textures.find(path);
-    if (found != _textures.end()) {
-        return found->second;
-    }
-    const graphics::TextureId id = _renderer.load_texture((_assets / path).string());
-    _textures.emplace(path, id);
-    return id;
 }
 
 } // namespace engine::app
