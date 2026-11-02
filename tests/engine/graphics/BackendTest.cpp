@@ -108,6 +108,27 @@ TEST(GraphicsBackend, ExposesRendererAndInputThroughInterfaces) {
     EXPECT_FALSE(backend.input().is_key_down(Key::Space));
 }
 
+TEST(GraphicsBackend, ConvertsThroughViewInVirtualSpace) {
+    bool destroyed = false;
+    FakeBackend fake(destroyed);
+    const IRenderer& renderer = fake.renderer();
+    const CameraView view{.center = {100.F, 200.F}, .zoom = 2.F};
+
+    EXPECT_EQ(renderer.world_to_screen(view, {100.F, 200.F}), (Vec2{960.F, 540.F}));
+    EXPECT_EQ(renderer.world_to_screen(view, {110.F, 200.F}), (Vec2{980.F, 540.F}));
+    EXPECT_EQ(renderer.screen_to_world(view, {980.F, 540.F}), (Vec2{110.F, 200.F}));
+}
+
+TEST(GraphicsBackend, DefaultViewConvertsToSamePoint) {
+    bool destroyed = false;
+    FakeBackend fake(destroyed);
+    const IRenderer& renderer = fake.renderer();
+    const CameraView view = default_view(renderer.virtual_size());
+
+    EXPECT_EQ(renderer.world_to_screen(view, {37.F, 1000.F}), (Vec2{37.F, 1000.F}));
+    EXPECT_EQ(renderer.screen_to_world(view, {37.F, 1000.F}), (Vec2{37.F, 1000.F}));
+}
+
 TEST(GraphicsBackend, InterfacesAreNotCopyableOrMovable) {
     static_assert(!std::is_copy_constructible_v<IRenderer>);
     static_assert(!std::is_move_constructible_v<IRenderer>);
