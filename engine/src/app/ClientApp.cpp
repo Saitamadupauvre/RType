@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "AudioPlayer.hpp"
+#include "CameraRig.hpp"
 #include "Fields.hpp"
 #include "SnapshotView.hpp"
 #include "engine/core/FieldRegistry.hpp"
@@ -104,14 +105,21 @@ void ClientApp::Impl::frame() {
     network.update();
     audio.get().update();
     const auto local = graphics::capture_input(input.get());
+    const core::Vec2 viewport = renderer.get().virtual_size();
+    const auto entities = network.entities();
+    client.set_camera_view(resolve_camera(entities, client.camera_override(), viewport), viewport);
     loop.run_frame([&](core::time::Duration step) {
         client.set_input(local);
         runtime.update(std::chrono::duration<float>(step).count());
         network.send_input(local);
     });
     sound.apply(client.audio_settings());
+    const core::CameraView camera = resolve_camera(entities, client.camera_override(), viewport);
+    client.set_camera_view(camera, viewport);
     renderer.get().begin_frame(options.background);
-    view.draw(network.entities(), network.strings());
+    renderer.get().begin_world(camera);
+    view.draw(entities, network.strings());
+    renderer.get().end_world();
     renderer.get().end_frame();
 }
 

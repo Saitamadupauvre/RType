@@ -48,6 +48,8 @@ public:
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {96, 36}; }
     void begin_frame(Color) override {}
     void end_frame() override {}
+    void begin_world(const engine::core::CameraView&) override {}
+    void end_world() override {}
     void draw_sprite(const SpriteDraw& sprite) override { sprites.push_back(sprite); }
     void draw_rect(const Rect& rect, Color color, bool) override {
         rects.push_back(rect);
@@ -150,4 +152,19 @@ TEST(SnapshotView, IgnoresFieldsOfComponentsItDoesNotDraw) {
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 5.F);
+}
+
+TEST(SnapshotView, CameraEntitiesAreNotDrawn) {
+    RecordingRenderer renderer;
+    SnapshotView view(renderer, "assets", fields);
+    EntitySnapshot camera{
+        .entity_id = 2,
+        .type_id = ship_type,
+        .fields = {value_of("Position", "pos", Vec2{5.F, 20.F}), value_of("Camera", "zoom", 1.F)}};
+
+    view.draw({camera, entity(ship_type, 40.F, 0)}, strings);
+
+    ASSERT_EQ(renderer.sprites.size(), 1U);
+    EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x, 40.F);
+    EXPECT_TRUE(renderer.rects.empty());
 }

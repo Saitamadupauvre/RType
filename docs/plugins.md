@@ -133,6 +133,10 @@ window, so the two copies never share state.
 - Timing comes from the engine clock, not from the backend.
 - The client draws in virtual units (1920 x 1080); the plugin handles scaling
   and letterboxing.
+- Draw calls between `begin_world(view)` and `end_world()` are in world units
+  and go through the camera view; the Raylib plugin maps it to a `Camera2D`
+  (`offset` = half the virtual size, `target` = view center). Outside, they are
+  in screen space.
 - Plugin loading is tested for both kinds: missing library, missing symbol,
   wrong API version, null backend, and the real Raylib plugin loaded without
   opening a window or an audio device.

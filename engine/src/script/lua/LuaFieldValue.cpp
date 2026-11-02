@@ -232,4 +232,19 @@ core::Vec2 size_from_lua(sol::this_state state, const sol::object& value, std::s
                       finite_float(state, table_number(state, table, "h", field), field)};
 }
 
+sol::object area_to_lua(sol::this_state state, const Area& area) {
+    return sol::state_view(state).create_table_with("x", area.origin.x, "y", area.origin.y, "w",
+                                                    area.size.x, "h", area.size.y);
+}
+
+Area area_from_lua(sol::this_state state, const sol::object& value, std::string_view name) {
+    const ValueName field = entity_field(name);
+    require_type(state, value, sol::type::table, field);
+    const auto table = value.as<sol::table>();
+    const auto number = [&](std::string_view key) {
+        return finite_float(state, table_number(state, table, key, field), field);
+    };
+    return Area{.origin = {number("x"), number("y")}, .size = {number("w"), number("h")}};
+}
+
 } // namespace engine::script

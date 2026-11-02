@@ -36,6 +36,8 @@ namespace {
 constexpr Duration tick_step = std::chrono::nanoseconds(1'000'000'000 / 60);
 const std::filesystem::path players_scripts =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "players";
+const std::filesystem::path camera_scripts =
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "camera";
 
 std::vector<Entity> owned_by(ServerApp& app, std::uint32_t player_id) {
     std::vector<Entity> owned;
@@ -200,6 +202,30 @@ TEST(ServerApp, ScriptEntitiesWithoutSpriteOrColorAreNotReplicated) {
     app.tick(tick_step);
 
     EXPECT_FALSE(app.world().has<engine::network::Replicated>(*scenery));
+}
+
+TEST(ServerApp, CameraEntitiesWithoutSpriteAreReplicated) {
+    Server server(camera_scripts);
+    ServerApp& app = server.app;
+    const auto camera = app.script().spawn("view");
+    ASSERT_TRUE(camera.has_value());
+
+    app.tick(tick_step);
+
+    EXPECT_TRUE(app.world().has<engine::network::Replicated>(*camera));
+}
+
+TEST(ServerApp, TickMovesFollowingCameraOntoItsTarget) {
+    Server server(camera_scripts);
+    ServerApp& app = server.app;
+    const auto camera = app.script().spawn("view");
+    ASSERT_TRUE(camera.has_value());
+    ASSERT_TRUE(app.script().spawn("ship").has_value());
+
+    app.tick(tick_step);
+
+    EXPECT_EQ(app.world().get<engine::core::Position>(*camera).pos,
+              (engine::core::Vec2{300.F, 400.F}));
 }
 
 TEST(ServerApp, LeavingPlayerEntitiesAreDestroyedOnTheNextTick) {

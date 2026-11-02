@@ -239,6 +239,8 @@ classDiagram
             +open(WindowConfig) bool
             +load_texture(path) TextureId
             +begin_frame(Color)
+            +begin_world(CameraView)
+            +end_world()
             +draw_sprite(SpriteDraw)
             +draw_text(text, position, size, color)
             +end_frame()

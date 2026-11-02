@@ -43,6 +43,8 @@ public:
     }
     void begin_frame(Color) override {}
     void end_frame() override {}
+    void begin_world(const engine::core::CameraView&) override {}
+    void end_world() override {}
     void draw_sprite(const SpriteDraw& sprite) override { sprites.push_back(sprite); }
     void draw_rect(const Rect& rect, Color color, bool) override {
         rects.push_back(rect);

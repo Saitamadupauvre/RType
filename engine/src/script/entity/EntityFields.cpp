@@ -59,7 +59,23 @@ constexpr std::array aliases{
                .apply_defaults = &give_script_body,
                .after_set = &anchor_hitbox},
     FieldAlias{.name = "collides_with", .component = "CollidesWith", .field = "labels"},
+    FieldAlias{.name = "zoom", .component = "Camera", .field = "zoom"},
+    FieldAlias{.name = "follow", .component = "Camera", .field = "follow"},
+    FieldAlias{.name = "bounds",
+               .component = "Camera",
+               .field = "bounds_origin",
+               .size_field = "bounds_size",
+               .shape = AliasShape::Area},
 };
+
+core::FieldRef require_alias_field(const core::FieldRegistry& registry, std::string_view component,
+                                   std::string_view field) {
+    const core::FieldRef found = registry.find_field(component, field);
+    if (!found) {
+        throw core::UnknownField(component, field);
+    }
+    return found;
+}
 
 [[noreturn]] void fail(sol::this_state state, std::string_view message) {
     throw std::runtime_error(std::format("{}{}", caller_location(state), message));
@@ -74,11 +90,12 @@ core::Vec2 with_axis(core::Vec2 vector, AliasShape shape, float value) {
 
 EntityFields::EntityFields(const core::FieldRegistry& registry) : _registry(registry) {
     for (const FieldAlias& alias : aliases) {
-        const core::FieldRef field = registry.find_field(alias.component, alias.field);
-        if (!field) {
-            throw core::UnknownField(alias.component, alias.field);
-        }
-        _bindings.push_back(Binding{.alias = alias, .field = field});
+        _bindings.push_back(Binding{
+            .alias = alias,
+            .field = require_alias_field(registry, alias.component, alias.field),
+            .size = alias.size_field.empty()
+                        ? core::FieldRef{}
+                        : require_alias_field(registry, alias.component, alias.size_field)});
     }
 }
 
@@ -99,6 +116,9 @@ sol::object EntityFields::read_alias(sol::this_state state, core::EntityManager&
     if (binding.alias.shape == AliasShape::Whole) {
         return read_field(state, world, entity, binding.field);
     }
+    if (binding.alias.shape == AliasShape::Area) {
+        return read_area(state, world, entity, binding);
+    }
     const auto value = _registry.get(world, entity, binding.field);
     if (!value) {
         return sol::make_object(state, sol::lua_nil);
@@ -111,6 +131,7 @@ sol::object EntityFields::read_alias(sol::this_state state, core::EntityManager&
         return sol::make_object(state, vector.y);
     case AliasShape::Size:
     case AliasShape::Whole:
+    case AliasShape::Area:
         break;
     }
     return size_to_lua(state, vector);
@@ -120,6 +141,10 @@ void EntityFields::write_alias(sol::this_state state, core::EntityManager& world
                                core::Entity entity, std::string_view name,
                                const sol::object& value) const {
     const Binding& binding = *find(name);
+    if (binding.alias.shape == AliasShape::Area) {
+        write_area(state, world, entity, binding, value);
+        return;
+    }
     const core::FieldValue converted = alias_value(state, world, entity, binding, value);
     const bool lacked_defaults =
         binding.alias.lacks_defaults != nullptr && binding.alias.lacks_defaults(world, entity);
@@ -144,6 +169,26 @@ void EntityFields::write(sol::this_state state, core::EntityManager& world, core
     const core::FieldRef found = require(state, component, field);
     const std::string name = std::format("{}.{}", component, field);
     write_value(state, world, entity, found, name, from_lua(state, value, *found.field, name));
+}
+
+sol::object EntityFields::read_area(sol::this_state state, core::EntityManager& world,
+                                    core::Entity entity, const Binding& binding) const {
+    const auto origin = _registry.get(world, entity, binding.field);
+    const auto size = _registry.get(world, entity, binding.size);
+    if (!origin || !size) {
+        return sol::make_object(state, sol::lua_nil);
+    }
+    return area_to_lua(
+        state, Area{.origin = std::get<core::Vec2>(*origin), .size = std::get<core::Vec2>(*size)});
+}
+
+void EntityFields::write_area(sol::this_state state, core::EntityManager& world,
+                              core::Entity entity, const Binding& binding,
+                              const sol::object& value) const {
+    const std::string_view name = binding.alias.name;
+    const Area area = area_from_lua(state, value, name);
+    write_value(state, world, entity, binding.size, name, area.size);
+    write_value(state, world, entity, binding.field, name, area.origin);
 }
 
 const EntityFields::Binding* EntityFields::find(std::string_view name) const {
@@ -192,6 +237,7 @@ core::FieldValue EntityFields::alias_value(sol::this_state state, core::EntityMa
         return from_lua(state, value, *binding.field.field, name);
     case AliasShape::Size:
         return size_from_lua(state, value, name);
+    case AliasShape::Area:
     case AliasShape::AxisX:
     case AliasShape::AxisY:
         break;

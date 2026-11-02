@@ -23,6 +23,8 @@ public:
     }
     void begin_frame(engine::graphics::Color) override {}
     void end_frame() override {}
+    void begin_world(const engine::core::CameraView&) override {}
+    void end_world() override {}
     void draw_sprite(const engine::graphics::SpriteDraw&) override {}
     void draw_rect(const engine::graphics::Rect&, engine::graphics::Color, bool) override {}
     void draw_circle(engine::core::Vec2, float, engine::graphics::Color) override {}

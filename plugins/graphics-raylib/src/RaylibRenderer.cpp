@@ -116,11 +116,14 @@ const Texture2D& RaylibRenderer::texture_or_placeholder(engine::graphics::Textur
 
 void RaylibRenderer::begin_frame(engine::graphics::Color clear) {
     _clear = clear;
+    _in_frame = true;
     BeginTextureMode(_target);
     ClearBackground(to_raylib(clear));
 }
 
 void RaylibRenderer::end_frame() {
+    end_world();
+    _in_frame = false;
     EndTextureMode();
     BeginDrawing();
     ClearBackground(to_raylib(_clear));
@@ -134,6 +137,25 @@ void RaylibRenderer::end_frame() {
                    {.x = view.x, .y = view.y, .width = view.width, .height = view.height},
                    {.x = 0.F, .y = 0.F}, 0.F, WHITE);
     EndDrawing();
+}
+
+void RaylibRenderer::begin_world(const engine::core::CameraView& view) {
+    if (!_in_frame) {
+        return;
+    }
+    _in_world = true;
+    BeginMode2D(Camera2D{.offset = to_raylib(virtual_resolution / 2.F),
+                         .target = to_raylib(view.center),
+                         .rotation = 0.F,
+                         .zoom = view.zoom});
+}
+
+void RaylibRenderer::end_world() {
+    if (!_in_world) {
+        return;
+    }
+    _in_world = false;
+    EndMode2D();
 }
 
 void RaylibRenderer::draw_sprite(const engine::graphics::SpriteDraw& sprite) {
