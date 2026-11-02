@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -11,6 +12,7 @@
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
+#include "engine/core/Transform.hpp"
 #include "engine/core/Vec2.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
@@ -190,6 +192,54 @@ TEST_F(InstancesTest, RoundTripRebuildsTheSameInstances) {
 
     EXPECT_TRUE(issues.empty());
     EXPECT_EQ(rebuilt.runtime.capture_instances(), captured);
+}
+
+TEST_F(InstancesTest, RotationAndScaleOverridesRoundTrip) {
+    const Entity plain = _scene.spawn("plain");
+    _scene.runtime.fields().set(_scene.world, plain, "Rotation", "degrees", FieldValue{90.0F});
+    _scene.runtime.fields().set(_scene.world, plain, "Scale", "factor",
+                                FieldValue{Vec2{-1.0F, 2.0F}});
+    const std::vector<Instance> captured = _scene.runtime.capture_instances();
+    ASSERT_EQ(captured.size(), 1U);
+    EXPECT_EQ(override_names(captured[0]),
+              (std::vector<std::string>{"Rotation.degrees", "Scale.factor"}));
+
+    Scene rebuilt;
+    const std::vector<InstanceIssue> issues = rebuilt.runtime.spawn_instances(captured);
+
+    EXPECT_TRUE(issues.empty());
+    EXPECT_EQ(rebuilt.runtime.capture_instances(), captured);
+    std::optional<Entity> spawned;
+    rebuilt.world.query<engine::core::Rotation>().each(
+        [&](Entity entity, engine::core::Rotation&) { spawned = entity; });
+    ASSERT_TRUE(spawned.has_value());
+    EXPECT_FLOAT_EQ(engine::core::rotation_of(rebuilt.world, *spawned), 90.0F);
+    EXPECT_EQ(engine::core::scale_of(rebuilt.world, *spawned), (Vec2{-1.0F, 2.0F}));
+}
+
+TEST_F(InstancesTest, PrefabRotationAndScaleAreNotOverrides) {
+    const Entity boss = _scene.spawn("boss");
+    EXPECT_TRUE(_scene.runtime.capture_instances().at(0).overrides.empty());
+
+    _scene.runtime.fields().set(_scene.world, boss, "Rotation", "degrees", FieldValue{60.0F});
+
+    EXPECT_EQ(override_names(_scene.runtime.capture_instances().at(0)),
+              std::vector<std::string>{"Rotation.degrees"});
+}
+
+TEST_F(InstancesTest, NonFiniteRotationOverrideIsReported) {
+    const std::vector<Instance> instances{
+        {.name = "",
+         .type = "boss",
+         .position = {},
+         .overrides = {{.field = "Rotation.degrees",
+                        .value = FieldValue{std::numeric_limits<float>::infinity()}}}}};
+
+    const std::vector<InstanceIssue> issues = _scene.runtime.spawn_instances(instances);
+
+    ASSERT_EQ(issues.size(), 1U);
+    EXPECT_EQ(issues[0].field, "Rotation.degrees");
+    EXPECT_TRUE(_scene.runtime.capture_instances().at(0).overrides.empty());
 }
 
 TEST_F(InstancesTest, OverridesWinOverOnSpawn) {
