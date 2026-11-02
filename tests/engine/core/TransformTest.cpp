@@ -16,10 +16,10 @@ using engine::core::FieldValue;
 using engine::core::FieldValueOutOfRange;
 using engine::core::Position;
 using engine::core::Rotation;
-using engine::core::Scale;
-using engine::core::Vec2;
 using engine::core::rotation_of;
+using engine::core::Scale;
 using engine::core::scale_of;
+using engine::core::Vec2;
 
 namespace {
 
@@ -129,6 +129,7 @@ TEST_F(TransformFieldsTest, SettingOneScaleAxisKeepsTheOtherAtOne) {
 
 TEST_F(TransformFieldsTest, RejectedValueKeepsPreviousOne) {
     registry.set(world, entity, "Rotation", "degrees", 30.F);
-    EXPECT_THROW(registry.set(world, entity, "Rotation", "degrees", not_a_number), FieldValueOutOfRange);
+    EXPECT_THROW(registry.set(world, entity, "Rotation", "degrees", not_a_number),
+                 FieldValueOutOfRange);
     EXPECT_EQ(rotation_of(world, entity), 30.F);
 }
