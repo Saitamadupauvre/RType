@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <functional>
 #include <set>
 #include <string>
 #include <system_error>
@@ -49,11 +51,18 @@ public:
     [[nodiscard]] bool should_close() const override { return frames >= close_after; }
     void set_fullscreen(bool) override {}
     [[nodiscard]] Vec2 virtual_size() const override { return {1920, 1080}; }
-    [[nodiscard]] TextureId load_texture(const std::string&) override { return {.value = 1}; }
+    [[nodiscard]] TextureId load_texture(const std::string& path) override {
+        loaded.push_back(path);
+        if (on_load) {
+            on_load();
+        }
+        return path.ends_with("missing.png") ? TextureId{} : TextureId{.value = 1};
+    }
     void unload_texture(TextureId) override {}
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {8, 8}; }
     void begin_frame(Color) override {
         sprites.clear();
+        texts.clear();
         sprites_in_world.clear();
         views.clear();
     }
@@ -73,7 +82,7 @@ public:
     void draw_rect(const Rect&, Color, bool) override {}
     void draw_circle(Vec2, float, Color) override {}
     void draw_line(Vec2, Vec2, float, Color) override {}
-    void draw_text(const std::string&, Vec2, float, Color) override {}
+    void draw_text(const std::string& text, Vec2, float, Color) override { texts.push_back(text); }
     [[nodiscard]] Vec2 measure_text(const std::string&, float) const override { return {}; }
 
     bool open_succeeds{true};
@@ -81,7 +90,10 @@ public:
     int close_after{1'000'000};
     int frames{0};
     std::string title;
+    std::function<void()> on_load;
+    std::vector<std::string> loaded;
     std::vector<SpriteDraw> sprites;
+    std::vector<std::string> texts;
     std::vector<bool> sprites_in_world;
     std::vector<engine::core::CameraView> views;
     bool in_world{false};
@@ -107,10 +119,16 @@ public:
     void close() override {}
     [[nodiscard]] bool is_open() const override { return true; }
     void update() override {}
-    [[nodiscard]] SoundId load_sound(const std::filesystem::path&) override { return {}; }
+    [[nodiscard]] SoundId load_sound(const std::filesystem::path& path) override {
+        loaded.push_back(path.string());
+        return {.value = 1};
+    }
     void unload_sound(SoundId) override {}
     void play_sound(SoundId, float, float) override {}
-    [[nodiscard]] MusicId load_music(const std::filesystem::path&) override { return {}; }
+    [[nodiscard]] MusicId load_music(const std::filesystem::path& path) override {
+        loaded.push_back(path.string());
+        return {.value = 1};
+    }
     void unload_music(MusicId) override {}
     void play_music(MusicId, bool) override {}
     void stop_music() override {}
@@ -119,7 +137,15 @@ public:
     void set_effects_volume(float) override {}
 
     float master{-1.F};
+    std::vector<std::string> loaded;
 };
+
+std::string asset(const std::string& name) { return (game / "assets" / name).string(); }
+
+std::vector<std::string> sorted(std::vector<std::string> names) {
+    std::ranges::sort(names);
+    return names;
+}
 
 class ClientAppTest : public ::testing::Test {
 protected:
@@ -179,6 +205,62 @@ TEST_F(ClientAppTest, DrawsTheEntitiesOfTheServer) {
     EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.x - _renderer.sprites.front().origin.x, 10.F);
     EXPECT_FLOAT_EQ(_renderer.sprites.front().dest.y - _renderer.sprites.front().origin.y, 20.F);
     EXPECT_EQ(_renderer.sprites.front().tint, (Color{.r = 10, .g = 20, .b = 30, .a = 255}));
+}
+
+TEST_F(ClientAppTest, ShowsTheLoadingScreenUntilEveryAssetIsLoaded) {
+    start_client();
+    std::vector<std::string> progress;
+    bool snapshot_hidden = false;
+
+    for (int frame = 0; frame < session_frames && _renderer.sprites.empty(); ++frame) {
+        play(1);
+        progress.insert(progress.end(), _renderer.texts.begin(), _renderer.texts.end());
+        snapshot_hidden |= _renderer.sprites.empty() && !_client.network().entities().empty();
+    }
+
+    EXPECT_EQ(progress, (std::vector<std::string>{"0 / 0", "4 / 8"}));
+    EXPECT_TRUE(snapshot_hidden);
+    EXPECT_EQ(_renderer.sprites.size(), 1U);
+    EXPECT_TRUE(_renderer.texts.empty());
+}
+
+TEST_F(ClientAppTest, EveryAssetOfTheServerIsLoadedBeforeTheFirstGameFrame) {
+    start_client();
+
+    for (int frame = 0; frame < session_frames && _renderer.sprites.empty(); ++frame) {
+        play(1);
+    }
+
+    ASSERT_EQ(_renderer.sprites.size(), 1U);
+    EXPECT_EQ(
+        sorted(_renderer.loaded),
+        sorted({asset("shapes/square.png"), asset("backgrounds/stars.png"), asset("ui/bar.png"),
+                asset("ui/missing.png"), asset("enemies/bug.png"), asset("enemies/boss.png")}));
+    EXPECT_EQ(_audio.loaded,
+              (std::vector<std::string>{asset("sounds/shot.wav"), asset("music/stage.ogg")}));
+}
+
+TEST_F(ClientAppTest, AMissingAssetIsTriedOnceAndTheGameStillStarts) {
+    start_client();
+
+    play(session_frames);
+
+    EXPECT_EQ(std::ranges::count(_renderer.loaded, asset("ui/missing.png")), 1);
+    EXPECT_EQ(_renderer.sprites.size(), 1U);
+}
+
+TEST_F(ClientAppTest, StaysConnectedWhileSlowAssetsLoad) {
+    _renderer.on_load = [this] {
+        _clock.advance(std::chrono::seconds(1));
+        _server.update();
+    };
+    start_client();
+
+    play(session_frames);
+
+    EXPECT_EQ(_client.network().state(), ConnectionState::connected);
+    EXPECT_EQ(_server.network().player_count(), 1U);
+    EXPECT_EQ(_renderer.sprites.size(), 1U);
 }
 
 TEST_F(ClientAppTest, WithoutCameraTheWorldIsDrawnThroughTheDefaultView) {

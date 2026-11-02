@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 readonly ci_clang_format_version="23.1.1"
 
 usage() {
     cat <<EOF
 Usage: $0 <command>
+       $0 rt_server <port> [server options]
+       $0 rt_client <server-ip> <port> [client options]
 
-  run      configure and build the release preset
-  debug    configure and build the debug preset
-  tests    build the debug preset and run the tests
-  tidy     build everything with clang-tidy (warnings as errors)
-  format   format the sources in place
-  all      format check, debug build, tests and clang-tidy
+  run        configure and build the release preset
+  rt_server  build the release preset and start a server on <port>
+  rt_client  build the release preset and start a client
+             (also: rt_client --host <port>, rt_client --solo)
+  debug      configure and build the debug preset
+  tests      build the debug preset and run the tests
+  tidy       build everything with clang-tidy (warnings as errors)
+  format     format the sources in place
+  all        format check, debug build, tests and clang-tidy
 EOF
 }
 
@@ -66,7 +71,25 @@ format_check() {
     cmake --build --preset debug --target format-check || fail "format check (run $0 format)"
 }
 
-if [[ $# -ne 1 ]]; then
+launch() {
+    local executable="$1"
+    shift
+    build release
+    step "Start $executable $*"
+    exec "./build/release/bin/$executable" "$@"
+}
+
+if [[ $# -lt 1 ]]; then
+    usage >&2
+    exit 2
+fi
+
+if [[ "$1" != rt_server && "$1" != rt_client && $# -ne 1 ]]; then
+    usage >&2
+    exit 2
+fi
+
+if [[ ( "$1" == rt_server || "$1" == rt_client ) && $# -lt 2 ]]; then
     usage >&2
     exit 2
 fi
@@ -84,6 +107,8 @@ export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-$(nproc 2>/dev/
 
 case "$1" in
     run) build release ;;
+    rt_server) launch r-type_server "${@:2}" ;;
+    rt_client) launch r-type_client "${@:2}" ;;
     debug) build debug ;;
     tests) tests ;;
     tidy) tidy ;;

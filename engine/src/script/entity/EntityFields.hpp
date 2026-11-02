@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 
+#include "assets/Textures.hpp"
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
@@ -26,7 +27,7 @@ struct FieldAlias {
 
 class EntityFields {
 public:
-    explicit EntityFields(const core::FieldRegistry& registry);
+    EntityFields(const core::FieldRegistry& registry, const Textures& textures);
 
     [[nodiscard]] bool has_alias(std::string_view name) const;
     [[nodiscard]] std::vector<std::string_view> alias_names() const;
@@ -68,7 +69,11 @@ private:
                                                core::Entity entity, const Binding& binding,
                                                const sol::object& value) const;
 
+    void require_declared_texture(sol::this_state state, std::string_view name,
+                                  const core::FieldValue& value) const;
+
     const core::FieldRegistry& _registry;
+    const Textures& _textures;
     std::vector<Binding> _bindings;
 };
 

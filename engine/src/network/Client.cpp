@@ -12,6 +12,7 @@
 
 #include "event/GameEvents.hpp"
 #include "input/InputCodec.hpp"
+#include "protocol/WireValue.hpp"
 #include "session/ClientConnection.hpp"
 #include "snapshot/SnapshotReceiver.hpp"
 #include "stats/TrafficMeter.hpp"
@@ -30,8 +31,11 @@ EntitySnapshot to_entity_snapshot(const EntityState& state, const ReceivedString
     EntitySnapshot snapshot{.entity_id = state.entity_id, .type_id = state.type_id, .fields = {}};
     snapshot.fields.reserve(state.fields.size());
     for (const FieldState& field : state.fields) {
-        snapshot.fields.push_back(
-            ReplicatedValue{.field = strings.field(field.field_id), .value = field.value});
+        auto value = from_wire(field.value, strings.names());
+        if (value) {
+            snapshot.fields.push_back(ReplicatedValue{.field = strings.field(field.field_id),
+                                                      .value = std::move(*value)});
+        }
     }
     return snapshot;
 }

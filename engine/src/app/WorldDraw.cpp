@@ -1,7 +1,6 @@
 #include "WorldDraw.hpp"
 
 #include <cmath>
-#include <utility>
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
@@ -25,8 +24,18 @@ float mirrored(float length, float factor) { return std::signbit(factor) ? -leng
 
 } // namespace
 
-WorldDraw::WorldDraw(graphics::IRenderer& renderer, std::filesystem::path assets)
-    : _renderer(renderer), _assets(std::move(assets)) {}
+WorldDraw::WorldDraw(graphics::IRenderer& renderer, const std::filesystem::path& assets)
+    : _renderer(renderer),
+      _textures(
+          assets,
+          [&renderer](const std::filesystem::path& path) {
+              return renderer.load_texture(path.string());
+          },
+          [&renderer](graphics::TextureId texture) { renderer.unload_texture(texture); }) {}
+
+bool WorldDraw::preload(const std::string& texture) {
+    return _textures.get(texture) != graphics::TextureId{};
+}
 
 void WorldDraw::draw(core::EntityManager& world) {
     world.query<core::Position, core::Sprite>().each(
@@ -48,7 +57,7 @@ void WorldDraw::draw_square(core::Vec2 position, core::Vec2 scale, core::Rgba co
 
 void WorldDraw::draw_texture(core::Vec2 position, core::Vec2 scale, float rotation,
                              const core::Sprite& sprite) {
-    const graphics::TextureId id = texture(sprite.path);
+    const graphics::TextureId id = _textures.get(sprite.path);
     const core::Vec2 texture_size = _renderer.texture_size(id);
     const core::Vec2 size = drawn_size(texture_size, scale);
     const core::Vec2 center = size / 2.F;
@@ -62,16 +71,6 @@ void WorldDraw::draw_texture(core::Vec2 position, core::Vec2 scale, float rotati
                            .origin = center,
                            .rotation = rotation,
                            .tint = to_color(sprite.color)});
-}
-
-graphics::TextureId WorldDraw::texture(const std::string& path) {
-    const auto found = _textures.find(path);
-    if (found != _textures.end()) {
-        return found->second;
-    }
-    const graphics::TextureId id = _renderer.load_texture((_assets / path).string());
-    _textures.emplace(path, id);
-    return id;
 }
 
 } // namespace engine::app

@@ -13,6 +13,7 @@ function(engine_add_test module)
 endfunction()
 
 engine_add_test(core SOURCES
+    engine/core/AssetCacheTest.cpp
     engine/core/EntityTest.cpp
     engine/core/KeysTest.cpp
     engine/core/EntityPoolTest.cpp
@@ -39,6 +40,7 @@ engine_add_test(script SOURCES
     engine/script/CameraApiTest.cpp
     engine/script/ClientApiTest.cpp
     engine/script/ScriptRuntimeTest.cpp
+    engine/script/assets/TexturesTest.cpp
     engine/script/audio/AudioTest.cpp
     engine/script/entity/CameraFieldsTest.cpp
     engine/script/entity/TransformFieldsTest.cpp
@@ -70,6 +72,7 @@ engine_add_test(network SOURCES
     engine/network/protocol/ProtocolHandlerTest.cpp
     engine/network/protocol/ReceivedStringsTest.cpp
     engine/network/protocol/SequenceTest.cpp
+    engine/network/protocol/WireValueTest.cpp
     engine/network/server/ServerNetworkTest.cpp
     engine/network/session/ClientConnectionTest.cpp
     engine/network/session/ServerSessionsTest.cpp
@@ -105,10 +108,12 @@ engine_add_test(audio SOURCES
     engine/audio/PluginLoaderTest.cpp
 )
 engine_add_test(app SOURCES
+    engine/app/AssetPreloaderTest.cpp
     engine/app/AudioPlayerTest.cpp
     engine/app/CameraFollowTest.cpp
     engine/app/CameraRigTest.cpp
     engine/app/ClientAppTest.cpp
+    engine/app/LoadingScreenTest.cpp
     engine/app/ServerAppTest.cpp
     engine/app/SnapshotViewTest.cpp
     engine/app/WorldDrawTest.cpp

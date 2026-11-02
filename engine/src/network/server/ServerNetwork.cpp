@@ -55,7 +55,7 @@ std::vector<Outbound> ServerNetwork::snapshot(core::EntityManager& world) {
     if (sessions_.sessions().empty()) {
         return outbound;
     }
-    for (auto& snapshot : build_snapshots(world, _replicated, server_tick_)) {
+    for (auto& snapshot : build_snapshots(world, _replicated, sessions_.strings(), server_tick_)) {
         append(outbound, sessions_.broadcast(std::move(snapshot)));
     }
     return outbound;

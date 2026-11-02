@@ -9,7 +9,7 @@ namespace engine::network {
 using Bytes = std::vector<std::uint8_t>;
 
 inline constexpr std::uint32_t protocol_magic = 0x5254'5950;
-inline constexpr std::uint16_t protocol_version = 7;
+inline constexpr std::uint16_t protocol_version = 8;
 
 inline constexpr std::size_t max_datagram_size = 1200;
 inline constexpr std::size_t encoded_packet_header_size = 13;

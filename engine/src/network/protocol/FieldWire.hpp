@@ -21,8 +21,8 @@ find_wire_field(const core::FieldRegistry& registry, std::string_view name);
 
 [[nodiscard]] bool is_replicable(core::FieldKind kind) noexcept;
 [[nodiscard]] std::size_t max_wire_size(core::FieldKind kind) noexcept;
-[[nodiscard]] bool fits_wire(const core::FieldValue& value) noexcept;
-[[nodiscard]] std::size_t wire_size(const core::FieldValue& value) noexcept;
+[[nodiscard]] bool fits_wire(const WireValue& value) noexcept;
+[[nodiscard]] std::size_t wire_size(const WireValue& value) noexcept;
 [[nodiscard]] std::size_t wire_size(const EntityState& entity) noexcept;
 
 } // namespace engine::network

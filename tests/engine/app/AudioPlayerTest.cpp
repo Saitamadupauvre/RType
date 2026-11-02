@@ -11,7 +11,6 @@
 #include "engine/script/ClientApi.hpp"
 
 using engine::app::AudioPlayer;
-using engine::app::is_plain_file_name;
 using engine::audio::MusicId;
 using engine::audio::SoundId;
 using engine::network::StringCategory;
@@ -30,13 +29,13 @@ public:
         loaded.push_back(path.generic_string());
         return fail_loads ? SoundId{} : SoundId{static_cast<std::uint32_t>(loaded.size())};
     }
-    void unload_sound(SoundId) override {}
+    void unload_sound(SoundId) override { ++unloaded_sounds; }
     void play_sound(SoundId sound, float, float) override { played.push_back(sound.value); }
     [[nodiscard]] MusicId load_music(const std::filesystem::path& path) override {
         loaded.push_back(path.generic_string());
         return fail_loads ? MusicId{} : MusicId{static_cast<std::uint32_t>(loaded.size())};
     }
-    void unload_music(MusicId) override {}
+    void unload_music(MusicId) override { ++unloaded_musics; }
     void play_music(MusicId music, bool loop) override {
         music_played.push_back(music.value);
         looped = loop;
@@ -53,6 +52,8 @@ public:
     std::vector<std::uint32_t> music_played;
     bool looped{false};
     int stops{0};
+    int unloaded_sounds{0};
+    int unloaded_musics{0};
     float master{-1.F};
     float music_volume{-1.F};
     float effects_volume{-1.F};
@@ -151,13 +152,34 @@ TEST(AudioPlayer, NeverLoadsANameThatLeavesTheAssetFolder) {
     RecordingAudio audio;
     AudioPlayer player(audio, "assets");
     const StringTable hostile =
-        strings_of(StringCategory::sound, {"../../secret.wav", "sub/shot.wav", ".hidden"});
+        strings_of(StringCategory::sound, {"../../secret.wav", "/etc/secret.wav", ".hidden"});
 
     player.play_sound(hostile, 1);
     player.play_sound(hostile, 2);
     player.play_sound(hostile, 3);
 
     EXPECT_TRUE(audio.loaded.empty());
+}
+
+TEST(AudioPlayer, LoadsASoundFromASubfolderOfTheSoundFolder) {
+    RecordingAudio audio;
+    AudioPlayer player(audio, "assets");
+
+    player.play_sound(strings_of(StringCategory::sound, {"enemies/boom.wav"}), 1);
+
+    EXPECT_EQ(audio.loaded, (std::vector<std::string>{"assets/sounds/enemies/boom.wav"}));
+}
+
+TEST(AudioPlayer, UnloadsEveryLoadedSoundAndMusicWhenDestroyed) {
+    RecordingAudio audio;
+    {
+        AudioPlayer player(audio, "assets");
+        player.play_sound(sounds, 1);
+        player.change_music(musics, 1);
+    }
+
+    EXPECT_EQ(audio.unloaded_sounds, 1);
+    EXPECT_EQ(audio.unloaded_musics, 1);
 }
 
 TEST(AudioPlayer, DoesNotRetryAFileThatFailedToLoad) {
@@ -183,12 +205,38 @@ TEST(AudioPlayer, LoadsNothingWhileTheDeviceIsClosed) {
     EXPECT_TRUE(audio.loaded.empty());
 }
 
-TEST(AudioPlayer, PlainFileNamesAreLettersDigitsAndSeparators) {
-    EXPECT_TRUE(is_plain_file_name("laser_shoot.wav"));
-    EXPECT_TRUE(is_plain_file_name("bit-space.mp3"));
-    EXPECT_FALSE(is_plain_file_name(""));
-    EXPECT_FALSE(is_plain_file_name(".."));
-    EXPECT_FALSE(is_plain_file_name("a/b.wav"));
-    EXPECT_FALSE(is_plain_file_name("a\\b.wav"));
-    EXPECT_FALSE(is_plain_file_name("a b.wav"));
+TEST(AudioPlayer, PreloadedSoundAndMusicAreNotLoadedAgainWhenPlayed) {
+    RecordingAudio audio;
+    AudioPlayer player(audio, "assets");
+
+    EXPECT_TRUE(player.preload_sound("shot.wav"));
+    EXPECT_TRUE(player.preload_music("stage.ogg"));
+    player.play_sound(sounds, 1);
+    player.change_music(musics, 1);
+
+    EXPECT_EQ(audio.loaded,
+              (std::vector<std::string>{"assets/sounds/shot.wav", "assets/music/stage.ogg"}));
+    EXPECT_EQ(audio.played, (std::vector<std::uint32_t>{1}));
+    EXPECT_EQ(audio.music_played, (std::vector<std::uint32_t>{2}));
+}
+
+TEST(AudioPlayer, PreloadReportsAMissingSoundOrMusic) {
+    RecordingAudio audio;
+    audio.fail_loads = true;
+    AudioPlayer player(audio, "assets");
+
+    EXPECT_FALSE(player.preload_sound("shot.wav"));
+    EXPECT_FALSE(player.preload_music("stage.ogg"));
+    EXPECT_FALSE(player.preload_sound("../secret.wav"));
+}
+
+TEST(AudioPlayer, PreloadSkipsAudioWhileTheDeviceIsClosed) {
+    RecordingAudio audio;
+    audio.open_succeeds = false;
+    AudioPlayer player(audio, "assets");
+
+    EXPECT_TRUE(player.preload_sound("shot.wav"));
+    EXPECT_TRUE(player.preload_music("stage.ogg"));
+
+    EXPECT_TRUE(audio.loaded.empty());
 }

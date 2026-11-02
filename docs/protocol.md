@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Category | Informational |
-| Protocol version | `7` |
+| Protocol version | `8` |
 | Transport | UDP |
 | Implementation | `engine/src/network/` |
 
@@ -49,7 +49,7 @@ Every datagram consists of a 13-byte header followed by `payload_size` payload b
 | Offset | Size | Field | Encoding | Value |
 |---|---:|---|---|---|
 | 0 | 4 | `magic` | Unsigned 32-bit, big-endian | `0x52545950` (`RTYP`) |
-| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `7` |
+| 4 | 2 | `version` | Unsigned 16-bit, big-endian | `8` |
 | 6 | 1 | `type` | Unsigned 8-bit | Message type |
 | 7 | 4 | `sequence` | Unsigned 32-bit, big-endian | Sender packet sequence |
 | 11 | 2 | `payload_size` | Unsigned 16-bit, big-endian | Number of bytes after the header |
@@ -69,7 +69,7 @@ Receivers must reject a datagram when its size is smaller than 13 bytes, its mag
 | 6 | `heartbeat` | Both directions | Unreliable |
 | 7 | `disconnect` | Both directions | Reliable |
 
-The "Delivery" column states the intended guarantee. In version 7 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
+The "Delivery" column states the intended guarantee. In version 8 no message is acknowledged: reliability comes from the protocol flow itself (a `connect_request` is retried until answered, heartbeats and timeouts detect a lost peer, the full world is resent every tick). Acknowledgement and retransmission of `event` and `disconnect` messages are planned for a later version.
 
 ## Connection Payloads
 
@@ -96,8 +96,9 @@ The server sends this message to the endpoint that sent the matching request. It
 | 4 | `shader` | shaders (reserved for a later version) |
 | 5 | `field` | replicated component fields, named `Component.field` (e.g. `Position.pos`) |
 | 6 | `event_key` | argument keys of `named` events, shared by every event |
+| 7 | `texture` | textures of `asset` values, paths relative to the assets folder (e.g. `sprites/ship.png`) |
 
-Sound and music names are file names (for R-Type, files under the client's `assets/sounds/` and `assets/music/` folders). Then comes the music the server is playing, so that a player joining mid-game hears it.
+Sound and music names are file names (for R-Type, files under the client's `assets/sounds/` and `assets/music/` folders). Texture names are the textures the scripts declare, plus the sprite of every declared entity. Then comes the music the server is playing, so that a player joining mid-game hears it.
 
 | Offset | Size | Field | Encoding |
 |---|---:|---|---|
@@ -122,7 +123,7 @@ The receiver rejects an unknown category; within one category, duplicate IDs or 
 
 The server fills the `field` category itself with every field its field registry flags `replicated`. A client resolves each `field` name in its own field registry. When one is unknown, it ends the connection: it sends `disconnect` with reason `protocol_error` and reports the connection as rejected.
 
-A client MUST NOT use a sound or music name as a path without checking it: R-Type only loads names made of letters, digits, `_`, `-` and `.`, not starting with `.`, and ignores the others.
+A client MUST NOT use a sound, music or texture name as a path without checking it: R-Type only loads relative paths whose `/`-separated segments are made of letters, digits, `_`, `-` and `.` and do not start with `.`, and ignores the others.
 
 ### Connection Flow
 
@@ -190,11 +191,11 @@ Each field has the following layout:
 | 3 | `string` | Unsigned 8-bit length, then that many opaque bytes |
 | 4 | `vec2` | Two signed 16-bit, big-endian: `x` then `y` (4 bytes) |
 | 5 | `color` | Four unsigned 8-bit: `r`, `g`, `b`, `a` |
-| 6 | `asset` | Same as `string`: a path relative to the assets folder |
+| 6 | `asset` | Unsigned 16-bit, big-endian (2 bytes): the id of a `texture` entry, or `0xFFFF` for no asset |
 
 Lists (kind 7 in the engine field registry) are not replicated: a server with a replicated list field refuses to start.
 
-The server replicates every entity that has the engine's `Replicated` component. Its record carries `Replicated::type_id` and, in registration order, every field flagged `replicated` that the entity owns; a field of a component the entity lacks is left out, and the client keeps its default value (opaque white for a missing `Sprite.color`). A string longer than 255 bytes or a non-finite float is left out and logged. `entity_id` is the entity index. Vec2 components (positions, velocities) are rounded to the nearest integer and clamped to the signed 16-bit range; ints are clamped to the signed 32-bit range. With the R-Type fields, an entity sends `Position.pos`, `Sprite.color`, `PhysicsBody.velocity` (when it has a body) and `Replicated.owner`; a client compares `owner` with the `player_entity_id` of its `connect_accept` to find its own entities.
+The server replicates every entity that has the engine's `Replicated` component. Its record carries `Replicated::type_id` and, in registration order, every field flagged `replicated` that the entity owns; a field of a component the entity lacks is left out, and the client keeps its default value (opaque white for a missing `Sprite.color`). A string longer than 255 bytes, a non-finite float or an asset missing from the `texture` category is left out and logged. `entity_id` is the entity index. Vec2 components (positions, velocities) are rounded to the nearest integer and clamped to the signed 16-bit range; ints are clamped to the signed 32-bit range. With the R-Type fields, an entity sends `Position.pos`, `Sprite.path`, `Sprite.color`, `PhysicsBody.velocity` (when it has a body) and `Replicated.owner`; a client compares `owner` with the `player_entity_id` of its `connect_accept` to find its own entities.
 
 A snapshot packet carries as many entities as fit in the maximum payload size: their records take at most 1181 bytes. A larger world is sent as several snapshot packets with the same `server_tick`. The format of each packet does not change. A server whose replicated fields, all present with the longest strings, would not fit one entity in a packet refuses to start, as does one with more than 255 replicated fields or a field name longer than 63 bytes.
 
@@ -204,7 +205,7 @@ The client keeps the world of the newest `server_tick` it has received, comparin
 - another packet of the same tick is merged in, an entity already present being updated rather than duplicated;
 - an older tick is ignored.
 
-The receiver rejects the whole snapshot when a record is truncated or extends beyond the payload, when bytes remain after the last record, when the records take more than 1181 bytes, on an unknown `kind`, a `bool` other than `0` or `1`, a NaN or infinite `float`, the same `field_id` twice in one record, a `type_id` that is not the id of a `type` entry, a `field_id` that is not the id of a `field` entry, or a `kind` other than the kind of that field in the client's registry.
+The receiver rejects the whole snapshot when a record is truncated or extends beyond the payload, when bytes remain after the last record, when the records take more than 1181 bytes, on an unknown `kind`, a `bool` other than `0` or `1`, a NaN or infinite `float`, the same `field_id` twice in one record, a `type_id` that is not the id of a `type` entry, a `field_id` that is not the id of a `field` entry, a `kind` other than the kind of that field in the client's registry, or an `asset` that is neither `0xFFFF` nor the id of a `texture` entry.
 
 ## Event Payload
 
@@ -234,9 +235,9 @@ The `named` event carries a game-defined event and its arguments. Its payload is
 | 3 | 1 | `argument_count` | Unsigned 8-bit, at most 16 |
 | 4 | | arguments | `argument_count` times `key_id`, `kind`, value |
 
-Each argument is an unsigned 16-bit big-endian `key_id` (id of an `event_key` entry), a one-byte `kind` and a value encoded exactly like a snapshot field value of that kind. `list` is not allowed, and `string` and `asset` values are at most 63 bytes long, so a `named` event always fits in one packet. The server checks no schema: which arguments an event carries is up to the game.
+Each argument is an unsigned 16-bit big-endian `key_id` (id of an `event_key` entry), a one-byte `kind` and a value encoded exactly like a snapshot field value of that kind. `list` is not allowed, and `string` values are at most 63 bytes long, so a `named` event always fits in one packet. The server checks no schema: which arguments an event carries is up to the game.
 
-The receiver rejects unknown event types, an event with an incorrect fixed payload size, and a `named` event that is truncated, has trailing bytes, more than 16 arguments, the same `key_id` twice, an unknown or `list` `kind`, a `bool` other than `0` or `1`, a NaN or infinite `float`, or a text longer than 63 bytes. A `sound` or `music` event with an id missing from its category is ignored; a `named` event whose `name_id` or one `key_id` is missing from its category is dropped and logged.
+The receiver rejects unknown event types, an event with an incorrect fixed payload size, and a `named` event that is truncated, has trailing bytes, more than 16 arguments, the same `key_id` twice, an unknown or `list` `kind`, a `bool` other than `0` or `1`, a NaN or infinite `float`, or a text longer than 63 bytes. A `sound` or `music` event with an id missing from its category is ignored; a `named` event whose `name_id`, one `key_id` or one `asset` (other than `0xFFFF`) is missing from its category is dropped and logged.
 
 The server sends the events of a tick to every connected session after the tick, in the order they happened, before that tick's snapshot. An event goes only to the sessions that existed when it happened: a client that connects later never receives earlier events. A client drops every snapshot and event that arrives before `connect_accept`. Until acknowledgements exist (a later protocol version), events are sent once and are not retransmitted.
 
@@ -278,14 +279,14 @@ All bytes are hexadecimal.
 `connect_request` with nonce `0x01020304`, sequence `0`:
 
 ```
-52 54 59 50  00 07  01  00 00 00 00  00 04  01 02 03 04
+52 54 59 50  00 08  01  00 00 00 00  00 04  01 02 03 04
 magic        ver    type sequence    size   client_nonce
 ```
 
 `input` holding `Space` (key 58) and `Left` (key 56), no mouse button, pointer at (640, 360), sequence `42`:
 
 ```
-52 54 59 50  00 07  03  00 00 00 2A  00 16
+52 54 59 50  00 08  03  00 00 00 2A  00 16
 00 00 00 00  00 00 00 05  00 00 00 00  00 00 00 00   keys: byte 7 = keys 56, 58
 00  01  02 80  01 68                                 mouse, flags, x=640, y=360
 ```
@@ -293,26 +294,26 @@ magic        ver    type sequence    size   client_nonce
 `heartbeat`, sequence `7`:
 
 ```
-52 54 59 50  00 07  06  00 00 00 07  00 00
+52 54 59 50  00 08  06  00 00 00 07  00 00
 ```
 
 `disconnect` with reason `normal`, sequence `8`:
 
 ```
-52 54 59 50  00 07  07  00 00 00 08  00 01  00
+52 54 59 50  00 08  07  00 00 00 08  00 01  00
 ```
 
 `event` `music` playing music id `1`, sequence `9`:
 
 ```
-52 54 59 50  00 07  05  00 00 00 09  00 03  06  00 01
+52 54 59 50  00 08  05  00 00 00 09  00 03  06  00 01
                                             music music_id
 ```
 
 `event` `named` with name id `2` and one `vec2` argument of key id `1` at `(10, -4)`, sequence `10`:
 
 ```
-52 54 59 50  00 07  05  00 00 00 0A  00 0A  07  00 02  01  00 01  04  00 0A FF FC
+52 54 59 50  00 08  05  00 00 00 0A  00 0A  07  00 02  01  00 01  04  00 0A FF FC
                                             named name  n   key   vec2 x     y
 ```
 
@@ -330,8 +331,9 @@ A minimal client:
    packet you send with an increasing sequence.
 4. Send a `heartbeat` every second.
 5. Keep the world of the newest `snapshot` tick, merging packets of the same
-   tick. Draw each entity using its `type` name from the string table; entities
-   whose `owner` equals your player id are yours.
+   tick. Draw each entity with the `texture` entry named by its `Sprite.path`
+   (or a square of its `Sprite.color` without one); entities whose `owner`
+   equals your player id are yours.
 6. On `event` `sound`, play the `sound` entry of that id; on `event`
    `music`, loop the `music` entry of that id, or stop it on `0xFFFF`.
    On `event` `named`, look up its `event` name and `event_key` keys to
@@ -349,7 +351,7 @@ The server and the clients treat every datagram as hostile.
 | Malformed or truncated packets crashing a peer | Every read is bounds-checked; the header, the exact payload size and every field range are validated before use; invalid datagrams are dropped and logged |
 | Oversized datagrams | Datagrams above 1200 bytes are dropped, never truncated or reassembled |
 | Memory exhaustion through announced counts | Counts (`entity_count`, `type_count`, `sound_count`, `music_count`) are checked against the bytes actually present **before** allocating |
-| Path traversal through sound or music names | Names are only used after checking they are plain file names (no `/`, `\`, leading `.`); others are ignored |
+| Path traversal through sound, music or texture names | Snapshots and events never carry paths, only ids of the string table. Names go through the client's asset cache, which only loads relative paths inside the assets, sound or music folder (no `..`, absolute path, `\` or segment starting with `.`); others are logged once and ignored |
 | Flooding the server | The receive queue is bounded (4096 messages); extra messages are dropped. Sessions are limited to `max_players` |
 | Cheating by sending positions | Clients only send inputs (keys and mouse buttons held, and a pointer); the server computes every position |
 | Replayed or reordered inputs | Inputs older than the last accepted sequence are ignored |

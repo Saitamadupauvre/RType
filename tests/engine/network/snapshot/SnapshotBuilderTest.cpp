@@ -23,7 +23,6 @@ namespace {
 
 using engine::core::Entity;
 using engine::core::EntityManager;
-using engine::core::FieldValue;
 using engine::core::Vec2;
 using engine::network::build_snapshots;
 using engine::network::encode_payload;
@@ -74,7 +73,7 @@ protected:
 TEST_F(SnapshotBuilder, WorldWithoutReplicatedComponentGivesOneEmptySnapshot) {
     EntityManager empty;
 
-    const auto snapshots = build_snapshots(empty, replicated, sample_tick);
+    const auto snapshots = build_snapshots(empty, replicated, strings, sample_tick);
 
     ASSERT_EQ(snapshots.size(), 1U);
     EXPECT_EQ(snapshots.front().server_tick, sample_tick);
@@ -86,7 +85,7 @@ TEST_F(SnapshotBuilder, SendsOnlyReplicatedEntities) {
     const auto hidden = world.spawn();
     world.add(hidden, Body{.pos = {1.F, 1.F}, .spin = 0.F});
 
-    const auto snapshots = build_snapshots(world, replicated, sample_tick);
+    const auto snapshots = build_snapshots(world, replicated, strings, sample_tick);
 
     ASSERT_EQ(snapshots.size(), 1U);
     const auto& states = snapshots.front().entities;
@@ -100,7 +99,7 @@ TEST_F(SnapshotBuilder, SendsTheReplicatedFieldsTheEntityOwns) {
     world.add(entity, Replicated{.type_id = 2, .owner = 3});
     world.add(entity, Body{.pos = {5.F, 6.F}, .spin = 0.25F});
 
-    const auto snapshots = build_snapshots(world, replicated, sample_tick);
+    const auto snapshots = build_snapshots(world, replicated, strings, sample_tick);
 
     const auto* state = find_state(snapshots.front().entities, entity);
     ASSERT_NE(state, nullptr);
@@ -118,13 +117,13 @@ TEST_F(SnapshotBuilder, LeavesOutFieldsThatAreNotReplicated) {
     world.add(entity, Replicated{.type_id = 1});
     world.add(entity, Label{.text = "boss", .hidden = true});
 
-    const auto snapshots = build_snapshots(world, replicated, sample_tick);
+    const auto snapshots = build_snapshots(world, replicated, strings, sample_tick);
 
     const auto* state = find_state(snapshots.front().entities, entity);
     ASSERT_NE(state, nullptr);
     EXPECT_EQ(state->fields,
               (std::vector<FieldState>{
-                  {.field_id = id_of("Label.text"), .value = FieldValue{std::string("boss")}},
+                  {.field_id = id_of("Label.text"), .value = std::string("boss")},
                   {.field_id = id_of("Replicated.owner"), .value = std::int64_t{0}}}));
 }
 
@@ -134,7 +133,7 @@ TEST_F(SnapshotBuilder, SplitsLargeWorldIntoPacketsUnderTheSizeLimit) {
         spawn_body(static_cast<float>(index), 0.F);
     }
 
-    const auto snapshots = build_snapshots(world, replicated, sample_tick);
+    const auto snapshots = build_snapshots(world, replicated, strings, sample_tick);
 
     ASSERT_EQ(snapshots.size(), 5U);
     std::set<std::uint32_t> ids;
@@ -157,7 +156,7 @@ TEST_F(SnapshotBuilder, SplitSnapshotIsReassembledByTheReceiver) {
     }
     SnapshotReceiver receiver;
 
-    const auto snapshots = build_snapshots(world, replicated, sample_tick);
+    const auto snapshots = build_snapshots(world, replicated, strings, sample_tick);
     EXPECT_GT(snapshots.size(), 1U);
     for (const auto& snapshot : snapshots) {
         EXPECT_TRUE(receiver.receive(snapshot));

@@ -161,7 +161,7 @@ runs any game folder (`scripts/` and `assets/`) without knowing the game.
 | Header | What it gives |
 |---|---|
 | `ServerApp.hpp` | Authoritative server over any `ServerTransport`: Lua with the server API, string table, 60 Hz tick (scripts, physics, collisions, systems, replication, audio and events) |
-| `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, snapshot drawing, audio, local input to Lua and to the server |
+| `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, asset preloading behind a loading screen, snapshot drawing, audio, local input to Lua and to the server |
 | `Launch.hpp` | `Mode` (`dedicated`, `client`, `host`, `solo`), `LaunchOptions` and `launch()`: picks the transports, loads the plugins and runs the apps; `host` runs the server on a background thread, `solo` runs both in one thread over a `LoopbackNetwork` |
 
 Its private helpers (`SnapshotView`, `WorldDraw`, `AudioPlayer`,

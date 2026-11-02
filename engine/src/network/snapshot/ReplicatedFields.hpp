@@ -26,8 +26,8 @@ public:
 
     [[nodiscard]] const std::string& error() const noexcept { return _error; }
     [[nodiscard]] const std::vector<ReplicatedField>& fields() const noexcept { return _fields; }
-    [[nodiscard]] std::vector<FieldState> read(core::EntityManager& world,
-                                               core::Entity entity) const;
+    [[nodiscard]] std::vector<FieldState> read(core::EntityManager& world, core::Entity entity,
+                                               const StringTable& strings) const;
 
 private:
     void declare(core::FieldRef field, StringTable& strings);

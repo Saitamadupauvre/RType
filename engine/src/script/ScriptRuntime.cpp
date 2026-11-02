@@ -47,7 +47,7 @@ std::string_view section_of(const std::vector<std::unique_ptr<ApiSet>>& sets) {
 } // namespace
 
 RuntimeContext::RuntimeContext()
-    : fields(engine_fields()), types(lua.create_table()), entities(lua, fields) {}
+    : fields(engine_fields()), types(lua.create_table()), entities(lua, fields, textures) {}
 
 const Declaration* RuntimeContext::find_declaration(std::string_view name) const {
     const auto found = declarations.find(name);
@@ -84,6 +84,7 @@ struct ScriptRuntime::Impl {
                                const sol::environment& environment);
     bool apply_sections(const std::vector<Declaration>& batch) const;
     bool register_declarations(std::vector<Declaration> batch);
+    bool declare_sprite(const Declaration& declaration);
     bool start(const sol::environment& main);
 };
 
@@ -124,6 +125,9 @@ void ScriptRuntime::Impl::bind_core() {
     });
     lua.set_function("musics", [this](sol::this_state state, const sol::object& names) {
         context.audio.declare_musics(state, names);
+    });
+    lua.set_function("textures", [this](sol::this_state state, const sol::object& names) {
+        context.textures.declare(state, names);
     });
     lua.set_function("event", [this](sol::this_state state, const sol::object& name) {
         return context.events.declare(state, name);
@@ -176,9 +180,11 @@ bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
     }
     modules.emplace(root);
     context.audio.allow_declarations(true);
+    context.textures.allow_declarations(true);
     context.events.allow_declarations(true);
     const bool loaded = load_all(root, files);
     context.events.allow_declarations(false);
+    context.textures.allow_declarations(false);
     context.audio.allow_declarations(false);
     return loaded;
 }
@@ -254,12 +260,32 @@ bool ScriptRuntime::Impl::register_declarations(std::vector<Declaration> batch) 
                    current->source.generic_string(), first.generic_string());
         return false;
     }
+    if (!std::ranges::all_of(batch, [this](const Declaration& declaration) {
+            return declare_sprite(declaration);
+        })) {
+        return false;
+    }
     for (Declaration& declaration : batch) {
         warn_reserved_names(declaration);
         std::string name = declaration.name;
         context.declarations.emplace(std::move(name), std::move(declaration));
     }
     return true;
+}
+
+bool ScriptRuntime::Impl::declare_sprite(const Declaration& declaration) {
+    if (declaration.kind != DeclarationKind::Entity) {
+        return true;
+    }
+    const auto sprite = declaration.prefab.raw_get<sol::object>("sprite");
+    if (sprite.get_type() != sol::type::string ||
+        context.textures.add(sprite.as<std::string_view>())) {
+        return true;
+    }
+    log::error("lua: {}: entity '{}' has an invalid sprite '{}'",
+               declaration.source.generic_string(), declaration.name,
+               sprite.as<std::string_view>());
+    return false;
 }
 
 bool ScriptRuntime::Impl::start(const sol::environment& environment) {
@@ -404,6 +430,10 @@ std::vector<std::string> ScriptRuntime::sound_names() const {
 
 std::vector<std::string> ScriptRuntime::music_names() const {
     return _impl->context.audio.music_names();
+}
+
+std::vector<std::string> ScriptRuntime::texture_names() const {
+    return _impl->context.textures.names();
 }
 
 std::vector<std::string> ScriptRuntime::event_names() const {

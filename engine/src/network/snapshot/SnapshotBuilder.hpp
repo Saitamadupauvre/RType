@@ -13,6 +13,6 @@ namespace engine::network {
 
 [[nodiscard]] ENGINE_NETWORK_EXPORT std::vector<SnapshotPayload>
 build_snapshots(core::EntityManager& world, const ReplicatedFields& fields,
-                std::uint32_t server_tick);
+                const StringTable& strings, std::uint32_t server_tick);
 
 } // namespace engine::network
