@@ -8,6 +8,7 @@
 #include "client/ClientAudio.hpp"
 #include "client/ClientCamera.hpp"
 #include "client/ClientEvents.hpp"
+#include "client/LocalSpawn.hpp"
 #include "engine/core/log/Log.hpp"
 #include "input/LuaInput.hpp"
 
@@ -38,6 +39,7 @@ void ClientApi::install(RuntimeContext& context) {
     _state->audio.bind(context.lua);
     _state->camera.bind(context.lua);
     _state->events.emplace(context).bind();
+    bind_spawn_local(context);
 }
 
 bool ClientApi::dispatch(const EventCommand& event) noexcept {

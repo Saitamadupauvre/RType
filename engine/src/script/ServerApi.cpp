@@ -39,8 +39,6 @@ struct ServerApi::State {
     void bind_players();
     void bind_entity_fields();
     void bind_globals();
-    sol::object spawn(sol::this_state state, const std::string& type,
-                      const sol::optional<sol::table>& overrides) const;
     [[nodiscard]] sol::object player_object(sol::this_state state, std::uint32_t player_id) const;
     sol::object player_field(sol::this_state state, const PlayerHandle& player,
                              const std::string& key) const;
@@ -100,7 +98,7 @@ void ServerApi::State::bind_globals() {
     sol::state& lua = context->lua;
     lua.set_function("spawn", [this](sol::this_state state, const std::string& type,
                                      const sol::optional<sol::table>& overrides) {
-        return spawn(state, type, overrides);
+        return context->spawn_declared(state, type, overrides);
     });
     lua.set_function("players", [this](sol::this_state state) { return all_players(state); });
     lua.set_function("find_player", [this](sol::this_state state, lua_Integer id) {
@@ -117,16 +115,6 @@ void ServerApi::State::bind_globals() {
                                     const sol::object& arguments) {
         context->events.emit(state, name, arguments);
     });
-}
-
-sol::object ServerApi::State::spawn(sol::this_state state, const std::string& type,
-                                    const sol::optional<sol::table>& overrides) const {
-    const Declaration* declaration = context->find_declaration(type);
-    if (declaration == nullptr) {
-        log::error("lua: {}cannot spawn unknown entity '{}'", caller_location(state), type);
-        return sol::make_object(state, sol::lua_nil);
-    }
-    return context->entities.spawn_from_lua(state, *declaration, overrides);
 }
 
 sol::object ServerApi::State::player_object(sol::this_state state, std::uint32_t player_id) const {

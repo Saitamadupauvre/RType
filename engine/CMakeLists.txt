@@ -57,6 +57,7 @@ engine_add_module(script
         src/script/client/ClientAudio.cpp
         src/script/client/ClientCamera.cpp
         src/script/client/ClientEvents.cpp
+        src/script/client/LocalSpawn.cpp
         src/script/entity/Entities.cpp
         src/script/entity/EntityFields.cpp
         src/script/entity/ScriptBody.cpp
