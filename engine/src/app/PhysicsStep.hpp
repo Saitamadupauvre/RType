@@ -14,7 +14,7 @@ namespace engine::app {
 class ENGINE_APP_EXPORT PhysicsStep {
 public:
     PhysicsStep(core::EntityManager& registry, core::event::EventBus& events,
-               script::ScriptRuntime& runtime);
+                script::ScriptRuntime& runtime);
     ~PhysicsStep();
 
     PhysicsStep(const PhysicsStep&) = delete;

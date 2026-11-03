@@ -26,7 +26,7 @@ core::EntityManager& with_physics_components(core::EntityManager& registry) {
 } // namespace
 
 PhysicsStep::PhysicsStep(core::EntityManager& registry, core::event::EventBus& events,
-                       script::ScriptRuntime& runtime)
+                         script::ScriptRuntime& runtime)
     : _events(events), _physics(with_physics_components(registry), events),
       _subscription(events.subscribe<physics::CollisionEvent>(
           [&runtime](const physics::CollisionEvent& collision) {

@@ -104,8 +104,7 @@ ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport&
       runtime(load_game(options.scripts)), client(runtime.api<script::ClientApi>()),
       sound(speakers, options.assets), textures(window, options.assets),
       shaders(window, options.assets), world_draw(window, textures, shaders), view(fields),
-      time_source(clock),
-      started_at(clock.now()), loop(clock) {
+      time_source(clock), started_at(clock.now()), loop(clock) {
     client.set_audio_settings(options.audio);
     events.subscribe<network::SoundPlayed>([this](const network::SoundPlayed& played) {
         sound.play_sound(network.strings(), played.sound_id);
