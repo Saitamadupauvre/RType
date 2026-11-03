@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "../graphics/fixtures/NullRenderer.hpp"
 #include "LoadingScreen.hpp"
 #include "engine/graphics/IRenderer.hpp"
 
@@ -25,29 +26,17 @@ struct DrawnText {
     Vec2 position;
 };
 
-class RecordingRenderer final : public engine::graphics::IRenderer {
+class RecordingRenderer final : public fixture::NullRenderer {
 public:
-    bool open(const engine::graphics::WindowConfig&) override { return true; }
-    void close() override {}
-    [[nodiscard]] bool should_close() const override { return false; }
-    void set_fullscreen(bool) override {}
     [[nodiscard]] Vec2 virtual_size() const override { return {1000, 600}; }
     [[nodiscard]] TextureId load_texture(const std::string&) override {
         ++loads;
         return {};
     }
-    void unload_texture(TextureId) override {}
-    [[nodiscard]] Vec2 texture_size(TextureId) const override { return {}; }
-    void begin_frame(Color) override {}
-    void end_frame() override {}
-    void begin_world(const engine::core::CameraView&) override {}
-    void end_world() override {}
     void draw_sprite(const SpriteDraw&) override { ++sprites; }
     void draw_rect(const Rect& rect, Color, bool filled) override {
         rects.push_back({.rect = rect, .filled = filled});
     }
-    void draw_circle(Vec2, float, Color) override {}
-    void draw_line(Vec2, Vec2, float, Color) override {}
     void draw_text(const std::string& text, Vec2 position, float, Color) override {
         texts.push_back({.text = text, .position = position});
     }

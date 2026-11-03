@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "../graphics/fixtures/NullRenderer.hpp"
 #include "WorldDraw.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
@@ -30,34 +31,20 @@ namespace {
 
 constexpr TextureId ship{.value = 7};
 
-class RecordingRenderer final : public engine::graphics::IRenderer {
+class RecordingRenderer final : public fixture::NullRenderer {
 public:
-    bool open(const engine::graphics::WindowConfig&) override { return true; }
-    void close() override {}
-    [[nodiscard]] bool should_close() const override { return false; }
-    void set_fullscreen(bool) override {}
-    [[nodiscard]] Vec2 virtual_size() const override { return {1920, 1080}; }
     [[nodiscard]] TextureId load_texture(const std::string& path) override {
         loaded.push_back(path);
         return path.ends_with("missing.png") ? TextureId{} : ship;
     }
-    void unload_texture(TextureId) override {}
     [[nodiscard]] Vec2 texture_size(TextureId texture) const override {
         return texture == ship ? Vec2{40, 20} : Vec2{32, 32};
     }
-    void begin_frame(Color) override {}
-    void end_frame() override {}
-    void begin_world(const engine::core::CameraView&) override {}
-    void end_world() override {}
     void draw_sprite(const SpriteDraw& sprite) override { sprites.push_back(sprite); }
     void draw_rect(const Rect& rect, Color color, bool) override {
         rects.push_back(rect);
         rect_colors.push_back(color);
     }
-    void draw_circle(Vec2, float, Color) override {}
-    void draw_line(Vec2, Vec2, float, Color) override {}
-    void draw_text(const std::string&, Vec2, float, Color) override {}
-    [[nodiscard]] Vec2 measure_text(const std::string&, float) const override { return {}; }
 
     std::vector<std::string> loaded;
     std::vector<SpriteDraw> sprites;
