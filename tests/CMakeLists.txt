@@ -115,6 +115,7 @@ engine_add_test(app SOURCES
     engine/app/ClientAppTest.cpp
     engine/app/LoadingScreenTest.cpp
     engine/app/ServerAppTest.cpp
+    engine/app/ShaderLibraryTest.cpp
     engine/app/SnapshotViewTest.cpp
     engine/app/WorldDrawTest.cpp
 )
