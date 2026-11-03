@@ -173,6 +173,45 @@ On start, the server runs `ScriptRuntime::load_game()` on its game folder:
 Clients never spawn scenes: they receive the server's entities through
 replication.
 
+## Switching scenes
+
+Server scripts move from one scene to another with `load_scene(name)`, and
+mark what must survive with `persistent = true`:
+
+```lua
+entity "game"
+persistent = true                 -- kept across scenes, with its Lua data
+
+function on_boss_killed(self)
+    load_scene("stage2")          -- scenes/stage2.json, at the end of the tick
+end
+```
+
+```lua
+-- main.lua
+server = {
+    on_scene_loaded = function(name) music(name .. ".mp3") end,
+}
+client = {
+    on_scene_loaded = function(name) camera.reset() end,
+}
+```
+
+1. `load_scene` reads and checks the file right away. A bad name, a missing
+   or rejected file, no game folder, or a second call in the same tick raises a
+   Lua error and the current scene keeps running.
+2. At the end of the tick, after `self:destroy()` removals, every entity whose
+   type is not `persistent` is destroyed (`on_destroy` runs).
+3. The scene's instances are spawned like the start scene (`on_spawn`, then
+   overrides).
+4. The built-in `scene_loaded { name }` event goes to every client, then
+   `on_scene_loaded(name)` of `main.lua` runs on the server. Clients call their
+   own `on_scene_loaded(name)` when the event arrives.
+
+A persistent entity placed in a scene file is spawned again every time that
+scene loads; persistent entities are usually spawned by scripts. Full rules:
+PROJECT.md §10.6.
+
 ## What is reported
 
 A scene file is untrusted input, like a packet. Nothing in it crashes the
@@ -235,6 +274,7 @@ engine::script::write_scene(game / "scenes" / "stage1.json", saved);
 | `ScriptRuntime::read_scene(file)` | Reads a scene against the loaded declarations: `SceneLoad{scene, issues, error}`. `ok()` is `false` when the file was rejected. Call it after loading the scripts, otherwise every type is unknown. |
 | `ScriptRuntime::spawn_instances(instances)` | Spawns instances into the attached world, see [Engine modules](engine.md#instances). |
 | `ScriptRuntime::capture_instances()` | Turns the world back into instances. |
+| `ScriptRuntime::flush_scene()` | Applies a pending Lua `load_scene`; returns the scene name, or `std::nullopt` when none was requested. The server calls it every tick after `flush_destroyed()`. |
 | `write_scene(file, scene)` | Saves a scene. It needs no runtime. |
 
 `InstanceIssue::instance` is the index in the file's `instances` array for

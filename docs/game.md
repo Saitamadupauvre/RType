@@ -67,7 +67,9 @@ SIGTERM, or until the window closes. Everything else is the engine:
   forwards `PlayerJoined` / `PlayerLeft` to Lua and runs the tick (see
   [PROJECT §6](PROJECT.md#6-executables)). Every scripted entity with a
   `sprite` or a `color` is replicated; entities with neither (`game`,
-  `bydo_spawner`) stay on the server.
+  `bydo_spawner`) stay on the server. `game` and `ship` are declared
+  `persistent = true`, so a future `load_scene("stage2")` keeps the controller
+  and the players' ships and replaces the rest.
 - `ClientApp` loads the same scripts with the client API, preloads every
   texture, sound and music the server lists behind a loading screen, draws each
   received entity with the `sprite` the server replicates, tinted with its

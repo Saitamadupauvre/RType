@@ -104,7 +104,9 @@ whole instance was skipped) and a message.
   captured too, so spawning the instances back spawns it twice.
 - Scene files store instances as JSON: `read_scene()` reads one against the
   loaded declarations and `write_scene()` saves one, and `load_game()` spawns
-  the `start_scene` of `game.json` before `on_start()`. The format, the
+  the `start_scene` of `game.json` before `on_start()`. Lua `load_scene(name)`
+  requests a switch that `flush_scene()` applies at the end of the server tick,
+  keeping entities declared `persistent = true`. The format, the switch, the
   reported problems and the API are in
   [Game folder and scenes](game-folder.md). The JSON code (`scene/`, built on
   `nlohmann-json`) stays private to the module.
