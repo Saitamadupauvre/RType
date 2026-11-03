@@ -47,8 +47,8 @@ std::string_view section_of(const std::vector<std::unique_ptr<ApiSet>>& sets) {
 } // namespace
 
 RuntimeContext::RuntimeContext()
-    : fields(engine_fields()), types(lua.create_table()), entities(lua, fields, textures, shaders) {
-}
+    : fields(engine_fields()), types(lua.create_table()), entities(lua, fields, textures, shaders),
+      navigation(entities) {}
 
 const Declaration* RuntimeContext::find_declaration(std::string_view name) const {
     const auto found = declarations.find(name);
@@ -136,6 +136,13 @@ void ScriptRuntime::Impl::bind_core() {
     });
     lua.set_function("event", [this](sol::this_state state, const sol::object& name) {
         return context.events.declare(state, name);
+    });
+    lua.set_function("navgrid", [this](sol::this_state state, const sol::object& options) {
+        context.navigation.configure(state, options);
+    });
+    lua.set_function("find_path", [this](sol::this_state state, const sol::object& from,
+                                         const sol::object& to, const sol::object& options) {
+        return context.navigation.find_path(state, from, to, options);
     });
 }
 
@@ -483,10 +490,17 @@ ScriptRuntime::spawn_instances(std::span<const Instance> instances) noexcept {
 
 void ScriptRuntime::update(float dt) noexcept {
     try {
-        _impl->context.entities.update(dt);
-        const auto main_update = _impl->context.main_callback("update");
+        RuntimeContext& context = _impl->context;
+        context.navigation.new_tick();
+        context.entities.update(dt);
+        const auto main_update = context.main_callback("update");
         if (main_update.valid()) {
             report(main_update(dt));
+        }
+        for (const core::Entity arrived : context.navigation.step(dt)) {
+            if (context.entities.is_active(arrived)) {
+                context.entities.call(arrived, "on_arrive");
+            }
         }
     } catch (const std::exception& exception) {
         log::error("lua: update: {}", exception.what());

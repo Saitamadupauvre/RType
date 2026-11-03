@@ -12,6 +12,7 @@
 #include "event/Events.hpp"
 #include "loading/Declarations.hpp"
 #include "lua/Sol.hpp"
+#include "navigation/Navigation.hpp"
 
 namespace engine::script {
 
@@ -28,6 +29,7 @@ public:
     DeclaredAssets textures{"textures", "texture"};
     DeclaredAssets shaders{"shaders", "shader"};
     Entities entities;
+    Navigation navigation;
     Audio audio;
     Events events;
     std::map<std::string, Declaration, std::less<>> declarations;
