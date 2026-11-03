@@ -45,7 +45,7 @@ engine_add_module(script
         src/script/ScriptRuntime.cpp
         src/script/ScriptRuntimeBuilder.cpp
         src/script/ServerApi.cpp
-        src/script/assets/Textures.cpp
+        src/script/assets/DeclaredAssets.cpp
         src/script/audio/Audio.cpp
         src/script/entity/Entities.cpp
         src/script/entity/EntityFields.cpp

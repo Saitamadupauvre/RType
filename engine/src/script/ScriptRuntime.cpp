@@ -47,7 +47,8 @@ std::string_view section_of(const std::vector<std::unique_ptr<ApiSet>>& sets) {
 } // namespace
 
 RuntimeContext::RuntimeContext()
-    : fields(engine_fields()), types(lua.create_table()), entities(lua, fields, textures) {}
+    : fields(engine_fields()), types(lua.create_table()), entities(lua, fields, textures, shaders) {
+}
 
 const Declaration* RuntimeContext::find_declaration(std::string_view name) const {
     const auto found = declarations.find(name);
@@ -84,7 +85,8 @@ struct ScriptRuntime::Impl {
                                const sol::environment& environment);
     bool apply_sections(const std::vector<Declaration>& batch) const;
     bool register_declarations(std::vector<Declaration> batch);
-    bool declare_sprite(const Declaration& declaration);
+    static bool declare_asset(const Declaration& declaration, std::string_view field,
+                              DeclaredAssets& declared);
     bool start(const sol::environment& main);
 };
 
@@ -128,6 +130,9 @@ void ScriptRuntime::Impl::bind_core() {
     });
     lua.set_function("textures", [this](sol::this_state state, const sol::object& names) {
         context.textures.declare(state, names);
+    });
+    lua.set_function("shaders", [this](sol::this_state state, const sol::object& names) {
+        context.shaders.declare(state, names);
     });
     lua.set_function("event", [this](sol::this_state state, const sol::object& name) {
         return context.events.declare(state, name);
@@ -181,9 +186,11 @@ bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
     modules.emplace(root);
     context.audio.allow_declarations(true);
     context.textures.allow_declarations(true);
+    context.shaders.allow_declarations(true);
     context.events.allow_declarations(true);
     const bool loaded = load_all(root, files);
     context.events.allow_declarations(false);
+    context.shaders.allow_declarations(false);
     context.textures.allow_declarations(false);
     context.audio.allow_declarations(false);
     return loaded;
@@ -261,7 +268,8 @@ bool ScriptRuntime::Impl::register_declarations(std::vector<Declaration> batch) 
         return false;
     }
     if (!std::ranges::all_of(batch, [this](const Declaration& declaration) {
-            return declare_sprite(declaration);
+            return declare_asset(declaration, "sprite", context.textures) &&
+                   declare_asset(declaration, "shader", context.shaders);
         })) {
         return false;
     }
@@ -273,18 +281,17 @@ bool ScriptRuntime::Impl::register_declarations(std::vector<Declaration> batch) 
     return true;
 }
 
-bool ScriptRuntime::Impl::declare_sprite(const Declaration& declaration) {
+bool ScriptRuntime::Impl::declare_asset(const Declaration& declaration, std::string_view field,
+                                        DeclaredAssets& declared) {
     if (declaration.kind != DeclarationKind::Entity) {
         return true;
     }
-    const auto sprite = declaration.prefab.raw_get<sol::object>("sprite");
-    if (sprite.get_type() != sol::type::string ||
-        context.textures.add(sprite.as<std::string_view>())) {
+    const auto value = declaration.prefab.raw_get<sol::object>(field);
+    if (value.get_type() != sol::type::string || declared.add(value.as<std::string_view>())) {
         return true;
     }
-    log::error("lua: {}: entity '{}' has an invalid sprite '{}'",
-               declaration.source.generic_string(), declaration.name,
-               sprite.as<std::string_view>());
+    log::error("lua: {}: entity '{}' has an invalid {} '{}'", declaration.source.generic_string(),
+               declaration.name, field, value.as<std::string_view>());
     return false;
 }
 
@@ -434,6 +441,10 @@ std::vector<std::string> ScriptRuntime::music_names() const {
 
 std::vector<std::string> ScriptRuntime::texture_names() const {
     return _impl->context.textures.names();
+}
+
+std::vector<std::string> ScriptRuntime::shader_names() const {
+    return _impl->context.shaders.names();
 }
 
 std::vector<std::string> ScriptRuntime::event_names() const {

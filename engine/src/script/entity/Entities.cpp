@@ -44,6 +44,7 @@ template <typename Component> void register_if_missing(core::EntityManager& worl
 void register_script_components(core::EntityManager& world) {
     register_if_missing<core::Position>(world);
     register_if_missing<core::Sprite>(world);
+    register_if_missing<core::Shader>(world);
     register_if_missing<core::Tags>(world);
     register_if_missing<core::Camera>(world);
     register_if_missing<core::Rotation>(world);
@@ -86,8 +87,9 @@ sol::table copy_table(sol::state& lua, const sol::table& source, TableCopies& co
 
 } // namespace
 
-Entities::Entities(sol::state& lua, const core::FieldRegistry& fields, const Textures& textures)
-    : _lua(lua), _fields(fields, textures), _methods(lua.create_table()) {
+Entities::Entities(sol::state& lua, const core::FieldRegistry& fields,
+                   const DeclaredAssets& textures, const DeclaredAssets& shaders)
+    : _lua(lua), _fields(fields, textures, shaders), _methods(lua.create_table()) {
     sol::table types = _lua.create_table();
     types.new_usertype<EntityHandle>(
         "EntityHandle", sol::no_constructor, sol::meta_function::index,

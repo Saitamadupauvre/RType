@@ -50,6 +50,7 @@ constexpr std::array aliases{
                .apply_defaults = &give_script_body},
     FieldAlias{.name = "sprite", .component = "Sprite", .field = "path"},
     FieldAlias{.name = "color", .component = "Sprite", .field = "color"},
+    FieldAlias{.name = "shader", .component = "Shader", .field = "path"},
     FieldAlias{.name = "tags", .component = "Tags", .field = "labels"},
     FieldAlias{.name = "hitbox",
                .component = "AABBCollider",
@@ -94,8 +95,9 @@ core::Vec2 with_axis(core::Vec2 vector, AliasShape shape, float value) {
 
 } // namespace
 
-EntityFields::EntityFields(const core::FieldRegistry& registry, const Textures& textures)
-    : _registry(registry), _textures(textures) {
+EntityFields::EntityFields(const core::FieldRegistry& registry, const DeclaredAssets& textures,
+                           const DeclaredAssets& shaders)
+    : _registry(registry), _textures(textures), _shaders(shaders) {
     for (const FieldAlias& alias : aliases) {
         _bindings.push_back(Binding{
             .alias = alias,
@@ -255,7 +257,7 @@ sol::object EntityFields::read_field(sol::this_state state, core::EntityManager&
 void EntityFields::write_value(sol::this_state state, core::EntityManager& world,
                                core::Entity entity, core::FieldRef field, std::string_view name,
                                const core::FieldValue& value) const {
-    require_declared_texture(state, name, value);
+    require_declared_asset(state, name, field, value);
     try {
         _registry.set(world, entity, field, value);
     } catch (const core::FieldValueOutOfRange& error) {
@@ -263,12 +265,18 @@ void EntityFields::write_value(sol::this_state state, core::EntityManager& world
     }
 }
 
-void EntityFields::require_declared_texture(sol::this_state state, std::string_view name,
-                                            const core::FieldValue& value) const {
+void EntityFields::require_declared_asset(sol::this_state state, std::string_view name,
+                                          core::FieldRef field,
+                                          const core::FieldValue& value) const {
     const auto* asset = std::get_if<core::AssetName>(&value);
-    if (asset != nullptr && !_textures.contains(asset->path)) {
-        fail(state, std::format("entity field '{}': unknown texture '{}', declare it with textures",
-                                name, asset->path));
+    if (asset == nullptr) {
+        return;
+    }
+    const DeclaredAssets& declared =
+        field.field->asset_type() == core::AssetType::Shader ? _shaders : _textures;
+    if (!declared.contains(asset->path)) {
+        fail(state, std::format("entity field '{}': unknown {} '{}', declare it with {}", name,
+                                declared.kind(), asset->path, declared.function()));
     }
 }
 
