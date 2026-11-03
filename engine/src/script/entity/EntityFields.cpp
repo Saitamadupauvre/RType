@@ -7,6 +7,7 @@
 #include <string>
 
 #include "engine/physics/Components.hpp"
+#include "entity/ScriptBody.hpp"
 #include "lua/LuaErrors.hpp"
 #include "lua/LuaFieldValue.hpp"
 
@@ -16,13 +17,6 @@ namespace {
 
 bool lacks_body(const core::EntityManager& world, core::Entity entity) {
     return !world.has<physics::PhysicsBody>(entity);
-}
-
-void give_script_body(core::EntityManager& world, core::Entity entity) {
-    auto& body = world.get<physics::PhysicsBody>(entity);
-    body.type = physics::PhysicsBody::Type::Dynamic;
-    body.resolve_collisions = false;
-    body.affected_by_gravity = false;
 }
 
 void anchor_hitbox(core::EntityManager& world, core::Entity entity) {
