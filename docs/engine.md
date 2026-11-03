@@ -66,8 +66,9 @@ Component types are identified by stable names registered in a `.cpp` of
 Scenes, the editor's Play/Stop and undo/redo store the world as **instances**
 rather than raw component memory. An instance holds the entity's type, its
 position, an optional name (`set_entity_name()`, never seen by scripts) and
-its **overrides**: the editable registry fields whose value differs from the
-type's default, keyed `"Component.field"` and sorted.
+its **overrides**: the editable registry fields and the script fields whose
+value differs from the type's default, keyed `"Component.field"` or
+`"Script.name"` and sorted.
 
 ```cpp
 const std::vector<engine::script::Instance> saved = runtime.capture_instances();
@@ -89,7 +90,15 @@ whole instance was skipped) and a message.
 - **Failures** never throw: an unknown type or a system skips the instance,
   an unknown or non-editable field, a wrong kind or an out-of-range value
   skips that override. Each is returned as an `InstanceIssue` and logged.
-- Not captured: Lua free fields (`self.health`), non-editable fields such as
+- **Script fields** are the Lua free fields of a declaration (`health = 3`)
+  whose default has a supported kind. `script_fields(type)` lists them with
+  their kind and default, inferred once at load (rules in
+  [Game folder and scenes](game-folder.md#script-fields)). Spawning writes a
+  `"Script.name"` override into the entity's Lua table after `on_spawn`, so
+  `self.health` reads it. A value of the wrong kind is skipped at spawn and
+  left out (with a warning) at capture.
+- Not captured: free fields that are not script fields (functions, `_private`
+  names, unsupported tables, fields of a `server`/`client` section), non-editable fields such as
   `Replicated.owner`, entities marked with `self:destroy()` and entities the
   runtime did not spawn. An entity spawned by another one's `on_spawn` is
   captured too, so spawning the instances back spawns it twice.
