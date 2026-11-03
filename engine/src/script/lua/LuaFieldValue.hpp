@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string_view>
 
 #include "engine/core/FieldRegistry.hpp"
@@ -15,6 +16,10 @@ core::FieldValue from_lua(sol::this_state state, const sol::object& value,
 
 core::FieldValue from_lua(sol::this_state state, const sol::object& value, core::FieldKind kind,
                           std::string_view label, std::string_view name);
+
+core::FieldValue from_lua(sol::this_state state, const sol::object& value, core::FieldKind kind,
+                          std::optional<core::FieldKind> element, std::string_view label,
+                          std::string_view name);
 
 float number_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
 

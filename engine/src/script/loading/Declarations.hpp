@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "engine/script/Declaration.hpp"
+#include "engine/script/ScriptField.hpp"
 #include "lua/Sol.hpp"
 
 namespace engine::script {
@@ -17,6 +18,7 @@ struct Declaration {
     DeclarationKind kind;
     std::filesystem::path source;
     sol::table prefab;
+    std::vector<ScriptField> script_fields{};
 };
 
 struct PendingDeclaration {

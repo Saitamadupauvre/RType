@@ -15,6 +15,7 @@
 #include "engine/core/log/Log.hpp"
 #include "engine/physics/Fields.hpp"
 #include "entity/Instances.hpp"
+#include "entity/ScriptFields.hpp"
 #include "loading/Declarations.hpp"
 #include "loading/ModuleLoader.hpp"
 #include "loading/ScriptFiles.hpp"
@@ -89,6 +90,7 @@ struct ScriptRuntime::Impl {
     bool spawn_scene(const fs::path& file);
     bool load_declaration_file(const fs::path& root, const fs::path& relative,
                                const sol::environment& environment);
+    void describe_script_fields(std::vector<Declaration>& batch) const;
     bool apply_sections(const std::vector<Declaration>& batch) const;
     bool register_declarations(std::vector<Declaration> batch);
     static bool declare_asset(const Declaration& declaration, std::string_view field,
@@ -276,7 +278,21 @@ bool ScriptRuntime::Impl::load_declaration_file(const fs::path& root, const fs::
     }
     auto resolved = resolve_declarations(*file, environment);
     file->declarations.clear();
-    return resolved && apply_sections(*resolved) && register_declarations(std::move(*resolved));
+    if (!resolved) {
+        return false;
+    }
+    describe_script_fields(*resolved);
+    return apply_sections(*resolved) && register_declarations(std::move(*resolved));
+}
+
+void ScriptRuntime::Impl::describe_script_fields(std::vector<Declaration>& batch) const {
+    const sol::this_state state{context.lua.lua_state()};
+    for (Declaration& declaration : batch) {
+        if (declaration.kind == DeclarationKind::Entity) {
+            declaration.script_fields =
+                infer_script_fields(state, declaration.prefab, context.entities);
+        }
+    }
 }
 
 bool ScriptRuntime::Impl::apply_sections(const std::vector<Declaration>& batch) const {
@@ -485,6 +501,14 @@ std::vector<std::string> ScriptRuntime::entity_types() const {
         }
     }
     return types;
+}
+
+std::vector<ScriptField> ScriptRuntime::script_fields(std::string_view type) const {
+    const Declaration* declaration = _impl->context.find_declaration(type);
+    if (declaration == nullptr || declaration->kind != DeclarationKind::Entity) {
+        return {};
+    }
+    return declaration->script_fields;
 }
 
 std::vector<std::string> ScriptRuntime::sound_names() const {

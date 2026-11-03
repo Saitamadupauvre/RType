@@ -20,6 +20,7 @@
 #include "engine/script/Export.hpp"
 #include "engine/script/Instance.hpp"
 #include "engine/script/Scene.hpp"
+#include "engine/script/ScriptField.hpp"
 #include "engine/script/ScriptRuntimeBuilder.hpp"
 
 namespace engine::script {
@@ -155,7 +156,8 @@ public:
      *   object;
      * - an instance whose type is not a declared entity: it is kept unchanged in
      *   Scene::unknown_instances, so write_scene() writes it back;
-     * - an override naming an unknown or non-editable field, or holding a value of the wrong kind
+     * - an override naming an unknown or non-editable field or an unknown script field of the
+     *   instance's type, or holding a value of the wrong kind
      *   or that a value of its kind cannot hold (an int above 2^63 - 1, a color channel above
      *   255...).
      *
@@ -253,6 +255,19 @@ public:
     [[nodiscard]] std::vector<std::string> entity_types() const;
 
     /**
+     * @brief Lists the Lua free fields of an entity type that instances can override.
+     *
+     * Inferred once, when the declaration loads, from the defaults it gives (see ScriptField for
+     * the rules). Instances store them under the key `"Script.<name>"`, e.g. `"Script.health"`.
+     * A field declared only inside a `server = { ... }` or `client = { ... }` section is not
+     * listed, so every API set sees the same list.
+     *
+     * @param type Declared entity name.
+     * @return The fields in ascending name order, empty for an unknown type or a system.
+     */
+    [[nodiscard]] std::vector<ScriptField> script_fields(std::string_view type) const;
+
+    /**
      * @brief Lists the sound effects declared with `sounds { ... }`, in ascending order.
      *
      * Scripts declare sounds while load_scripts() runs, for example in `main.lua`:
@@ -343,11 +358,13 @@ public:
      * entity, except `Position.pos` which is its position, whose value differs from the type's
      * default: the value the field gets from the prefab's component fields (`sprite`, `hitbox`...)
      * before `on_spawn` runs. A field of a component the prefab does not give is always stored.
+     * Each script field (see script_fields()) whose value differs from its prefab default is
+     * stored as `"Script.<name>"`; one holding a value of another kind is left out and logged at
+     * Level::Warn.
      *
      * @return The instances, empty if no world is attached. Save them with write_scene().
-     * @note Lua fields such as `self.health` are not captured. An entity spawned by another
-     * entity's `on_spawn` is captured like any other, so spawning the instances back spawns it
-     * twice.
+     * @note An entity spawned by another entity's `on_spawn` is captured like any other, so
+     * spawning the instances back spawns it twice.
      */
     [[nodiscard]] std::vector<Instance> capture_instances();
 
@@ -359,8 +376,9 @@ public:
      * Entities already in the world are kept.
      *
      * @return What was skipped: an instance whose type is unknown or declared as a system, or
-     * that cannot be spawned; an override naming an unknown or non-editable field, or holding a
-     * value of the wrong kind or out of range. The other instances and overrides are still
+     * that cannot be spawned; an override naming an unknown or non-editable field or an unknown
+     * script field, or holding a value of the wrong kind or out of range. The other instances and
+     * overrides are still
      * applied. Every issue is also logged at Level::Warn.
      * @note Never throws.
      */
