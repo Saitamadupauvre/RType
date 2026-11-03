@@ -6,8 +6,8 @@
 #include <tuple>
 #include <utility>
 
-#include "GameFolder.hpp"
 #include "SceneFile.hpp"
+#include "engine/script/GameFolder.hpp"
 #include "entity/Instances.hpp"
 #include "lua/LuaErrors.hpp"
 

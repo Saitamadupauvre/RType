@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -16,5 +17,9 @@ namespace engine::script {
 [[nodiscard]] std::vector<Instance> capture_instances(RuntimeContext& context);
 [[nodiscard]] std::vector<InstanceIssue> spawn_instances(RuntimeContext& context,
                                                          std::span<const Instance> instances);
+[[nodiscard]] Preview preview_instances(RuntimeContext& context, core::EntityManager& world,
+                                        std::span<const Instance> instances);
+[[nodiscard]] std::optional<core::FieldValue>
+default_value(RuntimeContext& context, std::string_view type, std::string_view key);
 
 } // namespace engine::script

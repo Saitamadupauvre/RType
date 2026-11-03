@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "engine/core/Entity.hpp"
 #include "engine/core/FieldRegistry.hpp"
 #include "engine/core/Vec2.hpp"
 
@@ -51,6 +53,14 @@ struct InstanceIssue {
     std::string message;
 
     bool operator==(const InstanceIssue&) const = default;
+};
+
+/** @brief What ScriptRuntime::preview_instances() built. */
+struct Preview {
+    /** Entity built for each instance, in the same order; std::nullopt for a skipped instance. */
+    std::vector<std::optional<core::Entity>> entities;
+    /** Same issues as ScriptRuntime::spawn_instances() would report for these instances. */
+    std::vector<InstanceIssue> issues;
 };
 
 } // namespace engine::script
