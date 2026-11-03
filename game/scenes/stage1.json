@@ -1,0 +1,15 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "name": "background",
+            "type": "space",
+            "position": [0, 0]
+        },
+        {
+            "name": "controller",
+            "type": "game",
+            "position": [0, 0]
+        }
+    ]
+}
