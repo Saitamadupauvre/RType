@@ -59,6 +59,9 @@ public:
     }
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {8, 8}; }
     void begin_frame(Color) override {
+        calls.clear();
+        rects.clear();
+        rects_in_world.clear();
         sprites.clear();
         texts.clear();
         sprites_in_world.clear();
@@ -74,8 +77,14 @@ public:
     }
     void end_world() override { in_world = false; }
     void draw_sprite(const SpriteDraw& sprite) override {
+        calls.emplace_back("sprite");
         sprites.push_back(sprite);
         sprites_in_world.push_back(in_world);
+    }
+    void draw_rect(const Rect& rect, Color, bool) override {
+        calls.emplace_back("rect");
+        rects.push_back(rect);
+        rects_in_world.push_back(in_world);
     }
     void draw_text(const std::string& text, Vec2, float, Color) override { texts.push_back(text); }
 
@@ -86,6 +95,9 @@ public:
     std::string title;
     std::function<void()> on_load;
     std::vector<std::string> loaded;
+    std::vector<std::string> calls;
+    std::vector<Rect> rects;
+    std::vector<bool> rects_in_world;
     std::vector<SpriteDraw> sprites;
     std::vector<std::string> texts;
     std::vector<bool> sprites_in_world;
@@ -390,4 +402,82 @@ TEST_F(ClientAppTest, ServerSeesThePlayerLeaveWhenTheClientStops) {
     _server.update();
 
     EXPECT_EQ(_server.network().player_count(), 0U);
+}
+
+TEST_F(ClientAppTest, LocalEntitiesAreDrawnInTheWorldOnlyOnTheirClient) {
+    FakeRenderer other_renderer;
+    ClientApp other{_clock,
+                    _loopback.add_client(),
+                    other_renderer,
+                    _input,
+                    _audio,
+                    ClientAppOptions{.scripts = game / "scripts",
+                                     .assets = game / "assets",
+                                     .window = {},
+                                     .background = {},
+                                     .audio = {}}};
+    std::string error;
+    ASSERT_TRUE(other.start(error)) << error;
+    start_client();
+    ASSERT_TRUE(_client.script().run_string("spawn_local('dust', { x = 100, vx = 0 })", "local"));
+
+    for (int frame = 0; frame < session_frames; ++frame) {
+        _clock.advance(std::chrono::milliseconds(17));
+        _server.update();
+        _client.frame();
+        other.frame();
+    }
+
+    ASSERT_EQ(_renderer.rects.size(), 1U);
+    EXPECT_FLOAT_EQ(_renderer.rects.front().x, 100.F);
+    EXPECT_TRUE(_renderer.rects_in_world.front());
+    EXPECT_TRUE(other_renderer.rects.empty());
+    EXPECT_EQ(other_renderer.sprites.size(), _renderer.sprites.size());
+    other.stop();
+}
+
+TEST_F(ClientAppTest, LocalEntitiesAreUpdatedByClientScripts) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string("spark = spawn_local('spark', { x = 100 })", "local"));
+
+    play(session_frames);
+
+    ASSERT_EQ(_renderer.rects.size(), 1U);
+    EXPECT_GT(_renderer.rects.front().x, 100.F);
+    EXPECT_TRUE(_client.script().run_string(
+        "assert(spark.x == " + std::to_string(static_cast<int>(_renderer.rects.front().x)) + ")",
+        "check"));
+}
+
+TEST_F(ClientAppTest, LocalEntitiesMoveWithTheirVelocity) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string("spawn_local('dust')", "local"));
+
+    play(session_frames);
+
+    ASSERT_EQ(_renderer.rects.size(), 1U);
+    EXPECT_GT(_renderer.rects.front().x, 0.F);
+}
+
+TEST_F(ClientAppTest, DestroyedLocalEntitiesAreNoLongerDrawn) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string("spark = spawn_local('spark')", "local"));
+    play(session_frames);
+    ASSERT_EQ(_renderer.rects.size(), 1U);
+
+    ASSERT_TRUE(_client.script().run_string("spark:destroy()", "destroy"));
+    play(1);
+
+    EXPECT_TRUE(_renderer.rects.empty());
+}
+
+TEST_F(ClientAppTest, LocalAndServerEntitiesAreDrawnTogetherByZIndex) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string(
+        "spawn_local('dust', { vx = 0, z_index = -1 }) spawn_local('spark', { z_index = 1 })",
+        "local"));
+
+    play(session_frames);
+
+    EXPECT_EQ(_renderer.calls, (std::vector<std::string>{"rect", "sprite", "rect"}));
 }

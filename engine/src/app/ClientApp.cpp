@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -12,6 +13,7 @@
 #include "CameraRig.hpp"
 #include "Fields.hpp"
 #include "LoadingScreen.hpp"
+#include "PhysicsStep.hpp"
 #include "ShaderLibrary.hpp"
 #include "SnapshotView.hpp"
 #include "TextureLibrary.hpp"
@@ -28,8 +30,9 @@ namespace engine::app {
 
 namespace {
 
-script::ScriptRuntime load_game(const std::filesystem::path& scripts) {
+script::ScriptRuntime load_game(core::EntityManager& local, const std::filesystem::path& scripts) {
     auto runtime = script::ScriptRuntime::builder().with<script::ClientApi>().build();
+    runtime.attach_world(local);
     if (!scripts.empty()) {
         runtime.load_scripts(scripts);
     }
@@ -65,8 +68,10 @@ struct ClientApp::Impl {
     core::event::EventBus events;
     core::FieldRegistry fields;
     network::NetworkClient network;
+    core::EntityManager local;
     script::ScriptRuntime runtime;
     script::ClientApi& client;
+    PhysicsStep local_physics;
     AudioPlayer sound;
     TextureLibrary textures;
     ShaderLibrary shaders;
@@ -101,10 +106,11 @@ ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport&
                       audio::IAudio& speakers, ClientAppOptions settings)
     : renderer(window), input(keys), audio(speakers), options(std::move(settings)),
       fields(replicated_fields()), network(clock, events, fields, transport),
-      runtime(load_game(options.scripts)), client(runtime.api<script::ClientApi>()),
-      sound(speakers, options.assets), textures(window, options.assets),
-      shaders(window, options.assets), world_draw(window, textures, shaders), view(fields),
-      time_source(clock), started_at(clock.now()), loop(clock) {
+      runtime(load_game(local, options.scripts)), client(runtime.api<script::ClientApi>()),
+      local_physics(local, events, runtime), sound(speakers, options.assets),
+      textures(window, options.assets), shaders(window, options.assets),
+      world_draw(window, textures, shaders), view(fields), time_source(clock),
+      started_at(clock.now()), loop(clock) {
     client.set_audio_settings(options.audio);
     events.subscribe<network::SoundPlayed>([this](const network::SoundPlayed& played) {
         sound.play_sound(network.strings(), played.sound_id);
@@ -178,12 +184,15 @@ void ClientApp::Impl::update_camera(const std::vector<network::EntitySnapshot>& 
 }
 
 void ClientApp::Impl::run_ticks(const std::vector<network::EntitySnapshot>& entities) {
-    const auto local = graphics::capture_input(input.get());
+    const auto held = graphics::capture_input(input.get());
     update_camera(entities);
     loop.run_frame([&](core::time::Duration step) {
-        client.set_input(local);
-        runtime.update(std::chrono::duration<float>(step).count());
-        network.send_input(local);
+        const float dt = std::chrono::duration<float>(step).count();
+        client.set_input(held);
+        runtime.update(dt);
+        local_physics.step(dt);
+        runtime.flush_destroyed();
+        network.send_input(held);
     });
 }
 
@@ -202,7 +211,7 @@ void ClientApp::Impl::draw_world(const std::vector<network::EntitySnapshot>& ent
     const core::CameraView camera = resolve_camera(entities, client.camera_override(), viewport);
     client.set_camera_view(camera, viewport);
     renderer.get().begin_world(camera);
-    world_draw.draw(view.mirror(entities),
+    world_draw.draw({std::ref(view.mirror(entities)), std::ref(local)},
                     std::chrono::duration<float>(time_source.get().now() - started_at).count());
     renderer.get().end_world();
 }

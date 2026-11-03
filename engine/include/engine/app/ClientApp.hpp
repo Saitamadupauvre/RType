@@ -53,6 +53,11 @@ struct ClientAppOptions {
  * frame. Every entity of the latest snapshot is drawn with the sprite the server replicates,
  * loaded once from the asset folder; an entity without one is drawn as a coloured square.
  *
+ * Entities spawned by client scripts with `spawn_local` live in a world of their own, attached to
+ * the scripts before they load: they are never sent to the server, run their `client` section and
+ * move with their velocity on every tick, and are removed after the tick that destroys them. They
+ * are drawn with the replicated entities, every entity in ascending `z_index`, then spawn order.
+ *
  * @note Not thread safe: every call must come from the thread owning the renderer.
  */
 class ENGINE_APP_EXPORT ClientApp {
