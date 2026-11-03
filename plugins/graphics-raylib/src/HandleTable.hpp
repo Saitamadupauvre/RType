@@ -6,22 +6,25 @@
 #include <utility>
 #include <vector>
 
-#include "engine/graphics/Types.hpp"
-
-template <typename Handle> class TextureTable {
+template <typename Id, typename Handle> class HandleTable {
 public:
-    engine::graphics::TextureId add(Handle handle) {
-        const engine::graphics::TextureId id{_next++};
+    Id add(Handle handle) {
+        const Id id{_next++};
         _handles.emplace(id.value, std::move(handle));
         return id;
     }
 
-    [[nodiscard]] const Handle* find(engine::graphics::TextureId id) const {
+    [[nodiscard]] const Handle* find(Id id) const {
         const auto found = _handles.find(id.value);
         return found == _handles.end() ? nullptr : &found->second;
     }
 
-    std::optional<Handle> remove(engine::graphics::TextureId id) {
+    [[nodiscard]] Handle* find(Id id) {
+        const auto found = _handles.find(id.value);
+        return found == _handles.end() ? nullptr : &found->second;
+    }
+
+    std::optional<Handle> remove(Id id) {
         const auto found = _handles.find(id.value);
         if (found == _handles.end()) {
             return std::nullopt;
