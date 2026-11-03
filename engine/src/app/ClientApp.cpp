@@ -12,6 +12,7 @@
 #include "AudioPlayer.hpp"
 #include "CameraRig.hpp"
 #include "Fields.hpp"
+#include "HudDraw.hpp"
 #include "LoadingScreen.hpp"
 #include "PhysicsStep.hpp"
 #include "ShaderLibrary.hpp"
@@ -76,6 +77,7 @@ struct ClientApp::Impl {
     TextureLibrary textures;
     ShaderLibrary shaders;
     WorldDraw world_draw;
+    HudDraw hud_draw;
     SnapshotView view;
     std::reference_wrapper<const core::time::IClock> time_source;
     core::time::Duration started_at;
@@ -109,8 +111,8 @@ ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport&
       runtime(load_game(local, options.scripts)), client(runtime.api<script::ClientApi>()),
       local_physics(local, events, runtime), sound(speakers, options.assets),
       textures(window, options.assets), shaders(window, options.assets),
-      world_draw(window, textures, shaders), view(fields), time_source(clock),
-      started_at(clock.now()), loop(clock) {
+      world_draw(window, textures, shaders), hud_draw(window, textures), view(fields),
+      time_source(clock), started_at(clock.now()), loop(clock) {
     client.set_audio_settings(options.audio);
     events.subscribe<network::SoundPlayed>([this](const network::SoundPlayed& played) {
         sound.play_sound(network.strings(), played.sound_id);
@@ -200,6 +202,7 @@ void ClientApp::Impl::draw(const std::vector<network::EntitySnapshot>& entities,
     renderer.get().begin_frame(options.background);
     if (playing) {
         draw_world(entities);
+        hud_draw.draw(client.draw_hud());
     } else {
         draw_loading_screen(renderer.get(), preloader.loaded(), preloader.total());
     }

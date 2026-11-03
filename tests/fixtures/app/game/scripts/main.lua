@@ -22,4 +22,9 @@ client = {
             audio.set_muted(not audio.muted())
         end
     end,
+    draw_hud = function()
+        if hud then
+            hud()
+        end
+    end,
 }

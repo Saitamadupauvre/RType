@@ -124,6 +124,7 @@ engine_add_test(app SOURCES
     engine/app/CameraFollowTest.cpp
     engine/app/CameraRigTest.cpp
     engine/app/ClientAppTest.cpp
+    engine/app/HudDrawTest.cpp
     engine/app/LoadingScreenTest.cpp
     engine/app/ServerAppTest.cpp
     engine/app/ShaderLibraryTest.cpp

@@ -65,6 +65,8 @@ public:
         sprites.clear();
         texts.clear();
         sprites_in_world.clear();
+        texts_in_world.clear();
+        text_positions.clear();
         views.clear();
     }
     void end_frame() override {
@@ -86,7 +88,12 @@ public:
         rects.push_back(rect);
         rects_in_world.push_back(in_world);
     }
-    void draw_text(const std::string& text, Vec2, float, Color) override { texts.push_back(text); }
+    void draw_text(const std::string& text, Vec2 position, float, Color) override {
+        calls.push_back("text " + text);
+        texts.push_back(text);
+        texts_in_world.push_back(in_world);
+        text_positions.push_back(position);
+    }
 
     bool open_succeeds{true};
     bool is_open{false};
@@ -100,6 +107,8 @@ public:
     std::vector<bool> rects_in_world;
     std::vector<SpriteDraw> sprites;
     std::vector<std::string> texts;
+    std::vector<bool> texts_in_world;
+    std::vector<Vec2> text_positions;
     std::vector<bool> sprites_in_world;
     std::vector<engine::core::CameraView> views;
     bool in_world{false};
@@ -480,4 +489,54 @@ TEST_F(ClientAppTest, LocalAndServerEntitiesAreDrawnTogetherByZIndex) {
     play(session_frames);
 
     EXPECT_EQ(_renderer.calls, (std::vector<std::string>{"rect", "sprite", "rect"}));
+}
+
+TEST_F(ClientAppTest, HudIsDrawnAfterTheWorldInScreenSpace) {
+    start_client();
+    ASSERT_TRUE(
+        _client.script().run_string("function hud() draw.text('HP', 10, 20, 16) end", "hud"));
+
+    play(session_frames);
+
+    ASSERT_EQ(_renderer.texts, (std::vector<std::string>{"HP"}));
+    EXPECT_FALSE(_renderer.texts_in_world.front());
+    EXPECT_EQ(_renderer.calls.back(), "text HP");
+}
+
+TEST_F(ClientAppTest, HudStaysFixedWhenTheCameraMoves) {
+    start_client();
+    ASSERT_TRUE(
+        _client.script().run_string("function hud() draw.text('HP', 10, 20, 16) end", "hud"));
+    play(session_frames);
+    const Vec2 before = _renderer.text_positions.front();
+
+    ASSERT_TRUE(_client.script().run_string("camera.set(900, 700, 3)", "move"));
+    play(1);
+
+    EXPECT_EQ(_renderer.views.front(),
+              (engine::core::CameraView{.center = {900.F, 700.F}, .zoom = 3.F}));
+    EXPECT_EQ(_renderer.text_positions.front(), before);
+}
+
+TEST_F(ClientAppTest, AnErrorInTheHudIsLoggedAndTheFrameGoesOn) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string(
+        "function hud() draw.text('HP', 10, 20, 16) error('broken hud') end", "hud"));
+
+    play(session_frames);
+
+    EXPECT_EQ(_renderer.texts, (std::vector<std::string>{"HP"}));
+    EXPECT_EQ(_renderer.sprites.size(), 1U);
+    EXPECT_EQ(_renderer.frames, session_frames);
+}
+
+TEST_F(ClientAppTest, NoHudIsDrawnWhileLoading) {
+    ASSERT_TRUE(
+        _client.script().run_string("function hud() draw.text('HP', 10, 20, 16) end", "hud"));
+    start_client();
+
+    _client.frame();
+
+    EXPECT_TRUE(std::ranges::none_of(_renderer.texts,
+                                     [](const std::string& text) { return text == "HP"; }));
 }

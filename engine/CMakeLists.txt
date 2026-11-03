@@ -140,12 +140,14 @@ engine_add_module(app
         src/app/CameraRig.cpp
         src/app/ClientApp.cpp
         src/app/Fields.cpp
+        src/app/HudDraw.cpp
         src/app/Launch.cpp
         src/app/LoadingScreen.cpp
         src/app/PhysicsStep.cpp
         src/app/ServerApp.cpp
         src/app/ShaderLibrary.cpp
         src/app/SnapshotView.cpp
+        src/app/SpriteLayout.cpp
         src/app/TextureLibrary.cpp
         src/app/WorldDraw.cpp
     DEPENDS engine::core engine::script engine::network engine::graphics engine::audio
