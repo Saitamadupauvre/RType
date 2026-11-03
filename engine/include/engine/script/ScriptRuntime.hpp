@@ -146,6 +146,21 @@ public:
     bool load_game(const std::filesystem::path& game) noexcept;
 
     /**
+     * @brief Loads the declarations of a script folder without starting the game.
+     *
+     * Runs the top level of every declaration file and of `main.lua` and registers what they
+     * declare, exactly as load_scripts() does, but never calls `on_start()` and never spawns
+     * anything. Meant for tools such as the editor, which list and preview declarations while no
+     * game runs.
+     *
+     * @param root Script folder, e.g. scripts_folder() of a game folder.
+     * @return Same as load_scripts().
+     * @note Can be called once per runtime, instead of load_scripts() or load_game(). Never
+     * throws.
+     */
+    bool load_declarations(const std::filesystem::path& root) noexcept;
+
+    /**
      * @brief Reads a scene file against the loaded declarations and field registry.
      *
      * The file is untrusted. It is rejected as a whole when it cannot be read, is not valid JSON,
@@ -383,6 +398,34 @@ public:
      * @note Never throws.
      */
     std::vector<InstanceIssue> spawn_instances(std::span<const Instance> instances) noexcept;
+
+    /**
+     * @brief Builds one entity per instance into @p world without running any Lua.
+     *
+     * Each entity gets the components its prefab's native fields give (`sprite`, `hitbox`...),
+     * the instance's position, then its component overrides through fields(). No callback runs:
+     * no `on_spawn`, `update`, `on_collide` or `on_destroy`. The entities have no Lua data, so
+     * `Script.*` overrides are only checked, not stored in @p world. @p world need not be the
+     * attached world and entities already in it are kept.
+     *
+     * @return The entity of each instance and the same issues spawn_instances() would report.
+     * Issues are not logged.
+     * @note Never throws.
+     */
+    [[nodiscard]] Preview preview_instances(core::EntityManager& world,
+                                            std::span<const Instance> instances) noexcept;
+
+    /**
+     * @brief Value an instance of @p type has for @p key when it does not override it.
+     *
+     * @param key `"Component.field"` of an editable registry field, or `"Script.<name>"` of a
+     * script field.
+     * @return The default of a script field; for a registry field, the value the prefab's native
+     * fields give it, or std::nullopt when the prefab does not give that component. std::nullopt
+     * too for an unknown type, a system, an unknown key or a non-editable field.
+     */
+    [[nodiscard]] std::optional<core::FieldValue> default_value(std::string_view type,
+                                                                std::string_view key);
 
     /**
      * @brief Advances every live entity by one tick.

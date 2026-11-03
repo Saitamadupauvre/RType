@@ -60,6 +60,10 @@ engine_add_test(script SOURCES
     engine/script/scene/SceneFileTest.cpp
     engine/script/scene/SceneSwitchTest.cpp
 )
+engine_add_test(editor SOURCES
+    engine/editor/EditorSessionTest.cpp
+    engine/editor/SceneCommandsTest.cpp
+)
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
     engine/network/FieldsTest.cpp

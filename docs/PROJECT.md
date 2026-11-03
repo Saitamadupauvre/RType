@@ -109,6 +109,7 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
             │  engine-network  UDP sockets, protocol, threads, replication   │
             │  engine-physics  bodies, colliders, collision resolution       │
             │  engine-graphics renderer/input interfaces, plugin loader      │
+            │  engine-editor   editing model: scenes, commands, undo/redo    │
             │                                                                │
             │  plugins/graphics-raylib   window, 2D rendering, input         │
             │                            (loaded at runtime, client only)    │
@@ -181,6 +182,7 @@ bin/
 ├── libengine-app.so
 ├── libengine-audio.so
 ├── libengine-core.so
+├── libengine-editor.so
 ├── libengine-graphics.so
 ├── libengine-network.so
 ├── libengine-physics.so
@@ -1018,6 +1020,7 @@ Developers must not use these names for their own fields or methods; the engine 
 - **Field access** goes through the entity handle's metatable. `__index` looks up, in order: native field aliases → entity methods → the entity's Lua data → its prefab table (methods). `__newindex` writes native fields into C++ storage and everything else into the Lua data. Aliases are a small data table (`engine/src/script/EntityFields.cpp`) mapping a Lua name to a `core::FieldRegistry` field, resolved to a `FieldRef` once; `sol::object` ↔ `FieldValue` conversion lives in one place (`LuaFieldValue.cpp`). The registry, filled by `register_core_fields` and `register_physics_fields`, is exposed by `ScriptRuntime::fields()`. Setting a collider field also adds the `PhysicsBody` it requires (`FieldRegistry::add(..., required<PhysicsBody>)`); the `hitbox` alias additionally makes a new body dynamic without gravity or collision response, centres the collider (`offset = size / 2`) and adds `Scriptable`.
 - **Instances** — `ScriptRuntime::capture_instances()` / `spawn_instances()` (`entity/Instances.cpp`) turn the world into `Instance{name, type, position, overrides}` and back. A type's defaults come from a prototype entity built in a scratch world from the prefab's native fields, without `on_spawn`; only editable fields that differ are stored. Script fields (`entity/ScriptFields.cpp`) are inferred from each entity prefab before its sections are merged, kept on the `Declaration`, compared with the entity's Lua data and written back into it as `"Script.<name>"` overrides; `ScriptRuntime::script_fields()` lists them. See [Engine modules](engine.md#instances).
 - **Scenes** — `ScriptRuntime::read_scene()`, `write_scene()` and `load_game()` (`scene/`) store instances in `scenes/<name>.json` and spawn the `start_scene` of `game.json`. `nlohmann-json` is private to the module. `load_scene` (`scene/SceneSwitch.cpp`) reads the file into `RuntimeContext::pending_scene`; `ScriptRuntime::flush_scene()`, called by `ServerApp` after `flush_destroyed()`, dooms every non-persistent entity (`Declaration::persistent`), flushes them, spawns the instances and queues the `scene_loaded` event that `Events` registers in its constructor. See [Game folder and scenes](game-folder.md).
+- **Editor** — `engine-editor` (`engine/src/editor/`) loads a game folder with `ScriptRuntime::load_declarations()`, which runs the declaration files but neither `on_start` nor the start scene. `EditorSession` keeps the open scene as a `SceneDocument` (instances with session-only `InstanceId`s); every edit records a copy of the document in `History` (100 entries) and rebuilds the edit world with `ScriptRuntime::preview_instances()`, which builds prototypes in a given world without any Lua callback. `set_field` previews the single override in a scratch world before recording it. See [Editor backend](editor.md).
 - **Callbacks** are called by native systems through `sol::protected_function`.
 - **Coroutines** are `sol::thread` + `sol::coroutine`; `wait(t)` yields and the scheduler resumes the coroutine when `t` has elapsed.
 

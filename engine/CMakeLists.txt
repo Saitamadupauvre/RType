@@ -143,3 +143,12 @@ engine_add_module(app
     PRIVATE_DEPENDS engine::physics
 )
 target_include_directories(engine-app PRIVATE src/app)
+
+engine_add_module(editor
+    SOURCES
+        src/editor/EditorSession.cpp
+        src/editor/History.cpp
+        src/editor/SceneCommands.cpp
+        src/editor/SceneDocument.cpp
+    DEPENDS engine::core engine::script
+)

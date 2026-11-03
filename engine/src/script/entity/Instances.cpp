@@ -106,10 +106,8 @@ Instance capture_instance(RuntimeContext& context, Prototypes& prototypes, core:
     return instance;
 }
 
-std::optional<std::string> script_override_error(Entities& entities, core::Entity entity,
-                                                 const Declaration& declaration,
-                                                 std::string_view name,
-                                                 const core::FieldValue& value) {
+std::optional<std::string> script_field_error(const Declaration& declaration, std::string_view name,
+                                              const core::FieldValue& value) {
     const ScriptField* field = find_script_field(declaration, name);
     if (field == nullptr) {
         return std::format("unknown script field '{}'", name);
@@ -119,19 +117,12 @@ std::optional<std::string> script_override_error(Entities& entities, core::Entit
                            core::field_kind_name(field->kind()),
                            core::field_kind_name(core::kind_of(value)));
     }
-    entities.set_script_value(entity, name, value);
     return std::nullopt;
 }
 
-std::optional<std::string> override_error(RuntimeContext& context, core::Entity entity,
-                                          const Declaration& declaration,
-                                          const FieldOverride& field_override) {
-    if (const auto name = script_field_name(field_override.field)) {
-        return script_override_error(context.entities, entity, declaration, *name,
-                                     field_override.value);
-    }
-    const core::FieldRegistry& fields = context.fields;
-    core::EntityManager& world = *context.entities.world();
+std::optional<std::string> registry_override_error(const core::FieldRegistry& fields,
+                                                   core::EntityManager& world, core::Entity entity,
+                                                   const FieldOverride& field_override) {
     const core::FieldRef field = find_field_key(fields, field_override.field);
     if (!field) {
         return std::format("unknown field '{}'", field_override.field);
@@ -147,10 +138,64 @@ std::optional<std::string> override_error(RuntimeContext& context, core::Entity 
     return std::nullopt;
 }
 
+std::optional<std::string> override_error(RuntimeContext& context, core::Entity entity,
+                                          const Declaration& declaration,
+                                          const FieldOverride& field_override) {
+    if (const auto name = script_field_name(field_override.field)) {
+        auto error = script_field_error(declaration, *name, field_override.value);
+        if (!error) {
+            context.entities.set_script_value(entity, *name, field_override.value);
+        }
+        return error;
+    }
+    return registry_override_error(context.fields, *context.entities.world(), entity,
+                                   field_override);
+}
+
+std::optional<std::string> preview_override_error(const RuntimeContext& context,
+                                                  core::EntityManager& world, core::Entity entity,
+                                                  const Declaration& declaration,
+                                                  const FieldOverride& field_override) {
+    if (const auto name = script_field_name(field_override.field)) {
+        return script_field_error(declaration, *name, field_override.value);
+    }
+    return registry_override_error(context.fields, world, entity, field_override);
+}
+
+const Declaration* entity_declaration(const RuntimeContext& context, std::string_view type) {
+    const Declaration* declaration = context.find_declaration(type);
+    if (declaration == nullptr || declaration->kind != DeclarationKind::Entity) {
+        return nullptr;
+    }
+    return declaration;
+}
+
+std::optional<core::Entity> preview_instance(RuntimeContext& context, core::EntityManager& world,
+                                             const Instance& instance, std::size_t index,
+                                             std::vector<InstanceIssue>& issues) {
+    const Declaration* declaration = entity_declaration(context, instance.type);
+    if (declaration == nullptr) {
+        issues.push_back({.instance = index,
+                          .field = {},
+                          .message = std::format("unknown entity type '{}'", instance.type)});
+        return std::nullopt;
+    }
+    const core::Entity entity = context.entities.prototype(world, *declaration);
+    world.get<core::Position>(entity).pos = instance.position;
+    for (const FieldOverride& field_override : instance.overrides) {
+        auto error = preview_override_error(context, world, entity, *declaration, field_override);
+        if (error) {
+            issues.push_back(
+                {.instance = index, .field = field_override.field, .message = std::move(*error)});
+        }
+    }
+    return entity;
+}
+
 void spawn_instance(RuntimeContext& context, const Instance& instance, std::size_t index,
                     std::vector<InstanceIssue>& issues) {
-    const Declaration* declaration = context.find_declaration(instance.type);
-    if (declaration == nullptr || declaration->kind != DeclarationKind::Entity) {
+    const Declaration* declaration = entity_declaration(context, instance.type);
+    if (declaration == nullptr) {
         issues.push_back({.instance = index,
                           .field = {},
                           .message = std::format("unknown entity type '{}'", instance.type)});
@@ -223,6 +268,39 @@ std::vector<InstanceIssue> spawn_instances(RuntimeContext& context,
         }
     }
     return issues;
+}
+
+Preview preview_instances(RuntimeContext& context, core::EntityManager& world,
+                          std::span<const Instance> instances) {
+    Preview preview;
+    preview.entities.reserve(instances.size());
+    for (std::size_t index = 0; index < instances.size(); ++index) {
+        std::optional<core::Entity> entity;
+        try {
+            entity = preview_instance(context, world, instances[index], index, preview.issues);
+        } catch (const std::exception& error) {
+            preview.issues.push_back({.instance = index, .field = {}, .message = error.what()});
+        }
+        preview.entities.push_back(entity);
+    }
+    return preview;
+}
+
+std::optional<core::FieldValue> default_value(RuntimeContext& context, std::string_view type,
+                                              std::string_view key) {
+    const Declaration* declaration = entity_declaration(context, type);
+    if (declaration == nullptr) {
+        return std::nullopt;
+    }
+    if (const auto name = script_field_name(key)) {
+        const ScriptField* field = find_script_field(*declaration, *name);
+        return field == nullptr ? std::nullopt : std::optional(field->default_value);
+    }
+    const core::FieldRef field = find_field_key(context.fields, key);
+    if (!field || !field.field->flags().editable) {
+        return std::nullopt;
+    }
+    return Prototypes(context).default_of(*declaration, field);
 }
 
 } // namespace engine::script

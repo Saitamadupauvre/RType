@@ -38,6 +38,7 @@ flowchart TB
         PHYS["engine-physics<br/>bodies, colliders, collisions"]
         GFX["engine-graphics<br/>IRenderer, IInput,<br/>plugin loader"]
         AUD["engine-audio<br/>IAudio, NullAudio,<br/>plugin loader"]
+        EDIT["engine-editor<br/>EditorSession, scene document,<br/>undo/redo"]
     end
     subgraph Plugins["Plugins (plugins/), loaded at runtime"]
         RAY["graphics-raylib<br/>window, 2D rendering, input"]
@@ -53,6 +54,8 @@ flowchart TB
     APP --> AUD
     APP --> CORE
     SCRIPT --> CORE
+    EDIT --> SCRIPT
+    EDIT --> CORE
     NET --> CORE
     PHYS --> CORE
     GFX --> CORE
@@ -82,6 +85,7 @@ Third-party headers stay private: `raylib.h` appears only in
 | Time | `engine-core` | `IClock`, `SteadyClock`, `ManualClock`, `FixedStepLoop` | Fixed-step simulation, injectable clock for tests |
 | Logging | `engine-core` | `log::info/warn/error`, `Sink`, `MemorySink` | Levelled logs on stderr; tests capture them |
 | Scripting | `engine-script` | `ScriptRuntime`, `ScriptRuntimeBuilder`, `ServerApi`, `ClientApi` | Loads and sandboxes Lua, spawns scripted entities, runs callbacks; API sets give each side its own Lua functions |
+| Editor model | `engine-editor` | `EditorSession`, `SceneDocument`, `CommandResult` | Opens a game folder, edits its scenes with undo/redo and saves them; no UI, no Lua callbacks |
 | Networking | `engine-network` | `NetworkServer`, `NetworkClient` | UDP transport, protocol, sessions, replication |
 | Physics | `engine-physics` | `PhysicsSystem`, `PhysicsBody`, `AABBCollider` | Integration and collision detection/resolution; the server uses it to find hitbox overlaps |
 | Rendering and input | `engine-graphics` + plugin | `IRenderer`, `IInput`, `load_graphics_plugin` | Backend-independent drawing and keyboard/mouse input |
