@@ -62,6 +62,7 @@ network::StringTable strings_of(const script::ScriptRuntime& runtime) {
     add_all(network::StringCategory::event, runtime.event_names(), "event");
     add_all(network::StringCategory::event_key, runtime.event_keys(), "event key");
     add_all(network::StringCategory::texture, runtime.texture_names(), "texture");
+    add_all(network::StringCategory::shader, runtime.shader_names(), "shader");
     return strings;
 }
 

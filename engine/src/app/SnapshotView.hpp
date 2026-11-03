@@ -19,8 +19,9 @@ public:
     SnapshotView(graphics::IRenderer& renderer, const std::filesystem::path& assets,
                  const core::FieldRegistry& fields);
 
-    void draw(const std::vector<network::EntitySnapshot>& entities);
+    void draw(const std::vector<network::EntitySnapshot>& entities, float seconds);
     bool preload_texture(const std::string& texture);
+    bool preload_shader(const std::string& shader);
 
 private:
     void mirror(const std::vector<network::EntitySnapshot>& entities);

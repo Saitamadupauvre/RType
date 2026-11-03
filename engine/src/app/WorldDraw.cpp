@@ -31,22 +31,51 @@ WorldDraw::WorldDraw(graphics::IRenderer& renderer, const std::filesystem::path&
           [&renderer](const std::filesystem::path& path) {
               return renderer.load_texture(path.string());
           },
-          [&renderer](graphics::TextureId texture) { renderer.unload_texture(texture); }) {}
+          [&renderer](graphics::TextureId texture) { renderer.unload_texture(texture); }),
+      _shaders(renderer, assets) {}
 
 bool WorldDraw::preload(const std::string& texture) {
     return _textures.get(texture) != graphics::TextureId{};
 }
 
-void WorldDraw::draw(core::EntityManager& world) {
+bool WorldDraw::preload_shader(const std::string& shader) { return _shaders.preload(shader); }
+
+void WorldDraw::draw(core::EntityManager& world, float seconds) {
     world.query<core::Position, core::Sprite>().each(
         [&](core::Entity entity, const core::Position& position, const core::Sprite& sprite) {
-            const core::Vec2 scale = core::scale_of(world, entity);
-            if (sprite.path.empty()) {
-                draw_square(position.pos, scale, sprite.color);
+            const graphics::ShaderId shader = shader_of(world, entity);
+            if (shader == graphics::ShaderId{}) {
+                draw_entity(world, entity, position.pos, sprite);
                 return;
             }
-            draw_texture(position.pos, scale, core::rotation_of(world, entity), sprite);
+            begin_shader(shader, seconds);
+            draw_entity(world, entity, position.pos, sprite);
+            _renderer.end_shader();
         });
+}
+
+void WorldDraw::draw_entity(core::EntityManager& world, core::Entity entity, core::Vec2 position,
+                            const core::Sprite& sprite) {
+    const core::Vec2 scale = core::scale_of(world, entity);
+    if (sprite.path.empty()) {
+        draw_square(position, scale, sprite.color);
+        return;
+    }
+    draw_texture(position, scale, core::rotation_of(world, entity), sprite);
+}
+
+graphics::ShaderId WorldDraw::shader_of(core::EntityManager& world, core::Entity entity) {
+    if (!world.is_registered<core::Shader>() || !world.has<core::Shader>(entity)) {
+        return {};
+    }
+    const std::string& path = world.get<core::Shader>(entity).path;
+    return path.empty() ? graphics::ShaderId{} : _shaders.get(path);
+}
+
+void WorldDraw::begin_shader(graphics::ShaderId shader, float seconds) {
+    _renderer.set_uniform(shader, "time", seconds);
+    _renderer.set_uniform(shader, "resolution", _renderer.virtual_size());
+    _renderer.begin_shader(shader);
 }
 
 void WorldDraw::draw_square(core::Vec2 position, core::Vec2 scale, core::Rgba color) {
