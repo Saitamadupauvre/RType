@@ -15,19 +15,30 @@ namespace {
 
 namespace log = engine::core::log;
 
-constexpr std::array<std::string_view, 29> reserved_globals{
-    "entity", "system", "query",    "spawn",   "find_all",   "find_first",  "count", "after",
-    "every",  "wait",   "play",     "music",   "sounds",     "musics",      "event", "emit",
-    "random", "world",  "log",      "synced",  "players",    "find_player", "on",    "input",
-    "audio",  "camera", "textures", "shaders", "load_scene",
+constexpr std::array<std::string_view, 31> reserved_globals{
+    "entity", "system", "query",    "spawn",   "find_all", "find_first",  "count",      "after",
+    "every",  "wait",   "play",     "music",   "sounds",   "musics",      "event",      "emit",
+    "random", "world",  "log",      "synced",  "players",  "find_player", "on",         "input",
+    "audio",  "camera", "textures", "shaders", "navgrid",  "find_path",   "load_scene",
 };
 
-constexpr std::array<std::string_view, 11> engine_owned_fields{
-    "age",     "id",        "type",      "input",  "owner", "destroy",
-    "has_tag", "get_field", "set_field", "server", "client"};
+constexpr std::array<std::string_view, 14> engine_owned_fields{"age",
+                                                               "id",
+                                                               "type",
+                                                               "input",
+                                                               "owner",
+                                                               "destroy",
+                                                               "has_tag",
+                                                               "get_field",
+                                                               "set_field",
+                                                               "server",
+                                                               "client",
+                                                               "navigate_to",
+                                                               "stop_navigation",
+                                                               "is_navigating"};
 
-constexpr std::array<std::string_view, 5> callbacks{"on_spawn", "update", "on_collide",
-                                                    "on_destroy", "behavior"};
+constexpr std::array<std::string_view, 6> callbacks{"on_spawn",   "update",   "on_collide",
+                                                    "on_destroy", "behavior", "on_arrive"};
 
 template <std::size_t Size>
 bool contains(const std::array<std::string_view, Size>& names, std::string_view name) {

@@ -55,6 +55,7 @@ engine_add_test(script SOURCES
     engine/script/loading/ScriptDeclarationsTest.cpp
     engine/script/loading/ScriptRequireTest.cpp
     engine/script/loading/SectionsTest.cpp
+    engine/script/navigation/NavigationTest.cpp
     engine/script/player/PlayersTest.cpp
     engine/script/scene/GameFolderTest.cpp
     engine/script/scene/SceneFileTest.cpp
@@ -100,6 +101,12 @@ engine_add_test(network SOURCES
 target_include_directories(engine_network_tests PRIVATE
     "${PROJECT_SOURCE_DIR}/engine/src/network"
     "${CMAKE_CURRENT_SOURCE_DIR}/engine/network"
+)
+engine_add_test(navigation SOURCES
+    engine/navigation/GridFixture.cpp
+    engine/navigation/NavGridTest.cpp
+    engine/navigation/PathfindingTest.cpp
+    engine/navigation/SmoothingTest.cpp
 )
 engine_add_test(physics SOURCES
     engine/physics/PhysicsSystemTest.cpp

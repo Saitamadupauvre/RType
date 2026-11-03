@@ -36,6 +36,7 @@ flowchart TB
         SCRIPT["engine-script<br/>Lua runtime, declarations,<br/>entity handles, players"]
         NET["engine-network<br/>UDP sockets, protocol, threads,<br/>sessions, snapshots, stats"]
         PHYS["engine-physics<br/>bodies, colliders, collisions"]
+        NAV["engine-navigation<br/>grid, A*, path smoothing"]
         GFX["engine-graphics<br/>IRenderer, IInput,<br/>plugin loader"]
         AUD["engine-audio<br/>IAudio, NullAudio,<br/>plugin loader"]
         EDIT["engine-editor<br/>EditorSession, scene document,<br/>undo/redo"]
@@ -88,6 +89,7 @@ Third-party headers stay private: `raylib.h` appears only in
 | Editor model | `engine-editor` | `EditorSession`, `SceneDocument`, `CommandResult` | Opens a game folder, edits its scenes with undo/redo and saves them; no UI, no Lua callbacks |
 | Networking | `engine-network` | `NetworkServer`, `NetworkClient` | UDP transport, protocol, sessions, replication |
 | Physics | `engine-physics` | `PhysicsSystem`, `PhysicsBody`, `AABBCollider` | Integration and collision detection/resolution; the server uses it to find hitbox overlaps |
+| Navigation | `engine-navigation` | `NavGrid`, `find_path`, `smooth_path` | Grid pathfinding with A* (or Dijkstra), selectable heuristic, diagonals, search budget and path smoothing |
 | Rendering and input | `engine-graphics` + plugin | `IRenderer`, `IInput`, `load_graphics_plugin` | Backend-independent drawing and keyboard/mouse input |
 
 ## Class diagram

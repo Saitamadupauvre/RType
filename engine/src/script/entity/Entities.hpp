@@ -34,6 +34,9 @@ public:
              const DeclaredAssets& shaders);
 
     void add_handle_field(std::string name, HandleField field);
+    template <typename Function> void add_method(std::string_view name, Function&& function) {
+        _methods.set_function(name, std::forward<Function>(function));
+    }
     void on_release(std::function<void(core::Entity)> listener);
 
     void attach(core::EntityManager& world);

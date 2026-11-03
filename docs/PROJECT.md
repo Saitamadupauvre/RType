@@ -482,6 +482,7 @@ This section is the specification of the Lua API. Not everything is implemented 
 | `shaders { ... }`, entity `shader` replicated to clients by shader id and drawn through it | Implemented (see §10.5, §10.6) |
 | API sets (`core`, `server`, `client`, `editor`), `server = { ... }` / `client = { ... }` sections, client `on(name, handler)` | Implemented (see §10.10) |
 | Client `input` (`key`, `mouse`, `pointer`, `pressed`) and `audio` (`muted`, `set_muted`, `volume`, `set_volume`) | Implemented (see §10.10) |
+| Pathfinding: `navgrid`, `find_path`, `self:navigate_to`, `stop_navigation`, `is_navigating`, `on_arrive` (see §10.6) | Implemented |
 | `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
 
 [Writing the game](writing-the-game.md) shows how the current game works around what is missing.
@@ -620,6 +621,11 @@ self:add_tag("phase2")
 self:remove_tag("phase2")
 self:distance_to(other)
 self:move_to(x, y, duration)  -- inside a coroutine
+
+self:navigate_to(target, 200) -- follow a path to a point or an entity at 200 units/s
+self:stop_navigation()
+self:is_navigating()
+function on_arrive(self) end  -- called once the target is reached
 ```
 
 `sprite` is a path relative to `assets/`, such as `sprites/boss/core.png`. The `sprite` of an entity declaration is declared as a texture on its own; any other value must be declared with `textures { ... }` (§10.6) or be `""` (no sprite), otherwise the assignment raises an error and the sprite does not change. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a 64 × 64 square of that color (before `scale`). It reads back as a new table.
@@ -740,6 +746,11 @@ input:key("Space")               -- held keys, like self.input on the server
 audio.set_muted(not audio.muted())
 audio.set_volume("music", 0.5)   -- "music" or "effects", from 0 to 1
 
+-- pathfinding
+navgrid { width = 1920, height = 1080, cell = 32, obstacles = { "wall" } }
+find_path(self, { x = 1500, y = 300 })                  -- array of { x, y }, or nil
+find_path(a, b, { avoid = { "lava" }, max_nodes = 500 })
+
 -- utilities
 random(1, 10)
 world.width, world.height        -- 1920, 1080
@@ -774,6 +785,27 @@ log("message")
 - Persistent entities keep their id and their Lua data. Fields that point to destroyed entities are left as they are; using one raises the usual "destroyed entity" error, so clean them in `on_scene_loaded`. A persistent entity placed in a scene file is spawned again each time that scene loads, so persistent entities are usually spawned by scripts.
 - `persistent` must be a boolean set at the top level of the declaration (not in a `server`/`client` section); anything else rejects the file. It is not a script field.
 - `main.lua` lives across scenes. On the client, `on_scene_loaded(name)` from `main.lua` is called when the `scene_loaded` event arrives, before the `on("scene_loaded", ...)` handlers. The start scene of `game.json` does not fire it: `on_start` covers it.
+
+**Pathfinding rules.**
+
+- `navgrid { ... }` lays a grid of square cells over an area of the world and chooses how paths are searched. It can be called at any time (usually in `on_start`); a later call replaces the grid. A bad option raises an error and keeps the previous grid.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `width`, `height` | required | Size of the area, in world units |
+| `x`, `y` | `0`, `0` | Top-left corner of the area |
+| `cell` | `32` | Side of a cell; at most 2^20 cells in total |
+| `obstacles` | `{}` | Tags of the entities that block cells |
+| `padding` | `0` | Grows each obstacle by this many units on every side, so wide entities keep clear of walls |
+| `heuristic` | `"octile"` | `"octile"`, `"manhattan"`, `"euclidean"` or `"dijkstra"` |
+| `diagonals` | `true` | Allow diagonal moves; a diagonal never cuts a wall corner |
+| `max_nodes` | `10000` | Search budget per call: a search that explores more cells gives up |
+| `smooth` | `true` | Skip the waypoints a straight line can cut across |
+
+- An entity carrying one of the `obstacles` tags and a `hitbox` (or a circle collider) blocks every cell its collider, grown by `padding`, strictly overlaps; touching a cell's edge does not block it. The grid is rebuilt at most once per tick, the first time it is used, so obstacles spawned or moved during a tick count from the next tick on.
+- `find_path(from, to, options)` returns the waypoints from `from` to `to` as an array of `{ x, y }`: the centres of the cells to cross, without the start, ending with `to` exactly. `from` and `to` are tables `{ x = .., y = .. }` or entities (the centre of their `hitbox`, or their `x`, `y` without one). It returns `nil` when either point is outside the grid or on a blocked cell, when no path exists, or when the search budget runs out. `options` may set `avoid` (extra obstacle tags for this call only) and `max_nodes`.
+- `self:navigate_to(target, speed)` plans a path from the entity's centre to `target` (a point or an entity, taken where it is now) and returns `true`; the engine then sets the entity's `vx`, `vy` every tick to follow the waypoints at `speed` units per second (giving the entity a physics body if it has none), stops it on the target and calls its `on_arrive(self)`. Without a path it returns `false` and the entity stops. The path is not re-planned on its own: call `navigate_to` again to follow a moving target or after obstacles change (every few tenths of a second is plenty). `self:stop_navigation()` stops the entity; `self:is_navigating()` tells whether it is following a path.
+- Calling `find_path` or `navigate_to` before `navgrid`, a point that is not an entity or a table of two finite numbers, an unknown option, a `speed` that is not a positive number or a `max_nodes` that is not a whole number from 1 to 10 000 000 raises an error.
 
 ### 10.7 Systems
 
@@ -922,7 +954,7 @@ speed  = 150         -- server only
 
 | Set | Globals and fields | Runtime |
 |---|---|---|
-| `core` | `entity`, `system`, `require`, `sounds`, `musics`, `textures`, `shaders`, `event`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
+| `core` | `entity`, `system`, `require`, `sounds`, `musics`, `textures`, `shaders`, `event`, `navgrid`, `find_path`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
 | `server` | `spawn`, `players`, `find_player`, `play`, `music`, `emit`, `load_scene`, `self.input`, `self.owner`, `on_player_joined`, `on_player_left`, `on_scene_loaded` | server (`core` + `server`) |
 | `client` | `on`, `input`, `audio`, `camera`, `on_scene_loaded` | client (`core` + `client`) |
 | `editor` | nothing yet | editor (`core` + `editor`) |
@@ -982,11 +1014,12 @@ A missing `zoom` keeps the zoom of the current view. `camera.follow` keeps the s
 1. Apply received inputs.
 2. Run Lua systems.
 3. Run entity `update` callbacks and resume coroutines; fire `after` / `every` timers.
-4. Native movement (`vx`, `vy`).
-5. Collisions (`engine-physics`) → `on_collide` callbacks.
-6. Destroy entities marked for destruction → `on_destroy` callbacks.
-7. Switch scene if `load_scene` was called → `on_destroy`, `on_spawn`, `on_scene_loaded`.
-8. Send snapshot to clients.
+4. Steer navigating entities (`navigate_to`) → `on_arrive` callbacks.
+5. Native movement (`vx`, `vy`).
+6. Collisions (`engine-physics`) → `on_collide` callbacks.
+7. Destroy entities marked for destruction → `on_destroy` callbacks.
+8. Switch scene if `load_scene` was called → `on_destroy`, `on_spawn`, `on_scene_loaded`.
+9. Send snapshot to clients.
 
 ### 10.12 Reserved names
 
@@ -994,9 +1027,9 @@ Developers must not use these names for their own fields or methods; the engine 
 
 - Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds`, `layer`, `age`, `id`, `type`, `input`, `owner`.
 - Declaration sections: `server`, `client`. Declaration flag: `persistent`.
-- Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`.
-- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `on_scene_loaded`, `update`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `textures`, `shaders`, `load_scene`.
+- Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`, `navigate_to`, `stop_navigation`, `is_navigating`.
+- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`, `on_arrive`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `on_scene_loaded`, `update`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `textures`, `shaders`, `navgrid`, `find_path`, `load_scene`.
 - Events: `scene_loaded`.
 
 ### 10.13 Error handling and sandbox

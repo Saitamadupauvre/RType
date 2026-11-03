@@ -38,6 +38,13 @@ engine_add_module(physics
     DEPENDS engine::core
 )
 
+engine_add_module(navigation
+    SOURCES
+        src/navigation/NavGrid.cpp
+        src/navigation/Pathfinding.cpp
+        src/navigation/Smoothing.cpp
+)
+
 engine_add_module(script
     SOURCES
         src/script/ApiSet.cpp
@@ -50,6 +57,7 @@ engine_add_module(script
         src/script/audio/Audio.cpp
         src/script/entity/Entities.cpp
         src/script/entity/EntityFields.cpp
+        src/script/entity/ScriptBody.cpp
         src/script/entity/Instances.cpp
         src/script/entity/ScriptFields.cpp
         src/script/event/Events.cpp
@@ -61,6 +69,7 @@ engine_add_module(script
         src/script/loading/Sections.cpp
         src/script/lua/LuaErrors.cpp
         src/script/lua/LuaFieldValue.cpp
+        src/script/navigation/Navigation.cpp
         src/script/player/Players.cpp
         src/script/scene/GameFolder.cpp
         src/script/scene/JsonFieldValue.cpp
@@ -68,7 +77,8 @@ engine_add_module(script
         src/script/scene/SceneFile.cpp
         src/script/scene/SceneSwitch.cpp
     DEPENDS engine::core
-    PRIVATE_DEPENDS engine::physics sol2::sol2 engine_lua nlohmann_json::nlohmann_json
+    PRIVATE_DEPENDS engine::physics engine::navigation sol2::sol2 engine_lua
+        nlohmann_json::nlohmann_json
 )
 target_include_directories(engine-script PRIVATE src/script)
 
