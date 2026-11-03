@@ -5,6 +5,7 @@
 #include <string>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 #include "AssetPreloader.hpp"
 #include "AudioPlayer.hpp"
@@ -83,9 +84,10 @@ struct ClientApp::Impl {
 private:
     bool assets_ready();
     void queue_preload();
-    void run_ticks();
-    void draw(bool playing);
-    void draw_world();
+    void run_ticks(const std::vector<network::EntitySnapshot>& entities);
+    void draw(const std::vector<network::EntitySnapshot>& entities, bool playing);
+    void draw_world(const std::vector<network::EntitySnapshot>& entities);
+    void update_camera(const std::vector<network::EntitySnapshot>& entities);
 };
 
 ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport& transport,
@@ -131,11 +133,12 @@ void ClientApp::Impl::frame() {
     network.update();
     audio.get().update();
     const bool playing = assets_ready();
+    const auto entities = network.entities();
     if (playing) {
-        run_ticks();
+        run_ticks(entities);
     }
     sound.apply(client.audio_settings());
-    draw(playing);
+    draw(entities, playing);
 }
 
 bool ClientApp::Impl::assets_ready() {
@@ -162,11 +165,14 @@ void ClientApp::Impl::queue_preload() {
             [this](const std::string& name) { return sound.preload_music(name); });
 }
 
-void ClientApp::Impl::run_ticks() {
-    const auto local = graphics::capture_input(input.get());
+void ClientApp::Impl::update_camera(const std::vector<network::EntitySnapshot>& entities) {
     const core::Vec2 viewport = renderer.get().virtual_size();
-    const auto entities = network.entities();
     client.set_camera_view(resolve_camera(entities, client.camera_override(), viewport), viewport);
+}
+
+void ClientApp::Impl::run_ticks(const std::vector<network::EntitySnapshot>& entities) {
+    const auto local = graphics::capture_input(input.get());
+    update_camera(entities);
     loop.run_frame([&](core::time::Duration step) {
         client.set_input(local);
         runtime.update(std::chrono::duration<float>(step).count());
@@ -174,19 +180,18 @@ void ClientApp::Impl::run_ticks() {
     });
 }
 
-void ClientApp::Impl::draw(bool playing) {
+void ClientApp::Impl::draw(const std::vector<network::EntitySnapshot>& entities, bool playing) {
     renderer.get().begin_frame(options.background);
     if (playing) {
-        draw_world();
+        draw_world(entities);
     } else {
         draw_loading_screen(renderer.get(), preloader.loaded(), preloader.total());
     }
     renderer.get().end_frame();
 }
 
-void ClientApp::Impl::draw_world() {
+void ClientApp::Impl::draw_world(const std::vector<network::EntitySnapshot>& entities) {
     const core::Vec2 viewport = renderer.get().virtual_size();
-    const auto entities = network.entities();
     const core::CameraView camera = resolve_camera(entities, client.camera_override(), viewport);
     client.set_camera_view(camera, viewport);
     renderer.get().begin_world(camera);
