@@ -2,15 +2,19 @@
 
 #include <exception>
 #include <optional>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "RuntimeContext.hpp"
 #include "client/ClientAudio.hpp"
 #include "client/ClientCamera.hpp"
 #include "client/ClientEvents.hpp"
+#include "client/HudCanvas.hpp"
 #include "client/LocalSpawn.hpp"
 #include "engine/core/log/Log.hpp"
 #include "input/LuaInput.hpp"
+#include "lua/LuaErrors.hpp"
 
 namespace engine::script {
 
@@ -18,10 +22,14 @@ namespace {
 
 namespace log = engine::core::log;
 
+constexpr std::string_view draw_hud_callback = "draw_hud";
+
 } // namespace
 
 struct ClientApi::State {
+    RuntimeContext* context = nullptr;
     std::optional<ClientEvents> events;
+    std::optional<HudCanvas> hud;
     ClientInput input;
     ClientAudio audio;
     ClientCamera camera;
@@ -34,12 +42,14 @@ ClientApi::~ClientApi() = default;
 std::string_view ClientApi::section() const noexcept { return "client"; }
 
 void ClientApi::install(RuntimeContext& context) {
+    _state->context = &context;
     bind_client_input(context.types);
     context.lua["input"] = &_state->input;
     _state->audio.bind(context.lua);
     _state->camera.bind(context.lua);
     _state->events.emplace(context).bind();
     bind_spawn_local(context);
+    _state->hud.emplace(context.textures).bind(context.lua);
 }
 
 bool ClientApi::dispatch(const EventCommand& event) noexcept {
@@ -54,6 +64,24 @@ bool ClientApi::dispatch(const EventCommand& event) noexcept {
         log::error("lua: event '{}': unknown error", event.name);
     }
     return false;
+}
+
+std::vector<HudCommand> ClientApi::draw_hud() noexcept {
+    if (_state->context == nullptr || !_state->hud) {
+        return {};
+    }
+    _state->hud->open();
+    try {
+        const auto callback = _state->context->main_callback(draw_hud_callback);
+        if (callback.valid()) {
+            report(callback());
+        }
+    } catch (const std::exception& exception) {
+        log::error("lua: draw_hud: {}", exception.what());
+    } catch (...) {
+        log::error("lua: draw_hud: unknown error");
+    }
+    return _state->hud->close();
 }
 
 void ClientApi::set_input(core::InputState input) noexcept {

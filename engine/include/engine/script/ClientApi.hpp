@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string_view>
+#include <vector>
 
 #include "engine/core/Camera.hpp"
 #include "engine/core/Entity.hpp"
@@ -11,6 +12,7 @@
 #include "engine/script/ApiSet.hpp"
 #include "engine/script/EventCommand.hpp"
 #include "engine/script/Export.hpp"
+#include "engine/script/HudCommand.hpp"
 
 namespace engine::script {
 
@@ -53,8 +55,8 @@ struct CameraOverride {
 };
 
 /**
- * @brief API set of the presentation side: local input, audio levels and events received from
- * the server.
+ * @brief API set of the presentation side: local input, audio levels, events received from the
+ * server, local entities and the HUD.
  *
  * Reads the `client = { ... }` section of declarations and of `main.lua`, and adds these Lua
  * globals:
@@ -77,6 +79,15 @@ struct CameraOverride {
  *   `input:pointer()`, through the view given to set_camera_view(). A coordinate that is not a
  *   finite number, a zoom that is not positive or an id that is not a non-negative integer raises
  *   a Lua error and changes nothing.
+ * - `spawn_local(type [, overrides])` spawns a declared entity, with its `client` section, into
+ *   the world given to ScriptRuntime::attach_world(), exactly like `spawn` on the server: the
+ *   host never replicates it. An unknown type is logged and returns nil.
+ * - `draw.text(text, x, y, size [, color])`, `draw.rect(x, y, w, h [, color [, filled]])` and
+ *   `draw.sprite(texture, x, y [, { scale, rotation, color }])` queue a HudCommand in screen
+ *   space; they only work while draw_hud() runs the `draw_hud()` callback of `main.lua`. A
+ *   coordinate that is not a finite number, a negative size, a text longer than
+ *   `max_hud_text_length` bytes, an undeclared texture or a call outside `draw_hud()` raises a Lua
+ *   error and queues nothing.
  *
  * @note Not thread safe. Created by ScriptRuntimeBuilder::with(), reached with
  * ScriptRuntime::api(), destroyed with its runtime.
@@ -143,6 +154,17 @@ public:
      * @param viewport Size of the screen in virtual units.
      */
     void set_camera_view(core::CameraView view, core::Vec2 viewport) noexcept;
+
+    /**
+     * @brief Calls `draw_hud()` from `main.lua` and returns what it drew, in call order.
+     *
+     * The call is protected: an error is logged and the commands queued before it are still
+     * returned. At most `max_hud_commands` are kept; later ones are dropped and logged once.
+     *
+     * @return The HUD of this frame, empty when `main.lua` defines no `draw_hud`.
+     * @note Never throws. Typically called once per frame, after the world is drawn.
+     */
+    [[nodiscard]] std::vector<HudCommand> draw_hud() noexcept;
 
 private:
     friend class ScriptRuntimeBuilder;

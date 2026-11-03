@@ -33,9 +33,10 @@ constexpr const char* server_globals =
     "assert(spawn and players and find_player and play and music and emit)";
 constexpr const char* no_server_globals = "assert(not (spawn or players or find_player or play "
                                           "or music or emit))";
-constexpr const char* client_globals = "assert(on and input and audio and camera and spawn_local)";
+constexpr const char* client_globals =
+    "assert(on and input and audio and camera and spawn_local and draw)";
 constexpr const char* no_client_globals =
-    "assert(not (on or input or audio or camera or spawn_local))";
+    "assert(not (on or input or audio or camera or spawn_local or draw))";
 
 class ApiSetsTest : public ::testing::Test {
 protected:
