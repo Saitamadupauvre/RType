@@ -290,7 +290,7 @@ The engine replicates the type of every replicated entity and each component fie
 
 ### 9.1 Interfaces
 
-The engine only knows these interfaces (in `engine/include/engine/graphics/`). They use engine types (`Vec2`, `Rect`, `Color`, `TextureId`...) and never Raylib types.
+The engine only knows these interfaces (in `engine/include/engine/graphics/`). They use engine types (`Vec2`, `Rect`, `Color`, `TextureId`, `RenderTargetId`, `ShaderId`...) and never Raylib types.
 
 ```cpp
 class IRenderer {
@@ -304,6 +304,21 @@ class IRenderer {
     virtual TextureId load_texture(const std::string& path) = 0;
     virtual void unload_texture(TextureId) = 0;
     virtual Vec2 texture_size(TextureId) const = 0;
+    // render targets: off-screen surfaces, drawn back like any texture
+    virtual RenderTargetId create_render_target(Vec2 size) = 0;   // pixels
+    virtual void destroy_render_target(RenderTargetId) = 0;
+    virtual void begin_target(RenderTargetId, Color clear) = 0;
+    virtual void end_target() = 0;
+    virtual TextureId target_texture(RenderTargetId) const = 0;
+    // shaders (called through the engine's shader library, see 9.5)
+    virtual ShaderId load_shader(const std::string& vertex, const std::string& fragment) = 0;
+    virtual void unload_shader(ShaderId) = 0;
+    virtual void begin_shader(ShaderId) = 0;
+    virtual void end_shader() = 0;
+    virtual void set_uniform(ShaderId, const std::string& name, float) = 0;
+    virtual void set_uniform(ShaderId, const std::string& name, Vec2) = 0;
+    virtual void set_uniform(ShaderId, const std::string& name, Color) = 0;      // vec4 in [0, 1]
+    virtual void set_uniform(ShaderId, const std::string& name, TextureId) = 0;  // sampler2D
     // frame
     virtual void begin_frame(Color clear) = 0;
     virtual void end_frame() = 0;
@@ -365,6 +380,9 @@ The loader refuses a plugin built for another API version, and the backend is al
 - Timing comes from the engine clock, not from the backend.
 - The client draws in virtual units; the backend handles scaling and letterboxing.
 - **World space and screen space.** Between `begin_world(view)` and `end_world()`, draw calls take world units: a `CameraView` (`center`, the world point shown at the middle of the screen, and `zoom`) turns them into virtual units, `screen = (world - center) * zoom + virtual_size / 2`. Everything else, such as a HUD, is drawn in screen space and does not move with the camera. `end_frame()` ends world space if needed. The client draws the replicated entities in world space every frame.
+- **Render targets.** `create_render_target(size)` makes an off-screen surface of `size` pixels. Between `begin_target(target, clear)` and `end_target()`, draw calls go into it instead of the frame: screen space is the target's own pixels, and `begin_world(view)` centers the view on the target. `target_texture(target)` is a normal `TextureId`, drawn upright with `draw_sprite` (the backend handles the flip of the render texture); `unload_texture` ignores it, it lives as long as its target. `begin_target` and `end_target` end world space first, so the editor viewport is `begin_target` → `begin_world` → draw → `end_world` → `end_target` → `draw_sprite(target_texture)`. Calling `begin_target` again switches target; targets do not nest.
+- **Shaders.** `load_shader(vertex, fragment)` compiles GLSL files; an empty path uses the backend's default stage. Between `begin_shader(shader)` and `end_shader()`, draw calls go through it; calling `begin_shader` again replaces it. Uniforms keep their value across frames and only affect the draw calls made after them; unknown shaders and uniforms the program does not use are ignored. A missing file, a compile or link error gives the default `ShaderId`, is logged, and `begin_shader` on it draws with the default pipeline, so drawing always continues.
+- **Lifetime.** `destroy_render_target` / `unload_shader` end the target or shader first if it is current; `end_frame()` ends the current target, world space and shader; `close()` frees every texture, target and shader.
 - **Camera.** The view comes from, in this order: the local override of the client scripts (`camera.*`, §10.10), the scene camera (the replicated entity with a `Camera` component and the lowest id, clamped to its bounds), or the default view (`center = virtual_size / 2`, `zoom = 1`), which draws exactly as without a camera. Camera entities are never drawn. The conversion math lives in `engine-core` (`engine/core/Camera.hpp`), so the script module uses it without depending on graphics.
 
 ### 9.4 Audio plugin
@@ -410,6 +428,16 @@ graphics::TextureId ship = textures.get("sprites/ship.png");   // loads assets/s
 - A rejected name or a failed load gives the placeholder (default id), is logged once and never retried.
 - `clear()` and the destructor unload every loaded handle; the backend must outlive the cache.
 - Main thread only, like the backends. The client uses one cache for textures (`assets/`), one for sounds (`assets/sounds/`) and one for musics (`assets/music/`).
+- Shaders go through `engine::app::ShaderLibrary`, a cache of `ShaderId` over `IRenderer::load_shader` / `unload_shader`. A shader is named without extension: `shaders/wave` loads `assets/shaders/wave.fs` (required) and `assets/shaders/wave.vs` when it exists, the default vertex stage otherwise. A missing or invalid shader is reported once and gives the default `ShaderId`, which draws without a shader.
+
+```cpp
+app::ShaderLibrary shaders(renderer, assets);
+graphics::ShaderId wave = shaders.get("shaders/wave");   // wave.vs + wave.fs, loaded once
+renderer.set_uniform(wave, "time", seconds);
+renderer.begin_shader(wave);
+renderer.draw_sprite(sprite);
+renderer.end_shader();
+```
 - Texture names never travel as text: the scripts declare them (`textures { ... }`, §10.6), the server lists them in the `texture` category of the string table and snapshots carry their 16-bit id. The client turns the id back into the name before asking its cache.
 
 #### Preloading and the loading screen
