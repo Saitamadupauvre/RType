@@ -1,4 +1,4 @@
-#include "Collisions.hpp"
+#include "PhysicsStep.hpp"
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/physics/Components.hpp"
@@ -25,7 +25,7 @@ core::EntityManager& with_physics_components(core::EntityManager& registry) {
 
 } // namespace
 
-Collisions::Collisions(core::EntityManager& registry, core::event::EventBus& events,
+PhysicsStep::PhysicsStep(core::EntityManager& registry, core::event::EventBus& events,
                        script::ScriptRuntime& runtime)
     : _events(events), _physics(with_physics_components(registry), events),
       _subscription(events.subscribe<physics::CollisionEvent>(
@@ -35,8 +35,8 @@ Collisions::Collisions(core::EntityManager& registry, core::event::EventBus& eve
               }
           })) {}
 
-Collisions::~Collisions() { _events.get().unsubscribe(_subscription); }
+PhysicsStep::~PhysicsStep() { _events.get().unsubscribe(_subscription); }
 
-void Collisions::step(float dt) { _physics.update(dt); }
+void PhysicsStep::step(float dt) { _physics.update(dt); }
 
 } // namespace engine::app

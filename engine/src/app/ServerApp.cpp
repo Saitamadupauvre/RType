@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "CameraFollow.hpp"
-#include "Collisions.hpp"
+#include "PhysicsStep.hpp"
 #include "Fields.hpp"
 #include "engine/core/Camera.hpp"
 #include "engine/core/ComponentPhysics.hpp"
@@ -101,7 +101,7 @@ struct ServerApp::Impl {
     network::StringTable strings;
     core::FieldRegistry fields;
     network::NetworkServer network;
-    Collisions collisions;
+    PhysicsStep physics;
     core::time::FixedStepLoop loop;
 
     Impl(const core::time::IClock& clock, network::ServerTransport& transport,
@@ -120,7 +120,7 @@ ServerApp::Impl::Impl(const core::time::IClock& clock, network::ServerTransport&
       strings(strings_of(runtime)), fields(replicated_fields()),
       network(clock, events, fields, transport,
               network::ServerOptions{.max_players = options.max_players, .strings = strings}),
-      collisions(world, events, runtime), loop(clock) {
+      physics(world, events, runtime), loop(clock) {
     register_if_missing<network::Replicated>(world);
     events.subscribe<network::PlayerJoined>(
         [this](const network::PlayerJoined& joined) { server.player_joined(joined.player_id); });
@@ -133,7 +133,7 @@ void ServerApp::Impl::tick(core::time::Duration step) {
     network.receive();
     apply_inputs();
     runtime.update(dt);
-    collisions.step(dt);
+    physics.step(dt);
     runtime.flush_destroyed();
     systems.run(world, dt);
     follow_cameras(world);

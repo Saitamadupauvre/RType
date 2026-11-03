@@ -133,10 +133,10 @@ engine_add_module(app
         src/app/CameraFollow.cpp
         src/app/CameraRig.cpp
         src/app/ClientApp.cpp
-        src/app/Collisions.cpp
         src/app/Fields.cpp
         src/app/Launch.cpp
         src/app/LoadingScreen.cpp
+        src/app/PhysicsStep.cpp
         src/app/ServerApp.cpp
         src/app/ShaderLibrary.cpp
         src/app/SnapshotView.cpp

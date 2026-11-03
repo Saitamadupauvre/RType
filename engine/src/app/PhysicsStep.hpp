@@ -11,16 +11,16 @@
 
 namespace engine::app {
 
-class ENGINE_APP_EXPORT Collisions {
+class ENGINE_APP_EXPORT PhysicsStep {
 public:
-    Collisions(core::EntityManager& registry, core::event::EventBus& events,
+    PhysicsStep(core::EntityManager& registry, core::event::EventBus& events,
                script::ScriptRuntime& runtime);
-    ~Collisions();
+    ~PhysicsStep();
 
-    Collisions(const Collisions&) = delete;
-    Collisions& operator=(const Collisions&) = delete;
-    Collisions(Collisions&&) = delete;
-    Collisions& operator=(Collisions&&) = delete;
+    PhysicsStep(const PhysicsStep&) = delete;
+    PhysicsStep& operator=(const PhysicsStep&) = delete;
+    PhysicsStep(PhysicsStep&&) = delete;
+    PhysicsStep& operator=(PhysicsStep&&) = delete;
 
     void step(float dt);
 
