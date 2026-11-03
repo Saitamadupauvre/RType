@@ -13,6 +13,7 @@ The [architecture](architecture.md) page shows how they fit together.
 | script | `engine::script` | core | Lua 5.4, sol2 |
 | network | `engine::network` | core | POSIX sockets |
 | physics | `engine::physics` | core | — |
+| navigation | `engine::navigation` | — | — |
 | graphics | `engine::graphics` | core | — (backends are [plugins](plugins.md)) |
 | audio | `engine::audio` | core | — (backends are [plugins](plugins.md)) |
 | app | `engine::app` | core, script, network, graphics, audio (physics privately) | — |
@@ -138,6 +139,37 @@ them and publishes collision events on the event bus once every pair has
 been checked, so handlers may spawn or destroy entities. The R-Type server
 runs it every tick and forwards each `CollisionEvent` to the script runtime;
 scripted entities only use it for detection (`resolve_collisions = false`).
+
+### navigation
+
+Grid pathfinding, with no dependency on any other module. A `NavGrid` lays
+`width × height` square cells of `cell_size` world units over the world from an
+`origin`; each cell is blocked or walkable with a movement cost of at least 1.
+`block_area(min, max)` blocks every cell a world rectangle strictly overlaps,
+`cell_at` / `center_of` convert between world points and cells. A grid holds at
+most `NavGrid::max_cells` (2^20) cells.
+
+`find_path(grid, start, goal, options)` runs A*: entering a cell costs its
+cost, times √2 for a diagonal. `PathOptions` chooses:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `heuristic` | `Octile` | `Dijkstra` (no estimate), `Manhattan`, `Octile`, `Euclidean` |
+| `diagonals` | `true` | 8-way moves; a diagonal needs both cells beside it walkable, so paths never cut wall corners |
+| `max_expanded` | 10 000 | Search budget, so one search never stalls a tick |
+| `smooth` | `false` | Run `smooth_path` on the result |
+
+The result has a `status` (`Found`, `Unreachable`, `LimitReached`,
+`OutsideGrid`, `Blocked`), the cells from start to goal (empty unless found),
+the grid path cost and the number of expanded cells. Dijkstra, Octile and
+Euclidean always give the cheapest path; Manhattan does too without diagonals,
+and with diagonals it is faster but may return a slightly longer path. Searches
+are deterministic.
+
+`smooth_path` keeps the first and last cells and jumps from each kept cell to
+the farthest following cell in straight `line_of_sight`, never through a
+blocked cell, between two blocked corners, or through a cell costlier than the
+part of the path it skips.
 
 ### graphics
 
