@@ -67,9 +67,10 @@ engine_add_module(script
         src/script/loading/Sections.cpp
         src/script/lua/LuaErrors.cpp
         src/script/lua/LuaFieldValue.cpp
+        src/script/navigation/Navigation.cpp
         src/script/player/Players.cpp
     DEPENDS engine::core
-    PRIVATE_DEPENDS engine::physics sol2::sol2 engine_lua
+    PRIVATE_DEPENDS engine::physics engine::navigation sol2::sol2 engine_lua
 )
 target_include_directories(engine-script PRIVATE src/script)
 
