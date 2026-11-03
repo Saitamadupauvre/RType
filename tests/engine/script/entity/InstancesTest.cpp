@@ -372,6 +372,63 @@ TEST_F(InstancesTest, SpawningWithoutWorldReportsEveryInstance) {
     EXPECT_TRUE(issues[0].field.empty());
 }
 
+TEST_F(InstancesTest, PreviewBuildsPrototypesWithoutRunningOnSpawn) {
+    EntityManager preview_world;
+    const std::vector<Instance> instances{
+        {.name = "a", .type = "painted", .position = Vec2{3, 4}, .overrides = {}},
+        {.name = "", .type = "dragon", .position = {}, .overrides = {}},
+        {.name = "",
+         .type = "ship",
+         .position = {},
+         .overrides = {{.field = "PhysicsBody.mass", .value = FieldValue{2.5F}}}}};
+
+    const auto preview = _scene.runtime.preview_instances(preview_world, instances);
+
+    ASSERT_EQ(preview.entities.size(), 3U);
+    ASSERT_TRUE(preview.entities[0].has_value());
+    EXPECT_FALSE(preview.entities[1].has_value());
+    ASSERT_TRUE(preview.entities[2].has_value());
+    const Entity painted = *preview.entities[0];
+    const Entity ship = *preview.entities[2];
+    ASSERT_TRUE(preview_world.has<Position>(painted));
+    EXPECT_EQ(preview_world.get<Position>(painted).pos, (Vec2{3, 4}));
+    ASSERT_TRUE(preview_world.has<Sprite>(painted));
+    EXPECT_NE(preview_world.get<Sprite>(painted).color,
+              (Rgba{.r = 200, .g = 100, .b = 50, .a = 255}));
+    ASSERT_TRUE(preview_world.has<PhysicsBody>(ship));
+    EXPECT_FLOAT_EQ(preview_world.get<PhysicsBody>(ship).mass, 2.5F);
+    EXPECT_TRUE(_scene.runtime.capture_instances().empty());
+}
+
+TEST_F(InstancesTest, PreviewReportsTheIssuesOfSpawnWithoutLoggingThem) {
+    EntityManager preview_world;
+    const std::vector<Instance> instances{
+        {.name = "", .type = "dragon", .position = {}, .overrides = {}},
+        {.name = "",
+         .type = "plain",
+         .position = {},
+         .overrides = {{.field = "Nope.field", .value = FieldValue{1.F}}}}};
+
+    const auto preview = _scene.runtime.preview_instances(preview_world, instances);
+    const std::vector<InstanceIssue> spawned = _scene.runtime.spawn_instances(instances);
+
+    EXPECT_EQ(preview.issues, spawned);
+    ASSERT_EQ(preview.issues.size(), 2U);
+    EXPECT_EQ(preview.issues[1].instance, 1U);
+    EXPECT_EQ(preview.issues[1].field, "Nope.field");
+    EXPECT_TRUE(preview.entities[1].has_value());
+}
+
+TEST_F(InstancesTest, DefaultValueIsThePrefabValue) {
+    EXPECT_EQ(_scene.runtime.default_value("ship", "Sprite.path"),
+              (FieldValue{engine::core::AssetName{"ship.png"}}));
+    EXPECT_EQ(_scene.runtime.default_value("boss", "Rotation.degrees"), FieldValue{30.F});
+    EXPECT_FALSE(_scene.runtime.default_value("ship", "Nope.field").has_value());
+    EXPECT_FALSE(_scene.runtime.default_value("dragon", "Sprite.path").has_value());
+    EXPECT_FALSE(_scene.runtime.default_value("wave", "Sprite.path").has_value());
+    EXPECT_FALSE(_scene.runtime.default_value("ship", "Script.health").has_value());
+}
+
 TEST_F(InstancesTest, NamesOnlyExistForScriptEntities) {
     const Entity plain = _scene.spawn("plain");
     const Entity foreign = _scene.world.spawn();

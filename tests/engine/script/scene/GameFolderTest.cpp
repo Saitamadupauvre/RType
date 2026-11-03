@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,7 @@
 #include "engine/core/Vec2.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/script/GameFolder.hpp"
 #include "engine/script/Instance.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 #include "engine/script/ServerApi.hpp"
@@ -170,4 +172,63 @@ TEST_F(GameFolderTest, MissingScriptsFolderFails) {
     EXPECT_FALSE(_runtime.load_game(_game.path()));
 
     EXPECT_TRUE(_runtime.capture_instances().empty());
+}
+
+TEST_F(GameFolderTest, LoadDeclarationsRunsNeitherOnStartNorTheStartScene) {
+    _game.write("game.json", R"({ "start_scene": "stage1" })");
+
+    EXPECT_TRUE(_runtime.load_declarations(engine::script::scripts_folder(_game.path())));
+
+    std::vector<std::string> types = _runtime.entity_types();
+    std::ranges::sort(types);
+    EXPECT_EQ(types, (std::vector<std::string>{"early", "late"}));
+    EXPECT_TRUE(_runtime.capture_instances().empty());
+}
+
+TEST_F(GameFolderTest, WriteStartSceneKeepsTheOtherKeys) {
+    _game.write("game.json", R"({ "name": "kept", "start_scene": "stage1", "extra": [1, 2] })");
+
+    ASSERT_TRUE(engine::script::write_start_scene(_game.path(), "stage2"));
+
+    const std::string text = _game.read("game.json");
+    EXPECT_NE(text.find("\"kept\""), std::string::npos);
+    EXPECT_NE(text.find("\"extra\""), std::string::npos);
+    EXPECT_EQ(engine::script::read_project(_game.path())->start_scene, "stage2");
+}
+
+TEST_F(GameFolderTest, WriteStartSceneCreatesTheProjectAndRemovesTheKey) {
+    ASSERT_TRUE(engine::script::write_start_scene(_game.path(), "stage1"));
+    EXPECT_EQ(engine::script::read_project(_game.path())->start_scene, "stage1");
+
+    ASSERT_TRUE(engine::script::write_start_scene(_game.path(), std::nullopt));
+    EXPECT_FALSE(engine::script::read_project(_game.path())->start_scene.has_value());
+}
+
+TEST_F(GameFolderTest, WriteStartSceneRejectsBadNamesAndBadProjects) {
+    EXPECT_FALSE(engine::script::write_start_scene(_game.path(), "../escape"));
+    EXPECT_FALSE(std::filesystem::exists(_game.path() / "game.json"));
+
+    _game.write("game.json", R"(["not", "an", "object"])");
+    EXPECT_FALSE(engine::script::write_start_scene(_game.path(), "stage1"));
+    EXPECT_EQ(_game.read("game.json"), R"(["not", "an", "object"])");
+
+    _game.write("game.json", R"({ "start_scene": )");
+    EXPECT_FALSE(engine::script::write_start_scene(_game.path(), "stage1"));
+}
+
+TEST_F(GameFolderTest, ListScenesReturnsValidNamesInOrder) {
+    _game.write("scenes/b.json", "{}");
+    _game.write("scenes/a.json", "{}");
+    _game.write("scenes/notes.txt", "");
+    _game.write("scenes/bad name.json", "{}");
+    _game.write("scenes/nested/c.json", "{}");
+
+    EXPECT_EQ(engine::script::list_scenes(_game.path()),
+              (std::vector<std::string>{"a", "b", "stage1"}));
+}
+
+TEST_F(GameFolderTest, ListScenesOfAGameWithoutScenesIsEmpty) {
+    std::filesystem::remove_all(_game.path() / "scenes");
+
+    EXPECT_TRUE(engine::script::list_scenes(_game.path()).empty());
 }
