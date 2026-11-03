@@ -11,6 +11,16 @@ TEST(GraphicsTypes, DefaultTextureIdRefersToNoTexture) {
     EXPECT_NE(TextureId{}, TextureId{.value = 1});
 }
 
+TEST(GraphicsTypes, DefaultRenderTargetIdRefersToNoTarget) {
+    EXPECT_EQ(RenderTargetId{}.value, 0U);
+    EXPECT_NE(RenderTargetId{}, RenderTargetId{.value = 1});
+}
+
+TEST(GraphicsTypes, DefaultShaderIdRefersToNoShader) {
+    EXPECT_EQ(ShaderId{}.value, 0U);
+    EXPECT_NE(ShaderId{}, ShaderId{.value = 1});
+}
+
 TEST(GraphicsTypes, ValueTypesCompareFieldByField) {
     EXPECT_EQ((Rect{.x = 0.F, .y = 0.F, .width = 10.F, .height = 5.F}),
               (Rect{.x = 0.F, .y = 0.F, .width = 10.F, .height = 5.F}));
