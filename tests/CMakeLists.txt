@@ -190,8 +190,10 @@ plugin_add_test(graphics-raylib
     SOURCES
         plugins/graphics-raylib/LetterboxTest.cpp
         plugins/graphics-raylib/KeyMapTest.cpp
-        plugins/graphics-raylib/TextureTableTest.cpp
-    LINKS graphics-raylib-letterbox graphics-raylib-keymap graphics-raylib-textures
+        plugins/graphics-raylib/HandleTableTest.cpp
+        plugins/graphics-raylib/TargetSourceTest.cpp
+        plugins/graphics-raylib/UniformLocationsTest.cpp
+    LINKS graphics-raylib-letterbox graphics-raylib-keymap graphics-raylib-handles
 )
 
 plugin_add_test(audio-raylib
