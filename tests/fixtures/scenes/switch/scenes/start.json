@@ -1,0 +1,7 @@
+{
+    "version": 1,
+    "instances": [
+        { "type": "keeper", "position": [0, 0] },
+        { "type": "rock", "position": [1, 1] }
+    ]
+}

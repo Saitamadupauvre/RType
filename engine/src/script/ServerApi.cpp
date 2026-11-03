@@ -14,6 +14,7 @@
 #include "input/LuaInput.hpp"
 #include "lua/LuaErrors.hpp"
 #include "player/Players.hpp"
+#include "scene/SceneSwitch.hpp"
 
 namespace engine::script {
 
@@ -119,6 +120,9 @@ void ServerApi::State::bind_globals() {
     lua.set_function("emit", [this](sol::this_state state, const sol::object& name,
                                     const sol::object& arguments) {
         context->events.emit(state, name, arguments);
+    });
+    lua.set_function("load_scene", [this](sol::this_state state, const sol::object& name) {
+        request_scene(*context, state, name);
     });
 }
 

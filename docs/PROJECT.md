@@ -220,6 +220,7 @@ void ServerApp::Impl::tick(Duration step)
     runtime.update(dt);                    // every entity's update(self, dt), then main.lua update(dt)
     collisions.step(dt);                   // engine-physics, then on_collide
     runtime.flush_destroyed();             // on_destroy, then removal
+    runtime.flush_scene();                 // load_scene: swap non-persistent entities
     systems.run(world, dt);                // native systems
     replicate();                           // mark scripted entities with a sprite or colour
     publish_audio(); publish_events();     // play, music, emit
@@ -468,7 +469,8 @@ This section is the specification of the Lua API. Not everything is implemented 
 | `entity "name"` declarations (short and table forms), `require` from `lib/`, sandbox | Implemented |
 | `system "name"` declarations | Parsed and validated; systems do not run yet |
 | `spawn(type, overrides)`, `players()`, `find_player(id)` | Implemented |
-| `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `update(dt)`, `server` / `client` sections | Implemented |
+| `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `on_scene_loaded`, `update(dt)`, `server` / `client` sections | Implemented |
+| `load_scene(name)`, `persistent = true` entities, built-in `scene_loaded` event | Implemented (see §10.6) |
 | Entity fields `x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`, `id`, `type`, `age`, `input`, `owner`; free fields | Implemented |
 | Entity methods `destroy()`, `has_tag()`, `get_field()`, `set_field()`; callbacks `on_spawn`, `update`, `on_collide`, `on_destroy` | Implemented |
 | Native collisions: `engine-physics` detects `hitbox` overlaps in the server tick and calls `on_collide` (see §10.5) | Implemented |
@@ -698,6 +700,9 @@ count("enemy")
 
 -- players
 players()                  -- connected players, by ascending id
+
+-- scenes (server)
+load_scene("stage2")       -- switch to scenes/stage2.json at the end of the tick
 find_player(1)             -- player handle, or nil
 
 -- time
@@ -758,6 +763,15 @@ log("message")
 - `emit(name, arguments)` queues a declared event. `arguments` is a table or `nil`; keys left out are absent from the event. An undeclared event or key, a value of the wrong kind (same conversions as entity fields), a non-finite number, a fractional `int` or a `string`/`asset` longer than 63 bytes raises an error and emits nothing. An `asset` argument travels as a texture id: the server drops, with a warning, an event naming a texture that is not declared. At most 64 events are kept per tick.
 - After each tick the server sends the queued events to every client (`named` events, see the [protocol](protocol.md)), after that tick's sounds and musics. Event names and keys are sent once in `connect_accept`; a client publishes each event on its event bus as `engine::network::NamedEvent`.
 - On the client, `on(name, function(event) ... end)` reacts to a declared event: the function gets a table of the event's arguments (same conversions as entity fields), handlers run in registration order, and an error in one is logged without stopping the others. `on` with an undeclared event or a non-function raises an error.
+- `scene_loaded { name = "string" }` is built in: it always exists, is sent by `load_scene`, and declaring it raises an error.
+
+**Scene rules.**
+
+- `load_scene(name)` (server only) switches to `scenes/<name>.json` of the game folder. The file is read and checked when it is called: a name that is not 1 to 63 letters, digits, `_` or `-`, a missing or invalid file, a server started without a game folder, or a second `load_scene` in the same tick raises an error and keeps the current scene. Problems inside a valid file (unknown type, bad override) are logged and skip only that instance or field.
+- The switch happens at the end of the tick, after the entities marked with `self:destroy()` are removed: every entity whose declaration does not set `persistent = true` is destroyed (`on_destroy` runs), the scene's instances are spawned (`on_spawn` runs, then their overrides), the `scene_loaded` event is queued for clients, and `on_scene_loaded(name)` from `main.lua` is called. A `load_scene` called during these callbacks switches at the end of the next tick.
+- Persistent entities keep their id and their Lua data. Fields that point to destroyed entities are left as they are; using one raises the usual "destroyed entity" error, so clean them in `on_scene_loaded`. A persistent entity placed in a scene file is spawned again each time that scene loads, so persistent entities are usually spawned by scripts.
+- `persistent` must be a boolean set at the top level of the declaration (not in a `server`/`client` section); anything else rejects the file. It is not a script field.
+- `main.lua` lives across scenes. On the client, `on_scene_loaded(name)` from `main.lua` is called when the `scene_loaded` event arrives, before the `on("scene_loaded", ...)` handlers. The start scene of `game.json` does not fire it: `on_start` covers it.
 
 ### 10.7 Systems
 
@@ -907,8 +921,8 @@ speed  = 150         -- server only
 | Set | Globals and fields | Runtime |
 |---|---|---|
 | `core` | `entity`, `system`, `require`, `sounds`, `musics`, `textures`, `shaders`, `event`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
-| `server` | `spawn`, `players`, `find_player`, `play`, `music`, `emit`, `self.input`, `self.owner`, `on_player_joined`, `on_player_left` | server (`core` + `server`) |
-| `client` | `on`, `input`, `audio`, `camera` | client (`core` + `client`) |
+| `server` | `spawn`, `players`, `find_player`, `play`, `music`, `emit`, `load_scene`, `self.input`, `self.owner`, `on_player_joined`, `on_player_left`, `on_scene_loaded` | server (`core` + `server`) |
+| `client` | `on`, `input`, `audio`, `camera`, `on_scene_loaded` | client (`core` + `client`) |
 | `editor` | nothing yet | editor (`core` + `editor`) |
 
 Top-level code of a file runs on every side, so it may only use `core` functions; side-specific calls belong in callbacks.
@@ -969,17 +983,19 @@ A missing `zoom` keeps the zoom of the current view. `camera.follow` keeps the s
 4. Native movement (`vx`, `vy`).
 5. Collisions (`engine-physics`) → `on_collide` callbacks.
 6. Destroy entities marked for destruction → `on_destroy` callbacks.
-7. Send snapshot to clients.
+7. Switch scene if `load_scene` was called → `on_destroy`, `on_spawn`, `on_scene_loaded`.
+8. Send snapshot to clients.
 
 ### 10.12 Reserved names
 
 Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
 
 - Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds`, `layer`, `age`, `id`, `type`, `input`, `owner`.
-- Declaration sections: `server`, `client`.
+- Declaration sections: `server`, `client`. Declaration flag: `persistent`.
 - Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`.
-- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `update`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `textures`, `shaders`.
+- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `on_scene_loaded`, `update`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `textures`, `shaders`, `load_scene`.
+- Events: `scene_loaded`.
 
 ### 10.13 Error handling and sandbox
 
@@ -1001,7 +1017,7 @@ Developers must not use these names for their own fields or methods; the engine 
 
 - **Field access** goes through the entity handle's metatable. `__index` looks up, in order: native field aliases → entity methods → the entity's Lua data → its prefab table (methods). `__newindex` writes native fields into C++ storage and everything else into the Lua data. Aliases are a small data table (`engine/src/script/EntityFields.cpp`) mapping a Lua name to a `core::FieldRegistry` field, resolved to a `FieldRef` once; `sol::object` ↔ `FieldValue` conversion lives in one place (`LuaFieldValue.cpp`). The registry, filled by `register_core_fields` and `register_physics_fields`, is exposed by `ScriptRuntime::fields()`. Setting a collider field also adds the `PhysicsBody` it requires (`FieldRegistry::add(..., required<PhysicsBody>)`); the `hitbox` alias additionally makes a new body dynamic without gravity or collision response, centres the collider (`offset = size / 2`) and adds `Scriptable`.
 - **Instances** — `ScriptRuntime::capture_instances()` / `spawn_instances()` (`entity/Instances.cpp`) turn the world into `Instance{name, type, position, overrides}` and back. A type's defaults come from a prototype entity built in a scratch world from the prefab's native fields, without `on_spawn`; only editable fields that differ are stored. Script fields (`entity/ScriptFields.cpp`) are inferred from each entity prefab before its sections are merged, kept on the `Declaration`, compared with the entity's Lua data and written back into it as `"Script.<name>"` overrides; `ScriptRuntime::script_fields()` lists them. See [Engine modules](engine.md#instances).
-- **Scenes** — `ScriptRuntime::read_scene()`, `write_scene()` and `load_game()` (`scene/`) store instances in `scenes/<name>.json` and spawn the `start_scene` of `game.json`. `nlohmann-json` is private to the module. See [Game folder and scenes](game-folder.md).
+- **Scenes** — `ScriptRuntime::read_scene()`, `write_scene()` and `load_game()` (`scene/`) store instances in `scenes/<name>.json` and spawn the `start_scene` of `game.json`. `nlohmann-json` is private to the module. `load_scene` (`scene/SceneSwitch.cpp`) reads the file into `RuntimeContext::pending_scene`; `ScriptRuntime::flush_scene()`, called by `ServerApp` after `flush_destroyed()`, dooms every non-persistent entity (`Declaration::persistent`), flushes them, spawns the instances and queues the `scene_loaded` event that `Events` registers in its constructor. See [Game folder and scenes](game-folder.md).
 - **Callbacks** are called by native systems through `sol::protected_function`.
 - **Coroutines** are `sol::thread` + `sol::coroutine`; `wait(t)` yields and the scheduler resumes the coroutine when `t` has elapsed.
 

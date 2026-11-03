@@ -24,6 +24,7 @@
 #include "lua/Sol.hpp"
 #include "scene/GameFolder.hpp"
 #include "scene/SceneFile.hpp"
+#include "scene/SceneSwitch.hpp"
 
 namespace engine::script {
 
@@ -182,6 +183,7 @@ bool ScriptRuntime::Impl::load_game(const fs::path& game) {
     if (project && project->start_scene) {
         start_scene = scene_file(game, *project->start_scene);
     }
+    context.game = game;
     const bool loaded = load_scripts(scripts_folder(game), start_scene);
     return loaded && project.has_value();
 }
@@ -279,6 +281,9 @@ bool ScriptRuntime::Impl::load_declaration_file(const fs::path& root, const fs::
     auto resolved = resolve_declarations(*file, environment);
     file->declarations.clear();
     if (!resolved) {
+        return false;
+    }
+    if (!std::ranges::all_of(*resolved, read_persistence)) {
         return false;
     }
     describe_script_fields(*resolved);
@@ -594,6 +599,17 @@ std::size_t ScriptRuntime::flush_destroyed() noexcept {
         log::error("lua: flush_destroyed: unknown error");
     }
     return 0;
+}
+
+std::optional<std::string> ScriptRuntime::flush_scene() noexcept {
+    try {
+        return switch_to_pending_scene(_impl->context);
+    } catch (const std::exception& exception) {
+        log::error("lua: flush_scene: {}", exception.what());
+    } catch (...) {
+        log::error("lua: flush_scene: unknown error");
+    }
+    return std::nullopt;
 }
 
 } // namespace engine::script

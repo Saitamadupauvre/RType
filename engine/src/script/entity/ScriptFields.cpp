@@ -192,7 +192,7 @@ bool is_free_field_name(const sol::object& key, const Entities& entities) {
     }
     const auto name = key.as<std::string_view>();
     return !name.empty() && !name.starts_with('_') && !is_section(name) &&
-           !entities.is_native_field(name);
+           name != persistent_field && !entities.is_native_field(name);
 }
 
 } // namespace
