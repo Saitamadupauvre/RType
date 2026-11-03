@@ -37,6 +37,13 @@ engine_add_module(physics
     DEPENDS engine::core
 )
 
+engine_add_module(navigation
+    SOURCES
+        src/navigation/NavGrid.cpp
+        src/navigation/Pathfinding.cpp
+        src/navigation/Smoothing.cpp
+)
+
 engine_add_module(script
     SOURCES
         src/script/ApiSet.cpp
