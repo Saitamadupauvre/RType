@@ -265,6 +265,8 @@ using engine::graphics::ShaderId;
 
 class ShaderRecordingRenderer final : public fixture::NullRenderer {
 public:
+    using fixture::NullRenderer::set_uniform;
+
     [[nodiscard]] ShaderId load_shader(const std::string&, const std::string& fragment) override {
         ++shader_loads;
         return std::filesystem::exists(fragment) ? ShaderId{.value = 3} : ShaderId{};
