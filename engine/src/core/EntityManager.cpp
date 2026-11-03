@@ -26,4 +26,6 @@ bool EntityManager::kill(Entity entity) {
 
 bool EntityManager::alive(Entity entity) const noexcept { return _entities.alive(entity); }
 
+std::size_t EntityManager::size() const noexcept { return _entities.size(); }
+
 } // namespace engine::core
