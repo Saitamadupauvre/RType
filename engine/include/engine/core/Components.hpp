@@ -32,6 +32,16 @@ struct Sprite {
 };
 
 /**
+ * @brief Drawing order of an entity among the others.
+ *
+ * @note Entities with a lower z_index are drawn first, so higher ones appear in front. Entities
+ * with the same z_index, or without this component (read as 0), are drawn in spawn order.
+ */
+struct Layer {
+    std::int32_t z_index{0};
+};
+
+/**
  * @brief Shader program an entity is drawn through.
  *
  * @note The path is relative to the assets folder and has no extension, such as `shaders/space`.

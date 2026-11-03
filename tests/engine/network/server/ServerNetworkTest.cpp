@@ -282,8 +282,8 @@ TEST_F(ServerNetworkTest, ConnectAcceptNamesEveryReplicatedField) {
     for (const auto& entry : accept->strings.entries(engine::network::StringCategory::field)) {
         names.push_back(entry.name);
     }
-    EXPECT_EQ(names, (std::vector<std::string>{"Position.pos", "Sprite.path", "Sprite.color",
-                                               "Shader.path", "Camera.zoom", "Camera.bounds_origin",
-                                               "Camera.bounds_size", "Rotation.degrees", "Scale.x",
-                                               "Scale.y", "Replicated.owner"}));
+    EXPECT_EQ(names, (std::vector<std::string>{
+                         "Position.pos", "Sprite.path", "Sprite.color", "Layer.z_index",
+                         "Shader.path", "Camera.zoom", "Camera.bounds_origin", "Camera.bounds_size",
+                         "Rotation.degrees", "Scale.x", "Scale.y", "Replicated.owner"}));
 }

@@ -41,6 +41,7 @@ template <typename Component> void register_if_missing(core::EntityManager& worl
 void register_script_components(core::EntityManager& world) {
     register_if_missing<core::Position>(world);
     register_if_missing<core::Sprite>(world);
+    register_if_missing<core::Layer>(world);
     register_if_missing<core::Shader>(world);
     register_if_missing<core::Tags>(world);
     register_if_missing<core::Camera>(world);

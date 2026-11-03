@@ -44,6 +44,7 @@ constexpr std::array aliases{
                .apply_defaults = &give_script_body},
     FieldAlias{.name = "sprite", .component = "Sprite", .field = "path"},
     FieldAlias{.name = "color", .component = "Sprite", .field = "color"},
+    FieldAlias{.name = "z_index", .component = "Layer", .field = "z_index"},
     FieldAlias{.name = "shader", .component = "Shader", .field = "path"},
     FieldAlias{.name = "tags", .component = "Tags", .field = "labels"},
     FieldAlias{.name = "hitbox",

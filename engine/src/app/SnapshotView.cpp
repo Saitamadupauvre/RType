@@ -13,6 +13,7 @@ namespace engine::app {
 SnapshotView::SnapshotView(const core::FieldRegistry& fields) : _fields(fields) {
     _world.register_component<core::Position>();
     _world.register_component<core::Sprite>();
+    _world.register_component<core::Layer>();
     _world.register_component<core::Shader>();
     _world.register_component<core::Rotation>();
     _world.register_component<core::Scale>();
