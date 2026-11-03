@@ -43,3 +43,12 @@ TEST(GraphicsTypes, DefaultSpriteDrawIsUprightFromTopLeft) {
     EXPECT_EQ(sprite.rotation, 0.F);
     EXPECT_EQ(sprite.origin, (engine::core::Vec2{0.F, 0.F}));
 }
+
+TEST(GraphicsTypes, SpriteDrawMayLeaveOutTheOriginWhenDesignated) {
+    const SpriteDraw sprite{.texture = TextureId{.value = 1},
+                            .source = {.width = 32, .height = 32},
+                            .dest = {.x = 10, .y = 20, .width = 64, .height = 64}};
+
+    EXPECT_EQ(sprite.origin, (engine::core::Vec2{0.F, 0.F}));
+    EXPECT_EQ(sprite.rotation, 0.F);
+}
