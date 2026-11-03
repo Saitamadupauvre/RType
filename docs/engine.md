@@ -10,7 +10,7 @@ The [architecture](architecture.md) page shows how they fit together.
 | Module | Target | Depends on | Third-party (private) |
 |---|---|---|---|
 | core | `engine::core` | — | `dl` |
-| script | `engine::script` | core | Lua 5.4, sol2 |
+| script | `engine::script` | core (physics, navigation privately) | Lua 5.4, sol2 |
 | network | `engine::network` | core | POSIX sockets |
 | physics | `engine::physics` | core | — |
 | navigation | `engine::navigation` | — | — |
@@ -170,6 +170,12 @@ are deterministic.
 the farthest following cell in straight `line_of_sight`, never through a
 blocked cell, between two blocked corners, or through a cell costlier than the
 part of the path it skips.
+
+Scripts reach it through `engine-script`, which links it privately: `navgrid`
+builds a `NavGrid` from the hitboxes of entities carrying obstacle tags (rebuilt
+at most once per tick), `find_path` returns waypoints and `self:navigate_to`
+steers an entity along them through its physics velocity. See
+[the Lua API](PROJECT.md#106-global-functions).
 
 ### graphics
 
