@@ -152,8 +152,8 @@ public:
      * @brief Creates an entity from a declaration registered by load_scripts().
      *
      * The entity gets a core::Position, then every component field its prefab sets through an
-     * alias (`x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`), and its
-     * own table for custom fields. Setting `vx`, `vy` or `hitbox` on an entity without a
+     * alias (`x`, `y`, `vx`, `vy`, `sprite`, `color`, `shader`, `tags`, `hitbox`, `collides_with`),
+     * and its own table for custom fields. Setting `vx`, `vy` or `hitbox` on an entity without a
      * physics::PhysicsBody gives it a dynamic body without gravity or collision response.
      * Table-valued custom fields of the prefab are deep-copied into that table, so no two entities
      * share one. Scripts reach the entity through a handle whose fields resolve, in order, to
@@ -233,6 +233,15 @@ public:
      * is stable for a given set of scripts.
      */
     [[nodiscard]] std::vector<std::string> texture_names() const;
+
+    /**
+     * @brief Lists the shaders declared with `shaders { ... }`, in ascending order.
+     *
+     * Works like texture_names(): the `shader` of every declared entity is declared on its own,
+     * and setting an entity's `shader` to a name missing from this list raises a Lua error. A
+     * shader name has no extension, such as `shaders/space`.
+     */
+    [[nodiscard]] std::vector<std::string> shader_names() const;
 
     /**
      * @brief Lists the events declared with `event "name" { key = "kind", ... }`, in ascending

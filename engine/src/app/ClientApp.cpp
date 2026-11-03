@@ -65,6 +65,8 @@ struct ClientApp::Impl {
     script::ClientApi& client;
     AudioPlayer sound;
     SnapshotView view;
+    std::reference_wrapper<const core::time::IClock> time_source;
+    core::time::Duration started_at;
     core::time::FixedStepLoop loop;
     AssetPreloader preloader;
     bool preload_queued{false};
@@ -92,7 +94,8 @@ ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport&
     : renderer(window), input(keys), audio(speakers), options(std::move(settings)),
       fields(replicated_fields()), network(clock, events, fields, transport),
       runtime(load_game(options.scripts)), client(runtime.api<script::ClientApi>()),
-      sound(speakers, options.assets), view(window, options.assets, fields), loop(clock) {
+      sound(speakers, options.assets), view(window, options.assets, fields), time_source(clock),
+      started_at(clock.now()), loop(clock) {
     client.set_audio_settings(options.audio);
     events.subscribe<network::SoundPlayed>([this](const network::SoundPlayed& played) {
         sound.play_sound(network.strings(), played.sound_id);
@@ -151,6 +154,8 @@ void ClientApp::Impl::queue_preload() {
     const auto strings = network.strings();
     add_all(preloader, strings, network::StringCategory::texture,
             [this](const std::string& name) { return view.preload_texture(name); });
+    add_all(preloader, strings, network::StringCategory::shader,
+            [this](const std::string& name) { return view.preload_shader(name); });
     add_all(preloader, strings, network::StringCategory::sound,
             [this](const std::string& name) { return sound.preload_sound(name); });
     add_all(preloader, strings, network::StringCategory::music,
@@ -185,7 +190,7 @@ void ClientApp::Impl::draw_world() {
     const core::CameraView camera = resolve_camera(entities, client.camera_override(), viewport);
     client.set_camera_view(camera, viewport);
     renderer.get().begin_world(camera);
-    view.draw(entities);
+    view.draw(entities, std::chrono::duration<float>(time_source.get().now() - started_at).count());
     renderer.get().end_world();
 }
 

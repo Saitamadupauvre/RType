@@ -46,7 +46,7 @@ The success criterion for the engine is simple: **a second, different game can b
 
 A playable, networked R-Type prototype:
 
-- Starfield scrolling background, timer-based (never tied to CPU speed). Removed from the C++ client with the generic `ClientApp`; it comes back as a shader.
+- Starfield scrolling background, timer-based (never tied to CPU speed): a Lua `space` entity drawn through `assets/shaders/space.fs` (§10.5, `shader`).
 - Up to 4 players, visually distinguishable (not only by colour).
 - Players move with the arrow keys and shoot.
 - Bydos (enemies) spawn randomly from the right side of the screen.
@@ -290,7 +290,7 @@ The engine replicates the type of every replicated entity and each component fie
 
 ### 9.1 Interfaces
 
-The engine only knows these interfaces (in `engine/include/engine/graphics/`). They use engine types (`Vec2`, `Rect`, `Color`, `TextureId`...) and never Raylib types.
+The engine only knows these interfaces (in `engine/include/engine/graphics/`). They use engine types (`Vec2`, `Rect`, `Color`, `TextureId`, `RenderTargetId`, `ShaderId`...) and never Raylib types.
 
 ```cpp
 class IRenderer {
@@ -304,6 +304,21 @@ class IRenderer {
     virtual TextureId load_texture(const std::string& path) = 0;
     virtual void unload_texture(TextureId) = 0;
     virtual Vec2 texture_size(TextureId) const = 0;
+    // render targets: off-screen surfaces, drawn back like any texture
+    virtual RenderTargetId create_render_target(Vec2 size) = 0;   // pixels
+    virtual void destroy_render_target(RenderTargetId) = 0;
+    virtual void begin_target(RenderTargetId, Color clear) = 0;
+    virtual void end_target() = 0;
+    virtual TextureId target_texture(RenderTargetId) const = 0;
+    // shaders (called through the engine's shader library, see 9.5)
+    virtual ShaderId load_shader(const std::string& vertex, const std::string& fragment) = 0;
+    virtual void unload_shader(ShaderId) = 0;
+    virtual void begin_shader(ShaderId) = 0;
+    virtual void end_shader() = 0;
+    virtual void set_uniform(ShaderId, const std::string& name, float) = 0;
+    virtual void set_uniform(ShaderId, const std::string& name, Vec2) = 0;
+    virtual void set_uniform(ShaderId, const std::string& name, Color) = 0;      // vec4 in [0, 1]
+    virtual void set_uniform(ShaderId, const std::string& name, TextureId) = 0;  // sampler2D
     // frame
     virtual void begin_frame(Color clear) = 0;
     virtual void end_frame() = 0;
@@ -365,6 +380,9 @@ The loader refuses a plugin built for another API version, and the backend is al
 - Timing comes from the engine clock, not from the backend.
 - The client draws in virtual units; the backend handles scaling and letterboxing.
 - **World space and screen space.** Between `begin_world(view)` and `end_world()`, draw calls take world units: a `CameraView` (`center`, the world point shown at the middle of the screen, and `zoom`) turns them into virtual units, `screen = (world - center) * zoom + virtual_size / 2`. Everything else, such as a HUD, is drawn in screen space and does not move with the camera. `end_frame()` ends world space if needed. The client draws the replicated entities in world space every frame.
+- **Render targets.** `create_render_target(size)` makes an off-screen surface of `size` pixels. Between `begin_target(target, clear)` and `end_target()`, draw calls go into it instead of the frame: screen space is the target's own pixels, and `begin_world(view)` centers the view on the target. `target_texture(target)` is a normal `TextureId`, drawn upright with `draw_sprite` (the backend handles the flip of the render texture); `unload_texture` ignores it, it lives as long as its target. `begin_target` and `end_target` end world space first, so the editor viewport is `begin_target` → `begin_world` → draw → `end_world` → `end_target` → `draw_sprite(target_texture)`. Calling `begin_target` again switches target; targets do not nest.
+- **Shaders.** `load_shader(vertex, fragment)` compiles GLSL files; an empty path uses the backend's default stage. Between `begin_shader(shader)` and `end_shader()`, draw calls go through it; calling `begin_shader` again replaces it. Uniforms keep their value across frames and only affect the draw calls made after them; unknown shaders and uniforms the program does not use are ignored. A missing file, a compile or link error gives the default `ShaderId`, is logged, and `begin_shader` on it draws with the default pipeline, so drawing always continues.
+- **Lifetime.** `destroy_render_target` / `unload_shader` end the target or shader first if it is current; `end_frame()` ends the current target, world space and shader; `close()` frees every texture, target and shader.
 - **Camera.** The view comes from, in this order: the local override of the client scripts (`camera.*`, §10.10), the scene camera (the replicated entity with a `Camera` component and the lowest id, clamped to its bounds), or the default view (`center = virtual_size / 2`, `zoom = 1`), which draws exactly as without a camera. Camera entities are never drawn. The conversion math lives in `engine-core` (`engine/core/Camera.hpp`), so the script module uses it without depending on graphics.
 
 ### 9.4 Audio plugin
@@ -410,6 +428,17 @@ graphics::TextureId ship = textures.get("sprites/ship.png");   // loads assets/s
 - A rejected name or a failed load gives the placeholder (default id), is logged once and never retried.
 - `clear()` and the destructor unload every loaded handle; the backend must outlive the cache.
 - Main thread only, like the backends. The client uses one cache for textures (`assets/`), one for sounds (`assets/sounds/`) and one for musics (`assets/music/`).
+- Entity shaders (`shader` field, §10.5) are drawn by `WorldDraw`, which sets the `time` and `resolution` uniforms, then `begin_shader` / draw / `end_shader` around the entity. Shader names never travel as text: the server lists them in the `shader` category of the string table, `Shader.path` is an asset field of type `AssetType::Shader`, and the client preloads them with the textures.
+- Shaders go through `engine::app::ShaderLibrary`, a cache of `ShaderId` over `IRenderer::load_shader` / `unload_shader`. A shader is named without extension: `shaders/wave` loads `assets/shaders/wave.fs` (required) and `assets/shaders/wave.vs` when it exists, the default vertex stage otherwise. A missing or invalid shader is reported once and gives the default `ShaderId`, which draws without a shader.
+
+```cpp
+app::ShaderLibrary shaders(renderer, assets);
+graphics::ShaderId wave = shaders.get("shaders/wave");   // wave.vs + wave.fs, loaded once
+renderer.set_uniform(wave, "time", seconds);
+renderer.begin_shader(wave);
+renderer.draw_sprite(sprite);
+renderer.end_shader();
+```
 - Texture names never travel as text: the scripts declare them (`textures { ... }`, §10.6), the server lists them in the `texture` category of the string table and snapshots carry their 16-bit id. The client turns the id back into the name before asking its cache.
 
 #### Preloading and the loading screen
@@ -441,6 +470,7 @@ This section is the specification of the Lua API. Not everything is implemented 
 | Native movement from `vx` / `vy` in the server tick (`engine-physics` integrates the body velocity) | Implemented |
 | `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
 | `textures { ... }`, entity `sprite` replicated to clients by texture id | Implemented (see §10.6) |
+| `shaders { ... }`, entity `shader` replicated to clients by shader id and drawn through it | Implemented (see §10.5, §10.6) |
 | API sets (`core`, `server`, `client`, `editor`), `server = { ... }` / `client = { ... }` sections, client `on(name, handler)` | Implemented (see §10.10) |
 | Client `input` (`key`, `mouse`, `pointer`, `pressed`) and `audio` (`muted`, `set_muted`, `volume`, `set_volume`) | Implemented (see §10.10) |
 | `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
@@ -549,7 +579,7 @@ Both forms produce the same internal representation.
 
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `rotation`, `scale`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds` | C++ component pools | Movement, collisions, rendering, replication |
+| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `shader`, `rotation`, `scale`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds` | C++ component pools | Movement, collisions, rendering, replication |
 | Free fields | `health`, `speed`, `points`, `waypoints` | Lua table of the entity | Scripts only |
 | Callbacks | `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
@@ -580,7 +610,17 @@ self:distance_to(other)
 self:move_to(x, y, duration)  -- inside a coroutine
 ```
 
-`sprite` is a path relative to `assets/`, such as `sprites/boss/core.png`. The `sprite` of an entity declaration is declared as a texture on its own; any other value must be declared with `textures { ... }` (§10.6) or be `""` (no sprite), otherwise the assignment raises an error and the sprite does not change. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a square of that color (temporary, until the renderer API lands). It reads back as a new table.
+`sprite` is a path relative to `assets/`, such as `sprites/boss/core.png`. The `sprite` of an entity declaration is declared as a texture on its own; any other value must be declared with `textures { ... }` (§10.6) or be `""` (no sprite), otherwise the assignment raises an error and the sprite does not change. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a 64 × 64 square of that color (before `scale`). It reads back as a new table.
+
+`shader` is the name of a GLSL program under `assets/`, without extension, such as `shaders/space`: the client draws the entity (its sprite or its square) through `assets/shaders/space.fs` and, when it exists, `assets/shaders/space.vs`. Like `sprite`, the `shader` of an entity declaration is declared on its own; any other value must be declared with `shaders { ... }` (§10.6) or be `""` (no shader). It is replicated by shader id and the client preloads every declared shader. The engine sets two uniforms before drawing: `float time`, seconds since the client started (from the engine clock, never the frame rate), and `vec2 resolution`, the virtual size of the screen (1920 × 1080), so `gl_FragCoord.xy / resolution` spans the screen. A shader that is missing or does not compile is logged once and the entity is drawn without it. Entities are drawn in spawn order, so a background is spawned first:
+
+```lua
+entity "space"
+
+shader = "shaders/space"
+color  = { r = 0, g = 0, b = 0 }
+scale  = { x = 1920 / 64, y = 1080 / 64 }   -- the 64 x 64 square covers the screen
+```
 
 `rotation` turns the sprite, in degrees clockwise, around its center. `scale` takes a number for both axes (`scale = 2`) or a table `{ x = .., y = .. }`; a negative factor mirrors the sprite (`scale = { x = -1, y = 1 }` faces it the other way) and `0` hides it. The scaled sprite keeps its top-left corner at `x`, `y`. Both are optional: an entity without them is drawn upright at the size of its texture and sends nothing over the network for them. `scale` always reads back as a new `{ x, y }` table. Both are replicated and editable, so the editor, scene files and snapshots carry them; the scale travels as two floats, so fractional factors reach clients exactly. Colliders do not follow them yet: `hitbox` stays exactly as written, whatever the rotation or scale. An entity drawn as a colored square (no `sprite`) is scaled but never rotated.
 
@@ -669,6 +709,10 @@ music(nil)                       -- stop the music
 textures { "sprites/explosion.png", "sprites/boss/core.png" }   -- declare, while the scripts load
 self.sprite = "sprites/boss/core.png"                           -- any declared texture
 
+-- shaders (replicated to clients by id; files are <name>.fs and an optional <name>.vs)
+shaders { "shaders/space", "shaders/hit_flash" }                -- declare, while the scripts load
+self.shader = "shaders/hit_flash"                               -- any declared shader, "" for none
+
 -- game events (sent to clients)
 event "explosion" { at = "vec2", size = "float" }   -- declare, while the scripts load
 emit("explosion", { at = { x = self.x, y = self.y }, size = 2 })
@@ -698,6 +742,7 @@ log("message")
 - `textures` takes a list of paths relative to `assets/` and can only be called while the scripts load. A name is 1 to 63 bytes of `/`-separated folders and a file, each made of letters, digits, `_`, `-` or `.` and not starting with `.` (no absolute path, no `..`). A bad name raises an error and declares none of the names of that call; declaring a name twice is allowed.
 - The `sprite` of every `entity` declaration is declared automatically; an entity whose `sprite` is not a valid name fails the load.
 - The server sends the declared textures once in `connect_accept`; snapshots then carry `sprite` as a 16-bit texture id, so the client only ever loads files the server declared.
+- `shaders` follows the same rules with the names of shaders (no extension) and the `shader` field; shaders and textures are separate lists, so a shader name is not a texture and the other way round.
 
 **Event rules.**
 
@@ -853,7 +898,7 @@ speed  = 150         -- server only
 
 | Set | Globals and fields | Runtime |
 |---|---|---|
-| `core` | `entity`, `system`, `require`, `sounds`, `musics`, `textures`, `event`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
+| `core` | `entity`, `system`, `require`, `sounds`, `musics`, `textures`, `shaders`, `event`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
 | `server` | `spawn`, `players`, `find_player`, `play`, `music`, `emit`, `self.input`, `self.owner`, `on_player_joined`, `on_player_left` | server (`core` + `server`) |
 | `client` | `on`, `input`, `audio`, `camera` | client (`core` + `client`) |
 | `editor` | nothing yet | editor (`core` + `editor`) |
@@ -926,7 +971,7 @@ Developers must not use these names for their own fields or methods; the engine 
 - Declaration sections: `server`, `client`.
 - Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`.
 - Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `update`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `textures`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `textures`, `shaders`.
 
 ### 10.13 Error handling and sandbox
 

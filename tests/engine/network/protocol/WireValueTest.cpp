@@ -88,3 +88,43 @@ TEST(WireValue, RefusesAnUnknownTextureId) {
 }
 
 TEST(WireValue, RefusesAList) { EXPECT_FALSE(to_wire(FieldList{}, texture_strings())); }
+
+namespace {
+
+constexpr std::uint16_t space_id = 2;
+
+StringTable shader_strings() {
+    StringTable table = texture_strings();
+    EXPECT_TRUE(table.insert(
+        {.category = StringCategory::shader, .id = space_id, .name = "shaders/space"}));
+    return table;
+}
+
+} // namespace
+
+TEST(WireValue, MapsEachAssetTypeToItsCategory) {
+    EXPECT_EQ(engine::network::asset_category(engine::core::AssetType::Texture),
+              StringCategory::texture);
+    EXPECT_EQ(engine::network::asset_category(engine::core::AssetType::Shader),
+              StringCategory::shader);
+}
+
+TEST(WireValue, SendsAShaderAsItsShaderId) {
+    EXPECT_EQ(
+        to_wire(AssetName{"shaders/space"}, shader_strings(), engine::core::AssetType::Shader),
+        WireValue{AssetId{space_id}});
+}
+
+TEST(WireValue, ReadsAShaderIdFromTheShaderCategory) {
+    EXPECT_EQ(from_wire(AssetId{space_id}, shader_strings(), engine::core::AssetType::Shader),
+              FieldValue{AssetName{"shaders/space"}});
+}
+
+TEST(WireValue, NeverMixesTextureAndShaderIds) {
+    const StringTable strings = shader_strings();
+
+    EXPECT_EQ(to_wire(AssetName{"shaders/space"}, strings), std::nullopt);
+    EXPECT_EQ(to_wire(AssetName{"sprites/ship.png"}, strings, engine::core::AssetType::Shader),
+              std::nullopt);
+    EXPECT_EQ(from_wire(AssetId{ship_id}, strings, engine::core::AssetType::Shader), std::nullopt);
+}

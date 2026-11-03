@@ -93,12 +93,12 @@ The server sends this message to the endpoint that sent the matching request. It
 | 1 | `sound` | sounds of `sound` events |
 | 2 | `music` | musics of `music` events |
 | 3 | `event` | names of `named` events |
-| 4 | `shader` | shaders (reserved for a later version) |
+| 4 | `shader` | shaders of `asset` fields that name shaders (e.g. `Shader.path`), without extension (e.g. `shaders/space`) |
 | 5 | `field` | replicated component fields, named `Component.field` (e.g. `Position.pos`) |
 | 6 | `event_key` | argument keys of `named` events, shared by every event |
-| 7 | `texture` | textures of `asset` values, paths relative to the assets folder (e.g. `sprites/ship.png`) |
+| 7 | `texture` | textures of `asset` values (every `asset` event argument, and the fields that name textures, e.g. `Sprite.path`), paths relative to the assets folder (e.g. `sprites/ship.png`) |
 
-Sound and music names are file names (for R-Type, files under the client's `assets/sounds/` and `assets/music/` folders). Texture names are the textures the scripts declare, plus the sprite of every declared entity. Then comes the music the server is playing, so that a player joining mid-game hears it.
+Sound and music names are file names (for R-Type, files under the client's `assets/sounds/` and `assets/music/` folders). Texture names are the textures the scripts declare, plus the sprite of every declared entity; shader names likewise are the shaders the scripts declare, plus the shader of every declared entity. An `asset` value is a 16-bit id of the category its field names (`texture` or `shader`), so the receiver reads it through the field's descriptor and no extra byte is sent. Then comes the music the server is playing, so that a player joining mid-game hears it.
 
 | Offset | Size | Field | Encoding |
 |---|---:|---|---|

@@ -25,6 +25,16 @@
 
 namespace engine::core {
 
+/**
+ * @brief What an asset field names, so that it is checked and sent with the right list of names.
+ */
+enum class AssetType : std::uint8_t {
+    /** @brief An image, such as `sprites/ship.png`. */
+    Texture,
+    /** @brief A shader program, such as `shaders/space`. */
+    Shader,
+};
+
 /** @brief Name of an asset (texture, sound, shader...), relative to the assets folder. */
 struct AssetName {
     std::string path;
@@ -160,12 +170,22 @@ public:
     /** @return The item kind of a list field, std::nullopt for any other kind. */
     [[nodiscard]] std::optional<FieldKind> element_kind() const noexcept { return _element; }
     [[nodiscard]] FieldFlags flags() const noexcept { return _flags; }
+    /** @return What an asset field names; AssetType::Texture for any other kind. */
+    [[nodiscard]] AssetType asset_type() const noexcept { return _asset_type; }
+
+    /**
+     * @brief Sets what an asset field names.
+     *
+     * @note Prefer the @p type argument of asset_field.
+     */
+    void set_asset_type(AssetType type) noexcept { _asset_type = type; }
 
 private:
     friend class FieldRegistry;
 
     std::string _name;
     FieldKind _kind;
+    AssetType _asset_type{AssetType::Texture};
     std::optional<FieldKind> _element;
     FieldFlags _flags;
     Getter _getter;
@@ -406,17 +426,21 @@ template <auto Member>
  * @brief Builds an asset field over a std::string data member holding an asset path.
  *
  * @tparam Member Pointer to a std::string data member.
+ * @param type What the path names.
  */
 template <auto Member>
     requires std::same_as<detail::MemberValue<Member>, std::string>
-[[nodiscard]] FieldDescriptor asset_field(std::string name, FieldFlags flags = {}) {
+[[nodiscard]] FieldDescriptor asset_field(std::string name, FieldFlags flags = {},
+                                          AssetType type = AssetType::Texture) {
     using Component = detail::MemberComponent<Member>;
-    return component_field<Component>(
+    FieldDescriptor field = component_field<Component>(
         std::move(name), FieldKind::Asset, flags,
         [](const Component& component) { return FieldValue{AssetName{component.*Member}}; },
         [](Component& component, const FieldValue& value) {
             component.*Member = std::get<AssetName>(value).path;
         });
+    field.set_asset_type(type);
+    return field;
 }
 
 /**
@@ -558,12 +582,12 @@ private:
 [[nodiscard]] ENGINE_CORE_EXPORT Tags labels_from_list(const FieldList& list);
 
 /**
- * @brief Registers the fields of the engine-core components: Position, Sprite, Tags, Camera,
- * Rotation and Scale.
+ * @brief Registers the fields of the engine-core components: Position, Sprite, Shader, Tags,
+ * Camera, Rotation and Scale.
  *
  * Camera requires Position: setting a Camera field gives the entity a Position too. Rotation and
  * Scale reject non-finite values. Scale is exposed as two float fields, x and y, so that snapshots
- * carry fractional factors exactly.
+ * carry fractional factors exactly. Shader.path is a replicated asset field of AssetType::Shader.
  *
  * @throws DuplicateComponentName If one of them is already registered.
  */

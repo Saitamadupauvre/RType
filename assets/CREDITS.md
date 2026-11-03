@@ -6,4 +6,5 @@
 | `sounds/laser_shoot.wav` | R-Type team | Made with [jsfxr](https://sfxr.me/) | MIT, like the project |
 | `sounds/explosion.wav` | R-Type team | Made with [jsfxr](https://sfxr.me/) | MIT, like the project |
 | `sprites/bydo_shot.png` | R-Type team | Generated for the project | MIT, like the project |
+| `shaders/space.fs` | R-Type team | Written for the project | MIT, like the project |
 | `sprites/bydo.png`, `sprites/missile.png`, `sprites/ship.png` | — | Provided with the Epitech R-Type subject | Educational use only (R-Type is a trademark of its owners) |

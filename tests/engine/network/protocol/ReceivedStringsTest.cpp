@@ -91,6 +91,27 @@ Message snapshot_of(std::uint16_t first_type, std::uint16_t second_type) {
                      EntityState{.entity_id = 2, .type_id = second_type, .fields = {}}}};
 }
 
+struct Effect {
+    std::string path;
+};
+
+engine::core::FieldRegistry effect_fields() {
+    engine::core::FieldRegistry registry;
+    registry.add<Effect>("Effect", {engine::core::asset_field<&Effect::path>(
+                                       "path", engine::core::field_flags::replicated,
+                                       engine::core::AssetType::Shader)});
+    return registry;
+}
+
+ConnectAcceptPayload accept_with_effect() {
+    return ConnectAcceptPayload{
+        .strings = payload_samples::strings_of(
+            {{.category = StringCategory::type, .id = player_type, .name = "player"},
+             {.category = StringCategory::field, .id = pos_field, .name = "Effect.path"},
+             {.category = StringCategory::texture, .id = 4, .name = "ship.png"},
+             {.category = StringCategory::shader, .id = 7, .name = "shaders/space"}})};
+}
+
 class ReceivedStrings : public testing::Test {
 protected:
     void expect_dropped_and_logged(const Message& message, const std::string& expected) {
@@ -273,4 +294,23 @@ TEST_F(ReceivedStrings, DropsSnapshotWithAnUnknownTextureId) {
     EXPECT_FALSE(skin_table.admits(skin_snapshot(1)));
     ASSERT_EQ(sink->records().size(), 1U);
     EXPECT_NE(sink->records().front().message.find("unknown texture id 1"), std::string::npos);
+}
+
+TEST_F(ReceivedStrings, AdmitsSnapshotWithAKnownShaderId) {
+    const engine::core::FieldRegistry effects = effect_fields();
+    engine::network::ReceivedStrings effect_table{effects};
+    ASSERT_TRUE(effect_table.assign(accept_with_effect()));
+
+    EXPECT_TRUE(effect_table.admits(skin_snapshot(7)));
+    EXPECT_TRUE(sink->records().empty());
+}
+
+TEST_F(ReceivedStrings, DropsSnapshotWhoseShaderIdOnlyNamesATexture) {
+    const engine::core::FieldRegistry effects = effect_fields();
+    engine::network::ReceivedStrings effect_table{effects};
+    ASSERT_TRUE(effect_table.assign(accept_with_effect()));
+
+    EXPECT_FALSE(effect_table.admits(skin_snapshot(4)));
+    ASSERT_EQ(sink->records().size(), 1U);
+    EXPECT_NE(sink->records().front().message.find("unknown shader id 4"), std::string::npos);
 }

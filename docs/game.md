@@ -73,6 +73,11 @@ The `sprite` of each entity declaration is a path under `assets/` and is
 declared as a texture automatically; a script that switches an entity to
 another image declares it first with `textures { ... }`.
 
+The background is the `space` entity (`world/space.lua`), spawned first so it
+is drawn behind everything: a black square scaled to the whole screen and drawn
+through `assets/shaders/space.fs`, a fragment shader painting a drifting nebula
+and three parallax layers of twinkling stars scrolling left with `time`.
+
 ## Scripts
 
 ```
@@ -84,6 +89,7 @@ game/scripts/
 ├── enemies/bydo.lua      entity "bydo": flies left, shoots after 0.8 s then every 2.5 s
 ├── enemies/bydo_shot.lua entity "bydo_shot": flies left, destroys the ship it hits
 ├── enemies/spawner.lua   entity "bydo_spawner": one Bydo every 1.5 s at a random height
+├── world/space.lua       entity "space": the background, drawn through shaders/space
 └── lib/                  config.lua (every tunable value), roster.lua (groups), controls.lua (key bindings)
 ```
 

@@ -15,16 +15,21 @@ SnapshotView::SnapshotView(graphics::IRenderer& renderer, const std::filesystem:
     : _fields(fields), _draw(renderer, assets) {
     _world.register_component<core::Position>();
     _world.register_component<core::Sprite>();
+    _world.register_component<core::Shader>();
     _world.register_component<core::Rotation>();
     _world.register_component<core::Scale>();
 }
 
-void SnapshotView::draw(const std::vector<network::EntitySnapshot>& entities) {
+void SnapshotView::draw(const std::vector<network::EntitySnapshot>& entities, float seconds) {
     mirror(entities);
-    _draw.draw(_world);
+    _draw.draw(_world, seconds);
 }
 
 bool SnapshotView::preload_texture(const std::string& texture) { return _draw.preload(texture); }
+
+bool SnapshotView::preload_shader(const std::string& shader) {
+    return _draw.preload_shader(shader);
+}
 
 void SnapshotView::mirror(const std::vector<network::EntitySnapshot>& entities) {
     for (const auto entity : _mirrored) {

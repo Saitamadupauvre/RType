@@ -9,6 +9,7 @@
 #include <system_error>
 #include <vector>
 
+#include "../graphics/fixtures/NullRenderer.hpp"
 #include "engine/app/ClientApp.hpp"
 #include "engine/app/ServerApp.hpp"
 #include "engine/audio/IAudio.hpp"
@@ -40,7 +41,7 @@ namespace {
 const std::filesystem::path game = std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "game";
 constexpr int session_frames = 10;
 
-class FakeRenderer final : public engine::graphics::IRenderer {
+class FakeRenderer final : public fixture::NullRenderer {
 public:
     bool open(const engine::graphics::WindowConfig& config) override {
         title = config.title;
@@ -49,8 +50,6 @@ public:
     }
     void close() override { is_open = false; }
     [[nodiscard]] bool should_close() const override { return frames >= close_after; }
-    void set_fullscreen(bool) override {}
-    [[nodiscard]] Vec2 virtual_size() const override { return {1920, 1080}; }
     [[nodiscard]] TextureId load_texture(const std::string& path) override {
         loaded.push_back(path);
         if (on_load) {
@@ -58,7 +57,6 @@ public:
         }
         return path.ends_with("missing.png") ? TextureId{} : TextureId{.value = 1};
     }
-    void unload_texture(TextureId) override {}
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {8, 8}; }
     void begin_frame(Color) override {
         sprites.clear();
@@ -79,11 +77,7 @@ public:
         sprites.push_back(sprite);
         sprites_in_world.push_back(in_world);
     }
-    void draw_rect(const Rect&, Color, bool) override {}
-    void draw_circle(Vec2, float, Color) override {}
-    void draw_line(Vec2, Vec2, float, Color) override {}
     void draw_text(const std::string& text, Vec2, float, Color) override { texts.push_back(text); }
-    [[nodiscard]] Vec2 measure_text(const std::string&, float) const override { return {}; }
 
     bool open_succeeds{true};
     bool is_open{false};

@@ -93,10 +93,30 @@ engine_add_plugin(graphics-raylib
 | `src/RaylibRenderer.*` | Window, textures (a magenta checkerboard replaces a missing file), drawing in 1920 × 1080 virtual units |
 | `src/Letterbox.*` | Scales the virtual screen to the window with black bars (static library, tested without Raylib) |
 | `src/RaylibInput.*`, `src/KeyMap.*` | Engine `Key` ↔ Raylib key codes (tested without Raylib) |
-| `src/TextureTable.hpp` | Texture ids, placeholder for missing files |
+| `src/HandleTable.hpp` | Texture, render target and shader ids (tested without Raylib) |
+| `src/TargetSource.hpp` | Source rectangle that draws a render texture upright (tested without Raylib) |
+| `src/UniformLocations.hpp` | Caches each uniform location per shader, missing ones included (tested without Raylib) |
 
 The window is resizable; `Esc` does not close it (`SetExitKey(KEY_NULL)`), so
 the key stays free for the game.
+
+Render targets and shaders (plugin API version 6):
+
+- The frame itself is drawn into a 1920 × 1080 `RenderTexture2D` that is
+  letterboxed in `end_frame()`. Raylib cannot nest texture modes, so
+  `begin_target` leaves the frame texture for the target's one and
+  `end_target` goes back to it.
+- `create_render_target` wraps `LoadRenderTexture`. Its color texture gets a
+  `TextureId` in the same table as loaded textures, so `draw_sprite` and
+  `set_uniform` take it like any texture; `draw_sprite` flips its source
+  rectangle because OpenGL stores render textures upside down.
+- `load_shader` checks that each given file exists, then calls `LoadShader`.
+  Raylib returns its default shader, or an invalid one, when a stage does not
+  compile or the program does not link: the plugin treats both as a failure,
+  logs it and returns the default `ShaderId`.
+- `set_uniform` flushes the pending batch, so draw calls made before it keep
+  the previous value, then calls `SetShaderValue` / `SetShaderValueTexture`.
+  Locations come from `GetShaderLocation` once per name.
 
 ## audio-raylib
 
@@ -136,7 +156,8 @@ window, so the two copies never share state.
 - Draw calls between `begin_world(view)` and `end_world()` are in world units
   and go through the camera view; the Raylib plugin maps it to a `Camera2D`
   (`offset` = half the virtual size, `target` = view center). Outside, they are
-  in screen space.
+  in screen space. Inside a render target, the `offset` is half the target's
+  size.
 - Plugin loading is tested for both kinds: missing library, missing symbol,
   wrong API version, null backend, and the real Raylib plugin loaded without
   opening a window or an audio device.

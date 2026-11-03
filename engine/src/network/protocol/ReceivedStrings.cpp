@@ -37,13 +37,15 @@ bool admits_type_ids(const ReceivedStrings& table, std::string_view message_name
     return true;
 }
 
-bool names_known_texture(const ReceivedStrings& table, const FieldState& state) {
+bool names_known_asset(const ReceivedStrings& table, const FieldState& state,
+                       core::AssetType type) {
     const auto* asset = std::get_if<AssetId>(&state.value);
     if (asset == nullptr || asset->value == no_asset ||
-        table.names().name_of(StringCategory::texture, asset->value) != nullptr) {
+        table.names().name_of(asset_category(type), asset->value) != nullptr) {
         return true;
     }
-    core::log::warn("network: dropped snapshot with unknown texture id {}", asset->value);
+    core::log::warn("network: dropped snapshot with unknown {} id {}",
+                    type == core::AssetType::Shader ? "shader" : "texture", asset->value);
     return false;
 }
 
@@ -59,7 +61,7 @@ bool admits_field(const ReceivedStrings& table, const FieldState& state) {
                         core::field_kind_name(kind_of(state.value)));
         return false;
     }
-    return names_known_texture(table, state);
+    return names_known_asset(table, state, field.field->asset_type());
 }
 
 bool admits_message(const ReceivedStrings& table, const SnapshotPayload& snapshot) {

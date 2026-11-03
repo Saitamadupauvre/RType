@@ -7,13 +7,14 @@
 #include "engine/core/Vec2.hpp"
 #include "engine/graphics/IGraphicsBackend.hpp"
 #include "engine/graphics/PluginApi.hpp"
+#include "fixtures/NullRenderer.hpp"
 
 using namespace engine::graphics;
 using namespace engine::core;
 
 namespace {
 
-class FakeRenderer final : public IRenderer {
+class FakeRenderer final : public fixture::NullRenderer {
 public:
     bool open(const WindowConfig& config) override {
         _open = config.width > 0 && config.height > 0;
@@ -22,20 +23,8 @@ public:
     void close() override { _open = false; }
     [[nodiscard]] bool should_close() const override { return !_open; }
     void set_fullscreen(bool enabled) override { fullscreen = enabled; }
-    [[nodiscard]] Vec2 virtual_size() const override { return {1920, 1080}; }
-    [[nodiscard]] TextureId load_texture(const std::string&) override { return {}; }
-    void unload_texture(TextureId) override {}
-    [[nodiscard]] Vec2 texture_size(TextureId) const override { return {}; }
     void begin_frame(Color clear) override { last_clear = clear; }
     void end_frame() override { ++frames; }
-    void begin_world(const engine::core::CameraView&) override {}
-    void end_world() override {}
-    void draw_sprite(const SpriteDraw&) override {}
-    void draw_rect(const Rect&, Color, bool) override {}
-    void draw_circle(Vec2, float, Color) override {}
-    void draw_line(Vec2, Vec2, float, Color) override {}
-    void draw_text(const std::string&, Vec2, float, Color) override {}
-    [[nodiscard]] Vec2 measure_text(const std::string&, float) const override { return {}; }
 
     bool fullscreen{false};
     engine::graphics::Color last_clear{};

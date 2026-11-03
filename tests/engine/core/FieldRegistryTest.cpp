@@ -576,3 +576,49 @@ TEST(RequiredComponents, UnregisteredRequirementThrowsAndChangesNothing) {
                  engine::core::ComponentNotRegistered);
     EXPECT_FALSE(world.has<Hull>(entity));
 }
+
+TEST(CoreFields, RegistersTheShaderPathAsAReplicatedShaderAsset) {
+    FieldRegistry registry;
+    engine::core::register_core_fields(registry);
+
+    const FieldRef path = registry.find_field("Shader", "path");
+    ASSERT_TRUE(path);
+    EXPECT_EQ(path.field->kind(), FieldKind::Asset);
+    EXPECT_EQ(path.field->asset_type(), engine::core::AssetType::Shader);
+    EXPECT_EQ(path.field->flags(), (FieldFlags{.replicated = true, .editable = true}));
+}
+
+TEST(CoreFields, KeepsTheSpritePathATextureAsset) {
+    FieldRegistry registry;
+    engine::core::register_core_fields(registry);
+
+    EXPECT_EQ(registry.find_field("Sprite", "path").field->asset_type(),
+              engine::core::AssetType::Texture);
+}
+
+TEST(FieldRegistry, AssetFieldsNameTexturesByDefault) {
+    const FieldDescriptor field = engine::core::asset_field<&Sample::icon>("icon");
+
+    EXPECT_EQ(field.asset_type(), engine::core::AssetType::Texture);
+}
+
+TEST(FieldRegistry, AssetFieldsKeepTheirAssetType) {
+    const FieldDescriptor field =
+        engine::core::asset_field<&Sample::icon>("icon", {}, engine::core::AssetType::Shader);
+
+    EXPECT_EQ(field.asset_type(), engine::core::AssetType::Shader);
+}
+
+TEST(FieldRegistry, ShaderPathRoundTripsThroughTheRegistry) {
+    FieldRegistry registry;
+    engine::core::register_core_fields(registry);
+    EntityManager world;
+    world.register_component<engine::core::Shader>();
+    const Entity entity = world.spawn();
+
+    registry.set(world, entity, "Shader", "path", AssetName{"shaders/space"});
+
+    EXPECT_EQ(world.get<engine::core::Shader>(entity).path, "shaders/space");
+    EXPECT_EQ(registry.get(world, entity, "Shader", "path"),
+              FieldValue{AssetName{"shaders/space"}});
+}

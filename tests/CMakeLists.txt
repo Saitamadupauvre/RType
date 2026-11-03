@@ -40,6 +40,7 @@ engine_add_test(script SOURCES
     engine/script/CameraApiTest.cpp
     engine/script/ClientApiTest.cpp
     engine/script/ScriptRuntimeTest.cpp
+    engine/script/assets/ShadersTest.cpp
     engine/script/assets/TexturesTest.cpp
     engine/script/audio/AudioTest.cpp
     engine/script/entity/CameraFieldsTest.cpp
@@ -115,6 +116,7 @@ engine_add_test(app SOURCES
     engine/app/ClientAppTest.cpp
     engine/app/LoadingScreenTest.cpp
     engine/app/ServerAppTest.cpp
+    engine/app/ShaderLibraryTest.cpp
     engine/app/SnapshotViewTest.cpp
     engine/app/WorldDrawTest.cpp
 )
@@ -190,8 +192,10 @@ plugin_add_test(graphics-raylib
     SOURCES
         plugins/graphics-raylib/LetterboxTest.cpp
         plugins/graphics-raylib/KeyMapTest.cpp
-        plugins/graphics-raylib/TextureTableTest.cpp
-    LINKS graphics-raylib-letterbox graphics-raylib-keymap graphics-raylib-textures
+        plugins/graphics-raylib/HandleTableTest.cpp
+        plugins/graphics-raylib/TargetSourceTest.cpp
+        plugins/graphics-raylib/UniformLocationsTest.cpp
+    LINKS graphics-raylib-letterbox graphics-raylib-keymap graphics-raylib-handles
 )
 
 plugin_add_test(audio-raylib

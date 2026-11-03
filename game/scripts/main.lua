@@ -9,6 +9,7 @@ end
 
 server = {
     on_start = function()
+        spawn("space")
         spawn("game")
         music("bit_space.mp3")
     end,

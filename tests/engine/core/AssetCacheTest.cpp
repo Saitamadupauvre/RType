@@ -14,7 +14,7 @@
 using engine::core::AssetCache;
 using engine::core::is_valid_asset_name;
 using engine::core::max_asset_name_length;
-namespace log = engine::core::log;
+namespace logger = engine::core::log;
 
 namespace {
 
@@ -42,10 +42,10 @@ AssetCache<TestId> cache_over(FakeBackend& backend) {
             [&backend](TestId id) { backend.unloaded.push_back(id.value); }};
 }
 
-std::size_t warnings_in(const log::MemorySink& sink) {
+std::size_t warnings_in(const logger::MemorySink& sink) {
     std::size_t count = 0;
     for (const auto& record : sink.records()) {
-        count += record.level == log::Level::Warn ? 1 : 0;
+        count += record.level == logger::Level::Warn ? 1 : 0;
     }
     return count;
 }
@@ -83,8 +83,8 @@ TEST(AssetCache, ResolvesNamesInsideTheFolder) {
 TEST(AssetCache, ReturnsThePlaceholderAndNeverRetriesAFailedLoad) {
     FakeBackend backend;
     auto cache = cache_over(backend);
-    auto sink = std::make_shared<log::MemorySink>();
-    const log::ScopedSink scope(sink, log::Level::Trace);
+    auto sink = std::make_shared<logger::MemorySink>();
+    const logger::ScopedSink scope(sink, logger::Level::Trace);
 
     EXPECT_EQ(cache.get("missing.png"), TestId{});
     EXPECT_EQ(cache.get("missing.png"), TestId{});
@@ -96,8 +96,8 @@ TEST(AssetCache, ReturnsThePlaceholderAndNeverRetriesAFailedLoad) {
 TEST(AssetCache, RejectsAnInvalidNameWithoutLoadingIt) {
     FakeBackend backend;
     auto cache = cache_over(backend);
-    auto sink = std::make_shared<log::MemorySink>();
-    const log::ScopedSink scope(sink, log::Level::Trace);
+    auto sink = std::make_shared<logger::MemorySink>();
+    const logger::ScopedSink scope(sink, logger::Level::Trace);
 
     EXPECT_EQ(cache.get("../secret.png"), TestId{});
     EXPECT_EQ(cache.get("../secret.png"), TestId{});
