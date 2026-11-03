@@ -335,6 +335,16 @@ TEST(ServerApp, StringTableListsDeclaredTexturesAndEntitySpritesInOrder) {
                   {.category = StringCategory::texture, .id = 2, .name = "sprites/shot.png"}}));
 }
 
+TEST(ServerApp, StringTableListsDeclaredShadersAndEntityShadersInOrder) {
+    const Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "shaders");
+
+    EXPECT_EQ(server.app.strings().entries(StringCategory::shader),
+              (std::vector<StringEntry>{
+                  {.category = StringCategory::shader, .id = 1, .name = "shaders/space"},
+                  {.category = StringCategory::shader, .id = 2, .name = "shaders/wave"}}));
+    EXPECT_TRUE(server.app.strings().entries(StringCategory::texture).empty());
+}
+
 TEST(ServerApp, TickPublishesTheMusicStartedByOnStart) {
     Server server(audio_scripts);
     ServerApp& app = server.app;
