@@ -1,35 +1,26 @@
 #pragma once
 
-#include <filesystem>
-#include <string>
 #include <vector>
 
-#include "WorldDraw.hpp"
 #include "engine/app/Export.hpp"
 #include "engine/core/Entity.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/FieldRegistry.hpp"
-#include "engine/graphics/IRenderer.hpp"
 #include "engine/network/Client.hpp"
 
 namespace engine::app {
 
 class ENGINE_APP_EXPORT SnapshotView {
 public:
-    SnapshotView(graphics::IRenderer& renderer, const std::filesystem::path& assets,
-                 const core::FieldRegistry& fields);
+    explicit SnapshotView(const core::FieldRegistry& fields);
 
-    void draw(const std::vector<network::EntitySnapshot>& entities, float seconds);
-    bool preload_texture(const std::string& texture);
-    bool preload_shader(const std::string& shader);
+    core::EntityManager& mirror(const std::vector<network::EntitySnapshot>& entities);
 
 private:
-    void mirror(const std::vector<network::EntitySnapshot>& entities);
     void apply(core::Entity entity, const network::EntitySnapshot& snapshot);
 
     const core::FieldRegistry& _fields;
     core::EntityManager _world;
-    WorldDraw _draw;
     std::vector<core::Entity> _mirrored;
 };
 

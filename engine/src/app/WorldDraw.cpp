@@ -1,6 +1,7 @@
 #include "WorldDraw.hpp"
 
 #include <cmath>
+#include <string>
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
@@ -24,21 +25,9 @@ float mirrored(float length, float factor) { return std::signbit(factor) ? -leng
 
 } // namespace
 
-WorldDraw::WorldDraw(graphics::IRenderer& renderer, const std::filesystem::path& assets)
-    : _renderer(renderer),
-      _textures(
-          assets,
-          [&renderer](const std::filesystem::path& path) {
-              return renderer.load_texture(path.string());
-          },
-          [&renderer](graphics::TextureId texture) { renderer.unload_texture(texture); }),
-      _shaders(renderer, assets) {}
-
-bool WorldDraw::preload(const std::string& texture) {
-    return _textures.get(texture) != graphics::TextureId{};
-}
-
-bool WorldDraw::preload_shader(const std::string& shader) { return _shaders.preload(shader); }
+WorldDraw::WorldDraw(graphics::IRenderer& renderer, TextureLibrary& textures,
+                     ShaderLibrary& shaders)
+    : _renderer(renderer), _textures(textures), _shaders(shaders) {}
 
 void WorldDraw::draw(core::EntityManager& world, float seconds) {
     world.query<core::Position, core::Sprite>().each(

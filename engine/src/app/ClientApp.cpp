@@ -12,7 +12,10 @@
 #include "CameraRig.hpp"
 #include "Fields.hpp"
 #include "LoadingScreen.hpp"
+#include "ShaderLibrary.hpp"
 #include "SnapshotView.hpp"
+#include "TextureLibrary.hpp"
+#include "WorldDraw.hpp"
 #include "engine/core/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/log/Log.hpp"
@@ -65,6 +68,9 @@ struct ClientApp::Impl {
     script::ScriptRuntime runtime;
     script::ClientApi& client;
     AudioPlayer sound;
+    TextureLibrary textures;
+    ShaderLibrary shaders;
+    WorldDraw world_draw;
     SnapshotView view;
     std::reference_wrapper<const core::time::IClock> time_source;
     core::time::Duration started_at;
@@ -96,7 +102,9 @@ ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport&
     : renderer(window), input(keys), audio(speakers), options(std::move(settings)),
       fields(replicated_fields()), network(clock, events, fields, transport),
       runtime(load_game(options.scripts)), client(runtime.api<script::ClientApi>()),
-      sound(speakers, options.assets), view(window, options.assets, fields), time_source(clock),
+      sound(speakers, options.assets), textures(window, options.assets),
+      shaders(window, options.assets), world_draw(window, textures, shaders), view(fields),
+      time_source(clock),
       started_at(clock.now()), loop(clock) {
     client.set_audio_settings(options.audio);
     events.subscribe<network::SoundPlayed>([this](const network::SoundPlayed& played) {
@@ -156,9 +164,9 @@ void ClientApp::Impl::queue_preload() {
     preload_queued = true;
     const auto strings = network.strings();
     add_all(preloader, strings, network::StringCategory::texture,
-            [this](const std::string& name) { return view.preload_texture(name); });
+            [this](const std::string& name) { return textures.preload(name); });
     add_all(preloader, strings, network::StringCategory::shader,
-            [this](const std::string& name) { return view.preload_shader(name); });
+            [this](const std::string& name) { return shaders.preload(name); });
     add_all(preloader, strings, network::StringCategory::sound,
             [this](const std::string& name) { return sound.preload_sound(name); });
     add_all(preloader, strings, network::StringCategory::music,
@@ -195,7 +203,8 @@ void ClientApp::Impl::draw_world(const std::vector<network::EntitySnapshot>& ent
     const core::CameraView camera = resolve_camera(entities, client.camera_override(), viewport);
     client.set_camera_view(camera, viewport);
     renderer.get().begin_world(camera);
-    view.draw(entities, std::chrono::duration<float>(time_source.get().now() - started_at).count());
+    world_draw.draw(view.mirror(entities),
+                    std::chrono::duration<float>(time_source.get().now() - started_at).count());
     renderer.get().end_world();
 }
 

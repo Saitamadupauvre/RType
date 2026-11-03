@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "../graphics/fixtures/NullRenderer.hpp"
+#include "ShaderLibrary.hpp"
+#include "TextureLibrary.hpp"
 #include "WorldDraw.hpp"
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/Components.hpp"
@@ -60,6 +62,22 @@ void register_components(EntityManager& world) {
     world.register_component<Scale>();
 }
 
+class Painter {
+public:
+    Painter(engine::graphics::IRenderer& renderer, const std::filesystem::path& assets)
+        : _textures(renderer, assets), _shaders(renderer, assets),
+          _draw(renderer, _textures, _shaders) {}
+
+    void draw(EntityManager& world, float seconds) { _draw.draw(world, seconds); }
+    bool preload(const std::string& texture) { return _textures.preload(texture); }
+    bool preload_shader(const std::string& shader) { return _shaders.preload(shader); }
+
+private:
+    engine::app::TextureLibrary _textures;
+    engine::app::ShaderLibrary _shaders;
+    WorldDraw _draw;
+};
+
 Entity spawn(EntityManager& world, Vec2 position, Sprite sprite) {
     const auto entity = world.spawn();
     world.add<Position>(entity, position);
@@ -76,7 +94,7 @@ TEST(WorldDraw, DrawsSpriteAtEntityPositionWithTextureSize) {
     spawn(world, {100, 50},
           {.path = "ship.png", .color = Rgba{.r = 10, .g = 20, .b = 30, .a = 40}});
 
-    WorldDraw(renderer, "assets").draw(world, 0.F);
+    Painter(renderer, "assets").draw(world, 0.F);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     const SpriteDraw& drawn = renderer.sprites.front();
@@ -94,7 +112,7 @@ TEST(WorldDraw, LoadsTexturesFromTheAssetsFolder) {
     register_components(world);
     spawn(world, {}, {.path = "ship.png", .color = {}});
 
-    WorldDraw(renderer, "assets").draw(world, 0.F);
+    Painter(renderer, "assets").draw(world, 0.F);
 
     ASSERT_EQ(renderer.loaded.size(), 1U);
     EXPECT_EQ(renderer.loaded.front(), (std::filesystem::path("assets") / "ship.png").string());
@@ -106,7 +124,7 @@ TEST(WorldDraw, LoadsEachTextureOnce) {
     register_components(world);
     spawn(world, {}, {.path = "ship.png", .color = {}});
     spawn(world, {10, 10}, {.path = "ship.png", .color = {}});
-    WorldDraw draw(renderer, "assets");
+    Painter draw(renderer, "assets");
 
     draw.draw(world, 0.F);
     draw.draw(world, 0.F);
@@ -120,7 +138,7 @@ TEST(WorldDraw, MissingTextureIsDrawnAsPlaceholderAndNotReloaded) {
     EntityManager world;
     register_components(world);
     spawn(world, {5, 5}, {.path = "missing.png", .color = {}});
-    WorldDraw draw(renderer, "assets");
+    Painter draw(renderer, "assets");
 
     draw.draw(world, 0.F);
     draw.draw(world, 0.F);
@@ -137,7 +155,7 @@ TEST(WorldDraw, SpriteWithoutPathIsAColoredSquare) {
     register_components(world);
     spawn(world, {3, 4}, {.path = "", .color = Rgba{.r = 255, .g = 0, .b = 0, .a = 255}});
 
-    WorldDraw(renderer, "assets").draw(world, 0.F);
+    Painter(renderer, "assets").draw(world, 0.F);
 
     EXPECT_TRUE(renderer.loaded.empty());
     EXPECT_TRUE(renderer.sprites.empty());
@@ -152,7 +170,7 @@ TEST(WorldDraw, EntityWithoutSpriteIsNotDrawn) {
     register_components(world);
     world.add<Position>(world.spawn(), Vec2{1, 1});
 
-    WorldDraw(renderer, "assets").draw(world, 0.F);
+    Painter(renderer, "assets").draw(world, 0.F);
 
     EXPECT_TRUE(renderer.sprites.empty());
     EXPECT_TRUE(renderer.rects.empty());
@@ -163,7 +181,7 @@ TEST(WorldDraw, PreloadedTextureIsNotLoadedAgainWhenDrawn) {
     EntityManager world;
     register_components(world);
     spawn(world, {}, {.path = "ship.png", .color = {}});
-    WorldDraw draw(renderer, "assets");
+    Painter draw(renderer, "assets");
 
     EXPECT_TRUE(draw.preload("ship.png"));
     draw.draw(world, 0.F);
@@ -175,7 +193,7 @@ TEST(WorldDraw, PreloadedTextureIsNotLoadedAgainWhenDrawn) {
 
 TEST(WorldDraw, PreloadReportsAMissingOrRejectedTexture) {
     RecordingRenderer renderer;
-    WorldDraw draw(renderer, "assets");
+    Painter draw(renderer, "assets");
 
     EXPECT_FALSE(draw.preload("missing.png"));
     EXPECT_FALSE(draw.preload("../secret.png"));
@@ -191,7 +209,7 @@ TEST(WorldDraw, WorksWhenRotationAndScaleAreNotRegistered) {
     world.register_component<Sprite>();
     spawn(world, {100, 50}, {.path = "ship.png", .color = {}});
 
-    WorldDraw(renderer, "assets").draw(world, 0.F);
+    Painter(renderer, "assets").draw(world, 0.F);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_EQ(renderer.sprites.front().dest, (Rect{.x = 120, .y = 60, .width = 40, .height = 20}));
@@ -204,7 +222,7 @@ TEST(WorldDraw, ScaleMultipliesTheDrawnSizeFromTheTopLeftCorner) {
     const Entity entity = spawn(world, {100, 50}, {.path = "ship.png", .color = {}});
     world.add(entity, Scale{.factor = {2, 3}});
 
-    WorldDraw(renderer, "assets").draw(world, 0.F);
+    Painter(renderer, "assets").draw(world, 0.F);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     const SpriteDraw& drawn = renderer.sprites.front();
@@ -220,7 +238,7 @@ TEST(WorldDraw, NegativeScaleMirrorsTheSourceAndKeepsAPositiveSize) {
     const Entity entity = spawn(world, {0, 0}, {.path = "ship.png", .color = {}});
     world.add(entity, Scale{.factor = {-1, -2}});
 
-    WorldDraw(renderer, "assets").draw(world, 0.F);
+    Painter(renderer, "assets").draw(world, 0.F);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     const SpriteDraw& drawn = renderer.sprites.front();
@@ -235,7 +253,7 @@ TEST(WorldDraw, RotationIsPassedThroughAroundTheSpriteCenter) {
     const Entity entity = spawn(world, {10, 10}, {.path = "ship.png", .color = {}});
     world.add(entity, Rotation{.degrees = 90});
 
-    WorldDraw(renderer, "assets").draw(world, 0.F);
+    Painter(renderer, "assets").draw(world, 0.F);
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     const SpriteDraw& drawn = renderer.sprites.front();
@@ -252,7 +270,7 @@ TEST(WorldDraw, ColoredSquareIsScaledButNotRotated) {
     world.add(entity, Scale{.factor = {-0.5F, 2}});
     world.add(entity, Rotation{.degrees = 45});
 
-    WorldDraw(renderer, "assets").draw(world, 0.F);
+    Painter(renderer, "assets").draw(world, 0.F);
 
     ASSERT_EQ(renderer.rects.size(), 1U);
     EXPECT_EQ(renderer.rects.front(), (Rect{.x = 3, .y = 4, .width = 32, .height = 128}));
@@ -306,7 +324,7 @@ TEST(WorldDraw, DrawsAnEntityThroughItsShaderWithTimeAndResolution) {
     const Entity backdrop = spawn(world, {}, {.path = "", .color = {}});
     world.add<Shader>(backdrop, Shader{.path = "shaders/tint"});
 
-    WorldDraw(renderer, shader_assets).draw(world, 12.F);
+    Painter(renderer, shader_assets).draw(world, 12.F);
 
     EXPECT_EQ(renderer.calls,
               (std::vector<std::string>{"uniform time 12", "uniform resolution 1920x1080",
@@ -320,7 +338,7 @@ TEST(WorldDraw, OnlyTheEntityWithAShaderIsDrawnThroughIt) {
     world.add<Shader>(backdrop, Shader{.path = "shaders/tint"});
     spawn(world, {}, {.path = "ship.png", .color = {}});
 
-    WorldDraw(renderer, shader_assets).draw(world, 0.F);
+    Painter(renderer, shader_assets).draw(world, 0.F);
 
     EXPECT_EQ(renderer.calls.back(), "sprite");
     EXPECT_EQ(std::ranges::count(renderer.calls, "begin_shader 3"), 1);
@@ -333,7 +351,7 @@ TEST(WorldDraw, AnEmptyShaderPathDrawsWithoutAShader) {
     const Entity entity = spawn(world, {}, {.path = "", .color = {}});
     world.add<Shader>(entity, Shader{});
 
-    WorldDraw(renderer, shader_assets).draw(world, 0.F);
+    Painter(renderer, shader_assets).draw(world, 0.F);
 
     EXPECT_EQ(renderer.calls, (std::vector<std::string>{"rect"}));
     EXPECT_EQ(renderer.shader_loads, 0);
@@ -344,7 +362,7 @@ TEST(WorldDraw, AMissingShaderIsLoadedOnceAndTheEntityIsStillDrawn) {
     EntityManager world = world_with_shaders();
     const Entity entity = spawn(world, {}, {.path = "", .color = {}});
     world.add<Shader>(entity, Shader{.path = "shaders/missing"});
-    WorldDraw draw(renderer, shader_assets);
+    Painter draw(renderer, shader_assets);
 
     draw.draw(world, 0.F);
     draw.draw(world, 1.F);
@@ -358,7 +376,7 @@ TEST(WorldDraw, PreloadedShaderIsNotLoadedAgainWhenDrawn) {
     EntityManager world = world_with_shaders();
     const Entity entity = spawn(world, {}, {.path = "", .color = {}});
     world.add<Shader>(entity, Shader{.path = "shaders/tint"});
-    WorldDraw draw(renderer, shader_assets);
+    Painter draw(renderer, shader_assets);
 
     EXPECT_TRUE(draw.preload_shader("shaders/tint"));
     EXPECT_FALSE(draw.preload_shader("shaders/missing"));

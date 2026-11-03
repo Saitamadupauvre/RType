@@ -9,7 +9,10 @@
 
 #include "../graphics/fixtures/NullRenderer.hpp"
 #include "Fields.hpp"
+#include "ShaderLibrary.hpp"
 #include "SnapshotView.hpp"
+#include "TextureLibrary.hpp"
+#include "WorldDraw.hpp"
 #include "engine/graphics/IRenderer.hpp"
 #include "engine/network/Client.hpp"
 
@@ -66,13 +69,32 @@ EntitySnapshot entity(std::string sprite, float x, std::int64_t owner) {
                        value_of("Sprite", "color", Rgba{.r = 10, .g = 20, .b = 30, .a = 255})}};
 }
 
+class Screen {
+public:
+    Screen()
+        : _textures(renderer, "assets"), _shaders(renderer, "assets"),
+          _draw(renderer, _textures, _shaders), _view(fields) {}
+
+    void show(const std::vector<EntitySnapshot>& entities) {
+        _draw.draw(_view.mirror(entities), 0.F);
+    }
+
+    RecordingRenderer renderer;
+
+private:
+    engine::app::TextureLibrary _textures;
+    engine::app::ShaderLibrary _shaders;
+    engine::app::WorldDraw _draw;
+    SnapshotView _view;
+};
+
 } // namespace
 
 TEST(SnapshotView, DrawsEachEntityWithItsReplicatedSpriteAndColor) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
+    Screen screen;
+    RecordingRenderer& renderer = screen.renderer;
 
-    view.draw({entity("sprites/boss/core.png", 5.F, 2)}, 0.F);
+    screen.show({entity("sprites/boss/core.png", 5.F, 2)});
 
     ASSERT_EQ(renderer.loaded.size(), 1U);
     EXPECT_EQ(renderer.loaded.front(),
@@ -83,10 +105,10 @@ TEST(SnapshotView, DrawsEachEntityWithItsReplicatedSpriteAndColor) {
 }
 
 TEST(SnapshotView, EntityWithoutSpriteIsAColoredSquare) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
+    Screen screen;
+    RecordingRenderer& renderer = screen.renderer;
 
-    view.draw({entity("", 5.F, 0)}, 0.F);
+    screen.show({entity("", 5.F, 0)});
 
     EXPECT_TRUE(renderer.loaded.empty());
     EXPECT_TRUE(renderer.sprites.empty());
@@ -95,62 +117,62 @@ TEST(SnapshotView, EntityWithoutSpriteIsAColoredSquare) {
 }
 
 TEST(SnapshotView, LoadsASpriteSharedByManyEntitiesOnce) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
+    Screen screen;
+    RecordingRenderer& renderer = screen.renderer;
 
-    view.draw({entity("sprites/ship.png", 5.F, 0), entity("sprites/ship.png", 50.F, 0)}, 0.F);
-    view.draw({entity("sprites/ship.png", 90.F, 0)}, 0.F);
+    screen.show({entity("sprites/ship.png", 5.F, 0), entity("sprites/ship.png", 50.F, 0)});
+    screen.show({entity("sprites/ship.png", 90.F, 0)});
 
     EXPECT_EQ(renderer.loaded.size(), 1U);
     EXPECT_EQ(renderer.sprites.size(), 3U);
 }
 
 TEST(SnapshotView, DrawsOnlyTheNewestSnapshot) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
-    view.draw({entity("sprites/ship.png", 5.F, 0), entity("sprites/ship.png", 50.F, 0)}, 0.F);
+    Screen screen;
+    RecordingRenderer& renderer = screen.renderer;
+    screen.show({entity("sprites/ship.png", 5.F, 0), entity("sprites/ship.png", 50.F, 0)});
     renderer.sprites.clear();
 
-    view.draw({entity("sprites/ship.png", 90.F, 0)}, 0.F);
+    screen.show({entity("sprites/ship.png", 90.F, 0)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 90.F);
 }
 
 TEST(SnapshotView, EntityWithoutColorIsDrawnWhite) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
+    Screen screen;
+    RecordingRenderer& renderer = screen.renderer;
     const EntitySnapshot plain{
         .entity_id = 1,
         .type_id = ship_type,
         .fields = {value_of("Position", "pos", Vec2{5.F, 20.F}),
                    value_of("Sprite", "path", AssetName{"sprites/ship.png"})}};
 
-    view.draw({plain}, 0.F);
+    screen.show({plain});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_EQ(renderer.sprites.front().tint, (Color{.r = 255, .g = 255, .b = 255, .a = 255}));
 }
 
 TEST(SnapshotView, IgnoresFieldsOfComponentsItDoesNotDraw) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
+    Screen screen;
+    RecordingRenderer& renderer = screen.renderer;
 
-    view.draw({entity("sprites/ship.png", 5.F, 1'000)}, 0.F);
+    screen.show({entity("sprites/ship.png", 5.F, 1'000)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 5.F);
 }
 
 TEST(SnapshotView, CameraEntitiesAreNotDrawn) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
+    Screen screen;
+    RecordingRenderer& renderer = screen.renderer;
     EntitySnapshot camera{
         .entity_id = 2,
         .type_id = ship_type,
         .fields = {value_of("Position", "pos", Vec2{5.F, 20.F}), value_of("Camera", "zoom", 1.F)}};
 
-    view.draw({camera, entity("sprites/ship.png", 40.F, 0)}, 0.F);
+    screen.show({camera, entity("sprites/ship.png", 40.F, 0)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_FLOAT_EQ(renderer.sprites.front().dest.x - renderer.sprites.front().origin.x, 40.F);
@@ -158,10 +180,10 @@ TEST(SnapshotView, CameraEntitiesAreNotDrawn) {
 }
 
 TEST(SnapshotView, EntityWithoutRotationOrScaleIsDrawnUpright) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
+    Screen screen;
+    RecordingRenderer& renderer = screen.renderer;
 
-    view.draw({entity("sprites/ship.png", 5.F, 0)}, 0.F);
+    screen.show({entity("sprites/ship.png", 5.F, 0)});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     EXPECT_EQ(renderer.sprites.front().rotation, 0.F);
@@ -170,14 +192,14 @@ TEST(SnapshotView, EntityWithoutRotationOrScaleIsDrawnUpright) {
 }
 
 TEST(SnapshotView, ReplicatedRotationAndScaleAreDrawn) {
-    RecordingRenderer renderer;
-    SnapshotView view(renderer, "assets", fields);
+    Screen screen;
+    RecordingRenderer& renderer = screen.renderer;
     EntitySnapshot turned = entity("sprites/ship.png", 5.F, 0);
     turned.fields.push_back(value_of("Rotation", "degrees", 30.F));
     turned.fields.push_back(value_of("Scale", "x", -2.F));
     turned.fields.push_back(value_of("Scale", "y", 0.5F));
 
-    view.draw({turned}, 0.F);
+    screen.show({turned});
 
     ASSERT_EQ(renderer.sprites.size(), 1U);
     const SpriteDraw& drawn = renderer.sprites.front();

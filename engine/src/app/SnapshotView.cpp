@@ -10,9 +10,7 @@
 
 namespace engine::app {
 
-SnapshotView::SnapshotView(graphics::IRenderer& renderer, const std::filesystem::path& assets,
-                           const core::FieldRegistry& fields)
-    : _fields(fields), _draw(renderer, assets) {
+SnapshotView::SnapshotView(const core::FieldRegistry& fields) : _fields(fields) {
     _world.register_component<core::Position>();
     _world.register_component<core::Sprite>();
     _world.register_component<core::Shader>();
@@ -20,18 +18,7 @@ SnapshotView::SnapshotView(graphics::IRenderer& renderer, const std::filesystem:
     _world.register_component<core::Scale>();
 }
 
-void SnapshotView::draw(const std::vector<network::EntitySnapshot>& entities, float seconds) {
-    mirror(entities);
-    _draw.draw(_world, seconds);
-}
-
-bool SnapshotView::preload_texture(const std::string& texture) { return _draw.preload(texture); }
-
-bool SnapshotView::preload_shader(const std::string& shader) {
-    return _draw.preload_shader(shader);
-}
-
-void SnapshotView::mirror(const std::vector<network::EntitySnapshot>& entities) {
+core::EntityManager& SnapshotView::mirror(const std::vector<network::EntitySnapshot>& entities) {
     for (const auto entity : _mirrored) {
         _world.kill(entity);
     }
@@ -45,6 +32,7 @@ void SnapshotView::mirror(const std::vector<network::EntitySnapshot>& entities) 
         apply(entity, snapshot);
         _mirrored.push_back(entity);
     }
+    return _world;
 }
 
 void SnapshotView::apply(core::Entity entity, const network::EntitySnapshot& snapshot) {

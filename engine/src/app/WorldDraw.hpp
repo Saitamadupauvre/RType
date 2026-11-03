@@ -1,11 +1,8 @@
 #pragma once
 
-#include <filesystem>
-#include <string>
-
 #include "ShaderLibrary.hpp"
+#include "TextureLibrary.hpp"
 #include "engine/app/Export.hpp"
-#include "engine/core/AssetCache.hpp"
 #include "engine/core/Components.hpp"
 #include "engine/core/EntityManager.hpp"
 #include "engine/core/Vec2.hpp"
@@ -15,11 +12,9 @@ namespace engine::app {
 
 class ENGINE_APP_EXPORT WorldDraw {
 public:
-    WorldDraw(graphics::IRenderer& renderer, const std::filesystem::path& assets);
+    WorldDraw(graphics::IRenderer& renderer, TextureLibrary& textures, ShaderLibrary& shaders);
 
     void draw(core::EntityManager& world, float seconds);
-    bool preload(const std::string& texture);
-    bool preload_shader(const std::string& shader);
 
 private:
     void draw_entity(core::EntityManager& world, core::Entity entity, core::Vec2 position,
@@ -31,8 +26,8 @@ private:
                       const core::Sprite& sprite);
 
     graphics::IRenderer& _renderer;
-    core::AssetCache<graphics::TextureId> _textures;
-    ShaderLibrary _shaders;
+    TextureLibrary& _textures;
+    ShaderLibrary& _shaders;
 };
 
 } // namespace engine::app

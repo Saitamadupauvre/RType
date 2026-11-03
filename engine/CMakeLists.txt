@@ -140,6 +140,7 @@ engine_add_module(app
         src/app/ServerApp.cpp
         src/app/ShaderLibrary.cpp
         src/app/SnapshotView.cpp
+        src/app/TextureLibrary.cpp
         src/app/WorldDraw.cpp
     DEPENDS engine::core engine::script engine::network engine::graphics engine::audio
     PRIVATE_DEPENDS engine::physics

@@ -125,6 +125,7 @@ engine_add_test(app SOURCES
     engine/app/ServerAppTest.cpp
     engine/app/ShaderLibraryTest.cpp
     engine/app/SnapshotViewTest.cpp
+    engine/app/TextureLibraryTest.cpp
     engine/app/WorldDrawTest.cpp
 )
 target_include_directories(engine_app_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/app")
