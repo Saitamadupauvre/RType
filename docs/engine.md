@@ -16,6 +16,7 @@ The [architecture](architecture.md) page shows how they fit together.
 | graphics | `engine::graphics` | core | — (backends are [plugins](plugins.md)) |
 | audio | `engine::audio` | core | — (backends are [plugins](plugins.md)) |
 | app | `engine::app` | core, script, network, graphics, audio (physics privately) | — |
+| editor | `engine::editor` | core, script | — |
 
 ### core
 
@@ -184,6 +185,16 @@ runs any game folder (`game.json`, `scripts/`, `scenes/` and `assets/`, see
 Its private helpers (`SnapshotView`, `WorldDraw`, `AudioPlayer`,
 `Collisions`) are tested in `tests/engine/app/`, with a fixture game in
 `tests/fixtures/app/game/` played over a `LoopbackNetwork`.
+
+### editor
+
+The editing model behind the editor front: `EditorSession` opens a game folder
+with the `editor` API set, holds the open scene as a `SceneDocument`, applies
+edits with undo and redo, and runs the scene commands; every command returns a
+`CommandResult`. Its edit world is built with
+`ScriptRuntime::preview_instances()`, which builds prototypes only, so no Lua
+callback runs. See [Editor backend](editor.md). Tested in
+`tests/engine/editor/` with the fixture game `tests/fixtures/editor/game/`.
 
 ## The contract
 

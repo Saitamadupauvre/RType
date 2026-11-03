@@ -276,6 +276,23 @@ engine::script::write_scene(game / "scenes" / "stage1.json", saved);
 | `ScriptRuntime::capture_instances()` | Turns the world back into instances. |
 | `ScriptRuntime::flush_scene()` | Applies a pending Lua `load_scene`; returns the scene name, or `std::nullopt` when none was requested. The server calls it every tick after `flush_destroyed()`. |
 | `write_scene(file, scene)` | Saves a scene. It needs no runtime. |
+| `ScriptRuntime::load_declarations(scripts)` | Loads the declarations of a scripts folder without starting the game: no `on_start()`, no start scene. Used by the editor. |
+| `ScriptRuntime::preview_instances(world, instances)` | Builds each instance into `world` as `spawn_instances()` would, from the prototype only: no `on_spawn`, no Lua. Returns `Preview{entities, issues}`, `entities[i]` being the entity of instance `i` or `std::nullopt`. Issues are not logged. |
+| `ScriptRuntime::default_value(type, key)` | Value an instance of `type` has for `key` (`"Component.field"` or `"Script.<name>"`) without an override; `std::nullopt` for an unknown type or key. |
+
+`engine/script/GameFolder.hpp` holds the game folder helpers, which need no
+runtime:
+
+| Call | Does |
+|---|---|
+| `is_scene_name(name)` | Whether `name` is a valid scene name. |
+| `scene_file(game, name)` | `<game>/scenes/<name>.json`. |
+| `scripts_folder(game)` | `<game>/scripts`. |
+| `read_project(game)` | Reads `game.json` into `GameProject{start_scene}`; `std::nullopt` when it is invalid. |
+| `write_start_scene(game, name)` | Sets (or, with `std::nullopt`, removes) `start_scene` in `game.json`, keeping its other keys; creates the file if needed. |
+| `list_scenes(game)` | Names of the scene files of `scenes/`, sorted. |
+
+The [editor backend](editor.md) builds on these calls.
 
 `InstanceIssue::instance` is the index in the file's `instances` array for
 `read_scene()`, and the index in the given list for `spawn_instances()`.
