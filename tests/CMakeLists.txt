@@ -40,6 +40,7 @@ engine_add_test(script SOURCES
     engine/script/CameraApiTest.cpp
     engine/script/ClientApiTest.cpp
     engine/script/ScriptRuntimeTest.cpp
+    engine/script/assets/ShadersTest.cpp
     engine/script/assets/TexturesTest.cpp
     engine/script/audio/AudioTest.cpp
     engine/script/entity/CameraFieldsTest.cpp
