@@ -81,7 +81,7 @@ std::vector<FieldState> ReplicatedFields::read(core::EntityManager& world, core:
         if (!value) {
             continue;
         }
-        auto wire = to_wire(*value, strings);
+        auto wire = to_wire(*value, strings, replicated.field.field->asset_type());
         if (!wire) {
             core::log::warn("network: field '{}' of entity {} cannot be sent: not in the string "
                             "table",
