@@ -121,6 +121,8 @@ TEST_F(CameraApiTest, RejectsInvalidArgumentsAndKeepsTheOverride) {
     EXPECT_TRUE(logged_error("camera.set: y must be a finite number"));
     EXPECT_FALSE(_runtime.run_string("camera.set(1, 2, 0)", "client"));
     EXPECT_TRUE(logged_error("camera.set: zoom must be a positive number"));
+    EXPECT_FALSE(_runtime.run_string("camera.set(1, 2, math.huge)", "client"));
+    EXPECT_TRUE(logged_error("camera.set: zoom must be a positive number"));
     EXPECT_FALSE(_runtime.run_string("camera.follow(1.5)", "client"));
     EXPECT_FALSE(_runtime.run_string("camera.follow(-1)", "client"));
     EXPECT_FALSE(_runtime.run_string("camera.follow('ship')", "client"));

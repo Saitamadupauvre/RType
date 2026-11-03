@@ -12,6 +12,7 @@
 #include "engine/core/Components.hpp"
 #include "engine/physics/Components.hpp"
 #include "entity/ScriptBody.hpp"
+#include "lua/LuaArgs.hpp"
 #include "lua/LuaErrors.hpp"
 
 namespace engine::script {
@@ -29,10 +30,6 @@ constexpr float arrival_distance = 0.01F;
 
 [[noreturn]] void fail(sol::this_state state, std::string_view caller, std::string_view message) {
     throw std::runtime_error(std::format("{}{}: {}", caller_location(state), caller, message));
-}
-
-bool is_nil(const sol::object& value) {
-    return value.get_type() == sol::type::lua_nil || value.get_type() == sol::type::none;
 }
 
 template <std::size_t Size>

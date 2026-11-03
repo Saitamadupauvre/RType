@@ -12,6 +12,7 @@
 #include "RuntimeContext.hpp"
 #include "engine/core/log/Log.hpp"
 #include "input/LuaInput.hpp"
+#include "lua/LuaArgs.hpp"
 #include "lua/LuaErrors.hpp"
 #include "player/Players.hpp"
 
@@ -25,10 +26,6 @@ constexpr std::string_view on_player_joined = "on_player_joined";
 constexpr std::string_view on_player_left = "on_player_left";
 
 const core::InputState neutral_input{};
-
-bool is_nil(const sol::object& value) {
-    return value.get_type() == sol::type::lua_nil || value.get_type() == sol::type::none;
-}
 
 } // namespace
 

@@ -17,6 +17,7 @@
 #include "engine/core/log/Log.hpp"
 #include "engine/physics/Components.hpp"
 #include "loading/Declarations.hpp"
+#include "lua/LuaArgs.hpp"
 #include "lua/LuaErrors.hpp"
 
 namespace engine::script {
@@ -29,10 +30,6 @@ constexpr std::array<std::string_view, 3> read_only_fields{"id", "type", "age"};
 
 bool is_read_only(std::string_view name) {
     return std::ranges::find(read_only_fields, name) != read_only_fields.end();
-}
-
-bool is_nil(const sol::object& value) {
-    return value.get_type() == sol::type::lua_nil || value.get_type() == sol::type::none;
 }
 
 template <typename Component> void register_if_missing(core::EntityManager& world) {

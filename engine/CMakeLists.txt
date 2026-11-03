@@ -54,6 +54,9 @@ engine_add_module(script
         src/script/ServerApi.cpp
         src/script/assets/DeclaredAssets.cpp
         src/script/audio/Audio.cpp
+        src/script/client/ClientAudio.cpp
+        src/script/client/ClientCamera.cpp
+        src/script/client/ClientEvents.cpp
         src/script/entity/Entities.cpp
         src/script/entity/EntityFields.cpp
         src/script/entity/ScriptBody.cpp
@@ -65,6 +68,7 @@ engine_add_module(script
         src/script/loading/NameList.cpp
         src/script/loading/ScriptFiles.cpp
         src/script/loading/Sections.cpp
+        src/script/lua/LuaArgs.cpp
         src/script/lua/LuaErrors.cpp
         src/script/lua/LuaFieldValue.cpp
         src/script/navigation/Navigation.cpp
