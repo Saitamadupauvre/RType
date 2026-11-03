@@ -1,0 +1,6 @@
+{
+    "version": 1,
+    "instances": [
+        { "type": "star", "position": [5, 6] }
+    ]
+}

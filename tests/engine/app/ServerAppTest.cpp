@@ -67,6 +67,14 @@ void press(ServerApp& app, std::uint32_t player_id, std::initializer_list<engine
         player_id, engine::core::InputState{.keys = keys, .mouse_buttons = {}, .pointer = {}});
 }
 
+std::vector<StringEntry> built_in_event_entries() {
+    return {{.category = StringCategory::event, .id = 1, .name = "scene_loaded"}};
+}
+
+std::vector<StringEntry> built_in_event_key_entries() {
+    return {{.category = StringCategory::event_key, .id = 1, .name = "name"}};
+}
+
 struct Server {
     explicit Server(const std::filesystem::path& game = {})
         : app(clock, loopback.server(), {.game = game, .max_players = 4}) {}
@@ -275,7 +283,9 @@ TEST(ServerApp, MissingScriptsGiveAnEmptyGame) {
     app.events().publish(PlayerJoined{.player_id = 1});
     app.tick(tick_step);
 
-    EXPECT_TRUE(app.strings().entries().empty());
+    EXPECT_EQ(app.strings().entries().size(), 2U);
+    EXPECT_EQ(app.strings().entries(StringCategory::event), built_in_event_entries());
+    EXPECT_EQ(app.strings().entries(StringCategory::event_key), built_in_event_key_entries());
     EXPECT_TRUE(owned_by(app, 1).empty());
 }
 
@@ -404,22 +414,24 @@ TEST(ServerApp, StringTableListsDeclaredEventNamesAndKeysInOrder) {
     const Server server(events_game);
     const ServerApp& app = server.app;
 
-    EXPECT_EQ(
-        app.strings().entries(StringCategory::event),
-        (std::vector<StringEntry>{{.category = StringCategory::event, .id = 1, .name = "explosion"},
-                                  {.category = StringCategory::event, .id = 2, .name = "ping"}}));
+    EXPECT_EQ(app.strings().entries(StringCategory::event),
+              (std::vector<StringEntry>{
+                  {.category = StringCategory::event, .id = 1, .name = "explosion"},
+                  {.category = StringCategory::event, .id = 2, .name = "ping"},
+                  {.category = StringCategory::event, .id = 3, .name = "scene_loaded"}}));
     EXPECT_EQ(app.strings().entries(StringCategory::event_key),
               (std::vector<StringEntry>{
                   {.category = StringCategory::event_key, .id = 1, .name = "at"},
-                  {.category = StringCategory::event_key, .id = 2, .name = "size"}}));
+                  {.category = StringCategory::event_key, .id = 2, .name = "name"},
+                  {.category = StringCategory::event_key, .id = 3, .name = "size"}}));
 }
 
-TEST(ServerApp, ScriptsWithoutEventsHaveNoEventNames) {
+TEST(ServerApp, ScriptsWithoutEventsHaveOnlyTheBuiltInEvent) {
     const Server server(players_game);
     const ServerApp& app = server.app;
 
-    EXPECT_TRUE(app.strings().entries(StringCategory::event).empty());
-    EXPECT_TRUE(app.strings().entries(StringCategory::event_key).empty());
+    EXPECT_EQ(app.strings().entries(StringCategory::event), built_in_event_entries());
+    EXPECT_EQ(app.strings().entries(StringCategory::event_key), built_in_event_key_entries());
 }
 
 TEST(ServerApp, TickPublishesEmittedEventsInOrder) {
@@ -436,6 +448,24 @@ TEST(ServerApp, TickPublishesEmittedEventsInOrder) {
                                         {.key = "size", .value = 2.0F}}},
                          {.name = "ping", .arguments = {}}}));
     EXPECT_TRUE(listen_events(app).empty());
+}
+
+TEST(ServerApp, TickSwitchesTheSceneAndPublishesSceneLoaded) {
+    Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "scenes");
+    ServerApp& app = server.app;
+    const auto before = app.script().spawn("marker", engine::core::Vec2{1.F, 2.F});
+    ASSERT_TRUE(before.has_value());
+    ASSERT_TRUE(app.script().run_string("load_scene('two')", "test"));
+
+    const auto heard = listen_events(app);
+
+    EXPECT_EQ(heard,
+              (std::vector<engine::network::NamedEvent>{
+                  {.name = "scene_loaded", .arguments = {{.key = "name", .value = "two"}}}}));
+    std::vector<engine::core::Vec2> markers;
+    app.world().query<engine::core::Position>().each(
+        [&](Entity, const engine::core::Position& position) { markers.push_back(position.pos); });
+    EXPECT_EQ(markers, (std::vector<engine::core::Vec2>{{7.F, 8.F}}));
 }
 
 TEST(ServerApp, TickDestroysEntitiesWhoseHitboxesOverlap) {

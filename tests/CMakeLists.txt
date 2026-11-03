@@ -58,6 +58,7 @@ engine_add_test(script SOURCES
     engine/script/player/PlayersTest.cpp
     engine/script/scene/GameFolderTest.cpp
     engine/script/scene/SceneFileTest.cpp
+    engine/script/scene/SceneSwitchTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
