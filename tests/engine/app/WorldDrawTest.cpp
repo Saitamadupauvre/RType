@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -383,4 +384,81 @@ TEST(WorldDraw, PreloadedShaderIsNotLoadedAgainWhenDrawn) {
     draw.draw(world, 0.F);
 
     EXPECT_EQ(renderer.shader_loads, 2);
+}
+
+namespace {
+
+using engine::core::Layer;
+
+class OrderRenderer final : public fixture::NullRenderer {
+public:
+    void draw_rect(const Rect& rect, Color, bool) override { xs.push_back(rect.x); }
+
+    std::vector<float> xs;
+};
+
+EntityManager layered_world() {
+    EntityManager world;
+    register_components(world);
+    world.register_component<Layer>();
+    return world;
+}
+
+Entity spawn_square(EntityManager& world, float x) {
+    return spawn(world, {x, 0}, {.path = "", .color = {}});
+}
+
+} // namespace
+
+TEST(WorldDraw, LowerZIndexIsDrawnFirst) {
+    OrderRenderer renderer;
+    EntityManager world = layered_world();
+    world.add<Layer>(spawn_square(world, 1), Layer{.z_index = 5});
+    world.add<Layer>(spawn_square(world, 2), Layer{.z_index = -3});
+    world.add<Layer>(spawn_square(world, 3), Layer{.z_index = 0});
+
+    Painter(renderer, "assets").draw(world, 0.F);
+
+    EXPECT_EQ(renderer.xs, (std::vector<float>{2, 3, 1}));
+}
+
+TEST(WorldDraw, SameZIndexKeepsSpawnOrderAndNoLayerCountsAsZero) {
+    OrderRenderer renderer;
+    EntityManager world = layered_world();
+    spawn_square(world, 1);
+    world.add<Layer>(spawn_square(world, 2), Layer{.z_index = 0});
+    spawn_square(world, 3);
+    world.add<Layer>(spawn_square(world, 4), Layer{.z_index = -1});
+
+    Painter(renderer, "assets").draw(world, 0.F);
+
+    EXPECT_EQ(renderer.xs, (std::vector<float>{4, 1, 2, 3}));
+}
+
+TEST(WorldDraw, WorksWhenLayerIsNotRegistered) {
+    OrderRenderer renderer;
+    EntityManager world;
+    register_components(world);
+    spawn_square(world, 1);
+    spawn_square(world, 2);
+
+    Painter(renderer, "assets").draw(world, 0.F);
+
+    EXPECT_EQ(renderer.xs, (std::vector<float>{1, 2}));
+}
+
+TEST(WorldDraw, EntitiesOfSeveralWorldsAreMergedByZIndexThenWorldOrder) {
+    OrderRenderer renderer;
+    EntityManager first = layered_world();
+    EntityManager second = layered_world();
+    first.add<Layer>(spawn_square(first, 1), Layer{.z_index = 2});
+    spawn_square(first, 2);
+    second.add<Layer>(spawn_square(second, 3), Layer{.z_index = 1});
+    spawn_square(second, 4);
+    engine::app::TextureLibrary textures(renderer, "assets");
+    engine::app::ShaderLibrary shaders(renderer, "assets");
+
+    WorldDraw(renderer, textures, shaders).draw({std::ref(first), std::ref(second)}, 0.F);
+
+    EXPECT_EQ(renderer.xs, (std::vector<float>{2, 4, 3, 1}));
 }

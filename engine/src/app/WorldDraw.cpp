@@ -1,5 +1,6 @@
 #include "WorldDraw.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -23,6 +24,13 @@ core::Vec2 drawn_size(core::Vec2 size, core::Vec2 scale) {
 
 float mirrored(float length, float factor) { return std::signbit(factor) ? -length : length; }
 
+std::int32_t z_index_of(core::EntityManager& world, core::Entity entity) {
+    if (!world.is_registered<core::Layer>() || !world.has<core::Layer>(entity)) {
+        return 0;
+    }
+    return world.get<core::Layer>(entity).z_index;
+}
+
 } // namespace
 
 WorldDraw::WorldDraw(graphics::IRenderer& renderer, TextureLibrary& textures,
@@ -30,17 +38,40 @@ WorldDraw::WorldDraw(graphics::IRenderer& renderer, TextureLibrary& textures,
     : _renderer(renderer), _textures(textures), _shaders(shaders) {}
 
 void WorldDraw::draw(core::EntityManager& world, float seconds) {
-    world.query<core::Position, core::Sprite>().each(
-        [&](core::Entity entity, const core::Position& position, const core::Sprite& sprite) {
-            const graphics::ShaderId shader = shader_of(world, entity);
-            if (shader == graphics::ShaderId{}) {
-                draw_entity(world, entity, position.pos, sprite);
-                return;
-            }
-            begin_shader(shader, seconds);
-            draw_entity(world, entity, position.pos, sprite);
-            _renderer.end_shader();
-        });
+    draw({std::ref(world)}, seconds);
+}
+
+void WorldDraw::draw(std::initializer_list<std::reference_wrapper<core::EntityManager>> worlds,
+                     float seconds) {
+    _queue.clear();
+    for (core::EntityManager& world : worlds) {
+        queue(world);
+    }
+    std::ranges::stable_sort(_queue, std::less{}, &Queued::z_index);
+    for (const Queued& item : _queue) {
+        draw_queued(item, seconds);
+    }
+}
+
+void WorldDraw::queue(core::EntityManager& world) {
+    world.query<core::Position, core::Sprite>().each([&](core::Entity entity, const core::Position&,
+                                                         const core::Sprite&) {
+        _queue.push_back({.z_index = z_index_of(world, entity), .world = &world, .entity = entity});
+    });
+}
+
+void WorldDraw::draw_queued(const Queued& item, float seconds) {
+    core::EntityManager& world = *item.world;
+    const core::Vec2 position = world.get<core::Position>(item.entity).pos;
+    const core::Sprite& sprite = world.get<core::Sprite>(item.entity);
+    const graphics::ShaderId shader = shader_of(world, item.entity);
+    if (shader == graphics::ShaderId{}) {
+        draw_entity(world, item.entity, position, sprite);
+        return;
+    }
+    begin_shader(shader, seconds);
+    draw_entity(world, item.entity, position, sprite);
+    _renderer.end_shader();
 }
 
 void WorldDraw::draw_entity(core::EntityManager& world, core::Entity entity, core::Vec2 position,

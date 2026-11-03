@@ -207,3 +207,15 @@ TEST(SnapshotView, ReplicatedRotationAndScaleAreDrawn) {
     EXPECT_EQ(drawn.source, (Rect{.x = 0.F, .y = 0.F, .width = -96.F, .height = 36.F}));
     EXPECT_EQ(drawn.dest, (Rect{.x = 101.F, .y = 29.F, .width = 192.F, .height = 18.F}));
 }
+
+TEST(SnapshotView, ReplicatedZIndexDrawsAnEntityBehindTheOthers) {
+    Screen screen;
+    EntitySnapshot backdrop = entity("sprites/stars.png", 70.F, 0);
+    backdrop.fields.push_back(value_of("Layer", "z_index", std::int64_t{-1}));
+
+    screen.show({entity("sprites/ship.png", 5.F, 0), backdrop});
+
+    ASSERT_EQ(screen.renderer.sprites.size(), 2U);
+    EXPECT_FLOAT_EQ(screen.renderer.sprites[0].dest.x - screen.renderer.sprites[0].origin.x, 70.F);
+    EXPECT_FLOAT_EQ(screen.renderer.sprites[1].dest.x - screen.renderer.sprites[1].origin.x, 5.F);
+}
