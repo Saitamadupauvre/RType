@@ -129,6 +129,7 @@ engine_add_module(app
         src/app/Launch.cpp
         src/app/LoadingScreen.cpp
         src/app/ServerApp.cpp
+        src/app/ShaderLibrary.cpp
         src/app/SnapshotView.cpp
         src/app/WorldDraw.cpp
     DEPENDS engine::core engine::script engine::network engine::graphics engine::audio
