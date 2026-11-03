@@ -12,7 +12,8 @@ namespace {
 AssetPreloader preloader_of(std::vector<std::string>& calls, const std::vector<bool>& results) {
     AssetPreloader preloader;
     for (std::size_t index = 0; index < results.size(); ++index) {
-        preloader.add([&calls, index, found = results[index]] {
+        const bool found = results[index];
+        preloader.add([&calls, index, found] {
             calls.push_back("asset " + std::to_string(index));
             return found;
         });
