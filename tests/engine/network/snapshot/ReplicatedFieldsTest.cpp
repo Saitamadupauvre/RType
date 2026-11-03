@@ -290,3 +290,24 @@ TEST_F(CoreReplicatedFieldsTest, EntityWithRotationAndScaleSendsBoth) {
 TEST_F(CoreReplicatedFieldsTest, CoreFieldsFitInOneSnapshot) {
     EXPECT_TRUE(_fields.error().empty()) << _fields.error();
 }
+
+TEST(ReplicatedFields, SendsAShaderAssetAsItsShaderId) {
+    FieldRegistry registry;
+    registry.add<Skin>("Skin", {engine::core::asset_field<&Skin::path>(
+                                   "path", replicated, engine::core::AssetType::Shader)});
+    StringTable strings;
+    strings.add(StringCategory::texture, "shaders/space");
+    strings.add(StringCategory::shader, "shaders/other");
+    const auto space = strings.add(StringCategory::shader, "shaders/space");
+    ASSERT_NE(space, strings.id_of(StringCategory::texture, "shaders/space"));
+    const ReplicatedFields fields(registry, strings);
+    engine::core::EntityManager world;
+    world.register_component<Skin>();
+    const auto entity = world.spawn();
+    world.add(entity, Skin{.path = "shaders/space"});
+
+    const auto states = fields.read(world, entity, strings);
+
+    ASSERT_EQ(states.size(), 1U);
+    EXPECT_EQ(states.front().value, WireValue{AssetId{space.value_or(0)}});
+}
