@@ -78,7 +78,7 @@ struct SpriteDraw {
      * @brief Point of the drawn rectangle, relative to its top-left corner, placed at dest.x and
      * dest.y and used as the pivot of @ref rotation.
      */
-    core::Vec2 origin;
+    core::Vec2 origin{};
     /** @brief Rotation around @ref origin, in degrees, clockwise on screen. */
     float rotation{0.F};
     /** @brief Color multiplied with the texture; white keeps it unchanged. */
