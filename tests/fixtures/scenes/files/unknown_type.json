@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "name": "smaug",
+            "type": "dragon",
+            "position": [1, 2],
+            "overrides": { "Dragon.fire": true },
+            "extra": { "kept": [1, "two", null] }
+        },
+        {
+            "type": "wave",
+            "position": [0, 0]
+        },
+        {
+            "type": "plain",
+            "position": [3, 4]
+        }
+    ]
+}

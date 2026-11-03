@@ -1,0 +1,6 @@
+{
+    "version": 2,
+    "instances": [
+        { "type": "ship", "position": [0, 0] }
+    ]
+}

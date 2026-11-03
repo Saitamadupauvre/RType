@@ -1,0 +1,15 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "type": "ship",
+            "position": [0, 0],
+            "overrides": {
+                "Sprite.color": [300, 0, 0, 255],
+                "PhysicsBody.collision_layer": 18446744073709551615,
+                "PhysicsBody.mass": 1e300,
+                "AABBCollider.size": [-1, 2]
+            }
+        }
+    ]
+}
