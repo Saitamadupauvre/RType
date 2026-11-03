@@ -37,11 +37,11 @@ template <typename Component> void register_if_missing(core::EntityManager& worl
     }
 }
 
-script::ScriptRuntime load_game(core::EntityManager& world, const std::filesystem::path& scripts) {
+script::ScriptRuntime load_game(core::EntityManager& world, const std::filesystem::path& game) {
     auto runtime = script::ScriptRuntime::builder().with<script::ServerApi>().build();
     runtime.attach_world(world);
-    if (!scripts.empty()) {
-        runtime.load_scripts(scripts);
+    if (!game.empty()) {
+        runtime.load_game(game);
     }
     return runtime;
 }
@@ -116,7 +116,7 @@ struct ServerApp::Impl {
 
 ServerApp::Impl::Impl(const core::time::IClock& clock, network::ServerTransport& transport,
                       const ServerAppOptions& options)
-    : runtime(load_game(world, options.scripts)), server(runtime.api<script::ServerApi>()),
+    : runtime(load_game(world, options.game)), server(runtime.api<script::ServerApi>()),
       strings(strings_of(runtime)), fields(replicated_fields()),
       network(clock, events, fields, transport,
               network::ServerOptions{.max_players = options.max_players, .strings = strings}),

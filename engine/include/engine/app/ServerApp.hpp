@@ -21,8 +21,11 @@ namespace engine::app {
 
 /** @brief Settings of a ServerApp. */
 struct ServerAppOptions {
-    /** @brief Script folder of the game, holding its `main.lua`. Empty runs no script. */
-    std::filesystem::path scripts;
+    /**
+     * @brief Game folder, holding `game.json`, `scripts/` and `scenes/`, loaded with
+     * script::ScriptRuntime::load_game(). Empty runs no script.
+     */
+    std::filesystem::path game;
     /** @brief Maximum number of players connected at once. */
     std::size_t max_players{4};
 };
@@ -35,7 +38,8 @@ struct ServerAppOptions {
 /**
  * @brief Runs the authoritative simulation of any game folder and serves it to clients.
  *
- * Loads the scripts with the server API set, builds the string table from their declarations,
+ * Loads the game folder with the server API set (scripts, then the start scene of `game.json`),
+ * builds the string table from the declarations,
  * then on every tick: handles the received packets, hands each player's input to the scripts,
  * updates the scripts, runs physics and reports collisions to the scripts, removes destroyed
  * entities, runs the systems, then sends the queued audio commands, events and a snapshot of

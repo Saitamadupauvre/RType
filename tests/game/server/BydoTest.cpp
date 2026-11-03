@@ -34,7 +34,7 @@ constexpr float first_shot_delay = 0.8F;
 constexpr float fire_interval = 2.5F;
 
 const std::filesystem::path game_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game" / "scripts";
 
 class BydoTest : public ::testing::Test {
 protected:

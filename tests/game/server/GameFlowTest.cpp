@@ -40,14 +40,14 @@ constexpr float world_width = 1920.F;
 constexpr std::uint32_t first_player = 1;
 constexpr std::uint32_t second_player = 2;
 
-const std::filesystem::path game_scripts =
+const std::filesystem::path game_folder =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
 
 class GameFlowTest : public ::testing::Test {
 protected:
     engine::core::time::ManualClock _clock;
     engine::network::LoopbackNetwork _loopback;
-    engine::app::ServerApp _app{_clock, _loopback.server(), {.scripts = game_scripts}};
+    engine::app::ServerApp _app{_clock, _loopback.server(), {.game = game_folder}};
     EntityManager& _world = _app.world();
     ScriptRuntime& _runtime = _app.script();
     ServerApi& _server = _app.script_server();

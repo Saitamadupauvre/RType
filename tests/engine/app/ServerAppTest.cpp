@@ -34,9 +34,9 @@ using engine::network::UdpServerTransport;
 namespace {
 
 constexpr Duration tick_step = std::chrono::nanoseconds(1'000'000'000 / 60);
-const std::filesystem::path players_scripts =
+const std::filesystem::path players_game =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "players";
-const std::filesystem::path camera_scripts =
+const std::filesystem::path camera_game =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "camera";
 
 std::vector<Entity> owned_by(ServerApp& app, std::uint32_t player_id) {
@@ -68,8 +68,8 @@ void press(ServerApp& app, std::uint32_t player_id, std::initializer_list<engine
 }
 
 struct Server {
-    explicit Server(const std::filesystem::path& scripts = {})
-        : app(clock, loopback.server(), {.scripts = scripts, .max_players = 4}) {}
+    explicit Server(const std::filesystem::path& game = {})
+        : app(clock, loopback.server(), {.game = game, .max_players = 4}) {}
 
     ManualClock clock;
     LoopbackNetwork loopback;
@@ -136,7 +136,7 @@ TEST(ServerApp, StartsOverALoopbackNetwork) {
 }
 
 TEST(ServerApp, StringTableListsDeclaredEntitiesInOrder) {
-    const Server server(players_scripts);
+    const Server server(players_game);
     const ServerApp& app = server.app;
 
     EXPECT_EQ(
@@ -146,7 +146,7 @@ TEST(ServerApp, StringTableListsDeclaredEntitiesInOrder) {
 }
 
 TEST(ServerApp, JoiningPlayerGetsTheEntitiesOfOnPlayerJoined) {
-    Server server(players_scripts);
+    Server server(players_game);
     ServerApp& app = server.app;
 
     app.events().publish(PlayerJoined{.player_id = 1});
@@ -157,7 +157,7 @@ TEST(ServerApp, JoiningPlayerGetsTheEntitiesOfOnPlayerJoined) {
 }
 
 TEST(ServerApp, TickTagsScriptEntitiesWithTypeAndOwner) {
-    Server server(players_scripts);
+    Server server(players_game);
     ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 3});
 
@@ -169,7 +169,7 @@ TEST(ServerApp, TickTagsScriptEntitiesWithTypeAndOwner) {
 }
 
 TEST(ServerApp, TickClearsTheOwnerOfDisownedEntities) {
-    Server server(players_scripts);
+    Server server(players_game);
     ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 1});
     const Entity ship = ship_of(app, 1);
@@ -183,7 +183,7 @@ TEST(ServerApp, TickClearsTheOwnerOfDisownedEntities) {
 }
 
 TEST(ServerApp, EntitiesNotSpawnedByScriptsAreNotReplicated) {
-    Server server(players_scripts);
+    Server server(players_game);
     ServerApp& app = server.app;
     const Entity native = app.world().spawn();
     app.world().add(native, engine::core::Position{});
@@ -194,7 +194,7 @@ TEST(ServerApp, EntitiesNotSpawnedByScriptsAreNotReplicated) {
 }
 
 TEST(ServerApp, ScriptEntitiesWithoutSpriteOrColorAreNotReplicated) {
-    Server server(players_scripts);
+    Server server(players_game);
     ServerApp& app = server.app;
     const auto scenery = app.script().spawn("scenery");
     ASSERT_TRUE(scenery.has_value());
@@ -205,7 +205,7 @@ TEST(ServerApp, ScriptEntitiesWithoutSpriteOrColorAreNotReplicated) {
 }
 
 TEST(ServerApp, CameraEntitiesWithoutSpriteAreReplicated) {
-    Server server(camera_scripts);
+    Server server(camera_game);
     ServerApp& app = server.app;
     const auto camera = app.script().spawn("view");
     ASSERT_TRUE(camera.has_value());
@@ -216,7 +216,7 @@ TEST(ServerApp, CameraEntitiesWithoutSpriteAreReplicated) {
 }
 
 TEST(ServerApp, TickMovesFollowingCameraOntoItsTarget) {
-    Server server(camera_scripts);
+    Server server(camera_game);
     ServerApp& app = server.app;
     const auto camera = app.script().spawn("view");
     ASSERT_TRUE(camera.has_value());
@@ -229,7 +229,7 @@ TEST(ServerApp, TickMovesFollowingCameraOntoItsTarget) {
 }
 
 TEST(ServerApp, LeavingPlayerEntitiesAreDestroyedOnTheNextTick) {
-    Server server(players_scripts);
+    Server server(players_game);
     ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 1});
     const Entity ship = ship_of(app, 1);
@@ -241,7 +241,7 @@ TEST(ServerApp, LeavingPlayerEntitiesAreDestroyedOnTheNextTick) {
 }
 
 TEST(ServerApp, InputMovesOnlyThatPlayerEntity) {
-    Server server(players_scripts);
+    Server server(players_game);
     ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 1});
     app.events().publish(PlayerJoined{.player_id = 2});
@@ -257,7 +257,7 @@ TEST(ServerApp, InputMovesOnlyThatPlayerEntity) {
 }
 
 TEST(ServerApp, InputFromUnknownPlayerIsIgnored) {
-    Server server(players_scripts);
+    Server server(players_game);
     ServerApp& app = server.app;
     app.events().publish(PlayerJoined{.player_id = 1});
     const auto start = position_of(app, 1);
@@ -281,7 +281,7 @@ TEST(ServerApp, MissingScriptsGiveAnEmptyGame) {
 
 namespace {
 
-const std::filesystem::path audio_scripts =
+const std::filesystem::path audio_game =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "audio";
 
 struct HeardAudio {
@@ -306,7 +306,7 @@ HeardAudio listen(ServerApp& app) {
 } // namespace
 
 TEST(ServerApp, StringTableListsDeclaredAudioNamesInOrder) {
-    const Server server(audio_scripts);
+    const Server server(audio_game);
     const ServerApp& app = server.app;
 
     EXPECT_EQ(app.strings().entries(StringCategory::sound),
@@ -319,7 +319,7 @@ TEST(ServerApp, StringTableListsDeclaredAudioNamesInOrder) {
 }
 
 TEST(ServerApp, ScriptsWithoutAudioHaveNoAudioNames) {
-    const Server server(players_scripts);
+    const Server server(players_game);
     const ServerApp& app = server.app;
 
     EXPECT_TRUE(app.strings().entries(StringCategory::sound).empty());
@@ -346,7 +346,7 @@ TEST(ServerApp, StringTableListsDeclaredShadersAndEntityShadersInOrder) {
 }
 
 TEST(ServerApp, TickPublishesTheMusicStartedByOnStart) {
-    Server server(audio_scripts);
+    Server server(audio_game);
     ServerApp& app = server.app;
 
     const auto heard = listen(app);
@@ -357,7 +357,7 @@ TEST(ServerApp, TickPublishesTheMusicStartedByOnStart) {
 }
 
 TEST(ServerApp, TickPublishesQueuedSoundsAndMusicStops) {
-    Server server(audio_scripts);
+    Server server(audio_game);
     ServerApp& app = server.app;
     app.tick(tick_step);
     ASSERT_TRUE(app.script().run_string(R"(play("boom.wav") music(nil))", "test"));
@@ -371,7 +371,7 @@ TEST(ServerApp, TickPublishesQueuedSoundsAndMusicStops) {
 }
 
 TEST(ServerApp, SoundPlayedByAnEntityCarriesItsIndex) {
-    Server server(audio_scripts);
+    Server server(audio_game);
     ServerApp& app = server.app;
     const auto speaker = app.script().spawn("speaker");
     ASSERT_TRUE(speaker.has_value());
@@ -386,7 +386,7 @@ TEST(ServerApp, SoundPlayedByAnEntityCarriesItsIndex) {
 
 namespace {
 
-const std::filesystem::path events_scripts =
+const std::filesystem::path events_game =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "events";
 
 std::vector<engine::network::NamedEvent> listen_events(ServerApp& app) {
@@ -401,7 +401,7 @@ std::vector<engine::network::NamedEvent> listen_events(ServerApp& app) {
 } // namespace
 
 TEST(ServerApp, StringTableListsDeclaredEventNamesAndKeysInOrder) {
-    const Server server(events_scripts);
+    const Server server(events_game);
     const ServerApp& app = server.app;
 
     EXPECT_EQ(
@@ -415,7 +415,7 @@ TEST(ServerApp, StringTableListsDeclaredEventNamesAndKeysInOrder) {
 }
 
 TEST(ServerApp, ScriptsWithoutEventsHaveNoEventNames) {
-    const Server server(players_scripts);
+    const Server server(players_game);
     const ServerApp& app = server.app;
 
     EXPECT_TRUE(app.strings().entries(StringCategory::event).empty());
@@ -423,7 +423,7 @@ TEST(ServerApp, ScriptsWithoutEventsHaveNoEventNames) {
 }
 
 TEST(ServerApp, TickPublishesEmittedEventsInOrder) {
-    Server server(events_scripts);
+    Server server(events_game);
     ServerApp& app = server.app;
     ASSERT_TRUE(app.script().run_string(
         R"(emit("explosion", { at = { x = 4, y = 5 }, size = 2 }) emit("ping"))", "test"));
