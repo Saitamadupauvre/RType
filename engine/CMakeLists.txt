@@ -66,6 +66,7 @@ engine_add_module(script
         src/script/scene/JsonFieldValue.cpp
         src/script/scene/JsonFile.cpp
         src/script/scene/SceneFile.cpp
+        src/script/scene/SceneSwitch.cpp
     DEPENDS engine::core
     PRIVATE_DEPENDS engine::physics sol2::sol2 engine_lua nlohmann_json::nlohmann_json
 )

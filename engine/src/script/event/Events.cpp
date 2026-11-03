@@ -86,6 +86,11 @@ std::size_t text_length(const core::FieldValue& value) noexcept {
 
 } // namespace
 
+Events::Events() {
+    _schemas.emplace(std::string(scene_loaded_event),
+                     Schema{{std::string(scene_loaded_key), core::FieldKind::String}});
+}
+
 sol::object Events::declare(sol::this_state state, const sol::object& name) {
     std::string event = checked_name(state, "event", name);
     if (!is_valid_event_name(event)) {
@@ -102,6 +107,9 @@ sol::object Events::declare(sol::this_state state, const sol::object& name) {
 void Events::define(sol::this_state state, const std::string& name, const sol::object& schema) {
     if (!_declarations_allowed) {
         fail(state, std::format("event '{}' can only be declared while the scripts load", name));
+    }
+    if (name == scene_loaded_event) {
+        fail(state, std::format("event '{}' is built in", name));
     }
     if (_schemas.contains(name)) {
         fail(state, std::format("event '{}' is already declared", name));
@@ -170,6 +178,12 @@ void Events::emit(sol::this_state state, const sol::object& name, const sol::obj
         command.arguments.push_back({.key = key, .value = std::move(value)});
     }
     queue(std::move(command));
+}
+
+void Events::emit_scene_loaded(std::string scene) {
+    queue(EventCommand{.name = std::string(scene_loaded_event),
+                       .arguments = {{.key = std::string(scene_loaded_key),
+                                      .value = core::FieldValue{std::move(scene)}}}});
 }
 
 bool Events::contains(std::string_view name) const { return _schemas.contains(name); }

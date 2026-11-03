@@ -15,11 +15,11 @@ namespace {
 
 namespace log = engine::core::log;
 
-constexpr std::array<std::string_view, 28> reserved_globals{
-    "entity",      "system", "query",  "spawn", "find_all", "find_first", "count",
-    "after",       "every",  "wait",   "play",  "music",    "sounds",     "musics",
-    "event",       "emit",   "random", "world", "log",      "synced",     "players",
-    "find_player", "on",     "input",  "audio", "camera",   "textures",   "shaders",
+constexpr std::array<std::string_view, 29> reserved_globals{
+    "entity", "system", "query",    "spawn",   "find_all",   "find_first",  "count", "after",
+    "every",  "wait",   "play",     "music",   "sounds",     "musics",      "event", "emit",
+    "random", "world",  "log",      "synced",  "players",    "find_player", "on",    "input",
+    "audio",  "camera", "textures", "shaders", "load_scene",
 };
 
 constexpr std::array<std::string_view, 11> engine_owned_fields{
@@ -120,6 +120,21 @@ std::optional<std::vector<Declaration>> resolve_declarations(const PendingFile& 
                                            .prefab = pending.body.value_or(environment)});
     }
     return declarations;
+}
+
+bool read_persistence(Declaration& declaration) {
+    const auto value = declaration.prefab.raw_get<sol::object>(persistent_field);
+    if (declaration.kind != DeclarationKind::Entity || value.get_type() == sol::type::lua_nil ||
+        value.get_type() == sol::type::none) {
+        return true;
+    }
+    if (value.get_type() != sol::type::boolean) {
+        log::error("lua: {}: entity '{}' field '{}' must be a boolean",
+                   declaration.source.generic_string(), declaration.name, persistent_field);
+        return false;
+    }
+    declaration.persistent = value.as<bool>();
+    return true;
 }
 
 void warn_reserved_names(const Declaration& declaration) {

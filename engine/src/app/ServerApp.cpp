@@ -135,6 +135,7 @@ void ServerApp::Impl::tick(core::time::Duration step) {
     runtime.update(dt);
     collisions.step(dt);
     runtime.flush_destroyed();
+    runtime.flush_scene();
     systems.run(world, dt);
     follow_cameras(world);
     replicate();

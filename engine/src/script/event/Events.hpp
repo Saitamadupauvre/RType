@@ -14,13 +14,18 @@ namespace engine::script {
 
 inline constexpr std::size_t max_event_name_length = 63;
 inline constexpr std::size_t max_queued_events = 64;
+inline constexpr std::string_view scene_loaded_event = "scene_loaded";
+inline constexpr std::string_view scene_loaded_key = "name";
 
 class Events {
 public:
+    Events();
+
     void allow_declarations(bool allowed) noexcept { _declarations_allowed = allowed; }
 
     sol::object declare(sol::this_state state, const sol::object& name);
     void emit(sol::this_state state, const sol::object& name, const sol::object& arguments);
+    void emit_scene_loaded(std::string scene);
 
     [[nodiscard]] bool contains(std::string_view name) const;
     [[nodiscard]] std::vector<std::string> names() const;

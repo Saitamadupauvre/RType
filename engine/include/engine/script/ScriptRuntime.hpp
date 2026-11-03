@@ -427,6 +427,26 @@ public:
      */
     std::size_t flush_destroyed() noexcept;
 
+    /**
+     * @brief Switches to the scene requested by Lua `load_scene(name)` since the last call.
+     *
+     * `load_scene` (server API set only) reads `scenes/<name>.json` of the game folder given to
+     * load_game() when it is called, raising a Lua error for an invalid name, a missing or invalid
+     * file, a runtime without a game folder, or a second request before this call. This function
+     * then marks every entity spawned by this runtime whose type is not declared with
+     * `persistent = true` and removes them as flush_destroyed() does (`on_destroy` runs), spawns
+     * the scene's instances as spawn_instances() does (`on_spawn` runs), queues the built-in
+     * `scene_loaded` event with argument `name` for clients, and calls `on_scene_loaded(name)` from
+     * `main.lua` if it defines one. A `load_scene` called during this switch is applied by the
+     * next call.
+     *
+     * Call it once per tick, after flush_destroyed().
+     *
+     * @return The name of the scene switched to, or std::nullopt when none was requested.
+     * @note Never throws. Lua errors raised by callbacks are logged.
+     */
+    std::optional<std::string> flush_scene() noexcept;
+
 private:
     friend class ScriptRuntimeBuilder;
 
