@@ -21,14 +21,6 @@ std::string field_key(core::FieldRef field) {
     return std::format("{}.{}", field.component->name(), field.field->name());
 }
 
-core::FieldRef find_field_key(const core::FieldRegistry& fields, std::string_view key) {
-    const auto separator = key.find('.');
-    if (separator == std::string_view::npos) {
-        return {};
-    }
-    return fields.find_field(key.substr(0, separator), key.substr(separator + 1));
-}
-
 class Prototypes {
 public:
     explicit Prototypes(RuntimeContext& context) : _context(context) {}
@@ -145,6 +137,14 @@ void log_issue(const Instance& instance, const InstanceIssue& issue) {
 }
 
 } // namespace
+
+core::FieldRef find_field_key(const core::FieldRegistry& fields, std::string_view key) {
+    const auto separator = key.find('.');
+    if (separator == std::string_view::npos) {
+        return {};
+    }
+    return fields.find_field(key.substr(0, separator), key.substr(separator + 1));
+}
 
 std::vector<Instance> capture_instances(RuntimeContext& context) {
     std::vector<Instance> instances;

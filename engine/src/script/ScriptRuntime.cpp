@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <typeinfo>
 #include <utility>
 #include <vector>
@@ -20,6 +21,8 @@
 #include "loading/Sections.hpp"
 #include "lua/LuaErrors.hpp"
 #include "lua/Sol.hpp"
+#include "scene/GameFolder.hpp"
+#include "scene/SceneFile.hpp"
 
 namespace engine::script {
 
@@ -79,8 +82,11 @@ struct ScriptRuntime::Impl {
     void bind_core();
     sol::object declare(sol::this_state state, DeclarationKind kind, const std::string& name);
     sol::object require(sol::this_state state, const std::string& name);
-    bool load_scripts(const fs::path& root);
-    bool load_all(const fs::path& root, const std::vector<fs::path>& files);
+    bool load_game(const fs::path& game);
+    bool load_scripts(const fs::path& root, const std::optional<fs::path>& start_scene);
+    bool load_all(const fs::path& root, const std::vector<fs::path>& files,
+                  const std::optional<fs::path>& start_scene);
+    bool spawn_scene(const fs::path& file);
     bool load_declaration_file(const fs::path& root, const fs::path& relative,
                                const sol::environment& environment);
     bool apply_sections(const std::vector<Declaration>& batch) const;
@@ -168,7 +174,18 @@ sol::object ScriptRuntime::Impl::require(sol::this_state state, const std::strin
     }
 }
 
-bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
+bool ScriptRuntime::Impl::load_game(const fs::path& game) {
+    const std::optional<GameProject> project = read_project(game);
+    std::optional<fs::path> start_scene;
+    if (project && project->start_scene) {
+        start_scene = scene_file(game, *project->start_scene);
+    }
+    const bool loaded = load_scripts(scripts_folder(game), start_scene);
+    return loaded && project.has_value();
+}
+
+bool ScriptRuntime::Impl::load_scripts(const fs::path& root,
+                                       const std::optional<fs::path>& start_scene) {
     if (modules) {
         log::error("lua: scripts are already loaded");
         return false;
@@ -188,7 +205,7 @@ bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
     context.textures.allow_declarations(true);
     context.shaders.allow_declarations(true);
     context.events.allow_declarations(true);
-    const bool loaded = load_all(root, files);
+    const bool loaded = load_all(root, files, start_scene);
     context.events.allow_declarations(false);
     context.shaders.allow_declarations(false);
     context.textures.allow_declarations(false);
@@ -196,7 +213,8 @@ bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
     return loaded;
 }
 
-bool ScriptRuntime::Impl::load_all(const fs::path& root, const std::vector<fs::path>& files) {
+bool ScriptRuntime::Impl::load_all(const fs::path& root, const std::vector<fs::path>& files,
+                                   const std::optional<fs::path>& start_scene) {
     bool success = true;
     bool found_entry_point = false;
     std::optional<sol::environment> entry;
@@ -215,7 +233,22 @@ bool ScriptRuntime::Impl::load_all(const fs::path& root, const std::vector<fs::p
         log::error("lua: {} has no {}", root.string(), entry_point);
         return false;
     }
-    return entry && start(*entry) && success;
+    if (!entry) {
+        return false;
+    }
+    const bool spawned = !start_scene || spawn_scene(*start_scene);
+    return start(*entry) && spawned && success;
+}
+
+bool ScriptRuntime::Impl::spawn_scene(const fs::path& file) {
+    if (context.entities.world() == nullptr) {
+        return true;
+    }
+    const SceneLoad load = script::read_scene(context, file);
+    if (load.ok()) {
+        std::ignore = script::spawn_instances(context, load.scene.instances);
+    }
+    return load.ok();
 }
 
 bool ScriptRuntime::Impl::load_declaration_file(const fs::path& root, const fs::path& relative,
@@ -356,13 +389,36 @@ bool ScriptRuntime::run_string(std::string_view code, std::string_view chunk_nam
 
 bool ScriptRuntime::load_scripts(const std::filesystem::path& root) noexcept {
     try {
-        return _impl->load_scripts(root);
+        return _impl->load_scripts(root, std::nullopt);
     } catch (const std::exception& exception) {
         log::error("lua: {}: {}", root.string(), exception.what());
     } catch (...) {
         log::error("lua: {}: unknown error", root.string());
     }
     return false;
+}
+
+bool ScriptRuntime::load_game(const std::filesystem::path& game) noexcept {
+    try {
+        return _impl->load_game(game);
+    } catch (const std::exception& exception) {
+        log::error("lua: {}: {}", game.string(), exception.what());
+    } catch (...) {
+        log::error("lua: {}: unknown error", game.string());
+    }
+    return false;
+}
+
+SceneLoad ScriptRuntime::read_scene(const std::filesystem::path& file) const noexcept {
+    try {
+        return script::read_scene(_impl->context, file);
+    } catch (const std::exception& exception) {
+        log::error("scene: {}: {}", file.string(), exception.what());
+        return {.scene = {}, .issues = {}, .error = exception.what()};
+    } catch (...) {
+        log::error("scene: {}: unknown error", file.string());
+    }
+    return {.scene = {}, .issues = {}, .error = "unknown error"};
 }
 
 std::optional<DeclarationInfo> ScriptRuntime::find_declaration(std::string_view name) const {

@@ -19,6 +19,7 @@
 #include "engine/script/Declaration.hpp"
 #include "engine/script/Export.hpp"
 #include "engine/script/Instance.hpp"
+#include "engine/script/Scene.hpp"
 #include "engine/script/ScriptRuntimeBuilder.hpp"
 
 namespace engine::script {
@@ -119,6 +120,54 @@ public:
      * @note Can be called once per runtime; later calls fail. Never throws.
      */
     bool load_scripts(const std::filesystem::path& root) noexcept;
+
+    /**
+     * @brief Loads a game folder: its scripts, then its start scene, then calls `on_start()`.
+     *
+     * A game folder holds `game.json`, `scripts/` and `scenes/`. The scripts in `scripts/` are
+     * loaded as load_scripts() does. If `game.json` names a `start_scene`, the file
+     * `scenes/<start_scene>.json` is read with read_scene() and its instances are spawned with
+     * spawn_instances() before `on_start()` runs, so `on_start()` already sees them. The scene is
+     * only spawned when a world is attached: a client gets these entities from the server.
+     *
+     * A missing `game.json`, or one without `start_scene`, loads the scripts alone. A `game.json`
+     * that is not a JSON object, or whose `start_scene` is not a scene name (1 to 63 letters,
+     * digits, `_` or `-`), is logged and no scene is spawned. A start scene that cannot be read
+     * is logged and nothing of it is spawned. In every case the scripts still load and
+     * `on_start()` still runs.
+     *
+     * @param game Game folder. Every file is found relative to it, never the working directory.
+     * @return true if the scripts loaded as for load_scripts(), `game.json` is valid and the start
+     * scene, if any, was read; false otherwise. Skipped instances and overrides are logged but do
+     * not make it fail.
+     * @note Can be called once per runtime, instead of load_scripts(). Never throws.
+     */
+    bool load_game(const std::filesystem::path& game) noexcept;
+
+    /**
+     * @brief Reads a scene file against the loaded declarations and field registry.
+     *
+     * The file is untrusted. It is rejected as a whole when it cannot be read, is not valid JSON,
+     * is not an object, or has no `version` equal to 1 or no `instances` array. Otherwise every
+     * instance is read on its own and these are skipped and reported in SceneLoad::issues:
+     * - an instance that is not an object, or whose `type` is missing or not a string, whose
+     *   `name` is not a string, whose `position` is not `[x, y]`, or whose `overrides` is not an
+     *   object;
+     * - an instance whose type is not a declared entity: it is kept unchanged in
+     *   Scene::unknown_instances, so write_scene() writes it back;
+     * - an override naming an unknown or non-editable field, or holding a value of the wrong kind
+     *   or that a value of its kind cannot hold (an int above 2^63 - 1, a color channel above
+     *   255...).
+     *
+     * Values that are of the right kind but that the component refuses (a negative hitbox size...)
+     * are reported by spawn_instances(). Every issue and error is also logged.
+     *
+     * @param file Scene file, usually `<game>/scenes/<name>.json`.
+     * @return The scene, its issues, and the error that rejected the file, if any.
+     * @note Call it after load_scripts() or load_game(): before, every type is unknown. Never
+     * throws.
+     */
+    [[nodiscard]] SceneLoad read_scene(const std::filesystem::path& file) const noexcept;
 
     /**
      * @brief Looks up a name registered by load_scripts().
@@ -295,7 +344,7 @@ public:
      * default: the value the field gets from the prefab's component fields (`sprite`, `hitbox`...)
      * before `on_spawn` runs. A field of a component the prefab does not give is always stored.
      *
-     * @return The instances, empty if no world is attached.
+     * @return The instances, empty if no world is attached. Save them with write_scene().
      * @note Lua fields such as `self.health` are not captured. An entity spawned by another
      * entity's `on_spawn` is captured like any other, so spawning the instances back spawns it
      * twice.

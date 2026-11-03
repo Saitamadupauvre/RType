@@ -36,9 +36,12 @@ struct Instance {
     bool operator==(const Instance&) const = default;
 };
 
-/** @brief Something ScriptRuntime::spawn_instances() skipped. */
+/** @brief Something ScriptRuntime::spawn_instances() or ScriptRuntime::read_scene() skipped. */
 struct InstanceIssue {
-    /** Index of the instance in the span given to spawn_instances(). */
+    /**
+     * Index of the instance in the span given to spawn_instances(), or in the `instances` array of
+     * the file given to read_scene().
+     */
     std::size_t instance = 0;
     /** Field of the skipped override, empty when the whole instance was skipped. */
     std::string field;
