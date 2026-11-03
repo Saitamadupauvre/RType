@@ -54,6 +54,7 @@ engine_add_test(script SOURCES
     engine/script/loading/ScriptDeclarationsTest.cpp
     engine/script/loading/ScriptRequireTest.cpp
     engine/script/loading/SectionsTest.cpp
+    engine/script/navigation/NavigationTest.cpp
     engine/script/player/PlayersTest.cpp
 )
 engine_add_test(network SOURCES
