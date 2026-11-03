@@ -140,6 +140,10 @@ void NetworkServer::send_snapshot(core::EntityManager& world) {
     impl_->send_all(impl_->network.snapshot(world));
 }
 
+std::size_t NetworkServer::last_snapshot_bytes() const {
+    return impl_->network.last_snapshot_bytes();
+}
+
 std::size_t NetworkServer::player_count() const { return impl_->network.sessions().size(); }
 
 std::vector<PlayerStats> NetworkServer::stats() const { return impl_->network.stats(); }

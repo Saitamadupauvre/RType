@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <vector>
@@ -34,6 +35,7 @@ public:
         return sessions_.sessions();
     }
     [[nodiscard]] std::uint32_t server_tick() const noexcept { return server_tick_; }
+    [[nodiscard]] std::size_t last_snapshot_bytes() const noexcept { return last_snapshot_bytes_; }
     [[nodiscard]] const StringTable& strings() const noexcept { return sessions_.strings(); }
     [[nodiscard]] const ReplicatedFields& replicated() const noexcept { return _replicated; }
     [[nodiscard]] std::vector<PlayerStats> stats() const { return sessions_.stats(); }
@@ -47,6 +49,7 @@ private:
     ServerSessions sessions_;
     std::vector<Outbound> queued_events_;
     std::uint32_t server_tick_{0};
+    std::size_t last_snapshot_bytes_{0};
 };
 
 } // namespace engine::network

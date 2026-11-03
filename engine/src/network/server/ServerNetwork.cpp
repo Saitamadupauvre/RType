@@ -51,12 +51,15 @@ void ServerNetwork::queue_event(EventPayload event) {
 
 std::vector<Outbound> ServerNetwork::snapshot(core::EntityManager& world) {
     ++server_tick_;
+    last_snapshot_bytes_ = 0;
     auto outbound = std::exchange(queued_events_, {});
     if (sessions_.sessions().empty()) {
         return outbound;
     }
     for (auto& snapshot : build_snapshots(world, _replicated, sessions_.strings(), server_tick_)) {
-        append(outbound, sessions_.broadcast(std::move(snapshot)));
+        const Message message = std::move(snapshot);
+        last_snapshot_bytes_ += datagram_size(message);
+        append(outbound, sessions_.broadcast(message));
     }
     return outbound;
 }

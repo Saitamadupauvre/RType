@@ -133,6 +133,13 @@ public:
     void send_snapshot(core::EntityManager& world);
 
     /**
+     * @return Bytes of the snapshot datagrams built by the latest send_snapshot(), headers
+     * included, counted once whatever the number of players; 0 before the first call and while
+     * nobody is connected.
+     */
+    [[nodiscard]] std::size_t last_snapshot_bytes() const;
+
+    /**
      * @return Number of connected players.
      */
     [[nodiscard]] std::size_t player_count() const;
