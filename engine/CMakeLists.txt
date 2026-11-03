@@ -23,6 +23,8 @@ engine_add_module(core
         src/core/log/Log.cpp
         src/core/log/MemorySink.cpp
         src/core/log/StderrSink.cpp
+        src/core/metrics/Metrics.cpp
+        src/core/metrics/ProcessUsage.cpp
         src/core/time/IClock.cpp
         src/core/time/SteadyClock.cpp
         src/core/time/ManualClock.cpp
