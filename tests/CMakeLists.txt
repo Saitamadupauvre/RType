@@ -93,6 +93,12 @@ target_include_directories(engine_network_tests PRIVATE
     "${PROJECT_SOURCE_DIR}/engine/src/network"
     "${CMAKE_CURRENT_SOURCE_DIR}/engine/network"
 )
+engine_add_test(navigation SOURCES
+    engine/navigation/GridFixture.cpp
+    engine/navigation/NavGridTest.cpp
+    engine/navigation/PathfindingTest.cpp
+    engine/navigation/SmoothingTest.cpp
+)
 engine_add_test(physics SOURCES
     engine/physics/PhysicsSystemTest.cpp
     engine/physics/CollisionsTest.cpp
