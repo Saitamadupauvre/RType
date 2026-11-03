@@ -31,7 +31,11 @@ public:
      */
     virtual bool open(const WindowConfig& config) = 0;
 
-    /** @brief Closes the window. Harmless if it is not open. */
+    /**
+     * @brief Closes the window and frees every texture, render target and shader.
+     *
+     * @note Harmless if it is not open.
+     */
     virtual void close() = 0;
 
     /** @return true once the user asked to close the window, or if it is not open. */
@@ -64,6 +68,107 @@ public:
     [[nodiscard]] virtual core::Vec2 texture_size(TextureId texture) const = 0;
 
     /**
+     * @brief Creates an off-screen surface that draw calls can be redirected to.
+     *
+     * @param size Size of the surface in pixels; both components must be at least 1. Backends
+     * may refuse sizes their GPU cannot hold (16384 for graphics-raylib).
+     * @return A new target, or the default RenderTargetId if the size is invalid, the window is
+     * not open or the backend fails. The failure is logged.
+     */
+    [[nodiscard]] virtual RenderTargetId create_render_target(core::Vec2 size) = 0;
+
+    /**
+     * @brief Frees a target returned by create_render_target().
+     *
+     * @note Ends drawing into it first if it is the current target. Its texture becomes unknown.
+     * Harmless on the default or an unknown target. Every target is freed by close().
+     */
+    virtual void destroy_render_target(RenderTargetId target) = 0;
+
+    /**
+     * @brief Redirects the following draw calls into @p target and clears it.
+     *
+     * Inside the target, screen space is its own size in pixels, and begin_world() centers the
+     * view on it.
+     *
+     * @param target Target to draw into.
+     * @param clear Color the whole target is cleared to.
+     * @note Ends world-space drawing first. Calling it again before end_target() switches to the
+     * new target. Does nothing outside begin_frame() / end_frame() or for an unknown target.
+     */
+    virtual void begin_target(RenderTargetId target, Color clear) = 0;
+
+    /**
+     * @brief Sends the following draw calls back to the frame.
+     *
+     * @note Ends world-space drawing first. Harmless when no target is being drawn into.
+     */
+    virtual void end_target() = 0;
+
+    /**
+     * @return The texture holding what was drawn into @p target, to draw with draw_sprite() like
+     * any texture, upright; the default TextureId for an unknown target.
+     * @note The texture belongs to the target: unload_texture() ignores it.
+     */
+    [[nodiscard]] virtual TextureId target_texture(RenderTargetId target) const = 0;
+
+    /**
+     * @brief Compiles a shader program from GLSL source files.
+     *
+     * @param vertex Vertex shader file; empty uses the backend's default vertex shader.
+     * @param fragment Fragment shader file; empty uses the backend's default fragment shader.
+     * @return A new shader, or the default ShaderId if a file is missing, the program does not
+     * compile or link, or the window is not open. The failure is logged.
+     */
+    [[nodiscard]] virtual ShaderId load_shader(const std::string& vertex,
+                                               const std::string& fragment) = 0;
+
+    /**
+     * @brief Frees a shader returned by load_shader().
+     *
+     * @note Ends it first if it is the current shader. Harmless on the default or an unknown
+     * shader. Every shader is freed by close().
+     */
+    virtual void unload_shader(ShaderId shader) = 0;
+
+    /**
+     * @brief Draws the following calls through @p shader until end_shader().
+     *
+     * @note Calling it again replaces the current shader. The default or an unknown shader goes
+     * back to the default pipeline, so drawing always continues. Does nothing outside
+     * begin_frame() / end_frame().
+     */
+    virtual void begin_shader(ShaderId shader) = 0;
+
+    /** @brief Goes back to the default pipeline. Harmless when no shader is in use. */
+    virtual void end_shader() = 0;
+
+    /**
+     * @brief Sets a `float` uniform of @p shader.
+     *
+     * @note Values are kept by the shader across frames. Affects only the draw calls made
+     * after it. An unknown shader or a uniform the program does not use is ignored.
+     */
+    virtual void set_uniform(ShaderId shader, const std::string& name, float value) = 0;
+
+    /** @brief Sets a `vec2` uniform of @p shader; same rules as the `float` overload. */
+    virtual void set_uniform(ShaderId shader, const std::string& name, core::Vec2 value) = 0;
+
+    /**
+     * @brief Sets a `vec4` uniform of @p shader to @p value with each channel in [0, 1]; same
+     * rules as the `float` overload.
+     */
+    virtual void set_uniform(ShaderId shader, const std::string& name, Color value) = 0;
+
+    /**
+     * @brief Binds @p value to a `sampler2D` uniform of @p shader; same rules as the `float`
+     * overload.
+     *
+     * @note An unknown texture binds the placeholder.
+     */
+    virtual void set_uniform(ShaderId shader, const std::string& name, TextureId value) = 0;
+
+    /**
      * @brief Starts a frame and clears it.
      *
      * @param clear Color of the whole window, letterbox bars included.
@@ -73,7 +178,8 @@ public:
     /**
      * @brief Presents the frame started by begin_frame().
      *
-     * @note Ends world-space drawing first if end_world() was not called.
+     * @note Ends world-space drawing, the current target and the current shader first if they
+     * were not ended.
      */
     virtual void end_frame() = 0;
 

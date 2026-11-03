@@ -39,6 +39,29 @@ struct TextureId {
     bool operator==(const TextureId&) const = default;
 };
 
+/**
+ * @brief Handle to an off-screen render target owned by a renderer.
+ *
+ * @note The default value refers to no target.
+ */
+struct RenderTargetId {
+    std::uint32_t value{0};
+
+    bool operator==(const RenderTargetId&) const = default;
+};
+
+/**
+ * @brief Handle to a shader program owned by a renderer.
+ *
+ * @note The default value refers to no shader: drawing with it uses the backend's default
+ * pipeline.
+ */
+struct ShaderId {
+    std::uint32_t value{0};
+
+    bool operator==(const ShaderId&) const = default;
+};
+
 /** @brief Part of a texture drawn into a rectangle of the virtual space. */
 struct SpriteDraw {
     /** @brief Texture to draw; the default value draws the placeholder texture. */
