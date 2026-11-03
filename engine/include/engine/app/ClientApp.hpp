@@ -7,6 +7,7 @@
 
 #include "engine/app/Export.hpp"
 #include "engine/audio/IAudio.hpp"
+#include "engine/core/metrics/Metrics.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/graphics/IInput.hpp"
 #include "engine/graphics/IRenderer.hpp"
@@ -116,6 +117,18 @@ public:
     [[nodiscard]] script::ScriptRuntime& script() noexcept;
     /** @return The client API set of the script runtime. */
     [[nodiscard]] script::ClientApi& script_client() noexcept;
+    /**
+     * @return The timings of every frame: one frame per call to frame().
+     *
+     * Timers (ms): `frame` (time since the previous frame), `network.update`, `lua.update` and
+     * `physics` (local entities), both summed over every tick of the frame, `draw`. Counter:
+     * `network.snapshots` (1 on a frame showing a newer snapshot). Gauges: `fps`, `entities` (of
+     * the latest snapshot), `network.rtt` (ms), `network.packets_lost` (since connecting),
+     * `network.packets_in`, `network.packets_out`, `network.bytes_in`, `network.bytes_out` (per
+     * second), `process.cpu` (% of one core) and `process.memory` (MiB).
+     * @note Unlike the rest of this class, the returned object may be read from any thread.
+     */
+    [[nodiscard]] core::metrics::Metrics& metrics() noexcept;
 
 private:
     struct Impl;

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <initializer_list>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -19,6 +20,7 @@
 #include "engine/network/StringTable.hpp"
 #include "engine/network/Transport.hpp"
 
+using namespace std::chrono_literals;
 using engine::app::ServerApp;
 using engine::core::Entity;
 using engine::core::EntityManager;
@@ -494,4 +496,55 @@ TEST(ServerApp, TickMovesScriptEntitiesByTheirVelocity) {
     const auto position = app.world().get<engine::core::Position>(*drifter).pos;
     EXPECT_FLOAT_EQ(position.x, 101.F);
     EXPECT_FLOAT_EQ(position.y, 99.5F);
+}
+
+TEST(ServerAppMetrics, EveryTickIsOneFrameWithEveryServerMetric) {
+    Server server(players_game);
+    ServerApp& app = server.app;
+
+    app.tick(tick_step);
+    app.tick(tick_step);
+
+    const auto names = app.metrics().names();
+    const std::set<std::string> recorded(names.begin(), names.end());
+    for (const char* name : {"tick", "network.receive", "lua.update", "physics", "systems",
+                             "network.send", "entities", "players", "snapshot.bytes"}) {
+        EXPECT_TRUE(recorded.contains(name)) << name;
+    }
+    EXPECT_EQ(app.metrics().summary("tick")->samples, 2U);
+}
+
+TEST(ServerAppMetrics, TimersMeasureTheirOwnStage) {
+    Server server;
+    ServerApp& app = server.app;
+    app.systems().add("slow", 0, [&server](EntityManager&, float) { server.clock.advance(3ms); });
+
+    app.tick(tick_step);
+
+    EXPECT_DOUBLE_EQ(app.metrics().summary("systems")->last, 3.0);
+    EXPECT_DOUBLE_EQ(app.metrics().summary("tick")->last, 3.0);
+    EXPECT_DOUBLE_EQ(app.metrics().summary("lua.update")->last, 0.0);
+}
+
+TEST(ServerAppMetrics, GaugesCountEntitiesAndPlayers) {
+    Server server(players_game);
+    ServerApp& app = server.app;
+    app.events().publish(PlayerJoined{.player_id = 1});
+
+    app.tick(tick_step);
+
+    EXPECT_DOUBLE_EQ(app.metrics().summary("entities")->last,
+                     static_cast<double>(app.world().size()));
+    EXPECT_GT(app.metrics().summary("entities")->last, 0.0);
+    EXPECT_DOUBLE_EQ(app.metrics().summary("players")->last, 0.0);
+}
+
+TEST(ServerAppMetrics, DisabledMetricsRecordNothing) {
+    Server server(players_game);
+    ServerApp& app = server.app;
+    app.metrics().set_enabled(false);
+
+    app.tick(tick_step);
+
+    EXPECT_TRUE(app.metrics().names().empty());
 }

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <filesystem>
 #include <functional>
 #include <set>
@@ -539,4 +540,48 @@ TEST_F(ClientAppTest, NoHudIsDrawnWhileLoading) {
 
     EXPECT_TRUE(std::ranges::none_of(_renderer.texts,
                                      [](const std::string& text) { return text == "HP"; }));
+}
+
+TEST_F(ClientAppTest, MetricsRecordTheFrameTimeAndFps) {
+    start_client();
+
+    play(session_frames);
+
+    const auto frame = _client.metrics().summary("frame");
+    ASSERT_TRUE(frame.has_value());
+    EXPECT_DOUBLE_EQ(frame->last, 17.0);
+    EXPECT_EQ(frame->samples, static_cast<std::size_t>(session_frames - 1));
+    EXPECT_NEAR(_client.metrics().summary("fps")->last, 1000.0 / 17.0, 1e-9);
+}
+
+TEST_F(ClientAppTest, MetricsDescribeTheGameAndTheNetwork) {
+    constexpr int frames_over_two_seconds = 120;
+    start_client();
+
+    play(frames_over_two_seconds);
+
+    const auto& metrics = _client.metrics();
+    const auto names = metrics.names();
+    const std::set<std::string> recorded(names.begin(), names.end());
+    for (const char* name :
+         {"frame", "fps", "network.update", "lua.update", "draw", "entities", "network.rtt",
+          "network.packets_lost", "network.packets_in", "network.packets_out", "network.bytes_in",
+          "network.bytes_out", "network.snapshots"}) {
+        EXPECT_TRUE(recorded.contains(name)) << name;
+    }
+    EXPECT_DOUBLE_EQ(metrics.summary("entities")->last, 1.0);
+    EXPECT_GT(metrics.summary("network.bytes_in")->last, 0.0);
+    EXPECT_GT(metrics.summary("network.packets_out")->last, 0.0);
+    EXPECT_GT(metrics.summary("network.snapshots")->max, 0.0);
+    EXPECT_DOUBLE_EQ(_server.metrics().summary("players")->last, 1.0);
+    EXPECT_GT(_server.metrics().summary("snapshot.bytes")->last, 0.0);
+}
+
+TEST_F(ClientAppTest, DisabledMetricsRecordNothing) {
+    _client.metrics().set_enabled(false);
+    start_client();
+
+    play(session_frames);
+
+    EXPECT_TRUE(_client.metrics().names().empty());
 }
