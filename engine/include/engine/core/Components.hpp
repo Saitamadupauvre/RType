@@ -32,6 +32,16 @@ struct Sprite {
 };
 
 /**
+ * @brief Shader program an entity is drawn through.
+ *
+ * @note The path is relative to the assets folder and has no extension, such as `shaders/space`.
+ * An empty path draws the entity with the default pipeline.
+ */
+struct Shader {
+    std::string path;
+};
+
+/**
  * @brief Set of labels attached to an entity, such as "enemy" or "player".
  *
  * @note Labels are unique: adding one twice keeps a single copy. Order of insertion is kept.

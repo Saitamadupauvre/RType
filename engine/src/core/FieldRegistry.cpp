@@ -310,6 +310,8 @@ void register_core_fields(FieldRegistry& registry) {
     registry.add<Sprite>("Sprite",
                          {asset_field<&Sprite::path>("path", field_flags::replicated),
                           member_field<&Sprite::color>("color", field_flags::replicated)});
+    registry.add<Shader>(
+        "Shader", {asset_field<&Shader::path>("path", field_flags::replicated, AssetType::Shader)});
     registry.add<Tags>("Tags",
                        {list_field<Tags>("labels", FieldKind::String, field_flags::editable,
                                          &labels_to_list, [](Tags& tags, const FieldList& list) {
