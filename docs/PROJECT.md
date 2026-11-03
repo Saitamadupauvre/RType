@@ -85,6 +85,7 @@ See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as
 | Scripting | Lua 5.4 + sol2 | Lightweight, designed to be embedded, industry standard for game scripting; sol2 gives a modern C++ binding. |
 | Tests | GoogleTest | Decided. |
 | Command line | clap (our own library, vcpkg overlay port) | Typed arguments with ranges, generated help. |
+| Scene and project files | JSON through nlohmann-json | Header-only and standard; keeps key order, so saved scenes stay stable in diffs. Private to `engine-script`. |
 | Logging | Own logger in `engine-core` | Levels, `std::format` syntax, capturable in tests; no dependency. |
 | Documentation | MkDocs Material + Doxygen | Markdown in the repository, published online with search; API reference from the public headers. |
 | Formatting / CI | clang-format, clang-tidy, GitHub Actions | Linux GCC/Clang and macOS builds, sanitizers, static analysis. |
@@ -159,6 +160,8 @@ r-type/
 │   ├── server/             → r-type_server (Cli, main.cpp)
 │   ├── client/             → r-type_client (Cli, main.cpp)
 │   ├── sandbox/            → r-type_sandbox
+│   ├── game.json           project file: name, start scene
+│   ├── scenes/             scene files (JSON)
 │   └── scripts/            Lua game code (free layout, see §10)
 ├── assets/                 sprites
 ├── ports/                  vcpkg overlay ports (clap)
@@ -185,17 +188,19 @@ bin/
 ├── plugins/
 │   ├── audio-raylib.so
 │   └── graphics-raylib.so
+├── game.json
+├── scenes/
 ├── scripts/
 └── assets/
 ```
 
-Executables locate their libraries, plugins, scripts and assets **relative to their own location** (RPATH `$ORIGIN` on Linux, same folder on Windows), never relative to the current working directory, so the game still works once installed.
+Executables locate their libraries, plugins, scripts, scenes and assets **relative to their own location** (RPATH `$ORIGIN` on Linux, same folder on Windows), never relative to the current working directory, so the game still works once installed.
 
 ---
 
 ## 6. Executables
 
-The executables are thin: `main` parses the command line and calls `engine::app::launch()` with a mode. `engine-app` holds a generic `ServerApp` and `ClientApp` that run any game folder (`scripts/` and `assets/` next to the executable) and know nothing about R-Type.
+The executables are thin: `main` parses the command line and calls `engine::app::launch()` with a mode. `engine-app` holds a generic `ServerApp` and `ClientApp` that run any game folder (`game.json`, `scripts/`, `scenes/` and `assets/` next to the executable, see [Game folder and scenes](game-folder.md)) and know nothing about R-Type.
 
 | Mode | Server | Client | Network |
 |---|---|---|---|
@@ -492,7 +497,8 @@ This section is the specification of the Lua API. Not everything is implemented 
 ### 10.2 Loading order
 
 1. Load every declaration file (entities and systems are registered, nothing is spawned).
-2. Merge the `server = { ... }` or `client = { ... }` table of `main.lua` into it (see §10.10), then call `on_start()` from `main.lua`. `on_player_joined(player)` and `on_player_left(player)` are called later, whenever a player connects or leaves; `update(dt)`, when `main.lua` defines one, runs once per tick after every entity's `update`.
+2. On the server, spawn the `start_scene` named by `game.json`, if any: each instance runs its `on_spawn`, then gets its overrides (see [Game folder and scenes](game-folder.md)).
+3. Merge the `server = { ... }` or `client = { ... }` table of `main.lua` into it (see §10.10), then call `on_start()` from `main.lua`, which already sees the scene's entities. `on_player_joined(player)` and `on_player_left(player)` are called later, whenever a player connects or leaves; `update(dt)`, when `main.lua` defines one, runs once per tick after every entity's `update`.
 
 Since `spawn` is only used once the game has started, file order never matters.
 
@@ -993,6 +999,7 @@ Developers must not use these names for their own fields or methods; the engine 
 
 - **Field access** goes through the entity handle's metatable. `__index` looks up, in order: native field aliases → entity methods → the entity's Lua data → its prefab table (methods). `__newindex` writes native fields into C++ storage and everything else into the Lua data. Aliases are a small data table (`engine/src/script/EntityFields.cpp`) mapping a Lua name to a `core::FieldRegistry` field, resolved to a `FieldRef` once; `sol::object` ↔ `FieldValue` conversion lives in one place (`LuaFieldValue.cpp`). The registry, filled by `register_core_fields` and `register_physics_fields`, is exposed by `ScriptRuntime::fields()`. Setting a collider field also adds the `PhysicsBody` it requires (`FieldRegistry::add(..., required<PhysicsBody>)`); the `hitbox` alias additionally makes a new body dynamic without gravity or collision response, centres the collider (`offset = size / 2`) and adds `Scriptable`.
 - **Instances** — `ScriptRuntime::capture_instances()` / `spawn_instances()` (`entity/Instances.cpp`) turn the world into `Instance{name, type, position, overrides}` and back. A type's defaults come from a prototype entity built in a scratch world from the prefab's native fields, without `on_spawn`; only editable fields that differ are stored. See [Engine modules](engine.md#instances).
+- **Scenes** — `ScriptRuntime::read_scene()`, `write_scene()` and `load_game()` (`scene/`) store instances in `scenes/<name>.json` and spawn the `start_scene` of `game.json`. `nlohmann-json` is private to the module. See [Game folder and scenes](game-folder.md).
 - **Callbacks** are called by native systems through `sol::protected_function`.
 - **Coroutines** are `sol::thread` + `sol::coroutine`; `wait(t)` yields and the scheduler resumes the coroutine when `t` has elapsed.
 

@@ -93,7 +93,12 @@ whole instance was skipped) and a message.
   `Replicated.owner`, entities marked with `self:destroy()` and entities the
   runtime did not spawn. An entity spawned by another one's `on_spawn` is
   captured too, so spawning the instances back spawns it twice.
-- The format is in memory only; scene files build on it.
+- Scene files store instances as JSON: `read_scene()` reads one against the
+  loaded declarations and `write_scene()` saves one, and `load_game()` spawns
+  the `start_scene` of `game.json` before `on_start()`. The format, the
+  reported problems and the API are in
+  [Game folder and scenes](game-folder.md). The JSON code (`scene/`, built on
+  `nlohmann-json`) stays private to the module.
 
 The runtime only holds this core API. Everything that belongs to one side is an
 **API set**, chosen once with a builder and owned by the runtime:
@@ -156,11 +161,12 @@ backend) and `load_audio_plugin()`, which loads a backend at runtime. See
 ### app
 
 The composition root: the only module that depends on most of the others. It
-runs any game folder (`scripts/` and `assets/`) without knowing the game.
+runs any game folder (`game.json`, `scripts/`, `scenes/` and `assets/`, see
+[Game folder and scenes](game-folder.md)) without knowing the game.
 
 | Header | What it gives |
 |---|---|
-| `ServerApp.hpp` | Authoritative server over any `ServerTransport`: Lua with the server API, string table, 60 Hz tick (scripts, physics, collisions, systems, replication, audio and events) |
+| `ServerApp.hpp` | Authoritative server over any `ServerTransport`: loads the game folder (scripts, then the start scene) with the server API, string table, 60 Hz tick (scripts, physics, collisions, systems, replication, audio and events) |
 | `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, asset preloading behind a loading screen, snapshot drawing, audio, local input to Lua and to the server |
 | `Launch.hpp` | `Mode` (`dedicated`, `client`, `host`, `solo`), `LaunchOptions` and `launch()`: picks the transports, loads the plugins and runs the apps; `host` runs the server on a background thread, `solo` runs both in one thread over a `LoopbackNetwork` |
 

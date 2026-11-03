@@ -66,6 +66,7 @@ nav:
       - Networking internals: networking.md
       - Plugins: plugins.md
       - Game: game.md
+      - Game folder and scenes: game-folder.md
       - Writing the game: writing-the-game.md
       - Commands: commands.md
       - Contributing: contributing.md

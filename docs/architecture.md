@@ -69,7 +69,8 @@ flowchart TB
 
 Third-party headers stay private: `raylib.h` appears only in
 `plugins/graphics-raylib/`, POSIX socket headers only in
-`engine/src/network/socket/`, Lua and sol2 only in `engine/src/script/`.
+`engine/src/network/socket/`, Lua, sol2 and nlohmann-json only in
+`engine/src/script/`.
 
 ## Subsystems
 
@@ -159,6 +160,8 @@ classDiagram
             +builder()$ ScriptRuntimeBuilder
             +api~Set~() Set&
             +load_scripts(path) bool
+            +load_game(path) bool
+            +read_scene(path) SceneLoad
             +attach_world(EntityManager&)
             +spawn(type, ...) optional~Entity~
             +update(float dt)
