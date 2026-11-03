@@ -9,9 +9,12 @@
 
 namespace engine::script {
 
-/** @brief A component field whose value differs from the one its entity type gives. */
+/** @brief A field whose value differs from the one its entity type gives. */
 struct FieldOverride {
-    /** Component and field names joined by a dot, such as "Sprite.color". */
+    /**
+     * Component and field names joined by a dot, such as "Sprite.color", or "Script." followed by
+     * a script field name, such as "Script.health" (see ScriptRuntime::script_fields()).
+     */
     std::string field;
     core::FieldValue value;
 
@@ -30,7 +33,7 @@ struct Instance {
     /** Declared entity type. */
     std::string type;
     core::Vec2 position;
-    /** Editable fields that differ from the type's defaults, sorted by field name. */
+    /** Editable and script fields that differ from the type's defaults, sorted by field name. */
     std::vector<FieldOverride> overrides;
 
     bool operator==(const Instance&) const = default;

@@ -586,13 +586,15 @@ Both forms produce the same internal representation.
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
 | Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `shader`, `rotation`, `scale`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds` | C++ component pools | Movement, collisions, rendering, replication |
-| Free fields | `health`, `speed`, `points`, `waypoints` | Lua table of the entity | Scripts only |
+| Free fields | `health`, `speed`, `points`, `waypoints` | Lua table of the entity | Scripts, and scenes / the editor as script fields |
 | Callbacks | `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
 
 Methods are not copied into each instance: they stay in the prefab table, so reloading a file updates every live entity.
 
 Free fields holding a table are the exception: each entity gets its own deep copy at spawn, so `self.waypoints[1] = nil` changes only that entity, never the prefab or the other instances. Nested tables and cycles are copied too (at most 64 levels deep, or the spawn fails); functions and metatables stay shared. Data meant to be shared by every instance, such as a module from `require`, belongs in a `local` of the file, not in a prefab field.
+
+A free field whose default is a number, boolean, string, `{ x, y }`, `{ r, g, b[, a] }` or a non-empty array of one of these is a **script field**: scenes and the editor store a per-instance value for it under `"Script.<name>"` (an integer default makes an int field, `3.0` a float one). Names starting with `_`, functions, other tables and fields declared only in a `server`/`client` section are never script fields; name a field `_cache` to keep it out of the editor. See [Game folder and scenes](game-folder.md#script-fields).
 
 ### 10.5 Entity API (`self`)
 
@@ -998,7 +1000,7 @@ Developers must not use these names for their own fields or methods; the engine 
   ```
 
 - **Field access** goes through the entity handle's metatable. `__index` looks up, in order: native field aliases → entity methods → the entity's Lua data → its prefab table (methods). `__newindex` writes native fields into C++ storage and everything else into the Lua data. Aliases are a small data table (`engine/src/script/EntityFields.cpp`) mapping a Lua name to a `core::FieldRegistry` field, resolved to a `FieldRef` once; `sol::object` ↔ `FieldValue` conversion lives in one place (`LuaFieldValue.cpp`). The registry, filled by `register_core_fields` and `register_physics_fields`, is exposed by `ScriptRuntime::fields()`. Setting a collider field also adds the `PhysicsBody` it requires (`FieldRegistry::add(..., required<PhysicsBody>)`); the `hitbox` alias additionally makes a new body dynamic without gravity or collision response, centres the collider (`offset = size / 2`) and adds `Scriptable`.
-- **Instances** — `ScriptRuntime::capture_instances()` / `spawn_instances()` (`entity/Instances.cpp`) turn the world into `Instance{name, type, position, overrides}` and back. A type's defaults come from a prototype entity built in a scratch world from the prefab's native fields, without `on_spawn`; only editable fields that differ are stored. See [Engine modules](engine.md#instances).
+- **Instances** — `ScriptRuntime::capture_instances()` / `spawn_instances()` (`entity/Instances.cpp`) turn the world into `Instance{name, type, position, overrides}` and back. A type's defaults come from a prototype entity built in a scratch world from the prefab's native fields, without `on_spawn`; only editable fields that differ are stored. Script fields (`entity/ScriptFields.cpp`) are inferred from each entity prefab before its sections are merged, kept on the `Declaration`, compared with the entity's Lua data and written back into it as `"Script.<name>"` overrides; `ScriptRuntime::script_fields()` lists them. See [Engine modules](engine.md#instances).
 - **Scenes** — `ScriptRuntime::read_scene()`, `write_scene()` and `load_game()` (`scene/`) store instances in `scenes/<name>.json` and spawn the `start_scene` of `game.json`. `nlohmann-json` is private to the module. See [Game folder and scenes](game-folder.md).
 - **Callbacks** are called by native systems through `sol::protected_function`.
 - **Coroutines** are `sol::thread` + `sol::coroutine`; `wait(t)` yields and the scheduler resumes the coroutine when `t` has elapsed.

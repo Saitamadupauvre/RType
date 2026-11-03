@@ -13,6 +13,7 @@
 #include "JsonFile.hpp"
 #include "engine/core/log/Log.hpp"
 #include "entity/Instances.hpp"
+#include "entity/ScriptFields.hpp"
 
 namespace engine::script {
 
@@ -76,14 +77,29 @@ core::Vec2 position_of(const Json& entry) {
     }
 }
 
-bool is_entity_type(const RuntimeContext& context, std::string_view type) {
+const Declaration* entity_declaration(const RuntimeContext& context, std::string_view type) {
     const Declaration* declaration = context.find_declaration(type);
-    return declaration != nullptr && declaration->kind == DeclarationKind::Entity;
+    if (declaration == nullptr || declaration->kind != DeclarationKind::Entity) {
+        return nullptr;
+    }
+    return declaration;
 }
 
-core::FieldValue override_value(const core::FieldRegistry& fields, const std::string& key,
-                                const Json& value) {
-    const core::FieldRef field = find_field_key(fields, key);
+core::FieldValue script_override_value(const Declaration& declaration, std::string_view name,
+                                       const Json& value) {
+    const ScriptField* field = find_script_field(declaration, name);
+    if (field == nullptr) {
+        throw std::invalid_argument(std::format("unknown script field '{}'", name));
+    }
+    return field_from_json(value, field->kind(), field->element());
+}
+
+core::FieldValue override_value(const RuntimeContext& context, const Declaration& declaration,
+                                const std::string& key, const Json& value) {
+    if (const auto name = script_field_name(key)) {
+        return script_override_value(declaration, *name, value);
+    }
+    const core::FieldRef field = find_field_key(context.fields, key);
     if (!field) {
         throw std::invalid_argument(std::format("unknown field '{}'", key));
     }
@@ -93,8 +109,9 @@ core::FieldValue override_value(const core::FieldRegistry& fields, const std::st
     return field_from_json(value, field.field->kind(), field.field->element_kind());
 }
 
-void read_overrides(const RuntimeContext& context, const Json& entry, std::size_t index,
-                    Instance& instance, std::vector<InstanceIssue>& issues) {
+void read_overrides(const RuntimeContext& context, const Declaration& declaration,
+                    const Json& entry, std::size_t index, Instance& instance,
+                    std::vector<InstanceIssue>& issues) {
     const Json* overrides = member(entry, "overrides");
     if (overrides == nullptr) {
         return;
@@ -105,7 +122,7 @@ void read_overrides(const RuntimeContext& context, const Json& entry, std::size_
     for (const auto& [key, value] : overrides->items()) {
         try {
             instance.overrides.push_back(
-                {.field = key, .value = override_value(context.fields, key, value)});
+                {.field = key, .value = override_value(context, declaration, key, value)});
         } catch (const std::invalid_argument& error) {
             issues.push_back({.instance = index, .field = key, .message = error.what()});
         }
@@ -127,7 +144,8 @@ void read_entry(const RuntimeContext& context, const Json& entry, std::size_t in
         throw std::invalid_argument(std::format("expected an object, got {}", entry.type_name()));
     }
     std::string type = string_member(entry, "type", true);
-    if (!is_entity_type(context, type)) {
+    const Declaration* declaration = entity_declaration(context, type);
+    if (declaration == nullptr) {
         keep_unknown(entry, index, type, load);
         return;
     }
@@ -135,7 +153,7 @@ void read_entry(const RuntimeContext& context, const Json& entry, std::size_t in
                       .type = std::move(type),
                       .position = position_of(entry),
                       .overrides = {}};
-    read_overrides(context, entry, index, instance, load.issues);
+    read_overrides(context, *declaration, entry, index, instance, load.issues);
     load.scene.instances.push_back(std::move(instance));
 }
 

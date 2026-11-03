@@ -77,7 +77,7 @@ Each instance:
 | `type` | yes | Name of an entity declared with `entity "name"`. |
 | `position` | yes | `[x, y]`, the world position of the entity's top-left corner. |
 | `name` | no | Label shown by the editor. Scripts never see it, and it need not be unique. |
-| `overrides` | no | Object mapping `"Component.field"` to a value. |
+| `overrides` | no | Object mapping `"Component.field"` or `"Script.name"` to a value. |
 
 ### Overrides
 
@@ -107,7 +107,45 @@ fields can be overridden:
 | `PhysicsBody.type`, `PhysicsBody.collision_layer`, `PhysicsBody.collision_mask` | int | |
 | `PhysicsBody.resolve_collisions`, `PhysicsBody.affected_by_gravity` | bool | |
 
-Lua free fields such as `self.health` are not stored in scenes yet.
+### Script fields
+
+Lua free fields are stored too, under `"Script.<name>"`:
+
+```lua
+entity "enemy"
+health = 3
+waypoints = { { x = 0, y = 0 }, { x = 200, y = 40 } }
+```
+
+```json
+"overrides": { "Script.health": 10, "Script.waypoints": [[0, 0], [50, 50]] }
+```
+
+A free field is a **script field** when its default in the declaration has
+one of these shapes; its kind is fixed by that default:
+
+| Default in Lua | Kind |
+|---|---|
+| `3` (an integer) | int |
+| `2.5`, `3.0` (a float, finite) | float |
+| `true` | bool |
+| `"boss"` | string |
+| `{ x = 1, y = 2 }` (exactly these keys, numbers) | vec2 |
+| `{ r = 255, g = 0, b = 0 }` or with `a` (exactly these keys, numbers 0-255) | color |
+| `{ 1, 2, 3 }` (non-empty array of one kind above) | list of that kind |
+| `{ 1, 2.5 }` (ints and floats mixed) | list of float |
+
+Never script fields: names starting with `_`, functions, empty tables, nested
+arrays, mixed arrays, other tables (`{ a = 1 }`, `{ x, y, z }`), native fields
+(`sprite`, `tags`...), and fields declared only inside a `server = { ... }` or
+`client = { ... }` section, so the server and the editor see the same list.
+
+`ScriptRuntime::script_fields(type)` returns them, sorted by name, as
+`ScriptField{name, default_value}` with `kind()` and `element()`: the editor
+uses it to build its inspector. A value that `on_spawn` sets is stored as an
+override, like a component field. An override is reported and skipped when the
+type has no such script field or its value is of another kind (`"Script.health":
+"lots"`, or `2.5` for an int); the declaration's default is kept.
 
 ### Values
 

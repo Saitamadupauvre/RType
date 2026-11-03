@@ -10,6 +10,7 @@
 
 #include "engine/core/ComponentPhysics.hpp"
 #include "engine/core/log/Log.hpp"
+#include "entity/ScriptFields.hpp"
 
 namespace engine::script {
 
@@ -60,6 +61,29 @@ const Declaration* declaration_of(const RuntimeContext& context, core::Entity en
     return type ? context.find_declaration(*type) : nullptr;
 }
 
+std::optional<core::FieldValue> captured_script_value(RuntimeContext& context, core::Entity entity,
+                                                      const ScriptField& field) {
+    try {
+        return script_value_from_lua(sol::this_state{context.lua.lua_state()},
+                                     context.entities.script_value(entity, field.name), field);
+    } catch (const std::exception& error) {
+        log::warn("instances: script field '{}' of entity {} not captured: {}", field.name,
+                  entity.id(), error.what());
+    }
+    return std::nullopt;
+}
+
+void capture_script_fields(RuntimeContext& context, core::Entity entity,
+                           const Declaration& declaration, Instance& instance) {
+    for (const ScriptField& field : declaration.script_fields) {
+        auto value = captured_script_value(context, entity, field);
+        if (value && *value != field.default_value) {
+            instance.overrides.push_back(
+                {.field = script_field_key(field.name), .value = std::move(*value)});
+        }
+    }
+}
+
 Instance capture_instance(RuntimeContext& context, Prototypes& prototypes, core::Entity entity,
                           const Declaration& declaration) {
     core::EntityManager& world = *context.entities.world();
@@ -77,13 +101,37 @@ Instance capture_instance(RuntimeContext& context, Prototypes& prototypes, core:
             instance.overrides.push_back({.field = field_key(field), .value = std::move(*value)});
         }
     }
+    capture_script_fields(context, entity, declaration, instance);
     std::ranges::sort(instance.overrides, {}, &FieldOverride::field);
     return instance;
 }
 
-std::optional<std::string> override_error(const core::FieldRegistry& fields,
-                                          core::EntityManager& world, core::Entity entity,
+std::optional<std::string> script_override_error(Entities& entities, core::Entity entity,
+                                                 const Declaration& declaration,
+                                                 std::string_view name,
+                                                 const core::FieldValue& value) {
+    const ScriptField* field = find_script_field(declaration, name);
+    if (field == nullptr) {
+        return std::format("unknown script field '{}'", name);
+    }
+    if (!has_shape_of(value, *field)) {
+        return std::format("script field '{}' expects {}, got {}", name,
+                           core::field_kind_name(field->kind()),
+                           core::field_kind_name(core::kind_of(value)));
+    }
+    entities.set_script_value(entity, name, value);
+    return std::nullopt;
+}
+
+std::optional<std::string> override_error(RuntimeContext& context, core::Entity entity,
+                                          const Declaration& declaration,
                                           const FieldOverride& field_override) {
+    if (const auto name = script_field_name(field_override.field)) {
+        return script_override_error(context.entities, entity, declaration, *name,
+                                     field_override.value);
+    }
+    const core::FieldRegistry& fields = context.fields;
+    core::EntityManager& world = *context.entities.world();
     const core::FieldRef field = find_field_key(fields, field_override.field);
     if (!field) {
         return std::format("unknown field '{}'", field_override.field);
@@ -118,8 +166,7 @@ void spawn_instance(RuntimeContext& context, const Instance& instance, std::size
     context.entities.rename(*entity, instance.name);
     context.entities.finish_spawn(*entity);
     for (const FieldOverride& field_override : instance.overrides) {
-        auto error =
-            override_error(context.fields, *context.entities.world(), *entity, field_override);
+        auto error = override_error(context, *entity, *declaration, field_override);
         if (error) {
             issues.push_back(
                 {.instance = index, .field = field_override.field, .message = std::move(*error)});

@@ -200,11 +200,17 @@ sol::object to_lua(sol::this_state state, const core::FieldValue& value) {
 
 core::FieldValue from_lua(sol::this_state state, const sol::object& value,
                           const core::FieldDescriptor& field, std::string_view name) {
-    if (field.kind() == FieldKind::List) {
-        return list_from_lua(state, value, field.element_kind().value_or(FieldKind::String),
-                             entity_field(name));
+    return from_lua(state, value, field.kind(), field.element_kind(), "entity field", name);
+}
+
+core::FieldValue from_lua(sol::this_state state, const sol::object& value, FieldKind kind,
+                          std::optional<FieldKind> element, std::string_view label,
+                          std::string_view name) {
+    if (kind == FieldKind::List) {
+        return list_from_lua(state, value, element.value_or(FieldKind::String),
+                             ValueName{.label = label, .name = std::string(name)});
     }
-    return from_lua(state, value, field.kind(), "entity field", name);
+    return from_lua(state, value, kind, label, name);
 }
 
 core::FieldValue from_lua(sol::this_state state, const sol::object& value, FieldKind kind,

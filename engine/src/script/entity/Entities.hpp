@@ -56,6 +56,10 @@ public:
     [[nodiscard]] sol::object handle_of(core::Entity entity) const;
     [[nodiscard]] std::vector<core::Entity> live_entities() const;
     [[nodiscard]] bool is_active(core::Entity entity) const;
+    [[nodiscard]] bool is_native_field(std::string_view name) const;
+    [[nodiscard]] sol::object script_value(core::Entity entity, std::string_view name) const;
+    void set_script_value(core::Entity entity, std::string_view name,
+                          const core::FieldValue& value);
 
 private:
     struct Record {
@@ -70,6 +74,7 @@ private:
 
     template <typename... Args>
     bool invoke(core::Entity entity, std::string_view method, Args&&... args);
+    static sol::object own_or_prefab(const Record& record, const sol::object& key);
     sol::object get(sol::this_state state, const EntityHandle& handle, const sol::object& key);
     void set(sol::this_state state, const EntityHandle& handle, const sol::object& key,
              const sol::object& value);
