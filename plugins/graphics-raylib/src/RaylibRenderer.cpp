@@ -191,7 +191,9 @@ void RaylibRenderer::destroy_render_target(engine::graphics::RenderTargetId targ
         end_target();
     }
     rlDrawRenderBatchActive();
-    release(*_targets.remove(target));
+    if (const auto removed = _targets.remove(target)) {
+        release(*removed);
+    }
 }
 
 void RaylibRenderer::begin_target(engine::graphics::RenderTargetId target,
@@ -255,7 +257,9 @@ void RaylibRenderer::unload_shader(engine::graphics::ShaderId shader) {
         end_shader();
     }
     rlDrawRenderBatchActive();
-    UnloadShader(_shaders.remove(shader)->shader);
+    if (const auto removed = _shaders.remove(shader)) {
+        UnloadShader(removed->shader);
+    }
 }
 
 void RaylibRenderer::begin_shader(engine::graphics::ShaderId shader) {
