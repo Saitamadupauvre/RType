@@ -5,7 +5,7 @@
 #include <optional>
 #include <unordered_map>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/network/Export.hpp"
 #include "engine/network/StringTable.hpp"
 

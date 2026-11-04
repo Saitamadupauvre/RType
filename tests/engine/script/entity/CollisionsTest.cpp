@@ -7,11 +7,11 @@
 #include <stdexcept>
 #include <string>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/physics/Components.hpp"
 #include "engine/script/ScriptRuntime.hpp"
 #include "engine/script/ServerApi.hpp"

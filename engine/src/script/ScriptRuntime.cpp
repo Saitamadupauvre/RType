@@ -71,6 +71,16 @@ sol::protected_function RuntimeContext::main_callback(std::string_view name) con
     return callback.as<sol::protected_function>();
 }
 
+sol::object RuntimeContext::spawn_declared(sol::this_state state, std::string_view type,
+                                           const sol::optional<sol::table>& overrides) {
+    const Declaration* declaration = find_declaration(type);
+    if (declaration == nullptr) {
+        log::error("lua: {}cannot spawn unknown entity '{}'", caller_location(state), type);
+        return sol::make_object(state, sol::lua_nil);
+    }
+    return entities.spawn_from_lua(state, *declaration, overrides);
+}
+
 struct GameStart {
     std::optional<fs::path> scene;
 };

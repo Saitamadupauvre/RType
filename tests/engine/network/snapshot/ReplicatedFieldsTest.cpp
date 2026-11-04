@@ -6,12 +6,12 @@
 
 #include <gtest/gtest.h>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Transform.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/core/math/Transform.hpp"
 #include "engine/network/StringTable.hpp"
 
 #include "TestFields.hpp"
@@ -246,6 +246,7 @@ protected:
     void SetUp() override {
         _world.register_component<engine::core::Position>();
         _world.register_component<engine::core::Rotation>();
+        _world.register_component<engine::core::Layer>();
         _world.register_component<engine::core::Scale>();
         _entity = _world.spawn();
         _world.add(_entity, engine::core::Position{1.F, 2.F});
@@ -285,6 +286,16 @@ TEST_F(CoreReplicatedFieldsTest, EntityWithRotationAndScaleSendsBoth) {
     EXPECT_EQ(states[1].value, WireValue{45.F});
     EXPECT_EQ(states[2].value, WireValue{-1.F});
     EXPECT_EQ(states[3].value, WireValue{0.25F});
+}
+
+TEST_F(CoreReplicatedFieldsTest, EntityWithALayerSendsItsZIndex) {
+    _world.add(_entity, engine::core::Layer{.z_index = -4});
+
+    const auto states = _fields.read(_world, _entity, _strings);
+
+    EXPECT_EQ(sent_names(), (std::vector<std::string>{"Position.pos", "Layer.z_index"}));
+    ASSERT_EQ(states.size(), 2U);
+    EXPECT_EQ(states[1].value, WireValue{std::int64_t{-4}});
 }
 
 TEST_F(CoreReplicatedFieldsTest, CoreFieldsFitInOneSnapshot) {

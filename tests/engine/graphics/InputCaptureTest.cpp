@@ -3,7 +3,7 @@
 #include <set>
 #include <utility>
 
-#include "engine/core/InputState.hpp"
+#include "engine/core/input/InputState.hpp"
 #include "engine/graphics/IInput.hpp"
 #include "engine/graphics/InputCapture.hpp"
 

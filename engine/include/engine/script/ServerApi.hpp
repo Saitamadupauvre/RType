@@ -6,8 +6,8 @@
 #include <string_view>
 #include <vector>
 
-#include "engine/core/Entity.hpp"
-#include "engine/core/InputState.hpp"
+#include "engine/core/ecs/Entity.hpp"
+#include "engine/core/input/InputState.hpp"
 #include "engine/script/ApiSet.hpp"
 #include "engine/script/AudioCommand.hpp"
 #include "engine/script/EventCommand.hpp"

@@ -1,4 +1,4 @@
-#include "engine/core/EntityPool.hpp"
+#include "engine/core/ecs/EntityPool.hpp"
 
 namespace engine::core {
 

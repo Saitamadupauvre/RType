@@ -43,12 +43,15 @@ engine_add_test(script SOURCES
     engine/script/assets/ShadersTest.cpp
     engine/script/assets/TexturesTest.cpp
     engine/script/audio/AudioTest.cpp
+    engine/script/client/HudTest.cpp
+    engine/script/client/LocalEntitiesTest.cpp
     engine/script/entity/CameraFieldsTest.cpp
     engine/script/entity/TransformFieldsTest.cpp
     engine/script/entity/CollisionsTest.cpp
     engine/script/entity/EntityFieldsTest.cpp
     engine/script/entity/EntityHandleTest.cpp
     engine/script/entity/InstancesTest.cpp
+    engine/script/entity/LayerFieldsTest.cpp
     engine/script/entity/ScriptFieldsTest.cpp
     engine/script/entity/TickTest.cpp
     engine/script/event/EventsTest.cpp
@@ -124,16 +127,18 @@ engine_add_test(audio SOURCES
     engine/audio/PluginLoaderTest.cpp
 )
 engine_add_test(app SOURCES
-    engine/app/AssetPreloaderTest.cpp
-    engine/app/AudioPlayerTest.cpp
-    engine/app/CameraFollowTest.cpp
-    engine/app/CameraRigTest.cpp
+    engine/app/assets/AssetPreloaderTest.cpp
+    engine/app/assets/AudioPlayerTest.cpp
+    engine/app/simulation/CameraFollowTest.cpp
+    engine/app/render/CameraRigTest.cpp
     engine/app/ClientAppTest.cpp
-    engine/app/LoadingScreenTest.cpp
+    engine/app/render/HudDrawTest.cpp
+    engine/app/render/LoadingScreenTest.cpp
     engine/app/ServerAppTest.cpp
-    engine/app/ShaderLibraryTest.cpp
-    engine/app/SnapshotViewTest.cpp
-    engine/app/WorldDrawTest.cpp
+    engine/app/assets/ShaderLibraryTest.cpp
+    engine/app/render/SnapshotViewTest.cpp
+    engine/app/assets/TextureLibraryTest.cpp
+    engine/app/render/WorldDrawTest.cpp
 )
 target_include_directories(engine_app_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/app")
 

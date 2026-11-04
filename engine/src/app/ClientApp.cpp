@@ -2,30 +2,38 @@
 
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <system_error>
 #include <utility>
+#include <vector>
 
-#include "AssetPreloader.hpp"
-#include "AudioPlayer.hpp"
-#include "CameraRig.hpp"
 #include "Fields.hpp"
-#include "LoadingScreen.hpp"
-#include "SnapshotView.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "assets/AssetPreloader.hpp"
+#include "assets/AudioPlayer.hpp"
+#include "assets/ShaderLibrary.hpp"
+#include "assets/TextureLibrary.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/graphics/InputCapture.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/script/EventCommand.hpp"
+#include "render/CameraRig.hpp"
+#include "render/HudDraw.hpp"
+#include "render/LoadingScreen.hpp"
+#include "render/SnapshotView.hpp"
+#include "render/WorldDraw.hpp"
+#include "simulation/PhysicsStep.hpp"
 
 namespace engine::app {
 
 namespace {
 
-script::ScriptRuntime load_game(const std::filesystem::path& scripts) {
+script::ScriptRuntime load_game(core::EntityManager& local, const std::filesystem::path& scripts) {
     auto runtime = script::ScriptRuntime::builder().with<script::ClientApi>().build();
+    runtime.attach_world(local);
     if (!scripts.empty()) {
         runtime.load_scripts(scripts);
     }
@@ -61,9 +69,15 @@ struct ClientApp::Impl {
     core::event::EventBus events;
     core::FieldRegistry fields;
     network::NetworkClient network;
+    core::EntityManager local;
     script::ScriptRuntime runtime;
     script::ClientApi& client;
+    PhysicsStep local_physics;
     AudioPlayer sound;
+    TextureLibrary textures;
+    ShaderLibrary shaders;
+    WorldDraw world_draw;
+    HudDraw hud_draw;
     SnapshotView view;
     std::reference_wrapper<const core::time::IClock> time_source;
     core::time::Duration started_at;
@@ -83,9 +97,10 @@ struct ClientApp::Impl {
 private:
     bool assets_ready();
     void queue_preload();
-    void run_ticks();
-    void draw(bool playing);
-    void draw_world();
+    void run_ticks(const std::vector<network::EntitySnapshot>& entities);
+    void draw(const std::vector<network::EntitySnapshot>& entities, bool playing);
+    void draw_world(const std::vector<network::EntitySnapshot>& entities);
+    void update_camera(const std::vector<network::EntitySnapshot>& entities);
 };
 
 ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport& transport,
@@ -93,9 +108,11 @@ ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport&
                       audio::IAudio& speakers, ClientAppOptions settings)
     : renderer(window), input(keys), audio(speakers), options(std::move(settings)),
       fields(replicated_fields()), network(clock, events, fields, transport),
-      runtime(load_game(options.scripts)), client(runtime.api<script::ClientApi>()),
-      sound(speakers, options.assets), view(window, options.assets, fields), time_source(clock),
-      started_at(clock.now()), loop(clock) {
+      runtime(load_game(local, options.scripts)), client(runtime.api<script::ClientApi>()),
+      local_physics(local, events, runtime), sound(speakers, options.assets),
+      textures(window, options.assets), shaders(window, options.assets),
+      world_draw(window, textures, shaders), hud_draw(window, textures), view(fields),
+      time_source(clock), started_at(clock.now()), loop(clock) {
     client.set_audio_settings(options.audio);
     events.subscribe<network::SoundPlayed>([this](const network::SoundPlayed& played) {
         sound.play_sound(network.strings(), played.sound_id);
@@ -131,11 +148,12 @@ void ClientApp::Impl::frame() {
     network.update();
     audio.get().update();
     const bool playing = assets_ready();
+    const auto entities = network.entities();
     if (playing) {
-        run_ticks();
+        run_ticks(entities);
     }
     sound.apply(client.audio_settings());
-    draw(playing);
+    draw(entities, playing);
 }
 
 bool ClientApp::Impl::assets_ready() {
@@ -153,44 +171,51 @@ void ClientApp::Impl::queue_preload() {
     preload_queued = true;
     const auto strings = network.strings();
     add_all(preloader, strings, network::StringCategory::texture,
-            [this](const std::string& name) { return view.preload_texture(name); });
+            [this](const std::string& name) { return textures.preload(name); });
     add_all(preloader, strings, network::StringCategory::shader,
-            [this](const std::string& name) { return view.preload_shader(name); });
+            [this](const std::string& name) { return shaders.preload(name); });
     add_all(preloader, strings, network::StringCategory::sound,
             [this](const std::string& name) { return sound.preload_sound(name); });
     add_all(preloader, strings, network::StringCategory::music,
             [this](const std::string& name) { return sound.preload_music(name); });
 }
 
-void ClientApp::Impl::run_ticks() {
-    const auto local = graphics::capture_input(input.get());
+void ClientApp::Impl::update_camera(const std::vector<network::EntitySnapshot>& entities) {
     const core::Vec2 viewport = renderer.get().virtual_size();
-    const auto entities = network.entities();
     client.set_camera_view(resolve_camera(entities, client.camera_override(), viewport), viewport);
+}
+
+void ClientApp::Impl::run_ticks(const std::vector<network::EntitySnapshot>& entities) {
+    const auto held = graphics::capture_input(input.get());
+    update_camera(entities);
     loop.run_frame([&](core::time::Duration step) {
-        client.set_input(local);
-        runtime.update(std::chrono::duration<float>(step).count());
-        network.send_input(local);
+        const float dt = std::chrono::duration<float>(step).count();
+        client.set_input(held);
+        runtime.update(dt);
+        local_physics.step(dt);
+        runtime.flush_destroyed();
+        network.send_input(held);
     });
 }
 
-void ClientApp::Impl::draw(bool playing) {
+void ClientApp::Impl::draw(const std::vector<network::EntitySnapshot>& entities, bool playing) {
     renderer.get().begin_frame(options.background);
     if (playing) {
-        draw_world();
+        draw_world(entities);
+        hud_draw.draw(client.draw_hud());
     } else {
         draw_loading_screen(renderer.get(), preloader.loaded(), preloader.total());
     }
     renderer.get().end_frame();
 }
 
-void ClientApp::Impl::draw_world() {
+void ClientApp::Impl::draw_world(const std::vector<network::EntitySnapshot>& entities) {
     const core::Vec2 viewport = renderer.get().virtual_size();
-    const auto entities = network.entities();
     const core::CameraView camera = resolve_camera(entities, client.camera_override(), viewport);
     client.set_camera_view(camera, viewport);
     renderer.get().begin_world(camera);
-    view.draw(entities, std::chrono::duration<float>(time_source.get().now() - started_at).count());
+    world_draw.draw({std::ref(view.mirror(entities)), std::ref(local)},
+                    std::chrono::duration<float>(time_source.get().now() - started_at).count());
     renderer.get().end_world();
 }
 

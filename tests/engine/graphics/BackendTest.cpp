@@ -4,7 +4,7 @@
 #include <string>
 #include <type_traits>
 
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/graphics/IGraphicsBackend.hpp"
 #include "engine/graphics/PluginApi.hpp"
 #include "fixtures/NullRenderer.hpp"

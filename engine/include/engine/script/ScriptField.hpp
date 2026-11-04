@@ -4,7 +4,7 @@
 #include <string>
 #include <variant>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 
 namespace engine::script {
 

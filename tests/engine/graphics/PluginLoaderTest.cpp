@@ -4,7 +4,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "engine/core/DynamicLibrary.hpp"
+#include "engine/core/util/DynamicLibrary.hpp"
 #include "engine/graphics/PluginLoader.hpp"
 
 using engine::core::DynamicLibrary;

@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/graphics/Types.hpp"
 
 inline engine::graphics::Rect upright_target_source(engine::graphics::Rect source,

@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/network/Audio.hpp"
 #include "engine/network/Export.hpp"
 

@@ -362,7 +362,7 @@ sequenceDiagram
     App->>Lua: set_player_input(player, input)
     App->>Lua: update(dt)
     Note over Lua: every entity's update(self, dt), then main.lua update(dt)
-    App->>ECS: Collisions::step(dt): PhysicsSystem
+    App->>ECS: PhysicsStep::step(dt): PhysicsSystem
     Note over ECS: CollisionEvent on the event bus
     ECS-->>Lua: collide(a, b) → on_collide(self, other)
     App->>Lua: flush_destroyed()
@@ -417,7 +417,7 @@ only handles local concerns such as hotkeys and audio levels.
 | Engine implementation | `engine/src/<module>/` |
 | CMake helpers (`engine_add_module`, `engine_add_plugin`) | `engine/cmake/EngineModule.cmake` |
 | Raylib backends | `plugins/graphics-raylib/src/`, `plugins/audio-raylib/src/` |
-| Generic apps and modes | `engine/src/app/` (`ServerApp`, `ClientApp`, `Launch`, `SnapshotView`, `AudioPlayer`, `AssetPreloader`, `LoadingScreen`, `Collisions`) |
+| Generic apps and modes | `engine/src/app/` (`ServerApp`, `ClientApp`, `Launch` at the root; `assets/`, `render/`, `simulation/` subfolders) |
 | Entry points | `game/server/`, `game/client/` (`main.cpp`, `Cli`) |
 | Game rules | `game/scripts/` |
 | Tests | `tests/engine/<module>/`, `tests/game/<target>/`, `tests/plugins/<name>/` |

@@ -6,9 +6,9 @@
 #include <string>
 #include <string_view>
 
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/physics/Components.hpp"
 #include "engine/physics/Fields.hpp"
 

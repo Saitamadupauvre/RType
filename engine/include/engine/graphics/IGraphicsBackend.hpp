@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/core/NonCopyableNonMovable.hpp"
+#include "engine/core/util/NonCopyableNonMovable.hpp"
 #include "engine/graphics/Export.hpp"
 #include "engine/graphics/IInput.hpp"
 #include "engine/graphics/IRenderer.hpp"

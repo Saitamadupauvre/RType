@@ -1,4 +1,4 @@
-#include "engine/core/DynamicLibrary.hpp"
+#include "engine/core/util/DynamicLibrary.hpp"
 
 #include <string>
 #include <utility>

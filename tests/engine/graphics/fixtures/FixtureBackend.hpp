@@ -1,7 +1,7 @@
 #pragma once
 
 #include "NullRenderer.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/graphics/IGraphicsBackend.hpp"
 
 namespace fixture {

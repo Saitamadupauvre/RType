@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "engine/core/ComponentPool.hpp"
+#include "engine/core/ecs/ComponentPool.hpp"
 
 using engine::core::ComponentPool;
 using engine::core::Entity;

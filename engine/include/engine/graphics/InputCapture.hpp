@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/core/InputState.hpp"
+#include "engine/core/input/InputState.hpp"
 #include "engine/graphics/Export.hpp"
 #include "engine/graphics/IInput.hpp"
 

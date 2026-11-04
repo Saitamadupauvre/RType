@@ -7,8 +7,8 @@
 
 #include <gtest/gtest.h>
 
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/network/Replicated.hpp"
 #include "engine/network/StringTable.hpp"
 

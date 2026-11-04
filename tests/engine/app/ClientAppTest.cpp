@@ -13,7 +13,7 @@
 #include "engine/app/ClientApp.hpp"
 #include "engine/app/ServerApp.hpp"
 #include "engine/audio/IAudio.hpp"
-#include "engine/core/Camera.hpp"
+#include "engine/core/math/Camera.hpp"
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/graphics/IInput.hpp"
 #include "engine/graphics/IRenderer.hpp"
@@ -59,9 +59,14 @@ public:
     }
     [[nodiscard]] Vec2 texture_size(TextureId) const override { return {8, 8}; }
     void begin_frame(Color) override {
+        calls.clear();
+        rects.clear();
+        rects_in_world.clear();
         sprites.clear();
         texts.clear();
         sprites_in_world.clear();
+        texts_in_world.clear();
+        text_positions.clear();
         views.clear();
     }
     void end_frame() override {
@@ -74,10 +79,21 @@ public:
     }
     void end_world() override { in_world = false; }
     void draw_sprite(const SpriteDraw& sprite) override {
+        calls.emplace_back("sprite");
         sprites.push_back(sprite);
         sprites_in_world.push_back(in_world);
     }
-    void draw_text(const std::string& text, Vec2, float, Color) override { texts.push_back(text); }
+    void draw_rect(const Rect& rect, Color, bool) override {
+        calls.emplace_back("rect");
+        rects.push_back(rect);
+        rects_in_world.push_back(in_world);
+    }
+    void draw_text(const std::string& text, Vec2 position, float, Color) override {
+        calls.push_back("text " + text);
+        texts.push_back(text);
+        texts_in_world.push_back(in_world);
+        text_positions.push_back(position);
+    }
 
     bool open_succeeds{true};
     bool is_open{false};
@@ -86,8 +102,13 @@ public:
     std::string title;
     std::function<void()> on_load;
     std::vector<std::string> loaded;
+    std::vector<std::string> calls;
+    std::vector<Rect> rects;
+    std::vector<bool> rects_in_world;
     std::vector<SpriteDraw> sprites;
     std::vector<std::string> texts;
+    std::vector<bool> texts_in_world;
+    std::vector<Vec2> text_positions;
     std::vector<bool> sprites_in_world;
     std::vector<engine::core::CameraView> views;
     bool in_world{false};
@@ -390,4 +411,132 @@ TEST_F(ClientAppTest, ServerSeesThePlayerLeaveWhenTheClientStops) {
     _server.update();
 
     EXPECT_EQ(_server.network().player_count(), 0U);
+}
+
+TEST_F(ClientAppTest, LocalEntitiesAreDrawnInTheWorldOnlyOnTheirClient) {
+    FakeRenderer other_renderer;
+    ClientApp other{_clock,
+                    _loopback.add_client(),
+                    other_renderer,
+                    _input,
+                    _audio,
+                    ClientAppOptions{.scripts = game / "scripts",
+                                     .assets = game / "assets",
+                                     .window = {},
+                                     .background = {},
+                                     .audio = {}}};
+    std::string error;
+    ASSERT_TRUE(other.start(error)) << error;
+    start_client();
+    ASSERT_TRUE(_client.script().run_string("spawn_local('dust', { x = 100, vx = 0 })", "local"));
+
+    for (int frame = 0; frame < session_frames; ++frame) {
+        _clock.advance(std::chrono::milliseconds(17));
+        _server.update();
+        _client.frame();
+        other.frame();
+    }
+
+    ASSERT_EQ(_renderer.rects.size(), 1U);
+    EXPECT_FLOAT_EQ(_renderer.rects.front().x, 100.F);
+    EXPECT_TRUE(_renderer.rects_in_world.front());
+    EXPECT_TRUE(other_renderer.rects.empty());
+    EXPECT_EQ(other_renderer.sprites.size(), _renderer.sprites.size());
+    other.stop();
+}
+
+TEST_F(ClientAppTest, LocalEntitiesAreUpdatedByClientScripts) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string("spark = spawn_local('spark', { x = 100 })", "local"));
+
+    play(session_frames);
+
+    ASSERT_EQ(_renderer.rects.size(), 1U);
+    EXPECT_GT(_renderer.rects.front().x, 100.F);
+    EXPECT_TRUE(_client.script().run_string(
+        "assert(spark.x == " + std::to_string(static_cast<int>(_renderer.rects.front().x)) + ")",
+        "check"));
+}
+
+TEST_F(ClientAppTest, LocalEntitiesMoveWithTheirVelocity) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string("spawn_local('dust')", "local"));
+
+    play(session_frames);
+
+    ASSERT_EQ(_renderer.rects.size(), 1U);
+    EXPECT_GT(_renderer.rects.front().x, 0.F);
+}
+
+TEST_F(ClientAppTest, DestroyedLocalEntitiesAreNoLongerDrawn) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string("spark = spawn_local('spark')", "local"));
+    play(session_frames);
+    ASSERT_EQ(_renderer.rects.size(), 1U);
+
+    ASSERT_TRUE(_client.script().run_string("spark:destroy()", "destroy"));
+    play(1);
+
+    EXPECT_TRUE(_renderer.rects.empty());
+}
+
+TEST_F(ClientAppTest, LocalAndServerEntitiesAreDrawnTogetherByZIndex) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string(
+        "spawn_local('dust', { vx = 0, z_index = -1 }) spawn_local('spark', { z_index = 1 })",
+        "local"));
+
+    play(session_frames);
+
+    EXPECT_EQ(_renderer.calls, (std::vector<std::string>{"rect", "sprite", "rect"}));
+}
+
+TEST_F(ClientAppTest, HudIsDrawnAfterTheWorldInScreenSpace) {
+    start_client();
+    ASSERT_TRUE(
+        _client.script().run_string("function hud() draw.text('HP', 10, 20, 16) end", "hud"));
+
+    play(session_frames);
+
+    ASSERT_EQ(_renderer.texts, (std::vector<std::string>{"HP"}));
+    EXPECT_FALSE(_renderer.texts_in_world.front());
+    EXPECT_EQ(_renderer.calls.back(), "text HP");
+}
+
+TEST_F(ClientAppTest, HudStaysFixedWhenTheCameraMoves) {
+    start_client();
+    ASSERT_TRUE(
+        _client.script().run_string("function hud() draw.text('HP', 10, 20, 16) end", "hud"));
+    play(session_frames);
+    const Vec2 before = _renderer.text_positions.front();
+
+    ASSERT_TRUE(_client.script().run_string("camera.set(900, 700, 3)", "move"));
+    play(1);
+
+    EXPECT_EQ(_renderer.views.front(),
+              (engine::core::CameraView{.center = {900.F, 700.F}, .zoom = 3.F}));
+    EXPECT_EQ(_renderer.text_positions.front(), before);
+}
+
+TEST_F(ClientAppTest, AnErrorInTheHudIsLoggedAndTheFrameGoesOn) {
+    start_client();
+    ASSERT_TRUE(_client.script().run_string(
+        "function hud() draw.text('HP', 10, 20, 16) error('broken hud') end", "hud"));
+
+    play(session_frames);
+
+    EXPECT_EQ(_renderer.texts, (std::vector<std::string>{"HP"}));
+    EXPECT_EQ(_renderer.sprites.size(), 1U);
+    EXPECT_EQ(_renderer.frames, session_frames);
+}
+
+TEST_F(ClientAppTest, NoHudIsDrawnWhileLoading) {
+    ASSERT_TRUE(
+        _client.script().run_string("function hud() draw.text('HP', 10, 20, 16) end", "hud"));
+    start_client();
+
+    _client.frame();
+
+    EXPECT_TRUE(std::ranges::none_of(_renderer.texts,
+                                     [](const std::string& text) { return text == "HP"; }));
 }

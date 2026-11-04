@@ -60,7 +60,7 @@ caller's job. When the `GraphicsPlugin` is destroyed, the backend is passed to
 `engine_graphics_destroy()` before the library is closed.
 
 Opening the library and looking up symbols is done by
-`engine::core::DynamicLibrary` (`<engine/core/DynamicLibrary.hpp>`), which any
+`engine::core::DynamicLibrary` (`<engine/core/util/DynamicLibrary.hpp>`), which any
 future plugin kind can reuse.
 
 Any change to the interfaces increments `plugin_api_version`, so an old plugin

@@ -9,10 +9,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "engine/core/Entity.hpp"
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/Entity.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "entity/EntityFields.hpp"
 #include "loading/Declarations.hpp"
 #include "lua/Sol.hpp"

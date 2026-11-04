@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/script/ScriptField.hpp"
 #include "entity/Entities.hpp"
 #include "loading/Declarations.hpp"

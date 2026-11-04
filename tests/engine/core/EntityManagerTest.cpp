@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 
 using engine::core::ComponentAlreadyRegistered;
 using engine::core::ComponentNotRegistered;

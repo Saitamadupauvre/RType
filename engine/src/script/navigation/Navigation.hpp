@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "engine/core/Entity.hpp"
+#include "engine/core/ecs/Entity.hpp"
 #include "engine/navigation/NavGrid.hpp"
 #include "engine/navigation/Pathfinding.hpp"
 #include "entity/Entities.hpp"

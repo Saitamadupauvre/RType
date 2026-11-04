@@ -1,4 +1,4 @@
-#include "engine/core/Camera.hpp"
+#include "engine/core/math/Camera.hpp"
 
 #include <algorithm>
 

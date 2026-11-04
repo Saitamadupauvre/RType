@@ -8,7 +8,7 @@
 
 #include "assets/DeclaredAssets.hpp"
 #include "audio/Audio.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/script/Scene.hpp"
 #include "entity/Entities.hpp"
 #include "event/Events.hpp"
@@ -29,6 +29,8 @@ public:
 
     [[nodiscard]] const Declaration* find_declaration(std::string_view name) const;
     [[nodiscard]] sol::protected_function main_callback(std::string_view name) const;
+    sol::object spawn_declared(sol::this_state state, std::string_view type,
+                               const sol::optional<sol::table>& overrides);
 
     core::FieldRegistry fields;
     sol::state lua;

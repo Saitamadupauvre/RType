@@ -14,7 +14,7 @@
 #include <utility>
 #include <variant>
 
-#include "engine/core/Components.hpp"
+#include "engine/core/ecs/Components.hpp"
 
 namespace engine::script {
 

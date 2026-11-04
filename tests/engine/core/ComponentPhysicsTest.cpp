@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 
 using engine::core::EntityManager;
 using engine::core::Position;

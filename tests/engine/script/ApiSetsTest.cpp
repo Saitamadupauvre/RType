@@ -6,7 +6,7 @@
 #include <string>
 #include <utility>
 
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/script/ClientApi.hpp"
@@ -33,6 +33,10 @@ constexpr const char* server_globals =
     "assert(spawn and players and find_player and play and music and emit)";
 constexpr const char* no_server_globals = "assert(not (spawn or players or find_player or play "
                                           "or music or emit))";
+constexpr const char* client_globals =
+    "assert(on and input and audio and camera and spawn_local and draw)";
+constexpr const char* no_client_globals =
+    "assert(not (on or input or audio or camera or spawn_local or draw))";
 
 class ApiSetsTest : public ::testing::Test {
 protected:
@@ -57,7 +61,7 @@ TEST_F(ApiSetsTest, CoreRuntimeOnlyHasCoreGlobals) {
 
     EXPECT_TRUE(runtime.run_string(core_globals, "core"));
     EXPECT_TRUE(runtime.run_string(no_server_globals, "core"));
-    EXPECT_TRUE(runtime.run_string("assert(on == nil)", "core"));
+    EXPECT_TRUE(runtime.run_string(no_client_globals, "core"));
 }
 
 TEST_F(ApiSetsTest, CoreRuntimeCallingSpawnIsCleanLuaError) {
@@ -74,6 +78,7 @@ TEST_F(ApiSetsTest, ServerRuntimeHasServerGlobalsButNotClientOnes) {
 
     EXPECT_TRUE(runtime.run_string(core_globals, "server"));
     EXPECT_TRUE(runtime.run_string(server_globals, "server"));
+    EXPECT_TRUE(runtime.run_string(no_client_globals, "server"));
     EXPECT_FALSE(runtime.run_string("on('hit', function() end)", "server.lua"));
     EXPECT_TRUE(logged_error("attempt to call a nil value (global 'on')"));
 }
@@ -82,7 +87,7 @@ TEST_F(ApiSetsTest, ClientRuntimeHasOnButNotServerGlobals) {
     auto runtime = ScriptRuntime::builder().with<ClientApi>().build();
 
     EXPECT_TRUE(runtime.run_string(core_globals, "client"));
-    EXPECT_TRUE(runtime.run_string("assert(on)", "client"));
+    EXPECT_TRUE(runtime.run_string(client_globals, "client"));
     EXPECT_TRUE(runtime.run_string(no_server_globals, "client"));
 }
 
@@ -91,6 +96,7 @@ TEST_F(ApiSetsTest, EditorRuntimeOnlyHasCoreGlobals) {
 
     EXPECT_TRUE(runtime.run_string(core_globals, "editor"));
     EXPECT_TRUE(runtime.run_string(no_server_globals, "editor"));
+    EXPECT_TRUE(runtime.run_string(no_client_globals, "editor"));
 }
 
 TEST_F(ApiSetsTest, CoreEntitiesTreatInputAndOwnerAsFreeFields) {

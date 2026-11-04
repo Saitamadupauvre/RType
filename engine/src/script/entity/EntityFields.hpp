@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "assets/DeclaredAssets.hpp"
-#include "engine/core/Entity.hpp"
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/Entity.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "lua/Sol.hpp"
 
 namespace engine::script {

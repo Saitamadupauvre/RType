@@ -4,8 +4,8 @@
 
 #include <nlohmann/json.hpp>
 
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/core/math/Vec2.hpp"
 
 namespace engine::script {
 

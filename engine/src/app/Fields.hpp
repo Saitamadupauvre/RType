@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/app/Export.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 
 namespace engine::app {
 

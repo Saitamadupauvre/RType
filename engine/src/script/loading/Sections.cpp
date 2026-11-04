@@ -5,16 +5,13 @@
 #include <string>
 
 #include "engine/core/log/Log.hpp"
+#include "lua/LuaArgs.hpp"
 
 namespace engine::script {
 
 namespace {
 
 namespace log = engine::core::log;
-
-bool is_nil(const sol::object& value) {
-    return value.get_type() == sol::type::lua_nil || value.get_type() == sol::type::none;
-}
 
 std::string describe_key(const sol::object& key) {
     if (key.get_type() == sol::type::string) {

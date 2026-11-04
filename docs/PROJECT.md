@@ -391,7 +391,7 @@ The loader refuses a plugin built for another API version, and the backend is al
 - **Render targets.** `create_render_target(size)` makes an off-screen surface of `size` pixels. Between `begin_target(target, clear)` and `end_target()`, draw calls go into it instead of the frame: screen space is the target's own pixels, and `begin_world(view)` centers the view on the target. `target_texture(target)` is a normal `TextureId`, drawn upright with `draw_sprite` (the backend handles the flip of the render texture); `unload_texture` ignores it, it lives as long as its target. `begin_target` and `end_target` end world space first, so the editor viewport is `begin_target` → `begin_world` → draw → `end_world` → `end_target` → `draw_sprite(target_texture)`. Calling `begin_target` again switches target; targets do not nest.
 - **Shaders.** `load_shader(vertex, fragment)` compiles GLSL files; an empty path uses the backend's default stage. Between `begin_shader(shader)` and `end_shader()`, draw calls go through it; calling `begin_shader` again replaces it. Uniforms keep their value across frames and only affect the draw calls made after them; unknown shaders and uniforms the program does not use are ignored. A missing file, a compile or link error gives the default `ShaderId`, is logged, and `begin_shader` on it draws with the default pipeline, so drawing always continues.
 - **Lifetime.** `destroy_render_target` / `unload_shader` end the target or shader first if it is current; `end_frame()` ends the current target, world space and shader; `close()` frees every texture, target and shader.
-- **Camera.** The view comes from, in this order: the local override of the client scripts (`camera.*`, §10.10), the scene camera (the replicated entity with a `Camera` component and the lowest id, clamped to its bounds), or the default view (`center = virtual_size / 2`, `zoom = 1`), which draws exactly as without a camera. Camera entities are never drawn. The conversion math lives in `engine-core` (`engine/core/Camera.hpp`), so the script module uses it without depending on graphics.
+- **Camera.** The view comes from, in this order: the local override of the client scripts (`camera.*`, §10.10), the scene camera (the replicated entity with a `Camera` component and the lowest id, clamped to its bounds), or the default view (`center = virtual_size / 2`, `zoom = 1`), which draws exactly as without a camera. Camera entities are never drawn. The conversion math lives in `engine-core` (`engine/core/math/Camera.hpp`), so the script module uses it without depending on graphics.
 
 ### 9.4 Audio plugin
 
@@ -424,7 +424,7 @@ class IAudio {   // engine/include/engine/audio/IAudio.hpp
 
 ### 9.5 Asset cache
 
-The game refers to assets by name; `engine::core::AssetCache<Id>` (`engine/core/AssetCache.hpp`) turns a name into a backend handle. It is built with a folder and a load / unload pair, e.g. `IRenderer::load_texture` / `unload_texture`.
+The game refers to assets by name; `engine::core::AssetCache<Id>` (`engine/core/util/AssetCache.hpp`) turns a name into a backend handle. It is built with a folder and a load / unload pair, e.g. `IRenderer::load_texture` / `unload_texture`.
 
 ```cpp
 core::AssetCache<graphics::TextureId> textures(assets, load, unload);
@@ -482,6 +482,8 @@ This section is the specification of the Lua API. Not everything is implemented 
 | `shaders { ... }`, entity `shader` replicated to clients by shader id and drawn through it | Implemented (see §10.5, §10.6) |
 | API sets (`core`, `server`, `client`, `editor`), `server = { ... }` / `client = { ... }` sections, client `on(name, handler)` | Implemented (see §10.10) |
 | Client `input` (`key`, `mouse`, `pointer`, `pressed`) and `audio` (`muted`, `set_muted`, `volume`, `set_volume`) | Implemented (see §10.10) |
+| Client `spawn_local` (local entities) and `draw.text`, `draw.rect`, `draw.sprite` from `draw_hud()` (screen-space HUD) | Implemented (see §10.10) |
+| Entity `z_index` (drawing order), replicated | Implemented (see §10.5) |
 | Pathfinding: `navgrid`, `find_path`, `self:navigate_to`, `stop_navigation`, `is_navigating`, `on_arrive` (see §10.6) | Implemented |
 | `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
 
@@ -590,7 +592,7 @@ Both forms produce the same internal representation.
 
 | Kind | Examples | Stored in | Used by |
 |---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `shader`, `rotation`, `scale`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds` | C++ component pools | Movement, collisions, rendering, replication |
+| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `z_index`, `shader`, `rotation`, `scale`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds` | C++ component pools | Movement, collisions, rendering, replication |
 | Free fields | `health`, `speed`, `points`, `waypoints` | Lua table of the entity | Scripts, and scenes / the editor as script fields |
 | Callbacks | `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
 | Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
@@ -630,17 +632,20 @@ function on_arrive(self) end  -- called once the target is reached
 
 `sprite` is a path relative to `assets/`, such as `sprites/boss/core.png`. The `sprite` of an entity declaration is declared as a texture on its own; any other value must be declared with `textures { ... }` (§10.6) or be `""` (no sprite), otherwise the assignment raises an error and the sprite does not change. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a 64 × 64 square of that color (before `scale`). It reads back as a new table.
 
-`shader` is the name of a GLSL program under `assets/`, without extension, such as `shaders/space`: the client draws the entity (its sprite or its square) through `assets/shaders/space.fs` and, when it exists, `assets/shaders/space.vs`. Like `sprite`, the `shader` of an entity declaration is declared on its own; any other value must be declared with `shaders { ... }` (§10.6) or be `""` (no shader). It is replicated by shader id and the client preloads every declared shader. The engine sets two uniforms before drawing: `float time`, seconds since the client started (from the engine clock, never the frame rate), and `vec2 resolution`, the virtual size of the screen (1920 × 1080), so `gl_FragCoord.xy / resolution` spans the screen. A shader that is missing or does not compile is logged once and the entity is drawn without it. Entities are drawn in spawn order, so a background is spawned first:
+`shader` is the name of a GLSL program under `assets/`, without extension, such as `shaders/space`: the client draws the entity (its sprite or its square) through `assets/shaders/space.fs` and, when it exists, `assets/shaders/space.vs`. Like `sprite`, the `shader` of an entity declaration is declared on its own; any other value must be declared with `shaders { ... }` (§10.6) or be `""` (no shader). It is replicated by shader id and the client preloads every declared shader. The engine sets two uniforms before drawing: `float time`, seconds since the client started (from the engine clock, never the frame rate), and `vec2 resolution`, the virtual size of the screen (1920 × 1080), so `gl_FragCoord.xy / resolution` spans the screen. A shader that is missing or does not compile is logged once and the entity is drawn without it. Entities are drawn in ascending `z_index`, then in spawn order, so a background either gets a low `z_index` or is spawned first:
 
 ```lua
 entity "space"
 
-shader = "shaders/space"
-color  = { r = 0, g = 0, b = 0 }
+shader  = "shaders/space"
+z_index = -100
+color   = { r = 0, g = 0, b = 0 }
 scale  = { x = 1920 / 64, y = 1080 / 64 }   -- the 64 x 64 square covers the screen
 ```
 
 `rotation` turns the sprite, in degrees clockwise, around its center. `scale` takes a number for both axes (`scale = 2`) or a table `{ x = .., y = .. }`; a negative factor mirrors the sprite (`scale = { x = -1, y = 1 }` faces it the other way) and `0` hides it. The scaled sprite keeps its top-left corner at `x`, `y`. Both are optional: an entity without them is drawn upright at the size of its texture and sends nothing over the network for them. `scale` always reads back as a new `{ x, y }` table. Both are replicated and editable, so the editor, scene files and snapshots carry them; the scale travels as two floats, so fractional factors reach clients exactly. Colliders do not follow them yet: `hitbox` stays exactly as written, whatever the rotation or scale. An entity drawn as a colored square (no `sprite`) is scaled but never rotated.
+
+`z_index` is a whole number from -2^31 to 2^31 - 1 that orders drawing: lower values are drawn first, so higher ones appear in front; entities with the same `z_index` are drawn in spawn order. It is optional: an entity without it reads `nil`, is drawn at 0 and sends nothing over the network for it. Replicated entities and the client's local entities (§10.10) are sorted together. A value that is not a whole number, or that does not fit, raises an error and keeps the old one.
 
 ```lua
 entity "boss" {
@@ -679,7 +684,7 @@ entity "main_camera" {
 }
 ```
 
-Native fields are aliases of component fields declared in the engine's field registry: `x` / `y` are the axes of `Position.pos`, `vx` / `vy` of `PhysicsBody.velocity`, `sprite` is `Sprite.path`, `color` is `Sprite.color`, `rotation` is `Rotation.degrees`, `scale` is `Scale.x` with `Scale.y`, `tags` is `Tags.labels`, `hitbox` is `AABBCollider.size`, `collides_with` is `CollidesWith.labels`, `zoom` is `Camera.zoom`, `follow` is `Camera.follow` and `bounds` is `Camera.bounds_origin` with `Camera.bounds_size`. `get_field` / `set_field` reach every other registered field by component and field name, with the same conversions:
+Native fields are aliases of component fields declared in the engine's field registry: `x` / `y` are the axes of `Position.pos`, `vx` / `vy` of `PhysicsBody.velocity`, `sprite` is `Sprite.path`, `color` is `Sprite.color`, `z_index` is `Layer.z_index`, `rotation` is `Rotation.degrees`, `scale` is `Scale.x` with `Scale.y`, `tags` is `Tags.labels`, `hitbox` is `AABBCollider.size`, `collides_with` is `CollidesWith.labels`, `zoom` is `Camera.zoom`, `follow` is `Camera.follow` and `bounds` is `Camera.bounds_origin` with `Camera.bounds_size`. `get_field` / `set_field` reach every other registered field by component and field name, with the same conversions:
 
 | Field kind | Lua value |
 |---|---|
@@ -739,6 +744,10 @@ event "explosion" { at = "vec2", size = "float" }   -- declare, while the script
 emit("explosion", { at = { x = self.x, y = self.y }, size = 2 })
 emit("explosion")                -- arguments left out are simply absent
 on("explosion", function(event) ... end)   -- client only: react to a received event
+
+-- local entities and HUD (client only, see §10.10)
+spawn_local("explosion", { x = 100, y = 200 })   -- never sent to the server
+draw.text("SCORE 42", 30, 28, 24)                 -- only inside client draw_hud()
 
 -- local input and audio (client only)
 input:pressed("M")               -- true on the tick the key goes down
@@ -939,7 +948,7 @@ end
 ### 10.10 Networking from the script's point of view
 
 - Scripts are written once; the developer does not write network code.
-- Game logic (`update`, `on_collide`, `behavior`, systems) runs **on the server only**. The client runs the same scripts but spawns no entity: its `main.lua` code (`client = { ... }`) reacts to events, reads the local input and changes the audio levels.
+- Game logic (`update`, `on_collide`, `behavior`, systems) runs **on the server only**. The client runs the same scripts: its `main.lua` code (`client = { ... }`) reacts to events, reads the local input, changes the audio levels, spawns **local** entities for effects and draws the HUD. Local entities never reach the server or the other clients.
 - `play`, `music` and `emit` are sent to clients as events; clients receive the declared names (and event keys) in `connect_accept`.
 - Native fields are replicated automatically. A free field is replicated only when marked:
 
@@ -956,7 +965,7 @@ speed  = 150         -- server only
 |---|---|---|
 | `core` | `entity`, `system`, `require`, `sounds`, `musics`, `textures`, `shaders`, `event`, `navgrid`, `find_path`, the sandboxed standard libraries, entity fields and methods of §10.5 except `input` and `owner` | every runtime |
 | `server` | `spawn`, `players`, `find_player`, `play`, `music`, `emit`, `load_scene`, `self.input`, `self.owner`, `on_player_joined`, `on_player_left`, `on_scene_loaded` | server (`core` + `server`) |
-| `client` | `on`, `input`, `audio`, `camera`, `on_scene_loaded` | client (`core` + `client`) |
+| `client` | `on`, `input`, `audio`, `camera`, `spawn_local`, `draw`, `draw_hud`, `on_scene_loaded` | client (`core` + `client`) |
 | `editor` | nothing yet | editor (`core` + `editor`) |
 
 Top-level code of a file runs on every side, so it may only use `core` functions; side-specific calls belong in callbacks.
@@ -1009,6 +1018,50 @@ local wx, wy = camera.screen_to_world(input:pointer())   -- world point under th
 
 A missing `zoom` keeps the zoom of the current view. `camera.follow` keeps the scene camera's bounds and falls back to the scene camera while the entity is not replicated; the server sends ids to clients through events, e.g. `emit("you_are", { id = self.id })`. `input:pointer()` stays in screen units; `camera.screen_to_world` converts through the view drawn this frame. A coordinate that is not a finite number, a `zoom` that is not positive or an `id` that is not a non-negative integer raises an error and changes nothing.
 
+**Local entities.** `spawn_local(type [, overrides])` spawns a declared entity on this client only, with its `client` section merged in, exactly like `spawn` on the server: it returns the entity, or `nil` (logged) for an unknown type. Local entities are never replicated. Every client tick runs their `update(self, dt)`, moves them by their `vx` / `vy`, runs `on_collide` between local entities, then removes those destroyed with `self:destroy()`. They are drawn with the replicated entities, in the world and through the camera, sorted by `z_index` (§10.5). Their `self.id` is only unique among local entities: `camera.follow` always means a replicated id.
+
+```lua
+entity "spark" {
+    color = { r = 255, g = 200, b = 0 },
+    z_index = 10,
+    client = {
+        update = function(self, dt)
+            if self.age > 0.3 then self:destroy() end
+        end,
+    },
+}
+
+client = {
+    on_start = function()
+        on("explosion", function(event)
+            spawn_local("spark", { x = event.at.x, y = event.at.y, vx = 80 })
+        end)
+    end,
+}
+```
+
+**HUD.** A `draw_hud()` callback in the `client` section of `main.lua` runs once per frame, after the world is drawn. Inside it, `draw.*` queue drawings in **screen space**: virtual units of the 1920 × 1080 screen, top-left origin, never moved or zoomed by the camera. They are drawn in call order, in front of the world.
+
+```lua
+local score = 0
+
+client = {
+    on_start = function()
+        on("scored", function(event) score = event.total end)
+    end,
+    draw_hud = function()
+        draw.rect(20, 20, 300, 40, { r = 0, g = 0, b = 0, a = 160 })          -- x, y, w, h [, color [, filled]]
+        draw.text("SCORE " .. score, 30, 28, 24, { r = 255, g = 255, b = 255 }) -- text, x, y, size [, color]
+        draw.sprite("ui/heart.png", 1800, 20, { scale = 2 })                   -- texture, x, y [, { scale, rotation, color }]
+    end,
+}
+```
+
+- Colors default to white. `filled = false` draws the outline only. `draw.sprite` takes a texture declared with `textures { ... }`; `scale` is a number or `{ x, y }` (negative mirrors), `rotation` is in degrees clockwise around the center, and the scaled sprite keeps its top-left corner at `x`, `y`.
+- A coordinate that is not a finite number, a negative `w` or `h`, a `size` that is not positive, a text that is not a string or is longer than 256 bytes, an undeclared texture, or a call outside `draw_hud()` raises an error and queues nothing.
+- An error in `draw_hud()` is logged; what it drew before the error is still shown and the frame goes on. At most 1024 drawings are kept per frame; later ones are dropped and logged once.
+- The callback is called `draw_hud`, not `draw`, because the `client` section's names become globals of `main.lua` and would hide the `draw` table.
+
 ### 10.11 Server tick order
 
 1. Apply received inputs.
@@ -1025,11 +1078,11 @@ A missing `zoom` keeps the zoom of the current view. `camera.follow` keeps the s
 
 Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
 
-- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds`, `layer`, `age`, `id`, `type`, `input`, `owner`.
+- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `z_index`, `hitbox`, `collides_with`, `tags`, `zoom`, `follow`, `bounds`, `layer`, `age`, `id`, `type`, `input`, `owner`.
 - Declaration sections: `server`, `client`. Declaration flag: `persistent`.
 - Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`, `navigate_to`, `stop_navigation`, `is_navigating`.
-- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`, `on_arrive`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `on_scene_loaded`, `update`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `textures`, `shaders`, `navgrid`, `find_path`, `load_scene`.
+- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`, `on_arrive`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `on_scene_loaded`, `update`, `draw_hud`.
+- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `spawn_local`, `draw`, `textures`, `shaders`, `navgrid`, `find_path`, `load_scene`.
 - Events: `scene_loaded`.
 
 ### 10.13 Error handling and sandbox

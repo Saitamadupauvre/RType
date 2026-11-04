@@ -4,11 +4,11 @@
 #include <memory>
 #include <string>
 
-#include "engine/core/InputState.hpp"
-#include "engine/core/Keys.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/input/InputState.hpp"
+#include "engine/core/input/Keys.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/script/ClientApi.hpp"
 #include "engine/script/EventCommand.hpp"
 #include "engine/script/ScriptRuntime.hpp"

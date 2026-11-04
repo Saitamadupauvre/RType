@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/SystemScheduler.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/SystemScheduler.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
 

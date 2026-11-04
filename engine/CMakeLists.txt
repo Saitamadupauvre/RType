@@ -55,6 +55,11 @@ engine_add_module(script
         src/script/ServerApi.cpp
         src/script/assets/DeclaredAssets.cpp
         src/script/audio/Audio.cpp
+        src/script/client/ClientAudio.cpp
+        src/script/client/ClientCamera.cpp
+        src/script/client/ClientEvents.cpp
+        src/script/client/HudCanvas.cpp
+        src/script/client/LocalSpawn.cpp
         src/script/entity/Entities.cpp
         src/script/entity/EntityFields.cpp
         src/script/entity/ScriptBody.cpp
@@ -67,6 +72,7 @@ engine_add_module(script
         src/script/loading/NameList.cpp
         src/script/loading/ScriptFiles.cpp
         src/script/loading/Sections.cpp
+        src/script/lua/LuaArgs.cpp
         src/script/lua/LuaErrors.cpp
         src/script/lua/LuaFieldValue.cpp
         src/script/navigation/Navigation.cpp
@@ -136,19 +142,22 @@ engine_add_module(audio
 
 engine_add_module(app
     SOURCES
-        src/app/AssetPreloader.cpp
-        src/app/AudioPlayer.cpp
-        src/app/CameraFollow.cpp
-        src/app/CameraRig.cpp
+        src/app/assets/AssetPreloader.cpp
+        src/app/assets/AudioPlayer.cpp
+        src/app/simulation/CameraFollow.cpp
+        src/app/render/CameraRig.cpp
         src/app/ClientApp.cpp
-        src/app/Collisions.cpp
         src/app/Fields.cpp
+        src/app/render/HudDraw.cpp
         src/app/Launch.cpp
-        src/app/LoadingScreen.cpp
+        src/app/render/LoadingScreen.cpp
+        src/app/simulation/PhysicsStep.cpp
         src/app/ServerApp.cpp
-        src/app/ShaderLibrary.cpp
-        src/app/SnapshotView.cpp
-        src/app/WorldDraw.cpp
+        src/app/assets/ShaderLibrary.cpp
+        src/app/render/SnapshotView.cpp
+        src/app/render/SpriteLayout.cpp
+        src/app/assets/TextureLibrary.cpp
+        src/app/render/WorldDraw.cpp
     DEPENDS engine::core engine::script engine::network engine::graphics engine::audio
     PRIVATE_DEPENDS engine::physics
 )

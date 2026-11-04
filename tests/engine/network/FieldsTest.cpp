@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/network/Fields.hpp"
 
 TEST(NetworkFields, OwnerIsReplicatedButNotEditable) {

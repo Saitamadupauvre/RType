@@ -1,8 +1,8 @@
 #pragma once
 
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 #include "engine/core/event/EventBus.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/physics/Export.hpp"
 
 namespace engine::physics {

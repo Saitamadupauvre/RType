@@ -4,8 +4,8 @@
 #include <limits>
 #include <optional>
 
-#include "engine/core/InputState.hpp"
-#include "engine/core/Keys.hpp"
+#include "engine/core/input/InputState.hpp"
+#include "engine/core/input/Keys.hpp"
 #include "input/InputCodec.hpp"
 #include "protocol/Messages.hpp"
 

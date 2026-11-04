@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/network/Export.hpp"
 
 #include "Messages.hpp"

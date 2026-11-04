@@ -10,13 +10,14 @@
 #include <unordered_map>
 #include <utility>
 
-#include "engine/core/Camera.hpp"
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Components.hpp"
-#include "engine/core/Transform.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/Components.hpp"
 #include "engine/core/log/Log.hpp"
+#include "engine/core/math/Camera.hpp"
+#include "engine/core/math/Transform.hpp"
 #include "engine/physics/Components.hpp"
 #include "loading/Declarations.hpp"
+#include "lua/LuaArgs.hpp"
 #include "lua/LuaErrors.hpp"
 #include "lua/LuaFieldValue.hpp"
 
@@ -32,10 +33,6 @@ bool is_read_only(std::string_view name) {
     return std::ranges::find(read_only_fields, name) != read_only_fields.end();
 }
 
-bool is_nil(const sol::object& value) {
-    return value.get_type() == sol::type::lua_nil || value.get_type() == sol::type::none;
-}
-
 template <typename Component> void register_if_missing(core::EntityManager& world) {
     if (!world.is_registered<Component>()) {
         world.register_component<Component>();
@@ -45,6 +42,7 @@ template <typename Component> void register_if_missing(core::EntityManager& worl
 void register_script_components(core::EntityManager& world) {
     register_if_missing<core::Position>(world);
     register_if_missing<core::Sprite>(world);
+    register_if_missing<core::Layer>(world);
     register_if_missing<core::Shader>(world);
     register_if_missing<core::Tags>(world);
     register_if_missing<core::Camera>(world);

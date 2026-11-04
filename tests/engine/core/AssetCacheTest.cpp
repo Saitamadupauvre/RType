@@ -7,9 +7,9 @@
 #include <string>
 #include <vector>
 
-#include "engine/core/AssetCache.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/core/util/AssetCache.hpp"
 
 using engine::core::AssetCache;
 using engine::core::is_valid_asset_name;

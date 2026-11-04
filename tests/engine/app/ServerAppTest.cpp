@@ -10,8 +10,8 @@
 #include <vector>
 
 #include "engine/app/ServerApp.hpp"
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Components.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/Components.hpp"
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/network/Replicated.hpp"
