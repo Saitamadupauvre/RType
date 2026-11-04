@@ -1,0 +1,15 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "type": "ship",
+            "position": [0, 0],
+            "overrides": {
+                "Sprite.glow": true,
+                "Nothing": 1,
+                "Ghost.alpha": 0.5,
+                "PhysicsBody.mass": 3
+            }
+        }
+    ]
+}

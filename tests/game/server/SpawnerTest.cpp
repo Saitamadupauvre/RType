@@ -30,7 +30,7 @@ constexpr float max_y = 1080.F - bydo_height;
 constexpr std::size_t waves = 20;
 
 const std::filesystem::path game_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game" / "scripts";
 
 class Game {
 public:

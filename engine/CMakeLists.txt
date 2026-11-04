@@ -2,6 +2,7 @@ include(cmake/EngineModule.cmake)
 
 find_package(Lua REQUIRED)
 find_package(sol2 CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 add_library(engine_lua INTERFACE)
 target_include_directories(engine_lua INTERFACE ${LUA_INCLUDE_DIR})
@@ -58,6 +59,7 @@ engine_add_module(script
         src/script/entity/EntityFields.cpp
         src/script/entity/ScriptBody.cpp
         src/script/entity/Instances.cpp
+        src/script/entity/ScriptFields.cpp
         src/script/event/Events.cpp
         src/script/input/LuaInput.cpp
         src/script/loading/Declarations.cpp
@@ -69,8 +71,14 @@ engine_add_module(script
         src/script/lua/LuaFieldValue.cpp
         src/script/navigation/Navigation.cpp
         src/script/player/Players.cpp
+        src/script/scene/GameFolder.cpp
+        src/script/scene/JsonFieldValue.cpp
+        src/script/scene/JsonFile.cpp
+        src/script/scene/SceneFile.cpp
+        src/script/scene/SceneSwitch.cpp
     DEPENDS engine::core
     PRIVATE_DEPENDS engine::physics engine::navigation sol2::sol2 engine_lua
+        nlohmann_json::nlohmann_json
 )
 target_include_directories(engine-script PRIVATE src/script)
 
@@ -145,3 +153,12 @@ engine_add_module(app
     PRIVATE_DEPENDS engine::physics
 )
 target_include_directories(engine-app PRIVATE src/app)
+
+engine_add_module(editor
+    SOURCES
+        src/editor/EditorSession.cpp
+        src/editor/History.cpp
+        src/editor/SceneCommands.cpp
+        src/editor/SceneDocument.cpp
+    DEPENDS engine::core engine::script
+)

@@ -3,8 +3,9 @@ local roster = require("roster")
 
 entity "game"
 
-state     = "waiting"
-countdown = 0
+persistent = true
+state      = "waiting"
+countdown  = 0
 
 function on_spawn(self)
     roster.add(self, "game")

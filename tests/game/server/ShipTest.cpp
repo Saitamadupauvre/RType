@@ -38,7 +38,7 @@ constexpr float missile_height = 24.F;
 constexpr float half_cooldown = 0.125F;
 
 const std::filesystem::path game_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game" / "scripts";
 
 InputState moving(float move_x, float move_y) {
     InputState input;

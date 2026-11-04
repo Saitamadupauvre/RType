@@ -1,0 +1,19 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "type": "tuned",
+            "position": [0, 0],
+            "overrides": {
+                "Script.health": 9,
+                "Script.tint": [0, 255, 0, 255],
+                "Script.waypoints": [[1, 2]],
+                "Script.mana": 1,
+                "Script.speed": "fast",
+                "Script.steps": [1.5],
+                "Script.server_only": 1,
+                "Script._secret": 2
+            }
+        }
+    ]
+}

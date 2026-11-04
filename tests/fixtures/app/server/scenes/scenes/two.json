@@ -1,0 +1,6 @@
+{
+    "version": 1,
+    "instances": [
+        { "type": "marker", "position": [7, 8] }
+    ]
+}

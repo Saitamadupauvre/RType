@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <map>
 #include <optional>
 #include <string>
@@ -8,6 +9,7 @@
 #include "assets/DeclaredAssets.hpp"
 #include "audio/Audio.hpp"
 #include "engine/core/FieldRegistry.hpp"
+#include "engine/script/Scene.hpp"
 #include "entity/Entities.hpp"
 #include "event/Events.hpp"
 #include "loading/Declarations.hpp"
@@ -15,6 +17,11 @@
 #include "navigation/Navigation.hpp"
 
 namespace engine::script {
+
+struct PendingScene {
+    std::string name;
+    Scene scene;
+};
 
 class RuntimeContext {
 public:
@@ -34,6 +41,8 @@ public:
     Events events;
     std::map<std::string, Declaration, std::less<>> declarations;
     std::optional<sol::environment> main;
+    std::optional<std::filesystem::path> game;
+    std::optional<PendingScene> pending_scene;
 };
 
 } // namespace engine::script

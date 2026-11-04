@@ -61,6 +61,8 @@ struct CameraOverride {
  * - `on(name, handler)` takes an event declared with `event "name" { ... }` and a function; the
  *   function is called with a table of the event's arguments every time dispatch() receives
  *   that event. An undeclared event or a handler that is not a function raises a Lua error.
+ *   The built-in `scene_loaded` event (argument `name`), sent when the server switches scene,
+ *   also calls `on_scene_loaded(name)` from `main.lua` if it defines one, before the handlers.
  * - `input` is the local input given to set_input(): `input:key(name)`, `input:mouse(name)` and
  *   `input:pointer()` read it like an entity's `self.input` on the server, and
  *   `input:pressed(name)` is true only when the key went down since the previous set_input().

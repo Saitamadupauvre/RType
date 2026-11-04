@@ -8,15 +8,20 @@
 #include <vector>
 
 #include "engine/script/Declaration.hpp"
+#include "engine/script/ScriptField.hpp"
 #include "lua/Sol.hpp"
 
 namespace engine::script {
+
+inline constexpr std::string_view persistent_field = "persistent";
 
 struct Declaration {
     std::string name;
     DeclarationKind kind;
     std::filesystem::path source;
     sol::table prefab;
+    std::vector<ScriptField> script_fields{};
+    bool persistent = false;
 };
 
 struct PendingDeclaration {
@@ -53,6 +58,8 @@ sol::object make_declarator(sol::this_state state, const std::shared_ptr<Pending
 
 std::optional<std::vector<Declaration>> resolve_declarations(const PendingFile& file,
                                                              const sol::table& environment);
+
+bool read_persistence(Declaration& declaration);
 
 void warn_reserved_names(const Declaration& declaration);
 

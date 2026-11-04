@@ -176,7 +176,7 @@ undeclared name is an error, logged with its file and line.
 
 **4. Declare it in the test fixture too**: its `main.lua` is not synced (see
 [Tests](#tests)), so add the name to the `sounds { ... }` of
-`tests/fixtures/game/server/game/main.lua`.
+`tests/fixtures/game/server/game/scripts/main.lua`.
 
 ## Rules
 
@@ -233,12 +233,13 @@ Setting `vx` / `vy` already moves an entity every server tick. The target style
 
 ## Tests
 
-Tests load a copy of the scripts from `tests/fixtures/game/server/game/`,
+Tests load a copy of the scripts from `tests/fixtures/game/server/game/scripts/`,
 identical except for `main.lua`, whose `server` `on_start` is empty and which
-has no `client` table, so each test spawns only what it checks. Re-sync it after editing a script:
+has no `client` table, and the copy has no `game.json`, so each test spawns
+only what it checks. Re-sync it after editing a script:
 
 ```sh
-rsync -a --delete --exclude /main.lua game/scripts/ tests/fixtures/game/server/game/
+rsync -a --delete --exclude /main.lua game/scripts/ tests/fixtures/game/server/game/scripts/
 ```
 
 Then add a test in `tests/game/server/` that spawns your entity and checks its

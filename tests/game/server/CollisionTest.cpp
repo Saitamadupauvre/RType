@@ -37,7 +37,7 @@ constexpr float bydo_height = 72.F;
 constexpr float missile_width = 48.F;
 constexpr float short_tick = 0.01F;
 
-const std::filesystem::path game_scripts =
+const std::filesystem::path game_folder =
     std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
 
 struct HeardSound {
@@ -53,7 +53,7 @@ protected:
     logger::ScopedSink _scope{_sink, logger::Level::Trace};
     engine::core::time::ManualClock _clock;
     engine::network::LoopbackNetwork _loopback;
-    engine::app::ServerApp _app{_clock, _loopback.server(), {.scripts = game_scripts}};
+    engine::app::ServerApp _app{_clock, _loopback.server(), {.game = game_folder}};
     EntityManager& _world = _app.world();
     ScriptRuntime& _runtime = _app.script();
     std::vector<HeardSound> _sounds;

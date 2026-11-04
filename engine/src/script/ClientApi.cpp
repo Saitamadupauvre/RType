@@ -9,6 +9,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "RuntimeContext.hpp"
@@ -83,6 +84,7 @@ struct ClientApi::State {
     core::Vec2 viewport = default_viewport;
 
     void on(sol::this_state state, const sol::object& name, const sol::object& handler);
+    [[nodiscard]] bool notify_scene_loaded(const EventCommand& event) const;
     bool dispatch(const EventCommand& event);
     void bind_audio();
     void bind_camera();
@@ -114,13 +116,30 @@ void ClientApi::State::on(sol::this_state state, const sol::object& name,
     handlers[std::move(event)].push_back(handler.as<sol::protected_function>());
 }
 
-bool ClientApi::State::dispatch(const EventCommand& event) {
-    const auto found = handlers.find(event.name);
-    if (found == handlers.end()) {
+bool ClientApi::State::notify_scene_loaded(const EventCommand& event) const {
+    if (event.name != scene_loaded_event) {
         return true;
     }
+    const sol::protected_function callback = context->main_callback("on_scene_loaded");
+    if (!callback.valid()) {
+        return true;
+    }
+    for (const EventArgument& argument : event.arguments) {
+        const auto* scene = std::get_if<std::string>(&argument.value);
+        if (argument.key == scene_loaded_key && scene != nullptr) {
+            return report(callback(*scene));
+        }
+    }
+    return true;
+}
+
+bool ClientApi::State::dispatch(const EventCommand& event) {
+    bool success = notify_scene_loaded(event);
+    const auto found = handlers.find(event.name);
+    if (found == handlers.end()) {
+        return success;
+    }
     const sol::this_state state{context->lua.lua_state()};
-    bool success = true;
     for (const sol::protected_function& handler : found->second) {
         sol::table arguments = context->lua.create_table();
         for (const EventArgument& argument : event.arguments) {

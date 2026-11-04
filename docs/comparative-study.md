@@ -251,6 +251,7 @@ What the project stores, and where:
 | Data | Storage | Persistence |
 |---|---|---|
 | Game rules and tunables | Lua files in `scripts/` | Files, versioned in git |
+| Levels (scenes) and start scene | JSON files in `scenes/` and `game.json` | Files, versioned in git, written by the editor |
 | Sprites | PNG files in `assets/` | Files, versioned in git |
 | World state | In memory, server only | Lost when the server stops (by design: a round lasts minutes) |
 | Sessions | In memory | Expire after 5 s of silence |
