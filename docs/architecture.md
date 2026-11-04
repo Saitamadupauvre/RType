@@ -417,7 +417,7 @@ only handles local concerns such as hotkeys and audio levels.
 | Engine implementation | `engine/src/<module>/` |
 | CMake helpers (`engine_add_module`, `engine_add_plugin`) | `engine/cmake/EngineModule.cmake` |
 | Raylib backends | `plugins/graphics-raylib/src/`, `plugins/audio-raylib/src/` |
-| Generic apps and modes | `engine/src/app/` (`ServerApp`, `ClientApp`, `Launch`, `SnapshotView`, `AudioPlayer`, `AssetPreloader`, `LoadingScreen`, `PhysicsStep`) |
+| Generic apps and modes | `engine/src/app/` (`ServerApp`, `ClientApp`, `Launch` at the root; `assets/`, `render/`, `simulation/` subfolders) |
 | Entry points | `game/server/`, `game/client/` (`main.cpp`, `Cli`) |
 | Game rules | `game/scripts/` |
 | Tests | `tests/engine/<module>/`, `tests/game/<target>/`, `tests/plugins/<name>/` |

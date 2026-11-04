@@ -13,7 +13,7 @@
 #include "engine/app/ClientApp.hpp"
 #include "engine/app/ServerApp.hpp"
 #include "engine/audio/IAudio.hpp"
-#include "engine/core/Camera.hpp"
+#include "engine/core/math/Camera.hpp"
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/graphics/IInput.hpp"
 #include "engine/graphics/IRenderer.hpp"

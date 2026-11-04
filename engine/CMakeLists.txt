@@ -142,22 +142,22 @@ engine_add_module(audio
 
 engine_add_module(app
     SOURCES
-        src/app/AssetPreloader.cpp
-        src/app/AudioPlayer.cpp
-        src/app/CameraFollow.cpp
-        src/app/CameraRig.cpp
+        src/app/assets/AssetPreloader.cpp
+        src/app/assets/AudioPlayer.cpp
+        src/app/simulation/CameraFollow.cpp
+        src/app/render/CameraRig.cpp
         src/app/ClientApp.cpp
         src/app/Fields.cpp
-        src/app/HudDraw.cpp
+        src/app/render/HudDraw.cpp
         src/app/Launch.cpp
-        src/app/LoadingScreen.cpp
-        src/app/PhysicsStep.cpp
+        src/app/render/LoadingScreen.cpp
+        src/app/simulation/PhysicsStep.cpp
         src/app/ServerApp.cpp
-        src/app/ShaderLibrary.cpp
-        src/app/SnapshotView.cpp
-        src/app/SpriteLayout.cpp
-        src/app/TextureLibrary.cpp
-        src/app/WorldDraw.cpp
+        src/app/assets/ShaderLibrary.cpp
+        src/app/render/SnapshotView.cpp
+        src/app/render/SpriteLayout.cpp
+        src/app/assets/TextureLibrary.cpp
+        src/app/render/WorldDraw.cpp
     DEPENDS engine::core engine::script engine::network engine::graphics engine::audio
     PRIVATE_DEPENDS engine::physics
 )

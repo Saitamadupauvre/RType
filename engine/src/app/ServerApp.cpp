@@ -10,18 +10,18 @@
 #include <utility>
 #include <vector>
 
-#include "CameraFollow.hpp"
 #include "Fields.hpp"
-#include "PhysicsStep.hpp"
-#include "engine/core/Camera.hpp"
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Components.hpp"
-#include "engine/core/Entity.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/Components.hpp"
+#include "engine/core/ecs/Entity.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/log/Log.hpp"
+#include "engine/core/math/Camera.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/network/Replicated.hpp"
+#include "simulation/CameraFollow.hpp"
+#include "simulation/PhysicsStep.hpp"
 
 namespace engine::app {
 

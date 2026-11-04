@@ -8,24 +8,24 @@
 #include <utility>
 #include <vector>
 
-#include "AssetPreloader.hpp"
-#include "AudioPlayer.hpp"
-#include "CameraRig.hpp"
 #include "Fields.hpp"
-#include "HudDraw.hpp"
-#include "LoadingScreen.hpp"
-#include "PhysicsStep.hpp"
-#include "ShaderLibrary.hpp"
-#include "SnapshotView.hpp"
-#include "TextureLibrary.hpp"
-#include "WorldDraw.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "assets/AssetPreloader.hpp"
+#include "assets/AudioPlayer.hpp"
+#include "assets/ShaderLibrary.hpp"
+#include "assets/TextureLibrary.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/graphics/InputCapture.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/script/EventCommand.hpp"
+#include "render/CameraRig.hpp"
+#include "render/HudDraw.hpp"
+#include "render/LoadingScreen.hpp"
+#include "render/SnapshotView.hpp"
+#include "render/WorldDraw.hpp"
+#include "simulation/PhysicsStep.hpp"
 
 namespace engine::app {
 
