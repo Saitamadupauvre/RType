@@ -5,7 +5,7 @@
 #include <utility>
 
 #include "engine/audio/PluginLoader.hpp"
-#include "engine/core/DynamicLibrary.hpp"
+#include "engine/core/util/DynamicLibrary.hpp"
 
 using engine::audio::AudioPlugin;
 using engine::audio::load_audio_plugin;

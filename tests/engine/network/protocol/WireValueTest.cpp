@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/network/StringTable.hpp"
 
 #include "protocol/WireValue.hpp"

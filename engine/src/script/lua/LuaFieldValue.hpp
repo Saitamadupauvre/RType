@@ -3,8 +3,8 @@
 #include <optional>
 #include <string_view>
 
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "lua/Sol.hpp"
 
 namespace engine::script {

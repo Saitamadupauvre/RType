@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/physics/Export.hpp"
 
 namespace engine::physics {

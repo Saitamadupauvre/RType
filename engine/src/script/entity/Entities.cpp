@@ -10,11 +10,11 @@
 #include <unordered_map>
 #include <utility>
 
-#include "engine/core/Camera.hpp"
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Components.hpp"
-#include "engine/core/Transform.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/Components.hpp"
 #include "engine/core/log/Log.hpp"
+#include "engine/core/math/Camera.hpp"
+#include "engine/core/math/Transform.hpp"
 #include "engine/physics/Components.hpp"
 #include "loading/Declarations.hpp"
 #include "lua/LuaArgs.hpp"

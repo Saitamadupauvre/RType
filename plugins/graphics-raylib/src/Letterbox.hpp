@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/graphics/Types.hpp"
 
 inline constexpr engine::core::Vec2 virtual_resolution{1920, 1080};

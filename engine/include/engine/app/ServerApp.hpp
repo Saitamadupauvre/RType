@@ -7,8 +7,8 @@
 #include <system_error>
 
 #include "engine/app/Export.hpp"
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/SystemScheduler.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/SystemScheduler.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Server.hpp"

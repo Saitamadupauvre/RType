@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <utility>
 
-#include "engine/core/AssetCache.hpp"
+#include "engine/core/util/AssetCache.hpp"
 #include "loading/NameList.hpp"
 #include "lua/LuaErrors.hpp"
 

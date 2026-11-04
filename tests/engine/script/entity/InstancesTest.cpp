@@ -8,14 +8,14 @@
 #include <string>
 #include <vector>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Components.hpp"
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Transform.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/Components.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/core/math/Transform.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/physics/Components.hpp"
 #include "engine/script/Instance.hpp"
 #include "engine/script/ScriptRuntime.hpp"

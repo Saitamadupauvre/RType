@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "EditorFixture.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/editor/CommandResult.hpp"
 #include "engine/editor/EditorSession.hpp"
 

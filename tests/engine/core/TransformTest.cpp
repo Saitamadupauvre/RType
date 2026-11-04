@@ -2,10 +2,10 @@
 
 #include <limits>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Transform.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/core/math/Transform.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityManager;

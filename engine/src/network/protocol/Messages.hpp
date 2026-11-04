@@ -7,7 +7,7 @@
 #include <variant>
 #include <vector>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/network/StringTable.hpp"
 

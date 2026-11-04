@@ -8,7 +8,7 @@
 
 #include "assets/DeclaredAssets.hpp"
 #include "audio/Audio.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/script/Scene.hpp"
 #include "entity/Entities.hpp"
 #include "event/Events.hpp"

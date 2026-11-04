@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-#include "engine/core/NonCopyableNonMovable.hpp"
+#include "engine/core/util/NonCopyableNonMovable.hpp"
 
 using engine::core::NonCopyableNonMovable;
 

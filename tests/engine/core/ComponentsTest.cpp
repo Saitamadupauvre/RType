@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "engine/core/Components.hpp"
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/Components.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 
 using engine::core::EntityManager;
 using engine::core::Sprite;

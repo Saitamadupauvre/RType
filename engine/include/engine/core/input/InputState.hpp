@@ -3,8 +3,8 @@
 #include <optional>
 #include <set>
 
-#include "engine/core/Keys.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/input/Keys.hpp"
+#include "engine/core/math/Vec2.hpp"
 
 namespace engine::core {
 

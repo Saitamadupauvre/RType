@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Client.hpp"
 #include "engine/network/Export.hpp"

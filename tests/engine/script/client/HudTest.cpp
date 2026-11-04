@@ -7,10 +7,10 @@
 #include <variant>
 #include <vector>
 
-#include "engine/core/Components.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/Components.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/script/ClientApi.hpp"
 #include "engine/script/HudCommand.hpp"
 #include "engine/script/ScriptRuntime.hpp"

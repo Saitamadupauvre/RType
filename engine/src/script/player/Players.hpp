@@ -6,7 +6,7 @@
 #include <optional>
 #include <vector>
 
-#include "engine/core/InputState.hpp"
+#include "engine/core/input/InputState.hpp"
 
 namespace engine::script {
 

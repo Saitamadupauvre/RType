@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "RuntimeContext.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/script/Instance.hpp"
 
 namespace engine::script {

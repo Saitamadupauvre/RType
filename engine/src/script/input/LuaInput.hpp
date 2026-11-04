@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/core/InputState.hpp"
-#include "engine/core/Keys.hpp"
+#include "engine/core/input/InputState.hpp"
+#include "engine/core/input/Keys.hpp"
 #include "lua/Sol.hpp"
 
 namespace engine::script {

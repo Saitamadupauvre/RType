@@ -7,12 +7,12 @@
 #include <utility>
 #include <vector>
 
-#include "engine/core/ComponentPool.hpp"
-#include "engine/core/ComponentQuery.hpp"
-#include "engine/core/ComponentTypeId.hpp"
-#include "engine/core/Entity.hpp"
-#include "engine/core/EntityPool.hpp"
 #include "engine/core/Export.hpp"
+#include "engine/core/ecs/ComponentPool.hpp"
+#include "engine/core/ecs/ComponentQuery.hpp"
+#include "engine/core/ecs/ComponentTypeId.hpp"
+#include "engine/core/ecs/Entity.hpp"
+#include "engine/core/ecs/EntityPool.hpp"
 
 namespace engine::core {
 

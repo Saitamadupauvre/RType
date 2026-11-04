@@ -150,7 +150,7 @@ An input message carries the raw keyboard and mouse state of the player: every k
 | 17 | 1 | `flags` | Bit set | Bit 0: a pointer follows; bits 1-7 must be zero |
 | 18 | 4 | `pointer` | Two signed 16-bit big-endian ints `x`, `y` | Present only with bit 0 of `flags`; virtual units |
 
-Key values are those of the engine's `Key` enumeration (`engine/core/Keys.hpp`), physical keys independent of the graphics backend; adding a key there changes the wire format and needs a new protocol version. The engine gives keys no meaning: the server's scripts decide what each one does.
+Key values are those of the engine's `Key` enumeration (`engine/core/input/Keys.hpp`), physical keys independent of the graphics backend; adding a key there changes the wire format and needs a new protocol version. The engine gives keys no meaning: the server's scripts decide what each one does.
 
 The receiver rejects input payloads that are truncated or have trailing bytes, hold bit 0 or a bit above the last key, hold an unknown mouse button, or set unknown `flags` bits.
 

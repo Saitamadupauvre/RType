@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "engine/core/Camera.hpp"
-#include "engine/core/NonCopyableNonMovable.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Camera.hpp"
+#include "engine/core/math/Vec2.hpp"
+#include "engine/core/util/NonCopyableNonMovable.hpp"
 #include "engine/graphics/Export.hpp"
 #include "engine/graphics/Types.hpp"
 

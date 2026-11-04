@@ -1,4 +1,4 @@
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -7,9 +7,9 @@
 #include <string>
 #include <unordered_set>
 
-#include "engine/core/Camera.hpp"
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Transform.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/math/Camera.hpp"
+#include "engine/core/math/Transform.hpp"
 
 namespace engine::core {
 

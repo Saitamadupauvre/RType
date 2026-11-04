@@ -10,9 +10,9 @@
 
 #include <gtest/gtest.h>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/network/Client.hpp"

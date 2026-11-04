@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "engine/core/Entity.hpp"
+#include "engine/core/ecs/Entity.hpp"
 
 namespace engine::core {
 

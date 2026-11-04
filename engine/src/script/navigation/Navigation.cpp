@@ -8,8 +8,8 @@
 #include <string_view>
 #include <utility>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Components.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/Components.hpp"
 #include "engine/physics/Components.hpp"
 #include "entity/ScriptBody.hpp"
 #include "lua/LuaArgs.hpp"

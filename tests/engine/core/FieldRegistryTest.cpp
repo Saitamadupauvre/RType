@@ -6,11 +6,11 @@
 #include <string>
 #include <vector>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Components.hpp"
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/Components.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/core/math/Vec2.hpp"
 
 using engine::core::AssetName;
 using engine::core::ComponentDescriptor;

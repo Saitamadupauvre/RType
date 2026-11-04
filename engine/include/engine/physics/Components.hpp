@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/core/Components.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/Components.hpp"
+#include "engine/core/math/Vec2.hpp"
 
 #include <cstdint>
 

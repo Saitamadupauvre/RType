@@ -1,7 +1,7 @@
 #include "engine/physics/PhysicsSystem.hpp"
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/physics/Collisions.hpp"
 #include "engine/physics/Components.hpp"
 #include "engine/physics/Events.hpp"

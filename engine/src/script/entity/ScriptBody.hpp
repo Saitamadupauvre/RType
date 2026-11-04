@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/core/Entity.hpp"
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/Entity.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 #include "engine/physics/Components.hpp"
 
 namespace engine::script {

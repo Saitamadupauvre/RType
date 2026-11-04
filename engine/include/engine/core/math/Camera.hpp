@@ -3,7 +3,7 @@
 #include <string>
 
 #include "engine/core/Export.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 
 namespace engine::core {
 

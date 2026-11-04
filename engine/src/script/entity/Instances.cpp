@@ -8,7 +8,7 @@
 #include <string>
 #include <string_view>
 
-#include "engine/core/ComponentPhysics.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
 #include "engine/core/log/Log.hpp"
 #include "entity/ScriptFields.hpp"
 

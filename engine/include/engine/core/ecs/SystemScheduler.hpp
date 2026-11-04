@@ -7,8 +7,8 @@
 #include <string_view>
 #include <vector>
 
-#include "engine/core/EntityManager.hpp"
 #include "engine/core/Export.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 
 namespace engine::core {
 

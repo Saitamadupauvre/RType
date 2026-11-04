@@ -391,7 +391,7 @@ The loader refuses a plugin built for another API version, and the backend is al
 - **Render targets.** `create_render_target(size)` makes an off-screen surface of `size` pixels. Between `begin_target(target, clear)` and `end_target()`, draw calls go into it instead of the frame: screen space is the target's own pixels, and `begin_world(view)` centers the view on the target. `target_texture(target)` is a normal `TextureId`, drawn upright with `draw_sprite` (the backend handles the flip of the render texture); `unload_texture` ignores it, it lives as long as its target. `begin_target` and `end_target` end world space first, so the editor viewport is `begin_target` → `begin_world` → draw → `end_world` → `end_target` → `draw_sprite(target_texture)`. Calling `begin_target` again switches target; targets do not nest.
 - **Shaders.** `load_shader(vertex, fragment)` compiles GLSL files; an empty path uses the backend's default stage. Between `begin_shader(shader)` and `end_shader()`, draw calls go through it; calling `begin_shader` again replaces it. Uniforms keep their value across frames and only affect the draw calls made after them; unknown shaders and uniforms the program does not use are ignored. A missing file, a compile or link error gives the default `ShaderId`, is logged, and `begin_shader` on it draws with the default pipeline, so drawing always continues.
 - **Lifetime.** `destroy_render_target` / `unload_shader` end the target or shader first if it is current; `end_frame()` ends the current target, world space and shader; `close()` frees every texture, target and shader.
-- **Camera.** The view comes from, in this order: the local override of the client scripts (`camera.*`, §10.10), the scene camera (the replicated entity with a `Camera` component and the lowest id, clamped to its bounds), or the default view (`center = virtual_size / 2`, `zoom = 1`), which draws exactly as without a camera. Camera entities are never drawn. The conversion math lives in `engine-core` (`engine/core/Camera.hpp`), so the script module uses it without depending on graphics.
+- **Camera.** The view comes from, in this order: the local override of the client scripts (`camera.*`, §10.10), the scene camera (the replicated entity with a `Camera` component and the lowest id, clamped to its bounds), or the default view (`center = virtual_size / 2`, `zoom = 1`), which draws exactly as without a camera. Camera entities are never drawn. The conversion math lives in `engine-core` (`engine/core/math/Camera.hpp`), so the script module uses it without depending on graphics.
 
 ### 9.4 Audio plugin
 
@@ -424,7 +424,7 @@ class IAudio {   // engine/include/engine/audio/IAudio.hpp
 
 ### 9.5 Asset cache
 
-The game refers to assets by name; `engine::core::AssetCache<Id>` (`engine/core/AssetCache.hpp`) turns a name into a backend handle. It is built with a folder and a load / unload pair, e.g. `IRenderer::load_texture` / `unload_texture`.
+The game refers to assets by name; `engine::core::AssetCache<Id>` (`engine/core/util/AssetCache.hpp`) turns a name into a backend handle. It is built with a folder and a load / unload pair, e.g. `IRenderer::load_texture` / `unload_texture`.
 
 ```cpp
 core::AssetCache<graphics::TextureId> textures(assets, load, unload);

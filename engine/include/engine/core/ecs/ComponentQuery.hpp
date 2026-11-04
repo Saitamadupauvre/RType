@@ -5,8 +5,8 @@
 #include <tuple>
 #include <type_traits>
 
-#include "engine/core/ComponentPool.hpp"
-#include "engine/core/Entity.hpp"
+#include "engine/core/ecs/ComponentPool.hpp"
+#include "engine/core/ecs/Entity.hpp"
 
 namespace engine::core {
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "engine/core/Entity.hpp"
-#include "engine/core/EntityManager.hpp"
 #include "engine/core/Export.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/Entity.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/math/Vec2.hpp"
 
 namespace engine::core {
 

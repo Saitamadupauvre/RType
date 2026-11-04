@@ -6,7 +6,7 @@
 #include <string>
 #include <utility>
 
-#include "engine/core/DynamicLibrary.hpp"
+#include "engine/core/util/DynamicLibrary.hpp"
 #include "engine/graphics/Export.hpp"
 #include "engine/graphics/IGraphicsBackend.hpp"
 #include "engine/graphics/PluginApi.hpp"

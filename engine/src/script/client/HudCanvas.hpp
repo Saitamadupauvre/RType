@@ -3,8 +3,8 @@
 #include <string_view>
 #include <vector>
 
-#include "engine/core/Components.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/Components.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/script/HudCommand.hpp"
 #include "lua/Sol.hpp"
 

@@ -6,7 +6,7 @@
 #include <string>
 #include <utility>
 
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/log/MemorySink.hpp"
 #include "engine/script/ClientApi.hpp"

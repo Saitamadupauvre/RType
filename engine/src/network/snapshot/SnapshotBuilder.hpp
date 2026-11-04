@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 #include "engine/network/Export.hpp"
 
 #include "ReplicatedFields.hpp"

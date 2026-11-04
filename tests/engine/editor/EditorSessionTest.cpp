@@ -8,8 +8,8 @@
 #include <vector>
 
 #include "EditorFixture.hpp"
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/editor/CommandResult.hpp"
 #include "engine/editor/EditorSession.hpp"
 #include "engine/editor/SceneDocument.hpp"

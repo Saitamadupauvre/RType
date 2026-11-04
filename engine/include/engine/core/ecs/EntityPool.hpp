@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "engine/core/Entity.hpp"
 #include "engine/core/Export.hpp"
+#include "engine/core/ecs/Entity.hpp"
 
 namespace engine::core {
 

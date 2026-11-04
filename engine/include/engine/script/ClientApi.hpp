@@ -5,10 +5,10 @@
 #include <string_view>
 #include <vector>
 
-#include "engine/core/Camera.hpp"
-#include "engine/core/Entity.hpp"
-#include "engine/core/InputState.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/Entity.hpp"
+#include "engine/core/input/InputState.hpp"
+#include "engine/core/math/Camera.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/script/ApiSet.hpp"
 #include "engine/script/EventCommand.hpp"
 #include "engine/script/Export.hpp"

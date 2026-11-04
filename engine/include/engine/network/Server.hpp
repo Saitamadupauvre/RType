@@ -6,10 +6,10 @@
 #include <system_error>
 #include <vector>
 
-#include "engine/core/EntityManager.hpp"
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/InputState.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
+#include "engine/core/input/InputState.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Audio.hpp"
 #include "engine/network/Export.hpp"

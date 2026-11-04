@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 
 namespace engine::core {
 

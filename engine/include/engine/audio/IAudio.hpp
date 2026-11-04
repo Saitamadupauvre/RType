@@ -4,7 +4,7 @@
 
 #include "engine/audio/Export.hpp"
 #include "engine/audio/Types.hpp"
-#include "engine/core/NonCopyableNonMovable.hpp"
+#include "engine/core/util/NonCopyableNonMovable.hpp"
 
 namespace engine::audio {
 

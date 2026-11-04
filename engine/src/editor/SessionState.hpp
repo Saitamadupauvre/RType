@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "History.hpp"
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 #include "engine/editor/CommandResult.hpp"
 #include "engine/editor/EditorSession.hpp"
 #include "engine/editor/SceneDocument.hpp"

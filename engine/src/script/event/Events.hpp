@@ -6,7 +6,7 @@
 #include <string_view>
 #include <vector>
 
-#include "engine/core/FieldRegistry.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/script/EventCommand.hpp"
 #include "lua/Sol.hpp"
 

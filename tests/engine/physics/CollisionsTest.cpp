@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/physics/Collisions.hpp"
 
 using engine::core::Vec2;

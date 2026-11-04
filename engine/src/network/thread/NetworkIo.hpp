@@ -8,7 +8,7 @@
 #include <thread>
 #include <vector>
 
-#include "engine/core/NonCopyableNonMovable.hpp"
+#include "engine/core/util/NonCopyableNonMovable.hpp"
 #include "engine/network/Export.hpp"
 
 #include "protocol/Messages.hpp"

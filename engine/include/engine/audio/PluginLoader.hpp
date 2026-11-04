@@ -9,7 +9,7 @@
 #include "engine/audio/Export.hpp"
 #include "engine/audio/IAudio.hpp"
 #include "engine/audio/PluginApi.hpp"
-#include "engine/core/DynamicLibrary.hpp"
+#include "engine/core/util/DynamicLibrary.hpp"
 
 namespace engine::audio {
 
