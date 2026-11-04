@@ -57,6 +57,8 @@ struct ClientAppOptions {
  * the scripts before they load: they are never sent to the server, run their `client` section and
  * move with their velocity on every tick, and are removed after the tick that destroys them. They
  * are drawn with the replicated entities, every entity in ascending `z_index`, then spawn order.
+ * Then the HUD queued by the `draw_hud()` callback of the scripts is drawn in screen space, in
+ * front of the world and unaffected by the camera; an error in it is logged and the frame goes on.
  *
  * @note Not thread safe: every call must come from the thread owning the renderer.
  */
