@@ -24,7 +24,7 @@ namespace log = core::log;
 constexpr std::string_view local_address = "127.0.0.1";
 
 ServerAppOptions server_options(const LaunchOptions& options) {
-    return {.scripts = options.game / "scripts", .max_players = options.max_players};
+    return {.game = options.game, .max_players = options.max_players};
 }
 
 ClientAppOptions client_options(const LaunchOptions& options) {

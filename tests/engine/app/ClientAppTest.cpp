@@ -169,7 +169,7 @@ protected:
     FakeRenderer _renderer;
     FakeInput _input;
     FakeAudio _audio;
-    ServerApp _server{_clock, _loopback.server(), {.scripts = game / "scripts", .max_players = 4}};
+    ServerApp _server{_clock, _loopback.server(), {.game = game, .max_players = 4}};
     ClientApp _client{_clock,
                       _loopback.add_client(),
                       _renderer,

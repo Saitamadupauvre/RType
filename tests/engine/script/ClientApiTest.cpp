@@ -70,6 +70,35 @@ TEST_F(ClientApiTest, DispatchCallsHandlerWithArguments) {
         "assert(last.damage == 3 and last.at.x == 1 and last.at.y == 2)", "check"));
 }
 
+TEST_F(ClientApiTest, SceneLoadedCallsOnSceneLoadedThenTheHandlers) {
+    ASSERT_TRUE(_runtime.run_string(R"(
+        trace = ""
+        scene_hook = function(name) trace = trace .. "main " .. name .. ";" end
+        on("scene_loaded", function(event) trace = trace .. "on " .. event.name .. ";" end)
+    )",
+                                    "client"));
+
+    EXPECT_TRUE(_client.dispatch(
+        EventCommand{.name = "scene_loaded", .arguments = {{.key = "name", .value = "stage2"}}}));
+
+    EXPECT_TRUE(
+        _runtime.run_string(R"(assert(trace == "main stage2;on stage2;", trace))", "check"));
+}
+
+TEST_F(ClientApiTest, FailingOnSceneLoadedIsLoggedAndHandlersStillRun) {
+    ASSERT_TRUE(_runtime.run_string(R"(
+        scene_hook = function() error("scene boom") end
+        on("scene_loaded", function() handled = true end)
+    )",
+                                    "client"));
+
+    EXPECT_FALSE(_client.dispatch(
+        EventCommand{.name = "scene_loaded", .arguments = {{.key = "name", .value = "stage2"}}}));
+
+    EXPECT_TRUE(logged_error("scene boom"));
+    EXPECT_TRUE(_runtime.run_string("assert(handled)", "check"));
+}
+
 TEST_F(ClientApiTest, DispatchRunsHandlersInRegistrationOrder) {
     ASSERT_TRUE(_runtime.run_string(R"(
         order = ""

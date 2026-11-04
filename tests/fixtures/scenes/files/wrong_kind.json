@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "type": "ship",
+            "position": [0, 0],
+            "overrides": {
+                "Sprite.color": "red",
+                "Tags.labels": ["enemy", 2],
+                "PhysicsBody.mass": true,
+                "PhysicsBody.collision_layer": 1.5,
+                "AABBCollider.size": [1, 2, 3],
+                "PhysicsBody.affected_by_gravity": false
+            }
+        }
+    ]
+}

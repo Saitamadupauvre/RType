@@ -1,0 +1,16 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "type": "rock",
+            "position": [0, 0]
+        },
+        {
+            "type": "rock",
+            "position": [8, 8],
+            "overrides": {
+                "PhysicsBody.type": 5
+            }
+        }
+    ]
+}

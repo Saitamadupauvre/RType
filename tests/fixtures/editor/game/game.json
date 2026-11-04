@@ -1,0 +1,5 @@
+{
+    "name": "editor-test",
+    "start_scene": "level1",
+    "window": { "width": 640 }
+}

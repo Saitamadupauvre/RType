@@ -9,7 +9,16 @@ function(game_add_runtime_data target folder source)
     )
 endfunction()
 
+function(game_add_runtime_file target file)
+    add_custom_target(${target}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${file} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+        VERBATIM
+    )
+endfunction()
+
 game_add_runtime_data(r-type_scripts scripts ${CMAKE_CURRENT_SOURCE_DIR}/scripts)
+game_add_runtime_data(r-type_scenes scenes ${CMAKE_CURRENT_SOURCE_DIR}/scenes)
+game_add_runtime_file(r-type_project ${CMAKE_CURRENT_SOURCE_DIR}/game.json)
 game_add_runtime_data(r-type_assets assets ${PROJECT_SOURCE_DIR}/assets)
 
 add_library(r-type_server_cli STATIC server/Cli.cpp)
@@ -19,7 +28,7 @@ rtype_set_warnings(r-type_server_cli)
 
 add_executable(r-type_server server/main.cpp)
 target_link_libraries(r-type_server PRIVATE r-type_server_cli engine::app)
-add_dependencies(r-type_server r-type_scripts)
+add_dependencies(r-type_server r-type_scripts r-type_scenes r-type_project)
 rtype_set_warnings(r-type_server)
 
 add_library(r-type_client_cli STATIC client/Cli.cpp)
@@ -33,7 +42,8 @@ target_compile_definitions(r-type_client PRIVATE
     GRAPHICS_PLUGIN_FILE="$<TARGET_FILE_NAME:graphics-raylib>"
     AUDIO_PLUGIN_FILE="$<TARGET_FILE_NAME:audio-raylib>"
 )
-add_dependencies(r-type_client graphics-raylib audio-raylib r-type_scripts r-type_assets)
+add_dependencies(r-type_client graphics-raylib audio-raylib r-type_scripts r-type_scenes
+    r-type_project r-type_assets)
 rtype_set_warnings(r-type_client)
 
 option(RTYPE_BUILD_SANDBOX "Build the r-type_sandbox executable" ON)
@@ -49,4 +59,6 @@ endif()
 
 install(TARGETS r-type_server r-type_client RUNTIME DESTINATION bin)
 install(DIRECTORY scripts/ DESTINATION bin/scripts)
+install(DIRECTORY scenes/ DESTINATION bin/scenes)
+install(FILES game.json DESTINATION bin)
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/assets/ DESTINATION bin/assets PATTERN .gitkeep EXCLUDE)

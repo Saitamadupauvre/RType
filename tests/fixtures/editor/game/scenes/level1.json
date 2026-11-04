@@ -1,0 +1,21 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "name": "hero",
+            "type": "ship",
+            "position": [1, 2],
+            "overrides": {
+                "Script.health": 7
+            }
+        },
+        {
+            "type": "ghost",
+            "position": [3, 4]
+        },
+        {
+            "type": "rock",
+            "position": [5, 6]
+        }
+    ]
+}

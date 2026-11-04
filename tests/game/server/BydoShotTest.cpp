@@ -25,7 +25,7 @@ constexpr float shot_speed = 700.F;
 constexpr float shot_size = 24.F;
 
 const std::filesystem::path game_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game" / "scripts";
 
 class BydoShotTest : public ::testing::Test {
 protected:

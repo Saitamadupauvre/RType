@@ -52,6 +52,7 @@ engine_add_test(script SOURCES
     engine/script/entity/EntityHandleTest.cpp
     engine/script/entity/InstancesTest.cpp
     engine/script/entity/LayerFieldsTest.cpp
+    engine/script/entity/ScriptFieldsTest.cpp
     engine/script/entity/TickTest.cpp
     engine/script/event/EventsTest.cpp
     engine/script/loading/ScriptDeclarationsTest.cpp
@@ -59,6 +60,13 @@ engine_add_test(script SOURCES
     engine/script/loading/SectionsTest.cpp
     engine/script/navigation/NavigationTest.cpp
     engine/script/player/PlayersTest.cpp
+    engine/script/scene/GameFolderTest.cpp
+    engine/script/scene/SceneFileTest.cpp
+    engine/script/scene/SceneSwitchTest.cpp
+)
+engine_add_test(editor SOURCES
+    engine/editor/EditorSessionTest.cpp
+    engine/editor/SceneCommandsTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
@@ -234,4 +242,9 @@ function(game_add_runtime_data_test folder source)
 endfunction()
 
 game_add_runtime_data_test(scripts ${PROJECT_SOURCE_DIR}/game/scripts)
+game_add_runtime_data_test(scenes ${PROJECT_SOURCE_DIR}/game/scenes)
 game_add_runtime_data_test(assets ${PROJECT_SOURCE_DIR}/assets)
+add_test(NAME game.runtime_data.project
+    COMMAND ${CMAKE_COMMAND} -E compare_files
+        ${PROJECT_SOURCE_DIR}/game/game.json ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/game.json
+)

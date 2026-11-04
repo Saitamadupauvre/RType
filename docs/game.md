@@ -8,8 +8,12 @@ game/
 ├── server/       r-type_server: Cli, main.cpp (dedicated server)
 ├── client/       r-type_client: Cli, main.cpp (client, host, solo)
 ├── sandbox/      r-type_sandbox: scratch executable to try the engine out (option `RTYPE_BUILD_SANDBOX`, on by default)
+├── game.json     project file: starts on the scene stage1
+├── scenes/       stage1.json: the background (space) and the game controller (game)
 └── scripts/      the Lua game, main.lua is the entry point
 ```
+
+`game/` is a game folder: see [Game folder and scenes](game-folder.md).
 
 ## The contract
 
@@ -58,11 +62,14 @@ Each `main.cpp` parses its command line into `engine::app::LaunchOptions`
 window, audio levels) and calls `engine::app::launch()` until SIGINT or
 SIGTERM, or until the window closes. Everything else is the engine:
 
-- `ServerApp` loads the scripts with the server API, builds the string table,
+- `ServerApp` loads the scripts with the server API, spawns the start scene
+  `stage1` before `on_start()`, builds the string table,
   forwards `PlayerJoined` / `PlayerLeft` to Lua and runs the tick (see
   [PROJECT §6](PROJECT.md#6-executables)). Every scripted entity with a
   `sprite` or a `color` is replicated; entities with neither (`game`,
-  `bydo_spawner`) stay on the server.
+  `bydo_spawner`) stay on the server. `game` and `ship` are declared
+  `persistent = true`, so a future `load_scene("stage2")` keeps the controller
+  and the players' ships and replaces the rest.
 - `ClientApp` loads the same scripts with the client API, preloads every
   texture, sound and music the server lists behind a loading screen, draws each
   received entity with the `sprite` the server replicates, tinted with its
@@ -82,7 +89,7 @@ and three parallax layers of twinkling stars scrolling left with `time`.
 
 ```
 game/scripts/
-├── main.lua              server: on_start, on_player_joined, on_player_left; client: mute on M
+├── main.lua              server: on_start (music), on_player_joined, on_player_left; client: mute on M
 ├── game.lua              entity "game": rounds, ships, game over, restart
 ├── player/ship.lua       entity "ship": movement, shooting
 ├── player/missile.lua    entity "missile"
@@ -132,7 +139,8 @@ add content is in [Writing the game](writing-the-game.md).
 ## Runtime layout
 
 Executables find everything relative to their own location, never the working
-directory. The build copies `scripts/` and `assets/` next to them:
+directory. The build copies `game.json`, `scenes/`, `scripts/` and `assets/`
+next to them:
 
 ```
 bin/
@@ -140,6 +148,8 @@ bin/
 ├── r-type_client
 ├── libengine-{core,graphics,network,physics,script}.so
 ├── plugins/graphics-raylib.so
+├── game.json
+├── scenes/stage1.json
 ├── scripts/
 └── assets/sprites/{ship,missile,bydo}.png
 ```

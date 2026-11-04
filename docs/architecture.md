@@ -39,6 +39,7 @@ flowchart TB
         NAV["engine-navigation<br/>grid, A*, path smoothing"]
         GFX["engine-graphics<br/>IRenderer, IInput,<br/>plugin loader"]
         AUD["engine-audio<br/>IAudio, NullAudio,<br/>plugin loader"]
+        EDIT["engine-editor<br/>EditorSession, scene document,<br/>undo/redo"]
     end
     subgraph Plugins["Plugins (plugins/), loaded at runtime"]
         RAY["graphics-raylib<br/>window, 2D rendering, input"]
@@ -54,6 +55,8 @@ flowchart TB
     APP --> AUD
     APP --> CORE
     SCRIPT --> CORE
+    EDIT --> SCRIPT
+    EDIT --> CORE
     NET --> CORE
     PHYS --> CORE
     GFX --> CORE
@@ -70,7 +73,8 @@ flowchart TB
 
 Third-party headers stay private: `raylib.h` appears only in
 `plugins/graphics-raylib/`, POSIX socket headers only in
-`engine/src/network/socket/`, Lua and sol2 only in `engine/src/script/`.
+`engine/src/network/socket/`, Lua, sol2 and nlohmann-json only in
+`engine/src/script/`.
 
 ## Subsystems
 
@@ -82,6 +86,7 @@ Third-party headers stay private: `raylib.h` appears only in
 | Time | `engine-core` | `IClock`, `SteadyClock`, `ManualClock`, `FixedStepLoop` | Fixed-step simulation, injectable clock for tests |
 | Logging | `engine-core` | `log::info/warn/error`, `Sink`, `MemorySink` | Levelled logs on stderr; tests capture them |
 | Scripting | `engine-script` | `ScriptRuntime`, `ScriptRuntimeBuilder`, `ServerApi`, `ClientApi` | Loads and sandboxes Lua, spawns scripted entities, runs callbacks; API sets give each side its own Lua functions |
+| Editor model | `engine-editor` | `EditorSession`, `SceneDocument`, `CommandResult` | Opens a game folder, edits its scenes with undo/redo and saves them; no UI, no Lua callbacks |
 | Networking | `engine-network` | `NetworkServer`, `NetworkClient` | UDP transport, protocol, sessions, replication |
 | Physics | `engine-physics` | `PhysicsSystem`, `PhysicsBody`, `AABBCollider` | Integration and collision detection/resolution; the server uses it to find hitbox overlaps |
 | Navigation | `engine-navigation` | `NavGrid`, `find_path`, `smooth_path` | Grid pathfinding with A* (or Dijkstra), selectable heuristic, diagonals, search budget and path smoothing |
@@ -161,6 +166,8 @@ classDiagram
             +builder()$ ScriptRuntimeBuilder
             +api~Set~() Set&
             +load_scripts(path) bool
+            +load_game(path) bool
+            +read_scene(path) SceneLoad
             +attach_world(EntityManager&)
             +spawn(type, ...) optional~Entity~
             +update(float dt)

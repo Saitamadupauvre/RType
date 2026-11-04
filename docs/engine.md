@@ -10,13 +10,14 @@ The [architecture](architecture.md) page shows how they fit together.
 | Module | Target | Depends on | Third-party (private) |
 |---|---|---|---|
 | core | `engine::core` | — | `dl` |
-| script | `engine::script` | core (physics, navigation privately) | Lua 5.4, sol2 |
+| script | `engine::script` | core (physics, navigation privately) | Lua 5.4, sol2, nlohmann-json |
 | network | `engine::network` | core | POSIX sockets |
 | physics | `engine::physics` | core | — |
 | navigation | `engine::navigation` | — | — |
 | graphics | `engine::graphics` | core | — (backends are [plugins](plugins.md)) |
 | audio | `engine::audio` | core | — (backends are [plugins](plugins.md)) |
 | app | `engine::app` | core, script, network, graphics, audio (physics privately) | — |
+| editor | `engine::editor` | core, script | — |
 
 ### core
 
@@ -67,8 +68,9 @@ Component types are identified by stable names registered in a `.cpp` of
 Scenes, the editor's Play/Stop and undo/redo store the world as **instances**
 rather than raw component memory. An instance holds the entity's type, its
 position, an optional name (`set_entity_name()`, never seen by scripts) and
-its **overrides**: the editable registry fields whose value differs from the
-type's default, keyed `"Component.field"` and sorted.
+its **overrides**: the editable registry fields and the script fields whose
+value differs from the type's default, keyed `"Component.field"` or
+`"Script.name"` and sorted.
 
 ```cpp
 const std::vector<engine::script::Instance> saved = runtime.capture_instances();
@@ -90,11 +92,26 @@ whole instance was skipped) and a message.
 - **Failures** never throw: an unknown type or a system skips the instance,
   an unknown or non-editable field, a wrong kind or an out-of-range value
   skips that override. Each is returned as an `InstanceIssue` and logged.
-- Not captured: Lua free fields (`self.health`), non-editable fields such as
+- **Script fields** are the Lua free fields of a declaration (`health = 3`)
+  whose default has a supported kind. `script_fields(type)` lists them with
+  their kind and default, inferred once at load (rules in
+  [Game folder and scenes](game-folder.md#script-fields)). Spawning writes a
+  `"Script.name"` override into the entity's Lua table after `on_spawn`, so
+  `self.health` reads it. A value of the wrong kind is skipped at spawn and
+  left out (with a warning) at capture.
+- Not captured: free fields that are not script fields (functions, `_private`
+  names, unsupported tables, fields of a `server`/`client` section), non-editable fields such as
   `Replicated.owner`, entities marked with `self:destroy()` and entities the
   runtime did not spawn. An entity spawned by another one's `on_spawn` is
   captured too, so spawning the instances back spawns it twice.
-- The format is in memory only; scene files build on it.
+- Scene files store instances as JSON: `read_scene()` reads one against the
+  loaded declarations and `write_scene()` saves one, and `load_game()` spawns
+  the `start_scene` of `game.json` before `on_start()`. Lua `load_scene(name)`
+  requests a switch that `flush_scene()` applies at the end of the server tick,
+  keeping entities declared `persistent = true`. The format, the switch, the
+  reported problems and the API are in
+  [Game folder and scenes](game-folder.md). The JSON code (`scene/`, built on
+  `nlohmann-json`) stays private to the module.
 
 The runtime only holds this core API. Everything that belongs to one side is an
 **API set**, chosen once with a builder and owned by the runtime:
@@ -194,17 +211,28 @@ backend) and `load_audio_plugin()`, which loads a backend at runtime. See
 ### app
 
 The composition root: the only module that depends on most of the others. It
-runs any game folder (`scripts/` and `assets/`) without knowing the game.
+runs any game folder (`game.json`, `scripts/`, `scenes/` and `assets/`, see
+[Game folder and scenes](game-folder.md)) without knowing the game.
 
 | Header | What it gives |
 |---|---|
-| `ServerApp.hpp` | Authoritative server over any `ServerTransport`: Lua with the server API, string table, 60 Hz tick (scripts, physics, collisions, systems, replication, audio and events) |
+| `ServerApp.hpp` | Authoritative server over any `ServerTransport`: loads the game folder (scripts, then the start scene) with the server API, string table, 60 Hz tick (scripts, physics, collisions, systems, replication, audio and events) |
 | `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, asset preloading behind a loading screen, snapshot drawing, audio, local input to Lua and to the server |
 | `Launch.hpp` | `Mode` (`dedicated`, `client`, `host`, `solo`), `LaunchOptions` and `launch()`: picks the transports, loads the plugins and runs the apps; `host` runs the server on a background thread, `solo` runs both in one thread over a `LoopbackNetwork` |
 
 Its private helpers (`SnapshotView`, `WorldDraw`, `AudioPlayer`,
 `Collisions`) are tested in `tests/engine/app/`, with a fixture game in
 `tests/fixtures/app/game/` played over a `LoopbackNetwork`.
+
+### editor
+
+The editing model behind the editor front: `EditorSession` opens a game folder
+with the `editor` API set, holds the open scene as a `SceneDocument`, applies
+edits with undo and redo, and runs the scene commands; every command returns a
+`CommandResult`. Its edit world is built with
+`ScriptRuntime::preview_instances()`, which builds prototypes only, so no Lua
+callback runs. See [Editor backend](editor.md). Tested in
+`tests/engine/editor/` with the fixture game `tests/fixtures/editor/game/`.
 
 ## The contract
 

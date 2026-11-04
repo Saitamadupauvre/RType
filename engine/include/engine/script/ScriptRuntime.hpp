@@ -19,6 +19,8 @@
 #include "engine/script/Declaration.hpp"
 #include "engine/script/Export.hpp"
 #include "engine/script/Instance.hpp"
+#include "engine/script/Scene.hpp"
+#include "engine/script/ScriptField.hpp"
 #include "engine/script/ScriptRuntimeBuilder.hpp"
 
 namespace engine::script {
@@ -121,6 +123,70 @@ public:
     bool load_scripts(const std::filesystem::path& root) noexcept;
 
     /**
+     * @brief Loads a game folder: its scripts, then its start scene, then calls `on_start()`.
+     *
+     * A game folder holds `game.json`, `scripts/` and `scenes/`. The scripts in `scripts/` are
+     * loaded as load_scripts() does. If `game.json` names a `start_scene`, the file
+     * `scenes/<start_scene>.json` is read with read_scene() and its instances are spawned with
+     * spawn_instances() before `on_start()` runs, so `on_start()` already sees them. The scene is
+     * only spawned when a world is attached: a client gets these entities from the server.
+     *
+     * A missing `game.json`, or one without `start_scene`, loads the scripts alone. A `game.json`
+     * that is not a JSON object, or whose `start_scene` is not a scene name (1 to 63 letters,
+     * digits, `_` or `-`), is logged and no scene is spawned. A start scene that cannot be read
+     * is logged and nothing of it is spawned. In every case the scripts still load and
+     * `on_start()` still runs.
+     *
+     * @param game Game folder. Every file is found relative to it, never the working directory.
+     * @return true if the scripts loaded as for load_scripts(), `game.json` is valid and the start
+     * scene, if any, was read; false otherwise. Skipped instances and overrides are logged but do
+     * not make it fail.
+     * @note Can be called once per runtime, instead of load_scripts(). Never throws.
+     */
+    bool load_game(const std::filesystem::path& game) noexcept;
+
+    /**
+     * @brief Loads the declarations of a script folder without starting the game.
+     *
+     * Runs the top level of every declaration file and of `main.lua` and registers what they
+     * declare, exactly as load_scripts() does, but never calls `on_start()` and never spawns
+     * anything. Meant for tools such as the editor, which list and preview declarations while no
+     * game runs.
+     *
+     * @param root Script folder, e.g. scripts_folder() of a game folder.
+     * @return Same as load_scripts().
+     * @note Can be called once per runtime, instead of load_scripts() or load_game(). Never
+     * throws.
+     */
+    bool load_declarations(const std::filesystem::path& root) noexcept;
+
+    /**
+     * @brief Reads a scene file against the loaded declarations and field registry.
+     *
+     * The file is untrusted. It is rejected as a whole when it cannot be read, is not valid JSON,
+     * is not an object, or has no `version` equal to 1 or no `instances` array. Otherwise every
+     * instance is read on its own and these are skipped and reported in SceneLoad::issues:
+     * - an instance that is not an object, or whose `type` is missing or not a string, whose
+     *   `name` is not a string, whose `position` is not `[x, y]`, or whose `overrides` is not an
+     *   object;
+     * - an instance whose type is not a declared entity: it is kept unchanged in
+     *   Scene::unknown_instances, so write_scene() writes it back;
+     * - an override naming an unknown or non-editable field or an unknown script field of the
+     *   instance's type, or holding a value of the wrong kind
+     *   or that a value of its kind cannot hold (an int above 2^63 - 1, a color channel above
+     *   255...).
+     *
+     * Values that are of the right kind but that the component refuses (a negative hitbox size...)
+     * are reported by spawn_instances(). Every issue and error is also logged.
+     *
+     * @param file Scene file, usually `<game>/scenes/<name>.json`.
+     * @return The scene, its issues, and the error that rejected the file, if any.
+     * @note Call it after load_scripts() or load_game(): before, every type is unknown. Never
+     * throws.
+     */
+    [[nodiscard]] SceneLoad read_scene(const std::filesystem::path& file) const noexcept;
+
+    /**
      * @brief Looks up a name registered by load_scripts().
      *
      * @param name Declared entity or system name.
@@ -202,6 +268,19 @@ public:
      * get the same list.
      */
     [[nodiscard]] std::vector<std::string> entity_types() const;
+
+    /**
+     * @brief Lists the Lua free fields of an entity type that instances can override.
+     *
+     * Inferred once, when the declaration loads, from the defaults it gives (see ScriptField for
+     * the rules). Instances store them under the key `"Script.<name>"`, e.g. `"Script.health"`.
+     * A field declared only inside a `server = { ... }` or `client = { ... }` section is not
+     * listed, so every API set sees the same list.
+     *
+     * @param type Declared entity name.
+     * @return The fields in ascending name order, empty for an unknown type or a system.
+     */
+    [[nodiscard]] std::vector<ScriptField> script_fields(std::string_view type) const;
 
     /**
      * @brief Lists the sound effects declared with `sounds { ... }`, in ascending order.
@@ -294,11 +373,13 @@ public:
      * entity, except `Position.pos` which is its position, whose value differs from the type's
      * default: the value the field gets from the prefab's component fields (`sprite`, `hitbox`...)
      * before `on_spawn` runs. A field of a component the prefab does not give is always stored.
+     * Each script field (see script_fields()) whose value differs from its prefab default is
+     * stored as `"Script.<name>"`; one holding a value of another kind is left out and logged at
+     * Level::Warn.
      *
-     * @return The instances, empty if no world is attached.
-     * @note Lua fields such as `self.health` are not captured. An entity spawned by another
-     * entity's `on_spawn` is captured like any other, so spawning the instances back spawns it
-     * twice.
+     * @return The instances, empty if no world is attached. Save them with write_scene().
+     * @note An entity spawned by another entity's `on_spawn` is captured like any other, so
+     * spawning the instances back spawns it twice.
      */
     [[nodiscard]] std::vector<Instance> capture_instances();
 
@@ -310,12 +391,41 @@ public:
      * Entities already in the world are kept.
      *
      * @return What was skipped: an instance whose type is unknown or declared as a system, or
-     * that cannot be spawned; an override naming an unknown or non-editable field, or holding a
-     * value of the wrong kind or out of range. The other instances and overrides are still
+     * that cannot be spawned; an override naming an unknown or non-editable field or an unknown
+     * script field, or holding a value of the wrong kind or out of range. The other instances and
+     * overrides are still
      * applied. Every issue is also logged at Level::Warn.
      * @note Never throws.
      */
     std::vector<InstanceIssue> spawn_instances(std::span<const Instance> instances) noexcept;
+
+    /**
+     * @brief Builds one entity per instance into @p world without running any Lua.
+     *
+     * Each entity gets the components its prefab's native fields give (`sprite`, `hitbox`...),
+     * the instance's position, then its component overrides through fields(). No callback runs:
+     * no `on_spawn`, `update`, `on_collide` or `on_destroy`. The entities have no Lua data, so
+     * `Script.*` overrides are only checked, not stored in @p world. @p world need not be the
+     * attached world and entities already in it are kept.
+     *
+     * @return The entity of each instance and the same issues spawn_instances() would report.
+     * Issues are not logged.
+     * @note Never throws.
+     */
+    [[nodiscard]] Preview preview_instances(core::EntityManager& world,
+                                            std::span<const Instance> instances) noexcept;
+
+    /**
+     * @brief Value an instance of @p type has for @p key when it does not override it.
+     *
+     * @param key `"Component.field"` of an editable registry field, or `"Script.<name>"` of a
+     * script field.
+     * @return The default of a script field; for a registry field, the value the prefab's native
+     * fields give it, or std::nullopt when the prefab does not give that component. std::nullopt
+     * too for an unknown type, a system, an unknown key or a non-editable field.
+     */
+    [[nodiscard]] std::optional<core::FieldValue> default_value(std::string_view type,
+                                                                std::string_view key);
 
     /**
      * @brief Advances every live entity by one tick.
@@ -359,6 +469,26 @@ public:
      * @note Never throws.
      */
     std::size_t flush_destroyed() noexcept;
+
+    /**
+     * @brief Switches to the scene requested by Lua `load_scene(name)` since the last call.
+     *
+     * `load_scene` (server API set only) reads `scenes/<name>.json` of the game folder given to
+     * load_game() when it is called, raising a Lua error for an invalid name, a missing or invalid
+     * file, a runtime without a game folder, or a second request before this call. This function
+     * then marks every entity spawned by this runtime whose type is not declared with
+     * `persistent = true` and removes them as flush_destroyed() does (`on_destroy` runs), spawns
+     * the scene's instances as spawn_instances() does (`on_spawn` runs), queues the built-in
+     * `scene_loaded` event with argument `name` for clients, and calls `on_scene_loaded(name)` from
+     * `main.lua` if it defines one. A `load_scene` called during this switch is applied by the
+     * next call.
+     *
+     * Call it once per tick, after flush_destroyed().
+     *
+     * @return The name of the scene switched to, or std::nullopt when none was requested.
+     * @note Never throws. Lua errors raised by callbacks are logged.
+     */
+    std::optional<std::string> flush_scene() noexcept;
 
 private:
     friend class ScriptRuntimeBuilder;

@@ -4,6 +4,7 @@ local roster = require("roster")
 
 entity "ship"
 
+persistent    = true
 tags          = { "player", "ship" }
 sprite        = "sprites/ship.png"
 speed         = config.ship.speed

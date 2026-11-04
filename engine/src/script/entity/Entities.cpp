@@ -19,6 +19,7 @@
 #include "loading/Declarations.hpp"
 #include "lua/LuaArgs.hpp"
 #include "lua/LuaErrors.hpp"
+#include "lua/LuaFieldValue.hpp"
 
 namespace engine::script {
 
@@ -312,11 +313,30 @@ sol::object Entities::get(sol::this_state state, const EntityHandle& handle,
             return method;
         }
     }
+    return own_or_prefab(record, key);
+}
+
+sol::object Entities::own_or_prefab(const Record& record, const sol::object& key) {
     auto own = record.data.raw_get<sol::object>(key);
     if (!is_nil(own)) {
         return own;
     }
     return record.prefab.raw_get<sol::object>(key);
+}
+
+bool Entities::is_native_field(std::string_view name) const {
+    return is_read_only(name) || _handle_fields.contains(name) || _fields.has_alias(name) ||
+           !is_nil(_methods.raw_get<sol::object>(name));
+}
+
+sol::object Entities::script_value(core::Entity entity, std::string_view name) const {
+    return own_or_prefab(_records.at(entity.id()), sol::make_object(_lua, name));
+}
+
+void Entities::set_script_value(core::Entity entity, std::string_view name,
+                                const core::FieldValue& value) {
+    Record& record = _records.at(entity.id());
+    record.data.raw_set(name, to_lua(sol::this_state{_lua.lua_state()}, value));
 }
 
 void Entities::set(sol::this_state state, const EntityHandle& handle, const sol::object& key,

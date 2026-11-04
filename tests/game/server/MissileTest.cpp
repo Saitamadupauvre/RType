@@ -24,7 +24,7 @@ constexpr float missile_speed = 1200.F;
 constexpr float world_width = 1920.F;
 
 const std::filesystem::path game_scripts =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game";
+    std::filesystem::path(RTYPE_FIXTURES_DIR) / "game" / "server" / "game" / "scripts";
 
 class MissileTest : public ::testing::Test {
 protected:

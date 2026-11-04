@@ -3,8 +3,10 @@
 #include <format>
 #include <stdexcept>
 #include <utility>
+#include <variant>
 
 #include "RuntimeContext.hpp"
+#include "event/Events.hpp"
 #include "lua/LuaErrors.hpp"
 #include "lua/LuaFieldValue.hpp"
 
@@ -35,13 +37,30 @@ void ClientEvents::on(sol::this_state state, const sol::object& name, const sol:
     _handlers[std::move(event)].push_back(handler.as<sol::protected_function>());
 }
 
-bool ClientEvents::dispatch(const EventCommand& event) {
-    const auto found = _handlers.find(event.name);
-    if (found == _handlers.end()) {
+bool ClientEvents::notify_scene_loaded(const EventCommand& event) const {
+    if (event.name != scene_loaded_event) {
         return true;
     }
+    const sol::protected_function callback = _context.main_callback("on_scene_loaded");
+    if (!callback.valid()) {
+        return true;
+    }
+    for (const EventArgument& argument : event.arguments) {
+        const auto* scene = std::get_if<std::string>(&argument.value);
+        if (argument.key == scene_loaded_key && scene != nullptr) {
+            return report(callback(*scene));
+        }
+    }
+    return true;
+}
+
+bool ClientEvents::dispatch(const EventCommand& event) {
+    bool success = notify_scene_loaded(event);
+    const auto found = _handlers.find(event.name);
+    if (found == _handlers.end()) {
+        return success;
+    }
     const sol::this_state state{_context.lua.lua_state()};
-    bool success = true;
     for (const sol::protected_function& handler : found->second) {
         sol::table arguments = _context.lua.create_table();
         for (const EventArgument& argument : event.arguments) {

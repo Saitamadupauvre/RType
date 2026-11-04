@@ -26,6 +26,8 @@ using engine::script::ServerApi;
 
 namespace {
 
+const std::vector<std::string> built_in_events{"scene_loaded"};
+
 std::filesystem::path events_fixture(const std::string& name) {
     return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "events" / name;
 }
@@ -61,15 +63,23 @@ protected:
 TEST_F(EventsTest, ListsDeclaredNamesAndKeysInAscendingOrder) {
     load_declared();
 
-    EXPECT_EQ(_runtime.event_names(), (std::vector<std::string>{"boss.died", "explosion", "ping"}));
-    EXPECT_EQ(_runtime.event_keys(), (std::vector<std::string>{"at", "final", "label", "points",
-                                                               "size", "sprite", "tint"}));
+    EXPECT_EQ(_runtime.event_names(),
+              (std::vector<std::string>{"boss.died", "explosion", "ping", "scene_loaded"}));
+    EXPECT_EQ(_runtime.event_keys(),
+              (std::vector<std::string>{"at", "final", "label", "name", "points", "size", "sprite",
+                                        "tint"}));
 }
 
-TEST_F(EventsTest, NothingIsDeclaredWithoutScripts) {
-    EXPECT_TRUE(_runtime.event_names().empty());
-    EXPECT_TRUE(_runtime.event_keys().empty());
+TEST_F(EventsTest, OnlyTheBuiltInEventExistsWithoutScripts) {
+    EXPECT_EQ(_runtime.event_names(), built_in_events);
+    EXPECT_EQ(_runtime.event_keys(), std::vector<std::string>{"name"});
     EXPECT_TRUE(_server.take_event_commands().empty());
+}
+
+TEST_F(EventsTest, BuiltInSceneLoadedEventCannotBeDeclared) {
+    EXPECT_FALSE(_runtime.load_scripts(events_fixture("scene_loaded")));
+
+    EXPECT_EQ(count_logged(logger::Level::Error, "event 'scene_loaded' is built in"), 1U);
 }
 
 TEST_F(EventsTest, EmitQueuesArgumentsInKeyOrder) {
@@ -212,7 +222,8 @@ TEST_F(EventsTest, DeclaringAfterLoadingFails) {
 
     EXPECT_FALSE(_runtime.run_string(R"(event "late" {})", "events"));
 
-    EXPECT_EQ(_runtime.event_names(), (std::vector<std::string>{"boss.died", "explosion", "ping"}));
+    EXPECT_EQ(_runtime.event_names(),
+              (std::vector<std::string>{"boss.died", "explosion", "ping", "scene_loaded"}));
     EXPECT_EQ(count_logged(logger::Level::Error,
                            "event 'late' can only be declared while the scripts load"),
               1U);
@@ -221,21 +232,21 @@ TEST_F(EventsTest, DeclaringAfterLoadingFails) {
 TEST_F(EventsTest, RejectsADuplicateDeclaration) {
     EXPECT_FALSE(_runtime.load_scripts(events_fixture("duplicate")));
 
-    EXPECT_EQ(_runtime.event_keys(), (std::vector<std::string>{"at"}));
+    EXPECT_EQ(_runtime.event_keys(), (std::vector<std::string>{"at", "name"}));
     EXPECT_EQ(count_logged(logger::Level::Error, "event 'explosion' is already declared"), 1U);
 }
 
 TEST_F(EventsTest, RejectsAnInvalidName) {
     EXPECT_FALSE(_runtime.load_scripts(events_fixture("invalid_name")));
 
-    EXPECT_TRUE(_runtime.event_names().empty());
+    EXPECT_EQ(_runtime.event_names(), built_in_events);
     EXPECT_EQ(count_logged(logger::Level::Error, "'../boom' is not a valid event name"), 1U);
 }
 
 TEST_F(EventsTest, RejectsAKeyThatIsNotAnIdentifier) {
     EXPECT_FALSE(_runtime.load_scripts(events_fixture("invalid_key")));
 
-    EXPECT_TRUE(_runtime.event_names().empty());
+    EXPECT_EQ(_runtime.event_names(), built_in_events);
     EXPECT_EQ(count_logged(logger::Level::Error, "argument keys must be identifiers"), 1U);
 }
 
@@ -244,7 +255,7 @@ TEST_F(EventsTest, RejectsUnknownAndListKinds) {
         ScriptRuntime runtime = ScriptRuntime::builder().with<ServerApi>().build();
 
         EXPECT_FALSE(runtime.load_scripts(events_fixture(fixture))) << fixture;
-        EXPECT_TRUE(runtime.event_names().empty()) << fixture;
+        EXPECT_EQ(runtime.event_names(), built_in_events) << fixture;
     }
     EXPECT_EQ(count_logged(logger::Level::Error,
                            "must be one of float, int, bool, string, vec2, color, asset"),
@@ -254,7 +265,7 @@ TEST_F(EventsTest, RejectsUnknownAndListKinds) {
 TEST_F(EventsTest, RejectsMoreArgumentsThanTheLimit) {
     EXPECT_FALSE(_runtime.load_scripts(events_fixture("too_many")));
 
-    EXPECT_TRUE(_runtime.event_names().empty());
+    EXPECT_EQ(_runtime.event_names(), built_in_events);
     EXPECT_EQ(count_logged(logger::Level::Error, "event 'crowded' has more than 16 arguments"), 1U);
 }
 
