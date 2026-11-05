@@ -22,8 +22,8 @@ private:
     void refresh_lists();
     void report(const engine::editor::CommandResult& result);
 
-    engine::editor::EditorSession session_;
-    EditorState state_;
+    engine::editor::EditorSession _session;
+    EditorState _state;
 };
 
 } // namespace editor

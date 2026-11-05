@@ -5,19 +5,19 @@
 namespace editor {
 
 Clay_BoundingBox ScissorStack::push(Clay_BoundingBox box) {
-    const Clay_BoundingBox active = boxes_.empty() ? box : intersect(boxes_.back(), box);
-    boxes_.push_back(active);
+    const Clay_BoundingBox active = _boxes.empty() ? box : intersect(_boxes.back(), box);
+    _boxes.push_back(active);
     return active;
 }
 
 std::optional<Clay_BoundingBox> ScissorStack::pop() {
-    if (!boxes_.empty()) {
-        boxes_.pop_back();
+    if (!_boxes.empty()) {
+        _boxes.pop_back();
     }
-    if (boxes_.empty()) {
+    if (_boxes.empty()) {
         return std::nullopt;
     }
-    return boxes_.back();
+    return _boxes.back();
 }
 
 } // namespace editor

@@ -13,7 +13,7 @@ public:
     std::optional<Clay_BoundingBox> pop();
 
 private:
-    std::vector<Clay_BoundingBox> boxes_;
+    std::vector<Clay_BoundingBox> _boxes;
 };
 
 } // namespace editor

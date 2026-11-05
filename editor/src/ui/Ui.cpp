@@ -6,20 +6,20 @@
 
 namespace editor {
 
-Ui::Ui(Theme theme, UiInput input) : theme_(theme), input_(input) {}
+Ui::Ui(Theme theme, UiInput input) : _theme(theme), _input(input) {}
 
-const Theme& Ui::theme() const noexcept { return theme_; }
+const Theme& Ui::theme() const noexcept { return _theme; }
 
-const UiInput& Ui::input() const noexcept { return input_; }
+const UiInput& Ui::input() const noexcept { return _input; }
 
 bool Ui::hovered(Clay_ElementId id) { return Clay_PointerOver(id); }
 
-bool Ui::clicked(Clay_ElementId id) const { return input_.primary_pressed && hovered(id); }
+bool Ui::clicked(Clay_ElementId id) const { return _input.primary_pressed && hovered(id); }
 
-void Ui::emit(Action action) { actions_.push_back(std::move(action)); }
+void Ui::emit(Action action) { _actions.push_back(std::move(action)); }
 
-std::vector<Action> Ui::take_actions() { return std::exchange(actions_, {}); }
+std::vector<Action> Ui::take_actions() { return std::exchange(_actions, {}); }
 
-Clay_String Ui::keep(std::string text) { return view_of(texts_.emplace_back(std::move(text))); }
+Clay_String Ui::keep(std::string text) { return view_of(_texts.emplace_back(std::move(text))); }
 
 } // namespace editor

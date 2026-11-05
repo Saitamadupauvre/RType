@@ -27,8 +27,8 @@ private:
     void begin_scissor(const Clay_RenderCommand& command);
     void end_scissor();
 
-    FontCache fonts_;
-    ScissorStack scissors_;
+    FontCache _fonts;
+    ScissorStack _scissors;
 };
 
 } // namespace editor

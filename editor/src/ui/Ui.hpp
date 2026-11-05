@@ -28,10 +28,10 @@ public:
     [[nodiscard]] Clay_String keep(std::string text);
 
 private:
-    Theme theme_;
-    UiInput input_;
-    std::vector<Action> actions_;
-    std::deque<std::string> texts_;
+    Theme _theme;
+    UiInput _input;
+    std::vector<Action> _actions;
+    std::deque<std::string> _texts;
 };
 
 } // namespace editor

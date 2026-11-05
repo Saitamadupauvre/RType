@@ -24,8 +24,8 @@ public:
     const Font& get(Face face, std::uint16_t size);
 
 private:
-    std::filesystem::path directory_;
-    std::map<std::pair<Face, std::uint16_t>, Font> fonts_;
+    std::filesystem::path _directory;
+    std::map<std::pair<Face, std::uint16_t>, Font> _fonts;
 };
 
 } // namespace editor

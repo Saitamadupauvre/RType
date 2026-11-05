@@ -41,24 +41,24 @@ std::vector<int> codepoints() {
 
 } // namespace
 
-FontCache::FontCache(std::filesystem::path directory) : directory_(std::move(directory)) {}
+FontCache::FontCache(std::filesystem::path directory) : _directory(std::move(directory)) {}
 
 FontCache::~FontCache() {
-    for (auto& [key, font] : fonts_) {
+    for (auto& [key, font] : _fonts) {
         UnloadFont(font);
     }
 }
 
 const Font& FontCache::get(Face face, std::uint16_t size) {
     const auto key = std::make_pair(face, size);
-    if (const auto found = fonts_.find(key); found != fonts_.end()) {
+    if (const auto found = _fonts.find(key); found != _fonts.end()) {
         return found->second;
     }
-    const std::string path = (directory_ / files.at(static_cast<std::size_t>(face))).string();
+    const std::string path = (_directory / files.at(static_cast<std::size_t>(face))).string();
     std::vector<int> glyphs = codepoints();
     Font font = LoadFontEx(path.c_str(), size, glyphs.data(), static_cast<int>(glyphs.size()));
     SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
-    return fonts_.emplace(key, font).first->second;
+    return _fonts.emplace(key, font).first->second;
 }
 
 } // namespace editor

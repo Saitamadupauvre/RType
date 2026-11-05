@@ -32,7 +32,7 @@ bool uniform(Clay_BorderWidth width) {
 } // namespace
 
 ClayRenderer::ClayRenderer(std::filesystem::path font_directory)
-    : fonts_(std::move(font_directory)) {}
+    : _fonts(std::move(font_directory)) {}
 
 Clay_Dimensions ClayRenderer::measure(std::string_view text, const Clay_TextElementConfig& config) {
     const std::string terminated(text);
@@ -43,7 +43,7 @@ Clay_Dimensions ClayRenderer::measure(std::string_view text, const Clay_TextElem
 }
 
 const Font& ClayRenderer::font_for(std::uint16_t font_id, std::uint16_t size) {
-    return fonts_.get(static_cast<Face>(font_id), size);
+    return _fonts.get(static_cast<Face>(font_id), size);
 }
 
 void ClayRenderer::render(Clay_RenderCommandArray commands) {
@@ -120,7 +120,7 @@ void ClayRenderer::draw_text(const Clay_RenderCommand& command) {
 }
 
 void ClayRenderer::begin_scissor(const Clay_RenderCommand& command) {
-    const Clay_BoundingBox active = scissors_.push(command.boundingBox);
+    const Clay_BoundingBox active = _scissors.push(command.boundingBox);
     EndScissorMode();
     BeginScissorMode(static_cast<int>(active.x), static_cast<int>(active.y),
                      static_cast<int>(active.width), static_cast<int>(active.height));
@@ -128,7 +128,7 @@ void ClayRenderer::begin_scissor(const Clay_RenderCommand& command) {
 
 void ClayRenderer::end_scissor() {
     EndScissorMode();
-    if (const auto restored = scissors_.pop()) {
+    if (const auto restored = _scissors.pop()) {
         BeginScissorMode(static_cast<int>(restored->x), static_cast<int>(restored->y),
                          static_cast<int>(restored->width), static_cast<int>(restored->height));
     }

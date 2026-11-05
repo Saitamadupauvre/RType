@@ -29,9 +29,9 @@ private:
                                         void* context);
     static void report_error(Clay_ErrorData error);
 
-    std::vector<char> memory_;
-    MeasureText measure_;
-    std::vector<std::string> errors_;
+    std::vector<char> _memory;
+    MeasureText _measure;
+    std::vector<std::string> _errors;
 };
 
 } // namespace editor
