@@ -1,41 +1,25 @@
 #include <gtest/gtest.h>
 
-#include <string_view>
-
-#include "clay/ClayContext.hpp"
-#include "ui/Layout.hpp"
+#include "FrameFixture.hpp"
 #include "ui/Theme.hpp"
 
-using editor::build_layout;
-using editor::ClayContext;
 using editor::Theme;
 
 namespace {
 
-Clay_Dimensions fixed_measure(std::string_view text, const Clay_TextElementConfig& config) {
-    return {.width = static_cast<float>(text.size()) * static_cast<float>(config.fontSize) / 2.F,
-            .height = static_cast<float>(config.fontSize)};
-}
+using Layout = FrameFixture;
 
-Clay_BoundingBox box_of(Clay_ElementId id) {
-    const Clay_ElementData data = Clay_GetElementData(id);
-    EXPECT_TRUE(data.found);
-    return data.boundingBox;
-}
-
-class LayoutAtScale : public testing::TestWithParam<float> {};
+class LayoutAtScale : public FrameFixture, public testing::WithParamInterface<float> {};
 
 } // namespace
 
-TEST(Layout, BuildsWithoutClayErrors) {
-    const ClayContext clay({1440, 900}, fixed_measure);
-    build_layout(Theme{}, {1440, 900});
-    EXPECT_TRUE(clay.errors().empty());
+TEST_F(Layout, BuildsWithoutClayErrors) {
+    frame();
+    EXPECT_TRUE(_clay.errors().empty());
 }
 
-TEST(Layout, PanelsKeepTheirDesignSizes) {
-    const ClayContext clay({1440, 900}, fixed_measure);
-    build_layout(Theme{}, {1440, 900});
+TEST_F(Layout, PanelsKeepTheirDesignSizes) {
+    frame();
 
     EXPECT_FLOAT_EQ(box_of(CLAY_ID("MenuBar")).height, 36.F);
     EXPECT_FLOAT_EQ(box_of(CLAY_ID("Toolbar")).height, 40.F);
@@ -45,9 +29,8 @@ TEST(Layout, PanelsKeepTheirDesignSizes) {
     EXPECT_FLOAT_EQ(box_of(CLAY_ID("StatusBar")).height, 24.F);
 }
 
-TEST(Layout, ViewportTakesTheRemainingSpace) {
-    const ClayContext clay({1440, 900}, fixed_measure);
-    build_layout(Theme{}, {1440, 900});
+TEST_F(Layout, ViewportTakesTheRemainingSpace) {
+    frame();
 
     const Clay_BoundingBox viewport = box_of(CLAY_ID("Viewport"));
     EXPECT_FLOAT_EQ(viewport.x, 260.F);
@@ -56,18 +39,16 @@ TEST(Layout, ViewportTakesTheRemainingSpace) {
     EXPECT_FLOAT_EQ(viewport.height, 650.F);
 }
 
-TEST(Layout, ViewportFollowsTheWindowSize) {
-    const ClayContext clay({1920, 1080}, fixed_measure);
-    build_layout(Theme{}, {1920, 1080});
+TEST_F(Layout, ViewportFollowsTheWindowSize) {
+    frame({}, {}, {.width = 1920, .height = 1080});
 
     const Clay_BoundingBox viewport = box_of(CLAY_ID("Viewport"));
     EXPECT_FLOAT_EQ(viewport.width, 1320.F);
     EXPECT_FLOAT_EQ(viewport.height, 830.F);
 }
 
-TEST(Layout, TinyWindowNeverGivesANegativeViewport) {
-    const ClayContext clay({300, 200}, fixed_measure);
-    build_layout(Theme{}, {300, 200});
+TEST_F(Layout, TinyWindowNeverGivesANegativeViewport) {
+    frame({}, {}, {.width = 300, .height = 200});
 
     const Clay_BoundingBox viewport = box_of(CLAY_ID("Viewport"));
     EXPECT_GE(viewport.width, 0.F);
@@ -76,11 +57,9 @@ TEST(Layout, TinyWindowNeverGivesANegativeViewport) {
 
 TEST_P(LayoutAtScale, PanelsScaleAndTheViewportKeepsTheRest) {
     const float scale = GetParam();
-    const Clay_Dimensions window{.width = 1440.F * scale, .height = 900.F * scale};
-    const ClayContext clay(window, fixed_measure);
-    build_layout(Theme{.scale = scale}, window);
+    frame({}, Theme{.scale = scale}, {.width = 1440.F * scale, .height = 900.F * scale});
 
-    EXPECT_TRUE(clay.errors().empty());
+    EXPECT_TRUE(_clay.errors().empty());
     EXPECT_FLOAT_EQ(box_of(CLAY_ID("Sidebar")).width, 260.F * scale);
     EXPECT_FLOAT_EQ(box_of(CLAY_ID("Inspector")).width, 340.F * scale);
     EXPECT_FLOAT_EQ(box_of(CLAY_ID("MenuBar")).height, 36.F * scale);

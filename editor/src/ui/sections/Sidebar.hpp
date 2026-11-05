@@ -1,9 +1,10 @@
 #pragma once
 
-#include "ui/Theme.hpp"
+#include "action/Editor.hpp"
+#include "ui/Ui.hpp"
 
 namespace editor {
 
-void sidebar(const Theme& theme);
+void sidebar(Ui& ui, const Editor& editor);
 
 } // namespace editor

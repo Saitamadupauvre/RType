@@ -1,5 +1,7 @@
 #include "ui/Text.hpp"
 
+#include <cstdint>
+
 namespace editor {
 
 void text(const Theme& theme, Clay_String content, float size, Clay_Color color, Face face) {
@@ -11,6 +13,12 @@ void text(const Theme& theme, Clay_String content, float size, Clay_Color color,
 
 void spacer() {
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()}}}) {}
+}
+
+Clay_String view_of(std::string_view stable) {
+    return {.isStaticallyAllocated = false,
+            .length = static_cast<std::int32_t>(stable.size()),
+            .chars = stable.data()};
 }
 
 } // namespace editor

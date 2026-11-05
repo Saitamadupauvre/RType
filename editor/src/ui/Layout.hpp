@@ -2,10 +2,11 @@
 
 #include <clay.h>
 
-#include "ui/Theme.hpp"
+#include "action/Editor.hpp"
+#include "ui/Ui.hpp"
 
 namespace editor {
 
-Clay_RenderCommandArray build_layout(const Theme& theme, Clay_Dimensions window);
+Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimensions window);
 
 } // namespace editor

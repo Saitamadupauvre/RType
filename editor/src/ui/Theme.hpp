@@ -22,6 +22,8 @@ inline constexpr Clay_Color text_on_accent{.r = 27, .g = 29, .b = 34, .a = 255};
 inline constexpr Clay_Color accent{.r = 240, .g = 160, .b = 75, .a = 255};
 inline constexpr Clay_Color focus{.r = 76, .g = 154, .b = 255, .a = 255};
 inline constexpr Clay_Color selected{.r = 47, .g = 58, .b = 77, .a = 255};
+inline constexpr Clay_Color hover{.r = 42, .g = 46, .b = 54, .a = 255};
+inline constexpr Clay_Color error{.r = 229, .g = 83, .b = 75, .a = 255};
 
 } // namespace color
 
@@ -41,6 +43,7 @@ inline constexpr float separator = 20.F;
 inline constexpr float text = 16.F;
 inline constexpr float small_text = 13.F;
 inline constexpr float gutter = 12.F;
+inline constexpr float row = 24.F;
 inline constexpr float radius = 6.F;
 
 } // namespace size

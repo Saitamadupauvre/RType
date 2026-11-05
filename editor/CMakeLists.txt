@@ -21,12 +21,15 @@ add_library(editor-core STATIC
     src/action/ApplyCommand.cpp
     src/action/ApplyEdit.cpp
     src/action/Editor.cpp
+    src/action/OpenEditor.cpp
     src/clay/ClayContext.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
+    src/ui/Labels.cpp
     src/ui/Layout.cpp
     src/ui/Text.cpp
     src/ui/Theme.cpp
+    src/ui/Ui.cpp
     src/ui/sections/BottomPanel.cpp
     src/ui/sections/Inspector.cpp
     src/ui/sections/MenuBar.cpp
@@ -35,6 +38,9 @@ add_library(editor-core STATIC
     src/ui/sections/StatusBar.cpp
     src/ui/sections/Toolbar.cpp
     src/ui/sections/Viewport.cpp
+    src/ui/widgets/Button.cpp
+    src/ui/widgets/ListRow.cpp
+    src/ui/widgets/Toggle.cpp
 )
 target_include_directories(editor-core PUBLIC src)
 target_link_libraries(editor-core PUBLIC editor-clay engine::editor)

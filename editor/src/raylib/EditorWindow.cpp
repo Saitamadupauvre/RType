@@ -9,6 +9,8 @@
 #include "raylib/ClayRenderer.hpp"
 #include "ui/Layout.hpp"
 #include "ui/Theme.hpp"
+#include "ui/Ui.hpp"
+#include "ui/UiInput.hpp"
 
 namespace editor {
 
@@ -29,43 +31,50 @@ std::filesystem::path font_directory() {
     return std::filesystem::path(GetApplicationDirectory()) / "editor-assets" / "fonts";
 }
 
+Clay_Vector2 to_clay(Vector2 vector) { return {.x = vector.x, .y = vector.y}; }
+
+UiInput read_input() {
+    return {.pointer = to_clay(GetMousePosition()),
+            .primary_down = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
+            .primary_pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT),
+            .wheel = to_clay(GetMouseWheelMoveV()),
+            .delta_time = GetFrameTime()};
+}
+
 void toggle_debug_view() { Clay_SetDebugModeEnabled(!Clay_IsDebugModeEnabled()); }
 
-void run_frames() {
+void run_frames(Editor& editor) {
     ClayRenderer renderer(font_directory());
     const ClayContext clay(window_size(), [&renderer](auto text, const auto& config) {
         return renderer.measure(text, config);
     });
 
     while (!WindowShouldClose()) {
-        const Theme theme{.scale = GetWindowScaleDPI().x};
-        const Vector2 pointer = GetMousePosition();
-        const Vector2 wheel = GetMouseWheelMoveV();
-        Clay_SetPointerState({.x = pointer.x, .y = pointer.y},
-                             IsMouseButtonDown(MOUSE_BUTTON_LEFT));
-        Clay_UpdateScrollContainers(false, {.x = wheel.x, .y = wheel.y}, GetFrameTime());
-
         if (IsKeyPressed(KEY_F11)) {
             toggle_debug_view();
         }
-
-        const Clay_RenderCommandArray commands = build_layout(theme, window_size());
+        Ui ui(Theme{.scale = GetWindowScaleDPI().x}, read_input());
+        const Clay_RenderCommandArray commands = build_frame(ui, editor, window_size());
         BeginDrawing();
         ClearBackground(BLACK);
         renderer.render(commands);
         EndDrawing();
+        for (const Action& action : ui.take_actions()) {
+            editor.handle(action);
+        }
     }
 }
 
 } // namespace
 
-bool run_editor_window() {
+bool run_editor_window(Editor& editor) {
     SetConfigFlags(window_flags);
     InitWindow(initial_width, initial_height, "Editor");
     if (!IsWindowReady()) {
         return false;
     }
-    run_frames();
+    SetExitKey(KEY_NULL);
+    run_frames(editor);
     CloseWindow();
     return true;
 }

@@ -253,9 +253,11 @@ editor_add_test(core
         editor/action/ApplyCommandTest.cpp
         editor/action/ApplyEditTest.cpp
         editor/action/EditorTest.cpp
+        editor/action/OpenEditorTest.cpp
         editor/clay/ClayContextTest.cpp
         editor/render/GeometryTest.cpp
         editor/render/ScissorStackTest.cpp
+        editor/ui/FrameTest.cpp
         editor/ui/LayoutTest.cpp
         editor/ui/ThemeTest.cpp
     LINKS editor-core
