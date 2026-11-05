@@ -19,6 +19,9 @@ engine_add_module(core
         src/core/FieldRegistry.cpp
         src/core/SystemScheduler.cpp
         src/core/Transform.cpp
+        src/core/console/Console.cpp
+        src/core/console/CVars.cpp
+        src/core/console/LogCapture.cpp
         src/core/event/EventBus.cpp
         src/core/log/Log.cpp
         src/core/log/MemorySink.cpp

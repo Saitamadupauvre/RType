@@ -21,6 +21,9 @@ engine_add_test(core SOURCES
     engine/core/ComponentTypeIdTest.cpp
     engine/core/EntityManagerTest.cpp
     engine/core/SystemSchedulerTest.cpp
+    engine/core/console/ConsoleTest.cpp
+    engine/core/console/CVarsTest.cpp
+    engine/core/console/LogCaptureTest.cpp
     engine/core/event/EventBusTest.cpp
     engine/core/log/LogTest.cpp
     engine/core/log/MemorySinkTest.cpp
