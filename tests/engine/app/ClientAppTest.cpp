@@ -14,6 +14,8 @@
 #include "engine/app/ClientApp.hpp"
 #include "engine/app/ServerApp.hpp"
 #include "engine/audio/IAudio.hpp"
+#include "engine/core/console/Console.hpp"
+#include "engine/core/log/Log.hpp"
 #include "engine/core/math/Camera.hpp"
 #include "engine/core/time/ManualClock.hpp"
 #include "engine/graphics/IInput.hpp"
@@ -663,4 +665,184 @@ TEST_F(ClientAppTest, TheMetricsOverlayIsAlsoDrawnWhileLoading) {
 
     EXPECT_TRUE(std::ranges::any_of(
         _renderer.texts, [](const std::string& text) { return text.starts_with("FPS"); }));
+}
+
+namespace {
+
+bool console_printed(ClientApp& client, const std::string& text) {
+    return std::ranges::any_of(client.console().lines(), [&text](const auto& line) {
+        return line.text.find(text) != std::string::npos;
+    });
+}
+
+} // namespace
+
+TEST_F(ClientAppTest, TheConsoleIsClosedAndDrawsNothingByDefault) {
+    start_client();
+    play(session_frames);
+
+    EXPECT_FALSE(_client.console().is_open());
+    EXPECT_FALSE(std::ranges::any_of(
+        _renderer.texts, [](const std::string& text) { return text.starts_with("> "); }));
+}
+
+TEST_F(ClientAppTest, GraveAccentAndF1ToggleTheConsoleAndEscapeClosesIt) {
+    start_client();
+    play(session_frames);
+
+    for (const Key toggle : {Key::GraveAccent, Key::F1}) {
+        _input.pressed = {toggle};
+        _input.typed = U"`";
+        play(1);
+        EXPECT_TRUE(_client.console().is_open());
+        EXPECT_TRUE(_client.console().input().empty());
+        _input.pressed = {Key::Escape};
+        play(1);
+        EXPECT_FALSE(_client.console().is_open());
+    }
+}
+
+TEST_F(ClientAppTest, TheConsoleIsDrawnOverEverythingWhileOpen) {
+    start_client();
+    _client.show_metrics_overlay(true);
+    _client.console().set_open(true);
+    _input.typed = U"abc";
+
+    play(session_frames);
+
+    const auto& calls = _renderer.calls;
+    const auto prompt = std::ranges::find(calls, std::string("text > abc"));
+    ASSERT_NE(prompt, calls.end());
+    const auto overlay = std::ranges::find_if(
+        calls, [](const std::string& call) { return call.starts_with("text FPS"); });
+    EXPECT_LT(overlay, prompt);
+    EXPECT_EQ(std::find(prompt, calls.end(), std::string("sprite")), calls.end());
+}
+
+TEST_F(ClientAppTest, TypedLuaRunsInTheClientRuntimeOnEnter) {
+    start_client();
+    play(session_frames);
+    _client.console().set_open(true);
+
+    _input.typed = U"21 * 2";
+    play(1);
+    _input.pressed = {Key::Enter};
+    play(1);
+    _input.pressed.clear();
+
+    EXPECT_TRUE(_client.console().input().empty());
+    EXPECT_TRUE(console_printed(_client, "> 21 * 2"));
+    EXPECT_TRUE(console_printed(_client, "42"));
+}
+
+TEST_F(ClientAppTest, LuaErrorsArePrintedAndTheGameContinues) {
+    start_client();
+    play(session_frames);
+
+    _client.console().execute("error('console boom')");
+    play(1);
+
+    EXPECT_TRUE(console_printed(_client, "console boom"));
+    EXPECT_EQ(_renderer.sprites.size(), 1U);
+}
+
+TEST_F(ClientAppTest, TheGameReceivesNoKeyWhileTheConsoleIsOpen) {
+    start_client();
+    play(1);
+    _client.console().set_open(true);
+
+    _input.held.insert(Key::M);
+    _input.pressed = {Key::F3};
+    play(3);
+
+    EXPECT_FALSE(_client.script_client().audio_settings().muted);
+    EXPECT_FALSE(_client.metrics_overlay_shown());
+}
+
+TEST_F(ClientAppTest, TheConsoleEditsItsInputWithTheKeyboard) {
+    start_client();
+    _client.console().set_open(true);
+    _input.typed = U"print(2)";
+    play(1);
+
+    _input.pressed = {Key::Left};
+    play(1);
+    _input.pressed = {Key::Backspace};
+    play(1);
+    _input.pressed.clear();
+    _input.typed = U"3";
+    play(1);
+
+    EXPECT_EQ(_client.console().input(), "print(3)");
+}
+
+TEST_F(ClientAppTest, LogMessagesAreCopiedToTheConsole) {
+    start_client();
+
+    engine::core::log::warn("something odd");
+    play(1);
+
+    const auto& lines = _client.console().lines();
+    const auto found =
+        std::ranges::find_if(lines, [](const auto& line) { return line.text == "something odd"; });
+    ASSERT_NE(found, lines.end());
+    EXPECT_EQ(found->kind, engine::core::console::LineKind::error);
+}
+
+TEST_F(ClientAppTest, ServerLinesRunOnTheLocalServer) {
+    _client.attach_local_server(_server);
+    start_client();
+    play(session_frames);
+
+    _client.console().execute("/server cvar.get('sv.tick_rate')");
+    play(2);
+
+    EXPECT_TRUE(console_printed(_client, "60"));
+}
+
+TEST_F(ClientAppTest, ServerLinesFailWithoutALocalServer) {
+    start_client();
+
+    _client.console().execute("/server 1");
+
+    EXPECT_TRUE(console_printed(_client, "no local server"));
+}
+
+TEST_F(ClientAppTest, TheEngineRegistersItsConsoleVariables) {
+    for (const auto* name : {"debug.metrics", "debug.hitboxes", "audio.music_volume",
+                             "audio.effects_volume", "audio.muted"}) {
+        EXPECT_TRUE(_client.cvars().contains(name)) << name;
+    }
+}
+
+TEST_F(ClientAppTest, TheMetricsCvarShowsTheOverlay) {
+    start_client();
+
+    _client.console().execute("cvar debug.metrics on");
+    play(1);
+
+    EXPECT_TRUE(_client.metrics_overlay_shown());
+    EXPECT_TRUE(std::ranges::any_of(
+        _renderer.texts, [](const std::string& text) { return text.starts_with("FPS"); }));
+}
+
+TEST_F(ClientAppTest, AudioCvarsFollowTheAudioSettingsBothWays) {
+    start_client();
+    play(1);
+
+    _client.console().execute("cvar audio.music_volume 0.25");
+    EXPECT_FLOAT_EQ(_client.script_client().audio_settings().music_volume, 0.25F);
+
+    _input.held.insert(Key::M);
+    play(3);
+    EXPECT_TRUE(_client.cvars().get_bool("audio.muted", false));
+}
+
+TEST_F(ClientAppTest, ScriptsReadTheConsoleVariables) {
+    start_client();
+
+    const auto result = _client.script().evaluate("cvar.get('debug.hitboxes')");
+
+    EXPECT_TRUE(result.ok);
+    EXPECT_EQ(result.output, "false");
 }

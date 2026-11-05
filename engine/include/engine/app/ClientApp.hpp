@@ -7,6 +7,8 @@
 
 #include "engine/app/Export.hpp"
 #include "engine/audio/IAudio.hpp"
+#include "engine/core/console/CVars.hpp"
+#include "engine/core/console/Console.hpp"
 #include "engine/core/metrics/Metrics.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/graphics/IInput.hpp"
@@ -18,6 +20,8 @@
 #include "engine/script/ScriptRuntime.hpp"
 
 namespace engine::app {
+
+class ServerApp;
 
 /** @brief Settings of a ClientApp. */
 struct ClientAppOptions {
@@ -75,7 +79,7 @@ public:
      * @note Every reference must outlive this app.
      */
     ClientApp(const core::time::IClock& clock, network::ClientTransport& transport,
-              graphics::IRenderer& renderer, const graphics::IInput& input, audio::IAudio& audio,
+              graphics::IRenderer& renderer, graphics::IInput& input, audio::IAudio& audio,
               ClientAppOptions options);
     ~ClientApp();
 
@@ -137,8 +141,10 @@ public:
      * only: FPS, frame time and its graph, Lua, physics and draw times, entity count, CPU and
      * memory, then the lagometer (ping, lost packets, snapshots per second, bytes in and out).
      * A hidden overlay draws nothing. Hidden by default.
+     *
+     * @note Same as setting the console variable `debug.metrics`.
      */
-    void show_metrics_overlay(bool shown) noexcept;
+    void show_metrics_overlay(bool shown);
 
     /** @return true while the metrics overlay is drawn. */
     [[nodiscard]] bool metrics_overlay_shown() const noexcept;
@@ -151,6 +157,35 @@ public:
      * from another; must outlive this app or be reset with nullptr. nullptr removes them.
      */
     void show_server_metrics(const core::metrics::Metrics* server) noexcept;
+
+    /**
+     * @brief Connects the overlay and the console to a server running in the same process.
+     *
+     * Shows its metrics like show_server_metrics(), and sends the console lines starting with
+     * `/server` to ServerApp::submit_lua(); their results are printed by the next frames.
+     *
+     * @param server Must outlive this app. It may run on another thread.
+     */
+    void attach_local_server(ServerApp& server);
+
+    /**
+     * @return The developer console, toggled with ` (grave accent) or F1 during frame().
+     *
+     * While open, it takes the keyboard: the game receives no key, typed characters edit the
+     * input line, Enter runs it, Up and Down walk the history, Page Up and Page Down scroll and
+     * Escape closes it. Plain lines run as Lua in the client runtime, and every log message is
+     * copied to its scrollback.
+     */
+    [[nodiscard]] core::console::Console& console() noexcept;
+
+    /**
+     * @return The console variables of the client, also reachable from its scripts as `cvar`.
+     *
+     * The engine registers `debug.metrics` and `debug.hitboxes` (bool), `audio.music_volume` and
+     * `audio.effects_volume` (number, 0 to 1) and `audio.muted` (bool). The audio variables
+     * follow script::ClientApi::audio_settings() both ways.
+     */
+    [[nodiscard]] core::console::CVars& cvars() noexcept;
 
 private:
     struct Impl;
