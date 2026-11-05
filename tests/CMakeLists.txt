@@ -265,6 +265,7 @@ editor_add_test(core
         editor/ui/LayoutTest.cpp
         editor/ui/ThemeTest.cpp
         editor/ui/widgets/CheckboxTest.cpp
+        editor/ui/widgets/DropdownTest.cpp
         editor/ui/widgets/NumberFieldTest.cpp
         editor/ui/widgets/TextFieldTest.cpp
     LINKS editor-core

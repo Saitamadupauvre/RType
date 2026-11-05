@@ -24,6 +24,7 @@ constexpr auto symbols = std::to_array<int>({
     0x2026,
     0x2190,
     0x2192,
+    0x25BE,
     0x25CF,
 });
 
