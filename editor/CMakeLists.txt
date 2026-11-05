@@ -27,6 +27,7 @@ add_library(editor-core STATIC
     src/cli/Cli.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
+    src/ui/CommandTable.cpp
     src/ui/Labels.cpp
     src/ui/Layout.cpp
     src/ui/Text.cpp

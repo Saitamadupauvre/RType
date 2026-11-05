@@ -6,7 +6,7 @@
 
 namespace editor {
 
-Ui::Ui(Theme theme, UiInput input) : _theme(theme), _input(input) {}
+Ui::Ui(Theme theme, UiInput input) : _theme(theme), _input(std::move(input)) {}
 
 const Theme& Ui::theme() const noexcept { return _theme; }
 

@@ -1,5 +1,6 @@
 #include "ui/Layout.hpp"
 
+#include "ui/CommandTable.hpp"
 #include "ui/sections/BottomPanel.hpp"
 #include "ui/sections/Inspector.hpp"
 #include "ui/sections/MenuBar.hpp"
@@ -22,6 +23,7 @@ void feed_input(const UiInput& input) {
 Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimensions window) {
     Clay_SetLayoutDimensions(window);
     feed_input(ui.input());
+    emit_shortcuts(ui, editor);
     Clay_BeginLayout();
     CLAY({.id = CLAY_ID("Root"),
           .layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
