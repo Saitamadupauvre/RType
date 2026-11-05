@@ -47,8 +47,10 @@ add_library(editor-core STATIC
     src/ui/sections/Toolbar.cpp
     src/ui/sections/Viewport.cpp
     src/ui/widgets/Button.cpp
+    src/ui/widgets/Checkbox.cpp
     src/ui/widgets/FieldKeys.cpp
     src/ui/widgets/ListRow.cpp
+    src/ui/widgets/NumberField.cpp
     src/ui/widgets/TextField.cpp
     src/ui/widgets/Toggle.cpp
 )
