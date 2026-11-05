@@ -76,6 +76,7 @@ disable the check project-wide in `.clang-tidy` and document why here.
 | Disabled check | Reason |
 |---|---|
 | `clang-analyzer-optin.core.EnumCastOutOfRange` | Decoders turn untrusted bytes into enums and must reject out-of-range values; their tests have to cast such values (e.g. `static_cast<DisconnectReason>(9)`) to prove it. |
+| `readability-redundant-member-init` | It removes `{}` from member initializers such as `std::vector<Key> keys{};`, and GCC's `-Wmissing-field-initializers` then warns on every designated initializer that leaves that member out. |
 
 ## Before pushing
 
