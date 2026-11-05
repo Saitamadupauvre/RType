@@ -18,6 +18,9 @@ target_include_directories(editor-clay SYSTEM PUBLIC ${CLAY_INCLUDE_DIR})
 set_target_properties(editor-clay PROPERTIES CXX_CLANG_TIDY "")
 
 add_library(editor-core STATIC
+    src/action/ApplyCommand.cpp
+    src/action/ApplyEdit.cpp
+    src/action/Editor.cpp
     src/clay/ClayContext.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
@@ -34,7 +37,7 @@ add_library(editor-core STATIC
     src/ui/sections/Viewport.cpp
 )
 target_include_directories(editor-core PUBLIC src)
-target_link_libraries(editor-core PUBLIC editor-clay)
+target_link_libraries(editor-core PUBLIC editor-clay engine::editor)
 editor_set_warnings(editor-core)
 
 set(EDITOR_ASSETS_DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/editor-assets)
