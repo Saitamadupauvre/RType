@@ -49,6 +49,7 @@ engine_add_test(script SOURCES
     engine/script/assets/TexturesTest.cpp
     engine/script/audio/AudioTest.cpp
     engine/script/client/HudTest.cpp
+    engine/script/console/ConsoleTest.cpp
     engine/script/client/LocalEntitiesTest.cpp
     engine/script/entity/CameraFieldsTest.cpp
     engine/script/entity/TransformFieldsTest.cpp

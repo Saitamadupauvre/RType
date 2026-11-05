@@ -61,6 +61,7 @@ engine_add_module(script
         src/script/assets/DeclaredAssets.cpp
         src/script/audio/Audio.cpp
         src/script/client/ClientAudio.cpp
+        src/script/console/ConsoleLua.cpp
         src/script/client/ClientCamera.cpp
         src/script/client/ClientEvents.cpp
         src/script/client/HudCanvas.cpp

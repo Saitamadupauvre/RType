@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "RuntimeContext.hpp"
+#include "console/ConsoleLua.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/physics/Fields.hpp"
 #include "engine/script/GameFolder.hpp"
@@ -488,6 +489,24 @@ std::optional<DeclarationInfo> ScriptRuntime::find_declaration(std::string_view 
 
 void ScriptRuntime::attach_world(core::EntityManager& world) {
     _impl->context.entities.attach(world);
+}
+
+void ScriptRuntime::attach_cvars(core::console::CVars& cvars) {
+    bind_cvars(_impl->context.lua, cvars);
+}
+
+core::console::ExecutionResult ScriptRuntime::evaluate(std::string_view code) noexcept {
+    try {
+        RuntimeContext& context = _impl->context;
+        if (context.main) {
+            return script::evaluate(context.lua, *context.main, code);
+        }
+        return script::evaluate(context.lua, context.lua.globals(), code);
+    } catch (const std::exception& exception) {
+        return {.ok = false, .output = exception.what()};
+    } catch (...) {
+        return {.ok = false, .output = "unknown error"};
+    }
 }
 
 const core::FieldRegistry& ScriptRuntime::fields() const noexcept { return _impl->context.fields; }
