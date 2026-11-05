@@ -61,11 +61,15 @@ void overlays(Ui& ui, const ViewSettings& view) {
     }
 }
 
-void history(Ui& ui, const engine::editor::EditorSession& session) {
-    if (button(ui, CLAY_ID("UndoButton"), CLAY_STRING("Undo"), plain, session.can_undo())) {
+void history(Ui& ui, const Editor& editor) {
+    const bool editing = editor.state().mode == Mode::editing;
+    const auto& session = editor.session();
+    if (button(ui, CLAY_ID("UndoButton"), CLAY_STRING("Undo"), plain,
+               editing && session.can_undo())) {
         ui.emit(command::Undo{});
     }
-    if (button(ui, CLAY_ID("RedoButton"), CLAY_STRING("Redo"), plain, session.can_redo())) {
+    if (button(ui, CLAY_ID("RedoButton"), CLAY_STRING("Redo"), plain,
+               editing && session.can_redo())) {
         ui.emit(command::Redo{});
     }
 }
@@ -88,7 +92,7 @@ void toolbar(Ui& ui, const Editor& editor) {
         separator(theme);
         overlays(ui, editor.state().view);
         spacer();
-        history(ui, editor.session());
+        history(ui, editor);
     }
 }
 

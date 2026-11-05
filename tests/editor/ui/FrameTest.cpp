@@ -87,6 +87,13 @@ TEST_F(FrameTest, UndoIsDisabledWithoutHistory) {
     EXPECT_NE(only<command::Undo>(actions), nullptr);
 }
 
+TEST_F(FrameTest, UndoIsDisabledWhilePlaying) {
+    _editor.handle(edit::Move{.id = id_of(_editor.session(), "rock"), .position = {9, 9}});
+    _editor.handle(command::Play{});
+
+    EXPECT_TRUE(click(CLAY_ID("UndoButton")).empty());
+}
+
 TEST_F(FrameTest, SceneRowOpensThatScene) {
     const auto actions = click(CLAY_IDI("SceneRow", 3));
     const auto* open = only<command::OpenScene>(actions);

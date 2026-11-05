@@ -12,6 +12,18 @@ namespace editor {
 using engine::editor::CommandResult;
 using engine::editor::EditorSession;
 
+namespace {
+
+bool allowed_while_running(const Command& command) {
+    return std::visit([](const auto& known) { return known.while_running; }, command);
+}
+
+CommandResult stop_first() {
+    return CommandResult::refused("Stop the game to change the project.");
+}
+
+} // namespace
+
 Editor::Editor(EditorSession session) : _session(std::move(session)) { refresh_lists(); }
 
 void Editor::handle(const Action& action) {
@@ -28,12 +40,15 @@ const EditorSession& Editor::session() const noexcept { return _session; }
 
 CommandResult Editor::apply(const Edit& edit) {
     if (_state.mode != Mode::editing) {
-        return CommandResult::refused("Stop the game to edit the scene.");
+        return stop_first();
     }
     return apply_edit(_session, edit);
 }
 
 CommandResult Editor::apply(const Command& command) {
+    if (_state.mode != Mode::editing && !allowed_while_running(command)) {
+        return stop_first();
+    }
     CommandResult result = apply_command(_session, _state, command);
     refresh_lists();
     return result;
