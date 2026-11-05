@@ -1,5 +1,6 @@
 find_package(raylib CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
+find_package(clap 1.0 CONFIG REQUIRED)
 find_path(CLAY_INCLUDE_DIR clay.h REQUIRED)
 
 include(CheckCXXCompilerFlag)
@@ -23,6 +24,7 @@ add_library(editor-core STATIC
     src/action/Editor.cpp
     src/action/OpenEditor.cpp
     src/clay/ClayContext.cpp
+    src/cli/Cli.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
     src/ui/Labels.cpp
@@ -43,7 +45,7 @@ add_library(editor-core STATIC
     src/ui/widgets/Toggle.cpp
 )
 target_include_directories(editor-core PUBLIC src)
-target_link_libraries(editor-core PUBLIC editor-clay engine::editor)
+target_link_libraries(editor-core PUBLIC editor-clay engine::editor PRIVATE clap::clap)
 editor_set_warnings(editor-core)
 
 set(EDITOR_ASSETS_DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/editor-assets)

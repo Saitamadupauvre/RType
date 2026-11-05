@@ -255,6 +255,7 @@ editor_add_test(core
         editor/action/EditorTest.cpp
         editor/action/OpenEditorTest.cpp
         editor/clay/ClayContextTest.cpp
+        editor/cli/CliTest.cpp
         editor/render/GeometryTest.cpp
         editor/render/ScissorStackTest.cpp
         editor/ui/FrameTest.cpp
