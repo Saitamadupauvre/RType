@@ -92,6 +92,10 @@ CommandResult apply_command(EditorSession& session, EditorState& state, const Co
                 state.bottom_tab = tab.tab;
                 return CommandResult::done();
             },
+            [&](const command::SetPrefabFilter& filter) {
+                state.prefab_filter = filter.text;
+                return CommandResult::done();
+            },
             [&](const command::Play&) { return play(state.mode); },
             [&](const command::Pause&) { return pause(state.mode); },
             [&](const command::Stop&) { return stop(state.mode); },

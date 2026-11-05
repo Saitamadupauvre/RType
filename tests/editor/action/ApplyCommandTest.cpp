@@ -156,3 +156,8 @@ TEST_F(ApplyCommand, ToolAndTabChangeTheState) {
     EXPECT_EQ(_state.tool, editor::Tool::pan);
     EXPECT_EQ(_state.bottom_tab, editor::BottomTab::problems);
 }
+
+TEST_F(ApplyCommand, PrefabFilterChangesTheState) {
+    ASSERT_TRUE(run(command::SetPrefabFilter{.text = "ro"}));
+    EXPECT_EQ(_state.prefab_filter, "ro");
+}

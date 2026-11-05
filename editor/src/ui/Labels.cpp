@@ -1,5 +1,8 @@
 #include "ui/Labels.hpp"
 
+#include <algorithm>
+#include <cctype>
+
 namespace editor {
 
 std::string_view instance_label(const engine::script::Instance& instance) {
@@ -24,6 +27,13 @@ std::string scene_title(const engine::editor::EditorSession& session) {
         return "no scene open";
     }
     return session.unsaved() ? *name + " •" : *name;
+}
+
+bool matches_filter(std::string_view label, std::string_view filter) {
+    const auto lower = [](char letter) {
+        return std::tolower(static_cast<unsigned char>(letter));
+    };
+    return filter.empty() || !std::ranges::search(label, filter, {}, lower, lower).empty();
 }
 
 } // namespace editor
