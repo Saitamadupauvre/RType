@@ -1,12 +1,14 @@
 #include "raylib/EditorWindow.hpp"
 
 #include <clay.h>
+#include <GLFW/glfw3.h>
 #include <raylib.h>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -16,6 +18,7 @@
 #include "raylib/ClayRenderer.hpp"
 #include "ui/ClickCounter.hpp"
 #include "ui/Layout.hpp"
+#include "ui/LetterKey.hpp"
 #include "ui/Platform.hpp"
 #include "ui/Theme.hpp"
 #include "ui/Ui.hpp"
@@ -41,16 +44,12 @@ std::filesystem::path font_directory() {
     return std::filesystem::path(GetApplicationDirectory()) / "editor-assets" / "fonts";
 }
 
-constexpr std::array key_map{
-    std::pair{KEY_A, Key::a},
-    std::pair{KEY_C, Key::c},
-    std::pair{KEY_S, Key::s},
-    std::pair{KEY_V, Key::v},
-    std::pair{KEY_X, Key::x},
-    std::pair{KEY_Y, Key::y},
-    std::pair{KEY_Z, Key::z},
-    std::pair{KEY_G, Key::g},
-    std::pair{KEY_H, Key::h},
+constexpr std::array punctuation_keys{
+    KEY_APOSTROPHE, KEY_COMMA,        KEY_MINUS,     KEY_PERIOD,        KEY_SLASH, KEY_SEMICOLON,
+    KEY_EQUAL,      KEY_LEFT_BRACKET, KEY_BACKSLASH, KEY_RIGHT_BRACKET, KEY_GRAVE,
+};
+
+constexpr std::array named_keys{
     std::pair{KEY_DELETE, Key::del},
     std::pair{KEY_BACKSPACE, Key::backspace},
     std::pair{KEY_ENTER, Key::enter},
@@ -73,9 +72,32 @@ constexpr KeyboardKey primary_left = KEY_LEFT_CONTROL;
 constexpr KeyboardKey primary_right = KEY_RIGHT_CONTROL;
 #endif
 
-std::vector<Key> keys_where(bool (*test)(int)) {
+void add_if_letter(std::vector<std::pair<int, Key>>& letters, int code) {
+    const char* name = glfwGetKeyName(code, 0);
+    if (const std::optional<Key> key = letter_key(name != nullptr ? name : "")) {
+        letters.emplace_back(code, *key);
+    }
+}
+
+std::vector<std::pair<int, Key>> layout_letters() {
+    std::vector<std::pair<int, Key>> letters;
+    for (int code = KEY_A; code <= KEY_Z; ++code) {
+        add_if_letter(letters, code);
+    }
+    for (const int code : punctuation_keys) {
+        add_if_letter(letters, code);
+    }
+    return letters;
+}
+
+std::vector<Key> keys_where(const std::vector<std::pair<int, Key>>& letters, bool (*test)(int)) {
     std::vector<Key> keys;
-    for (const auto& [code, key] : key_map) {
+    for (const auto& [code, key] : letters) {
+        if (test(code)) {
+            keys.push_back(key);
+        }
+    }
+    for (const auto& [code, key] : named_keys) {
         if (test(code)) {
             keys.push_back(key);
         }
@@ -103,6 +125,7 @@ void write_clipboard(std::string_view text) { SetClipboardText(std::string(text)
 Clay_Vector2 to_clay(Vector2 vector) { return {.x = vector.x, .y = vector.y}; }
 
 UiInput read_input(ClickCounter& clicks) {
+    const std::vector<std::pair<int, Key>> letters = layout_letters();
     const Clay_Vector2 pointer = to_clay(GetMousePosition());
     const bool pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     return {.pointer = pointer,
@@ -111,8 +134,8 @@ UiInput read_input(ClickCounter& clicks) {
             .click_count = pressed ? clicks.press(pointer, GetTime()) : std::uint8_t{1},
             .wheel = to_clay(GetMouseWheelMoveV()),
             .delta_time = GetFrameTime(),
-            .keys_pressed = keys_where(IsKeyPressed),
-            .keys_repeated = keys_where(IsKeyPressedRepeat),
+            .keys_pressed = keys_where(letters, IsKeyPressed),
+            .keys_repeated = keys_where(letters, IsKeyPressedRepeat),
             .typed = typed_text(),
             .primary_modifier = IsKeyDown(primary_left) || IsKeyDown(primary_right),
             .shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)};

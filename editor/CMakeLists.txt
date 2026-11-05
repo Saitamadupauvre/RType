@@ -33,6 +33,7 @@ add_library(editor-core STATIC
     src/ui/CommandTable.cpp
     src/ui/Labels.cpp
     src/ui/Layout.cpp
+    src/ui/LetterKey.cpp
     src/ui/Text.cpp
     src/ui/Theme.cpp
     src/ui/Ui.cpp
@@ -74,5 +75,6 @@ add_executable(editor
     src/raylib/FontCache.cpp
 )
 target_link_libraries(editor PRIVATE editor-core raylib glfw)
+target_compile_definitions(editor PRIVATE GLFW_INCLUDE_NONE)
 add_dependencies(editor editor-assets)
 editor_set_warnings(editor)
