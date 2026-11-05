@@ -98,7 +98,8 @@ docs/                       documentation (English, MkDocs sources; mkdocs.yml a
   explaining code, no commented-out code, no TODOs in the source (open an
   issue instead). Code must explain itself through names and small functions.
 - **The only exception is professional Doxygen**, and only where it is
-  important: public API in `engine/include/` and plugin interfaces. Use
+  important: public API in `engine/include/`, plugin interfaces and the
+  editor's contract headers (actions, `Editor`, `Ui`, widgets). Use
   `/** ... */` blocks with `@brief`, `@param`, `@return`, `@throws` and
   `@note` as needed. Document the contract (what, preconditions, errors,
   thread safety), never the implementation.

@@ -8,8 +8,10 @@
 
 namespace editor {
 
+/** @brief Whether the open scene is being edited or played. */
 enum class Mode : std::uint8_t { editing, playing, paused };
 
+/** @brief How the viewport shows the scene; never saved in the scene. */
 struct ViewSettings {
     bool snap = true;
     float grid_size = 16.F;
@@ -21,6 +23,7 @@ struct ViewSettings {
 
 enum class Severity : std::uint8_t { info, error };
 
+/** @brief A line of the editor console, usually the message of a refused command. */
 struct ConsoleLine {
     Severity severity = Severity::info;
     std::string text;
@@ -28,6 +31,12 @@ struct ConsoleLine {
     bool operator==(const ConsoleLine&) const = default;
 };
 
+/**
+ * @brief Everything the UI shows besides the session, owned and changed only by Editor.
+ *
+ * `prefabs` and `scenes` cache EditorSession::prefabs() and EditorSession::scenes(), which scan
+ * the disk, and are refreshed after every command.
+ */
 struct EditorState {
     Mode mode = Mode::editing;
     Tool tool = Tool::select;

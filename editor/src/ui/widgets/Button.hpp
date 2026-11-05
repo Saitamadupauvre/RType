@@ -11,9 +11,14 @@ struct ButtonStyle {
     Clay_Color foreground;
 };
 
+/**
+ * @brief Draws a button.
+ * @return Whether it was clicked this frame; always false when disabled.
+ */
 [[nodiscard]] bool button(Ui& ui, Clay_ElementId id, Clay_String label, ButtonStyle style,
                           bool enabled = true);
 
+/** @brief Draws a button that is never clickable, for commands not available yet. */
 void disabled_button(const Theme& theme, Clay_String label);
 
 } // namespace editor

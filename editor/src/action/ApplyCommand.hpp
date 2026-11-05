@@ -7,6 +7,9 @@
 
 namespace editor {
 
+/**
+ * @brief Applies a command to the session or to the editor state; does not check the mode.
+ */
 engine::editor::CommandResult apply_command(engine::editor::EditorSession& session,
                                             EditorState& state, const Command& command);
 

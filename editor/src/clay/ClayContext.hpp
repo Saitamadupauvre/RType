@@ -12,6 +12,11 @@ namespace editor {
 using MeasureText =
     std::function<Clay_Dimensions(std::string_view text, const Clay_TextElementConfig& config)>;
 
+/**
+ * @brief Owns the memory of the Clay context and makes it current.
+ *
+ * Clay keeps one global current context: only one ClayContext may exist at a time.
+ */
 class ClayContext {
 public:
     ClayContext(Clay_Dimensions size, MeasureText measure);
@@ -22,6 +27,7 @@ public:
     ClayContext(ClayContext&&) = delete;
     ClayContext& operator=(ClayContext&&) = delete;
 
+    /** @brief Clay errors reported since construction, such as duplicate element ids. */
     [[nodiscard]] const std::vector<std::string>& errors() const;
 
 private:

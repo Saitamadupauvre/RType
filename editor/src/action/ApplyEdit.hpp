@@ -6,6 +6,7 @@
 
 namespace editor {
 
+/** @brief Applies an edit to the session; does not check the mode. */
 engine::editor::CommandResult apply_edit(engine::editor::EditorSession& session, const Edit& edit);
 
 } // namespace editor
