@@ -132,6 +132,7 @@ bool run_host(const LaunchOptions& options, const std::function<bool()>& should_
                                                  server_transport.port());
     ClientApp client(clock, client_transport, backends.renderer(), backends.input(),
                      backends.audio(), client_options(options));
+    client.show_server_metrics(&server.metrics());
     std::jthread server_thread([&server](const std::stop_token& token) {
         server.run([&token] { return token.stop_requested(); });
     });
@@ -148,6 +149,7 @@ bool run_solo(const LaunchOptions& options, const std::function<bool()>& should_
     ServerApp server(clock, loopback.server(), server_options(options));
     ClientApp client(clock, loopback.add_client(), backends.renderer(), backends.input(),
                      backends.audio(), client_options(options));
+    client.show_server_metrics(&server.metrics());
     std::error_code ec;
     if (!server.start(ec)) {
         log::error("server: cannot start: {}", ec.message());

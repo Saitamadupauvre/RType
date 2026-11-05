@@ -130,6 +130,28 @@ public:
      */
     [[nodiscard]] core::metrics::Metrics& metrics() noexcept;
 
+    /**
+     * @brief Shows or hides the metrics overlay. F3 also toggles it during frame().
+     *
+     * The overlay is drawn over everything, in screen space, with the renderer's primitives
+     * only: FPS, frame time and its graph, Lua, physics and draw times, entity count, CPU and
+     * memory, then the lagometer (ping, lost packets, snapshots per second, bytes in and out).
+     * A hidden overlay draws nothing. Hidden by default.
+     */
+    void show_metrics_overlay(bool shown) noexcept;
+
+    /** @return true while the metrics overlay is drawn. */
+    [[nodiscard]] bool metrics_overlay_shown() const noexcept;
+
+    /**
+     * @brief Adds the tick, Lua and physics times and the entity count of a server running in
+     * the same process to the overlay.
+     *
+     * @param server The metrics of that server, read from this thread while it may write them
+     * from another; must outlive this app or be reset with nullptr. nullptr removes them.
+     */
+    void show_server_metrics(const core::metrics::Metrics* server) noexcept;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> _impl;
