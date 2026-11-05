@@ -548,3 +548,46 @@ TEST(ServerAppMetrics, DisabledMetricsRecordNothing) {
 
     EXPECT_TRUE(app.metrics().names().empty());
 }
+
+TEST(ServerAppConsole, SubmittedLuaRunsOnTheNextUpdate) {
+    Server server(players_game);
+    ServerApp& app = server.app;
+
+    app.submit_lua("1 + 2");
+    app.submit_lua("error('boom')");
+    EXPECT_TRUE(app.take_lua_results().empty());
+    app.update();
+
+    const auto results = app.take_lua_results();
+    ASSERT_EQ(results.size(), 2U);
+    EXPECT_TRUE(results[0].ok);
+    EXPECT_EQ(results[0].output, "3");
+    EXPECT_FALSE(results[1].ok);
+    EXPECT_NE(results[1].output.find("boom"), std::string::npos);
+    EXPECT_TRUE(app.take_lua_results().empty());
+}
+
+TEST(ServerAppConsole, TickRateCvarChangesTheTickStep) {
+    Server server;
+    ServerApp& app = server.app;
+    int ticks = 0;
+    app.systems().add("count", 0, [&ticks](EntityManager&, float) { ++ticks; });
+    EXPECT_EQ(app.tick_step(), tick_step);
+
+    app.submit_lua("cvar.set('sv.tick_rate', 20)");
+    app.update();
+    server.clock.advance(100ms);
+    app.update();
+
+    EXPECT_EQ(app.tick_step(), Duration(50ms));
+    EXPECT_EQ(ticks, 2);
+}
+
+TEST(ServerAppConsole, TickRateStaysWithinItsRange) {
+    Server server;
+    ServerApp& app = server.app;
+
+    EXPECT_FALSE(app.cvars().set("sv.tick_rate", std::int64_t{0}));
+    EXPECT_FALSE(app.cvars().set("sv.tick_rate", std::int64_t{1000}));
+    EXPECT_EQ(app.tick_step(), tick_step);
+}
