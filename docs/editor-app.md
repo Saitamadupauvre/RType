@@ -32,7 +32,7 @@ project, and creating one, come with the launcher (#158).
 | Ctrl+Z / Ctrl+Y | Undo / Redo |
 | Delete | Delete the selection |
 | V / G / H | Select, move, pan tool |
-| F12 | Clay debug view |
+| F11 | Clay debug view |
 
 On macOS, Cmd replaces Ctrl.
 
