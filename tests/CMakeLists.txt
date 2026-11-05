@@ -259,6 +259,7 @@ editor_add_test(core
         editor/render/GeometryTest.cpp
         editor/render/ScissorStackTest.cpp
         editor/text/TextEditTest.cpp
+        editor/ui/ClickCounterTest.cpp
         editor/ui/CommandTableTest.cpp
         editor/ui/FrameTest.cpp
         editor/ui/LayoutTest.cpp

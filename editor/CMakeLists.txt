@@ -29,12 +29,15 @@ add_library(editor-core STATIC
     src/render/ScissorStack.cpp
     src/text/TextEdit.cpp
     src/text/Utf8.cpp
+    src/ui/ClickCounter.cpp
     src/ui/CommandTable.cpp
     src/ui/Labels.cpp
     src/ui/Layout.cpp
     src/ui/Text.cpp
     src/ui/Theme.cpp
     src/ui/Ui.cpp
+    src/ui/UiInput.cpp
+    src/ui/WidgetState.cpp
     src/ui/sections/BottomPanel.cpp
     src/ui/sections/Inspector.cpp
     src/ui/sections/MenuBar.cpp

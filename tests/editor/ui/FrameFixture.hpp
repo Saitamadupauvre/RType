@@ -11,18 +11,16 @@
 #include <vector>
 
 #include "../GameFixture.hpp"
+#include "FixedMeasure.hpp"
 #include "action/Action.hpp"
 #include "action/Editor.hpp"
 #include "clay/ClayContext.hpp"
 #include "ui/Layout.hpp"
+#include "ui/Platform.hpp"
 #include "ui/Theme.hpp"
 #include "ui/Ui.hpp"
 #include "ui/UiInput.hpp"
-
-inline Clay_Dimensions fixed_measure(std::string_view text, const Clay_TextElementConfig& config) {
-    return {.width = static_cast<float>(text.size()) * static_cast<float>(config.fontSize) / 2.F,
-            .height = static_cast<float>(config.fontSize)};
-}
+#include "ui/WidgetState.hpp"
 
 inline Clay_BoundingBox box_of(Clay_ElementId id) {
     const Clay_ElementData data = Clay_GetElementData(id);
@@ -41,10 +39,16 @@ protected:
 
     editor::Editor _editor{open_level()};
     editor::ClayContext _clay{window, fixed_measure};
+    editor::WidgetState _widgets;
+    std::string _clipboard;
+    editor::Platform _platform{
+        .measure = fixed_measure,
+        .read_clipboard = [this] { return _clipboard; },
+        .write_clipboard = [this](std::string_view text) { _clipboard = std::string(text); }};
 
     Frame frame(editor::UiInput input = {}, editor::Theme theme = {},
                 Clay_Dimensions size = window) {
-        editor::Ui ui(theme, input);
+        editor::Ui ui(theme, input, _widgets, _platform);
         const Clay_RenderCommandArray commands = editor::build_frame(ui, _editor, size);
         return {.actions = ui.take_actions(), .texts = texts_of(commands)};
     }

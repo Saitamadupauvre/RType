@@ -68,6 +68,9 @@ bool pressed(const UiInput& input, const Shortcut& shortcut) {
 std::span<const CommandEntry> command_table() { return table; }
 
 void emit_shortcuts(Ui& ui, const Editor& editor) {
+    if (ui.widgets().wants_keyboard()) {
+        return;
+    }
     for (const CommandEntry& entry : table) {
         if (!entry.shortcut || !pressed(ui.input(), *entry.shortcut)) {
             continue;

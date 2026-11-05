@@ -34,7 +34,10 @@ struct CommandEntry {
 /** @brief Every command, in menu order. Shortcuts are unique across the table. */
 [[nodiscard]] std::span<const CommandEntry> command_table();
 
-/** @brief Emits the action of each enabled command whose shortcut was pressed this frame. */
+/**
+ * @brief Emits the action of each enabled command whose shortcut was pressed this frame.
+ * @note Emits nothing while a field has the keyboard.
+ */
 void emit_shortcuts(Ui& ui, const Editor& editor);
 
 } // namespace editor
