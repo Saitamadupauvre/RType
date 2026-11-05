@@ -68,6 +68,7 @@ nav:
       - Game: game.md
       - Game folder and scenes: game-folder.md
       - Editor backend: editor.md
+      - Editor app: editor-app.md
       - Writing the game: writing-the-game.md
       - Commands: commands.md
       - Contributing: contributing.md
