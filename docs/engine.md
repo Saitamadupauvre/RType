@@ -218,7 +218,7 @@ runs any game folder (`game.json`, `scripts/`, `scenes/` and `assets/`, see
 | Header | What it gives |
 |---|---|
 | `ServerApp.hpp` | Authoritative server over any `ServerTransport`: loads the game folder (scripts, then the start scene) with the server API, string table, 60 Hz tick (scripts, physics, collisions, systems, replication, audio and events) |
-| `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, asset preloading behind a loading screen, snapshot drawing, audio, local input to Lua and to the server |
+| `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, asset preloading behind a loading screen, snapshot drawing, audio, local input to Lua and to the server, [metrics overlay](#metrics-overlay) on `F3` |
 | `Launch.hpp` | `Mode` (`dedicated`, `client`, `host`, `solo`), `LaunchOptions` and `launch()`: picks the transports, loads the plugins and runs the apps; `host` runs the server on a background thread, `solo` runs both in one thread over a `LoopbackNetwork` |
 
 Its private helpers (`SnapshotView`, `WorldDraw`, `AudioPlayer`,
@@ -316,6 +316,28 @@ One frame per call to `frame()`.
 | `network.packets_in`, `network.packets_out` | gauge | Packets per second |
 | `network.bytes_in`, `network.bytes_out` | gauge | Bytes per second |
 | `process.cpu`, `process.memory` | gauge | CPU (% of one core) and resident memory (MiB) |
+
+### Metrics overlay
+
+`ClientApp` draws the metrics over the game, in screen space and with the
+renderer's primitives only (rectangles, lines and text, no asset). `F3` toggles
+it during `frame()`, and so do `show_metrics_overlay(bool)` and
+`metrics_overlay_shown()` from code. When hidden it draws nothing.
+
+- Text: FPS, average and max frame time, Lua, physics and draw times, entity
+  count, CPU and memory.
+- Lagometer: ping, packets lost, snapshots per second (the
+  `network.snapshots` counter over the summed frame times), bytes in and out
+  per second.
+- Graph: one bar per frame of the `frame` history, scaled to 50 ms, coloured
+  by frame time. A line marks 60 FPS.
+- `show_server_metrics(&server.metrics())` adds the server's tick, Lua and
+  physics times and its entity count. `launch()` does it in `host` and `solo`
+  modes.
+
+The layout lives in the private helper `render/MetricsOverlay`
+(`metrics_overlay_lines()` and `draw_metrics_overlay()`). It is tested with a
+recording renderer in `tests/engine/app/render/MetricsOverlayTest.cpp`.
 
 ## The contract
 
