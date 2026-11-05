@@ -7,7 +7,7 @@
 #include "action/ApplyCommand.hpp"
 #include "action/ApplyEdit.hpp"
 #include "action/EditorState.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/editor/EditorSession.hpp"
 
 using editor::apply_command;

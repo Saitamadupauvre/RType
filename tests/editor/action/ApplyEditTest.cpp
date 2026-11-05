@@ -5,8 +5,8 @@
 
 #include "../GameFixture.hpp"
 #include "action/ApplyEdit.hpp"
-#include "engine/core/FieldRegistry.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/editor/EditorSession.hpp"
 #include "engine/script/Instance.hpp"
 

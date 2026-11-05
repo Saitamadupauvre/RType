@@ -6,7 +6,7 @@
 #include "../GameFixture.hpp"
 #include "action/Editor.hpp"
 #include "action/EditorState.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 #include "engine/editor/SceneDocument.hpp"
 
 using editor::ConsoleLine;
