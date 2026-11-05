@@ -47,7 +47,9 @@ add_library(editor-core STATIC
     src/ui/sections/Toolbar.cpp
     src/ui/sections/Viewport.cpp
     src/ui/widgets/Button.cpp
+    src/ui/widgets/FieldKeys.cpp
     src/ui/widgets/ListRow.cpp
+    src/ui/widgets/TextField.cpp
     src/ui/widgets/Toggle.cpp
 )
 target_include_directories(editor-core PUBLIC src)

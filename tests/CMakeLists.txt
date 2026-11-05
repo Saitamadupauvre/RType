@@ -264,6 +264,7 @@ editor_add_test(core
         editor/ui/FrameTest.cpp
         editor/ui/LayoutTest.cpp
         editor/ui/ThemeTest.cpp
+        editor/ui/widgets/TextFieldTest.cpp
     LINKS editor-core
 )
 
