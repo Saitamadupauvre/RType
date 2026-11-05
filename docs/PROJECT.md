@@ -358,6 +358,7 @@ class IInput {   // raw keys; the engine's InputMap turns them into actions
     virtual bool is_key_pressed(Key) const = 0;
     virtual bool is_key_released(Key) const = 0;
     virtual Key  last_key_pressed() = 0;   // for the key-remapping screen
+    virtual char32_t next_character() = 0;  // typed text, for the developer console
     virtual Vec2 mouse_position() const = 0;
     virtual bool is_mouse_down(MouseButton) const = 0;
     virtual bool is_mouse_pressed(MouseButton) const = 0;
@@ -760,6 +761,13 @@ navgrid { width = 1920, height = 1080, cell = 32, obstacles = { "wall" } }
 find_path(self, { x = 1500, y = 300 })                  -- array of { x, y }, or nil
 find_path(a, b, { avoid = { "lava" }, max_nodes = 500 })
 
+-- console variables (see §10.15)
+cvar.register { name = "game.lives", default = 3, min = 0, max = 9, description = "lives at start" }
+cvar.get("game.lives")           -- value, or nil and an error log for an unknown name
+cvar.set("debug.hitboxes", true) -- true, or false and an error log
+cvar.reset("game.lives")
+cvar.list()                      -- names, sorted
+
 -- utilities
 random(1, 10)
 world.width, world.height        -- 1920, 1080
@@ -1082,7 +1090,7 @@ Developers must not use these names for their own fields or methods; the engine 
 - Declaration sections: `server`, `client`. Declaration flag: `persistent`.
 - Entity methods: `destroy`, `has_tag`, `get_field`, `set_field`, `navigate_to`, `stop_navigation`, `is_navigating`.
 - Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`, `on_arrive`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`, `on_scene_loaded`, `update`, `draw_hud`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `spawn_local`, `draw`, `textures`, `shaders`, `navgrid`, `find_path`, `load_scene`.
+- Declarations and globals: `cvar`, `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `event`, `emit`, `random`, `world`, `log`, `synced`, `players`, `find_player`, `on`, `input`, `audio`, `camera`, `spawn_local`, `draw`, `textures`, `shaders`, `navgrid`, `find_path`, `load_scene`.
 - Events: `scene_loaded`.
 
 ### 10.13 Error handling and sandbox
@@ -1109,6 +1117,31 @@ Developers must not use these names for their own fields or methods; the engine 
 - **Editor** — `engine-editor` (`engine/src/editor/`) loads a game folder with `ScriptRuntime::load_declarations()`, which runs the declaration files but neither `on_start` nor the start scene. `EditorSession` keeps the open scene as a `SceneDocument` (instances with session-only `InstanceId`s); every edit records a copy of the document in `History` (100 entries) and rebuilds the edit world with `ScriptRuntime::preview_instances()`, which builds prototypes in a given world without any Lua callback. `set_field` previews the single override in a scratch world before recording it. See [Editor backend](editor.md).
 - **Callbacks** are called by native systems through `sol::protected_function`.
 - **Coroutines** are `sol::thread` + `sol::coroutine`; `wait(t)` yields and the scheduler resumes the coroutine when `t` has elapsed.
+
+### 10.15 Developer console and console variables
+
+The client opens a developer console with `` ` `` or `F1` (see [How to play](how-to-play.md#developer-console)). A line runs, in order of precedence:
+
+1. `help`, `clear`, `cvar [list] [filter]`, `cvar <name>`, `cvar <name> <value>`, `cvar reset <name>`: built-in commands;
+2. `/server <lua>`: Lua run by the server of the same process (`solo` and `host` modes), before its next tick;
+3. anything else: Lua run by the client runtime.
+
+Console Lua is compiled as `return <line>` first, then as a statement, so `1 + 1` prints `2` and `x = 5` works. It reads and writes the globals of `main.lua` (the shared globals before scripts load); `local`s do not outlive the line. `print` is captured into the console. A syntax or runtime error is printed in red and nothing else happens: no entity or system is disabled.
+
+**Console variables (CVars)** are named, typed values shared by the engine and the scripts, on the client and on the server; each side has its own registry.
+
+- A name is lowercase letters, digits, `_` and `.`, starting with a letter (`game.lives`). The engine uses the prefixes `debug.`, `audio.` and `sv.`.
+- `cvar.register { name, default, description, min, max, kind }` registers a variable; usually at the top level of a file, so it exists before `on_start`. Its kind is `bool`, `int`, `number` or `string`, taken from `default` (`3` is an `int`, `3.0` a `number`) unless `kind` says otherwise (`kind = "number"` with `default = 1`). `min` and `max` go together and only for numbers. A duplicate or invalid name, a bad default or range logs an error and returns `false`.
+- `cvar.get(name)` returns the value; `cvar.set(name, value)` changes it if the kind matches (an `int` is accepted by a `number` variable, a whole `number` by an `int` one) and the value is within the range, else logs an error and returns `false`; `cvar.reset(name)` restores the default; `cvar.list()` returns the names.
+- Scripts read variables when they need them (`cvar.get` in `update`), there is no change callback in Lua.
+
+| Engine variable | Side | Kind | Effect |
+|---|---|---|---|
+| `debug.metrics` | client | bool | Metrics overlay, like `F3` |
+| `debug.hitboxes` | client | bool | Outlines the colliders of the client's local entities |
+| `audio.music_volume`, `audio.effects_volume` | client | number, 0–1 | Same as `audio.set_volume` |
+| `audio.muted` | client | bool | Same as `audio.set_muted` |
+| `sv.tick_rate` | server | int, 1–240 | Server ticks per second (60) |
 
 ---
 
@@ -1205,7 +1238,7 @@ Part 1 status:
 1. **Modularity:** finer-grained libraries; more subsystems as runtime plugins.
 2. **Standalone engine:** `engine/` moves to its own repository; R-Type consumes it as a dependency.
 3. **Generic runtime:** done for the apps: `engine-app` holds generic `ServerApp` / `ClientApp` and the dedicated, client, host and solo modes (§6); `r-type_server` / `r-type_client` are thin entry points. A launcher (`engine run <game-folder>`) and the editor's export choice of binaries remain.
-4. **Tooling:** hot reload of scripts, developer console executing Lua, level editor.
+4. **Tooling:** hot reload of scripts, developer console executing Lua (done, §10.15), level editor.
 5. **Second game:** a different game (e.g. a platformer or networked Breakout) written only in Lua and assets, proving the engine is generic.
 
 ---

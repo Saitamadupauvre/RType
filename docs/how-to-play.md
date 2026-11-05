@@ -13,6 +13,7 @@ many as you can, together with up to three other players.
 | Fire | `Space`, hold it to keep firing (4 missiles per second) |
 | Mute / unmute every sound | `M` |
 | Show / hide the metrics overlay | `F3` |
+| Open / close the developer console | `` ` `` (key left of `1` on a QWERTY keyboard) or `F1`; `Escape` also closes it |
 | Quit | Close the window |
 
 Both key sets work at the same time, so you can play with either hand.
@@ -82,3 +83,40 @@ shows:
 Below the text, a graph shows the frame time of the last 2 s, one bar per
 frame. A green bar is faster than 60 FPS, a yellow bar faster than 30 FPS and a
 red bar slower. The green line marks 60 FPS, and the graph is capped at 50 ms.
+
+### Developer console
+
+`` ` `` or `F1` opens a console over the top of the screen. While it is open,
+the game receives no key: what you type goes to the console.
+
+| Key | Action |
+|---|---|
+| `Enter` | Run the line |
+| `Left`, `Right`, `Home`, `End` | Move the cursor |
+| `Backspace`, `Delete` | Erase |
+| `Up`, `Down` | Walk the lines run before |
+| `Page Up`, `Page Down` | Scroll |
+| `Escape`, `` ` ``, `F1` | Close |
+
+Every log message also shows up in the console, warnings and errors in red.
+
+| Line | What it does |
+|---|---|
+| `help` | Lists the commands |
+| `clear` | Empties the console |
+| `cvar` or `cvar list [text]` | Lists the console variables, or those whose name contains `text` |
+| `cvar <name>` | Shows a variable: value, kind, default, range and description |
+| `cvar <name> <value>` | Changes it; booleans take `on`/`off`, `true`/`false`, `yes`/`no` or `1`/`0` |
+| `cvar reset <name>` | Restores its default |
+| `/server <lua>` | Runs Lua on the server, only in `solo` and `host` modes; the result shows up on the next frame |
+| anything else | Runs Lua in the client, e.g. `1 + 1` prints `2` and `print(x)` prints `x` |
+
+An error in a line is printed in red and the game goes on. Useful variables:
+
+| Variable | Effect |
+|---|---|
+| `debug.metrics` | Same as `F3` |
+| `debug.hitboxes` | Outlines the hitboxes of the effects drawn by the client |
+| `audio.music_volume`, `audio.effects_volume` | Volume, from `0` to `1` |
+| `audio.muted` | Same as `M` |
+| `sv.tick_rate` | Server ticks per second, from 1 to 240 (60 by default); change it with `/server cvar.set("sv.tick_rate", 30)` |
