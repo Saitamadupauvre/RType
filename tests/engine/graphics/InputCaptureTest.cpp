@@ -23,6 +23,7 @@ public:
     [[nodiscard]] bool is_key_pressed(Key) const override { return false; }
     [[nodiscard]] bool is_key_released(Key) const override { return false; }
     [[nodiscard]] Key last_key_pressed() override { return Key::Unknown; }
+    [[nodiscard]] char32_t next_character() override { return U'\0'; }
     [[nodiscard]] Vec2 mouse_position() const override { return _mouse; }
     [[nodiscard]] bool is_mouse_down(MouseButton button) const override {
         return _buttons.contains(button);

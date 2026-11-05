@@ -14,7 +14,7 @@ namespace engine::graphics {
  * rejects any plugin whose `engine_graphics_api_version()` returns a
  * different value.
  */
-inline constexpr std::uint32_t plugin_api_version = 6;
+inline constexpr std::uint32_t plugin_api_version = 7;
 
 /** @brief `extern "C" std::uint32_t engine_graphics_api_version()`: returns plugin_api_version. */
 using ApiVersionFunction = std::uint32_t (*)();

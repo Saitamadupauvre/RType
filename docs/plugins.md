@@ -100,6 +100,11 @@ engine_add_plugin(graphics-raylib
 The window is resizable; `Esc` does not close it (`SetExitKey(KEY_NULL)`), so
 the key stays free for the game.
 
+Text input (plugin API version 7): `IInput::next_character()` returns the
+characters typed this frame, one Unicode code point per call, from
+`GetCharPressed()`. Unlike keys, characters follow the keyboard layout and
+Shift, so the developer console can read `(`, `"` or `é` on any keyboard.
+
 Render targets and shaders (plugin API version 6):
 
 - The frame itself is drawn into a 1920 × 1080 `RenderTexture2D` that is

@@ -121,6 +121,14 @@ public:
     [[nodiscard]] bool is_key_pressed(Key key) const override { return pressed.contains(key); }
     [[nodiscard]] bool is_key_released(Key) const override { return false; }
     [[nodiscard]] Key last_key_pressed() override { return Key::Unknown; }
+    [[nodiscard]] char32_t next_character() override {
+        if (typed.empty()) {
+            return U'\0';
+        }
+        const char32_t character = typed.front();
+        typed.erase(typed.begin());
+        return character;
+    }
     [[nodiscard]] Vec2 mouse_position() const override { return {}; }
     [[nodiscard]] bool is_mouse_down(MouseButton) const override { return false; }
     [[nodiscard]] bool is_mouse_pressed(MouseButton) const override { return false; }
@@ -128,6 +136,7 @@ public:
 
     std::set<Key> held;
     std::set<Key> pressed;
+    std::u32string typed;
 };
 
 class FakeAudio final : public engine::audio::IAudio {
