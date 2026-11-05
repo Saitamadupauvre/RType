@@ -152,8 +152,10 @@ engine_add_module(app
         src/app/assets/AudioPlayer.cpp
         src/app/simulation/CameraFollow.cpp
         src/app/render/CameraRig.cpp
+        src/app/render/ConsoleOverlay.cpp
         src/app/ClientApp.cpp
         src/app/Fields.cpp
+        src/app/render/HitboxDraw.cpp
         src/app/render/HudDraw.cpp
         src/app/Launch.cpp
         src/app/render/LoadingScreen.cpp

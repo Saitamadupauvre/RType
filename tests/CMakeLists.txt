@@ -137,7 +137,9 @@ engine_add_test(app SOURCES
     engine/app/assets/AudioPlayerTest.cpp
     engine/app/simulation/CameraFollowTest.cpp
     engine/app/render/CameraRigTest.cpp
+    engine/app/render/ConsoleOverlayTest.cpp
     engine/app/ClientAppTest.cpp
+    engine/app/render/HitboxDrawTest.cpp
     engine/app/render/HudDrawTest.cpp
     engine/app/render/LoadingScreenTest.cpp
     engine/app/render/MetricsOverlayTest.cpp
