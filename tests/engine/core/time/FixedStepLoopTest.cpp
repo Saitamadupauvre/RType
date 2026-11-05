@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <stdexcept>
+#include <vector>
 
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/core/time/ManualClock.hpp"
@@ -142,4 +143,22 @@ TEST(FixedStepLoop, PropagatesUpdateExceptionsAndStaysUsable) {
                  std::runtime_error);
     clock.advance(10ms);
     EXPECT_EQ(loop.run_frame([](Duration) {}), 1U);
+}
+
+TEST(FixedStepLoop, RunsTheNewStepAfterSetStep) {
+    ManualClock clock;
+    FixedStepLoop loop(clock, ten_ms_config);
+    loop.set_step(20ms);
+    clock.advance(40ms);
+    std::vector<Duration> steps;
+    EXPECT_EQ(loop.run_frame([&steps](Duration step) { steps.push_back(step); }), 2U);
+    EXPECT_EQ(loop.step(), Duration(20ms));
+    EXPECT_EQ(steps, (std::vector<Duration>{20ms, 20ms}));
+}
+
+TEST(FixedStepLoop, SetStepRejectsANonPositiveStepAndKeepsTheOldOne) {
+    const ManualClock clock;
+    FixedStepLoop loop(clock, ten_ms_config);
+    EXPECT_THROW(loop.set_step(0ns), std::invalid_argument);
+    EXPECT_EQ(loop.step(), Duration(10ms));
 }
