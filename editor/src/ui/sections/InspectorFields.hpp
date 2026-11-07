@@ -10,6 +10,7 @@
 namespace editor {
 
 inline constexpr float reset_width = 72.F;
+inline constexpr float row_padding = 3.F;
 
 struct FieldRow {
     InstanceId id;

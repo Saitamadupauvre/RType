@@ -11,6 +11,13 @@ void text(const Theme& theme, Clay_String content, float size, Clay_Color color,
                                          .wrapMode = CLAY_TEXT_WRAP_NONE}));
 }
 
+void wrapped_text(const Theme& theme, Clay_String content, float size, Clay_Color color) {
+    CLAY_TEXT(content, CLAY_TEXT_CONFIG({.textColor = color,
+                                         .fontId = static_cast<std::uint16_t>(Face::regular),
+                                         .fontSize = theme.px16(size),
+                                         .wrapMode = CLAY_TEXT_WRAP_WORDS}));
+}
+
 void spacer() {
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()}}}) {}
 }

@@ -78,7 +78,9 @@ TEST_F(Inspector, ShowsTheInstanceAndItsFields) {
     EXPECT_TRUE(shows("hero"));
     EXPECT_TRUE(shows("ship"));
     EXPECT_TRUE(shows("COMPONENTS"));
-    EXPECT_TRUE(shows("Sprite.color"));
+    EXPECT_TRUE(shows("Sprite"));
+    EXPECT_TRUE(shows("color"));
+    EXPECT_FALSE(shows("Sprite.color"));
     EXPECT_TRUE(shows("#0A141EFF"));
     EXPECT_TRUE(shows("SCRIPT"));
     EXPECT_TRUE(shows("health"));

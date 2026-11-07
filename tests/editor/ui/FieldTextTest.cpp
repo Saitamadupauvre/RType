@@ -58,3 +58,15 @@ TEST(FieldText, DescribesAListByItsSize) {
     list.items.emplace_back(std::int64_t{1});
     EXPECT_EQ(editor::describe(FieldValue{list}), "1 item");
 }
+
+TEST(FieldText, ComponentIsThePartBeforeTheDot) {
+    EXPECT_EQ(editor::component_of("PhysicsBody.mass"), "PhysicsBody");
+    EXPECT_EQ(editor::component_of("Script.speed"), "Script");
+    EXPECT_EQ(editor::component_of("plain"), "");
+}
+
+TEST(FieldText, LabelIsTheFieldAsWords) {
+    EXPECT_EQ(editor::field_label("PhysicsBody.resolve_collisions"), "resolve collisions");
+    EXPECT_EQ(editor::field_label("Script.cooldown"), "cooldown");
+    EXPECT_EQ(editor::field_label("plain_key"), "plain key");
+}

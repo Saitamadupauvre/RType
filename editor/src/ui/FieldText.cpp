@@ -1,8 +1,12 @@
 #include "ui/FieldText.hpp"
 
+#include <algorithm>
 #include <charconv>
+#include <cstddef>
 #include <cstdint>
 #include <format>
+#include <string>
+#include <string_view>
 #include <type_traits>
 #include <variant>
 
@@ -63,6 +67,18 @@ std::string describe(const engine::core::FieldValue& value) {
             },
         },
         value);
+}
+
+std::string_view component_of(std::string_view key) {
+    const std::size_t dot = key.find('.');
+    return dot == std::string_view::npos ? std::string_view{} : key.substr(0, dot);
+}
+
+std::string field_label(std::string_view key) {
+    const std::size_t dot = key.find('.');
+    std::string label(dot == std::string_view::npos ? key : key.substr(dot + 1));
+    std::ranges::replace(label, '_', ' ');
+    return label;
 }
 
 } // namespace editor
