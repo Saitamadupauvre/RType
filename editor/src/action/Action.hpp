@@ -163,6 +163,12 @@ struct ShowTab {
     BottomTab tab = BottomTab::console;
 };
 
+/** @brief Refuses what the user typed in a field, so the console says why; changes nothing. */
+struct ReportInvalidInput {
+    static constexpr bool while_running = true;
+    std::string message;
+};
+
 /** @brief Shows only the prefabs whose type contains `text`, ignoring case; empty shows all. */
 struct SetPrefabFilter {
     static constexpr bool while_running = true;
@@ -191,8 +197,8 @@ using Command = std::variant<command::Select, command::Undo, command::Redo, comm
                              command::DuplicateScene, command::RenameScene, command::DeleteScene,
                              command::SetStartScene, command::SetSnap, command::SetGridSize,
                              command::SetOverlay, command::SetTool, command::ShowTab,
-                             command::SetPrefabFilter, command::Play, command::Pause,
-                             command::Stop>;
+                             command::ReportInvalidInput, command::SetPrefabFilter,
+                             command::Play, command::Pause, command::Stop>;
 
 /** @brief What the UI emits; applied after the frame by Editor::handle(). */
 using Action = std::variant<Edit, Command>;

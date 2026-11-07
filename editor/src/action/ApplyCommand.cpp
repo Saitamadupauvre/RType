@@ -92,6 +92,9 @@ CommandResult apply_command(EditorSession& session, EditorState& state, const Co
                 state.bottom_tab = tab.tab;
                 return CommandResult::done();
             },
+            [&](const command::ReportInvalidInput& input) {
+                return CommandResult::refused(input.message);
+            },
             [&](const command::SetPrefabFilter& filter) {
                 state.prefab_filter = filter.text;
                 return CommandResult::done();

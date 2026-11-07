@@ -161,3 +161,10 @@ TEST_F(ApplyCommand, PrefabFilterChangesTheState) {
     ASSERT_TRUE(run(command::SetPrefabFilter{.text = "ro"}));
     EXPECT_EQ(_state.prefab_filter, "ro");
 }
+
+TEST_F(ApplyCommand, InvalidInputIsRefusedWithItsMessage) {
+    const auto result =
+        apply_command(_session, _state, command::ReportInvalidInput{.message = "bad"});
+    EXPECT_FALSE(result.ok);
+    EXPECT_EQ(result.message, "bad");
+}
