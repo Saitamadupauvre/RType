@@ -229,7 +229,7 @@ branch, so an action without a handler does not compile.
 belongs to, an optional shortcut, a `make` function that returns the action, or
 `std::nullopt` when the command is disabled (nothing to undo, no selection...),
 and for toggles a `checked` function. Keyboard shortcuts and the menu bar read
-the same table, so they never disagree; the command palette (#185) will too.
+the same table, as does the command palette, so the three never disagree.
 
 ### Menus
 
@@ -243,6 +243,22 @@ the same table, so they never disagree; the command palette (#185) will too.
 - Help lists the viewport controls that have no entry: pan, zoom, placing,
   moving without snap.
 - To add an entry, add a `CommandEntry` with its `menu`; nothing else changes.
+
+### Command palette
+
+- `Ctrl+Shift+P` (`Cmd+Shift+P` on macOS) opens a list of every command over
+  the window, with a field to filter it. Help lists the shortcut too.
+- The filter is fuzzy: the typed letters must appear in order, ignoring case,
+  and matches at word starts or in a row rank first, so `sv` finds "Save
+  scene" and `stg` finds "Snap to grid". `text/FuzzyMatch` scores and ranks.
+- Each row shows the command, its menu and its shortcut. Disabled commands are
+  greyed out and never run.
+- Up and Down move the highlight, Enter or a click runs the command and closes
+  the palette, Esc or a click outside closes it. Tab keeps the keyboard in the
+  palette.
+- While it is open, its field holds the keyboard, so shortcuts are ignored.
+  It does not open over the export dialog.
+- A new `CommandEntry` shows up in the palette with nothing else to change.
 
 ## Writing UI
 
