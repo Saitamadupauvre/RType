@@ -3,14 +3,17 @@
 #include <chrono>
 #include <cstdint>
 #include <limits>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "Fields.hpp"
+#include "engine/core/console/CVars.hpp"
 #include "engine/core/ecs/ComponentPhysics.hpp"
 #include "engine/core/ecs/Components.hpp"
 #include "engine/core/ecs/Entity.hpp"
@@ -32,6 +35,8 @@ namespace {
 using namespace std::chrono_literals;
 
 constexpr auto idle_between_frames = 1ms;
+constexpr std::int64_t default_tick_rate = 60;
+constexpr double max_tick_rate = 240.0;
 
 template <typename Component> void register_if_missing(core::EntityManager& world) {
     if (!world.is_registered<Component>()) {
@@ -39,9 +44,11 @@ template <typename Component> void register_if_missing(core::EntityManager& worl
     }
 }
 
-script::ScriptRuntime load_game(core::EntityManager& world, const std::filesystem::path& game) {
+script::ScriptRuntime load_game(core::EntityManager& world, core::console::CVars& cvars,
+                                const std::filesystem::path& game) {
     auto runtime = script::ScriptRuntime::builder().with<script::ServerApi>().build();
     runtime.attach_world(world);
+    runtime.attach_cvars(cvars);
     if (!game.empty()) {
         runtime.load_game(game);
     }
@@ -97,6 +104,7 @@ std::uint8_t wire_owner(std::optional<std::uint32_t> owner) {
 struct ServerApp::Impl {
     core::event::EventBus events;
     core::EntityManager world;
+    core::console::CVars cvars;
     core::SystemScheduler systems;
     script::ScriptRuntime runtime;
     script::ServerApi& server;
@@ -107,10 +115,15 @@ struct ServerApp::Impl {
     core::time::FixedStepLoop loop;
     core::metrics::Metrics metrics;
     core::metrics::ProcessMonitor process;
+    std::mutex console_mutex;
+    std::vector<std::string> console_code;
+    std::vector<core::console::ExecutionResult> console_results;
 
     Impl(const core::time::IClock& clock, network::ServerTransport& transport,
          const ServerAppOptions& options);
 
+    void register_cvars();
+    void run_console_code();
     void tick(core::time::Duration step);
     void simulate(float dt);
     void publish_gauges();
@@ -122,16 +135,45 @@ struct ServerApp::Impl {
 
 ServerApp::Impl::Impl(const core::time::IClock& clock, network::ServerTransport& transport,
                       const ServerAppOptions& options)
-    : runtime(load_game(world, options.game)), server(runtime.api<script::ServerApi>()),
+    : runtime(load_game(world, cvars, options.game)), server(runtime.api<script::ServerApi>()),
       strings(strings_of(runtime)), fields(replicated_fields()),
       network(clock, events, fields, transport,
               network::ServerOptions{.max_players = options.max_players, .strings = strings}),
       physics(world, events, runtime), loop(clock), metrics(clock), process(metrics) {
     register_if_missing<network::Replicated>(world);
+    register_cvars();
     events.subscribe<network::PlayerJoined>(
         [this](const network::PlayerJoined& joined) { server.player_joined(joined.player_id); });
     events.subscribe<network::PlayerLeft>(
         [this](const network::PlayerLeft& left) { server.player_left(left.player_id); });
+}
+
+void ServerApp::Impl::register_cvars() {
+    const auto added =
+        cvars.add({.name = "sv.tick_rate",
+                   .default_value = default_tick_rate,
+                   .description = "server ticks per second",
+                   .range = core::console::CVarRange{.min = 1.0, .max = max_tick_rate}},
+                  [this](const core::console::CVarValue& value) {
+                      const auto rate = std::get<std::int64_t>(value);
+                      loop.set_step(std::chrono::duration_cast<core::time::Duration>(1s) / rate);
+                  });
+    if (!added) {
+        core::log::error("server: {}", added.error);
+    }
+}
+
+void ServerApp::Impl::run_console_code() {
+    std::vector<std::string> pending;
+    {
+        const std::scoped_lock lock(console_mutex);
+        pending = std::exchange(console_code, {});
+    }
+    for (const auto& code : pending) {
+        auto result = runtime.evaluate(code);
+        const std::scoped_lock lock(console_mutex);
+        console_results.push_back(std::move(result));
+    }
 }
 
 void ServerApp::Impl::tick(core::time::Duration step) {
@@ -258,6 +300,7 @@ bool ServerApp::start(std::error_code& ec) { return _impl->network.start(ec); }
 void ServerApp::tick(core::time::Duration step) { _impl->tick(step); }
 
 void ServerApp::update() {
+    _impl->run_console_code();
     _impl->loop.run_frame([this](core::time::Duration step) { _impl->tick(step); });
 }
 
@@ -286,5 +329,19 @@ script::ServerApi& ServerApp::script_server() noexcept { return _impl->server; }
 const network::StringTable& ServerApp::strings() const noexcept { return _impl->strings; }
 
 core::metrics::Metrics& ServerApp::metrics() noexcept { return _impl->metrics; }
+
+core::console::CVars& ServerApp::cvars() noexcept { return _impl->cvars; }
+
+core::time::Duration ServerApp::tick_step() const noexcept { return _impl->loop.step(); }
+
+void ServerApp::submit_lua(std::string code) {
+    const std::scoped_lock lock(_impl->console_mutex);
+    _impl->console_code.push_back(std::move(code));
+}
+
+std::vector<core::console::ExecutionResult> ServerApp::take_lua_results() {
+    const std::scoped_lock lock(_impl->console_mutex);
+    return std::exchange(_impl->console_results, {});
+}
 
 } // namespace engine::app

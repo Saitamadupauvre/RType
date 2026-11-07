@@ -11,6 +11,8 @@
 #include <typeinfo>
 #include <vector>
 
+#include "engine/core/console/CVars.hpp"
+#include "engine/core/console/Console.hpp"
 #include "engine/core/ecs/Entity.hpp"
 #include "engine/core/ecs/EntityManager.hpp"
 #include "engine/core/ecs/FieldRegistry.hpp"
@@ -204,6 +206,29 @@ public:
      * @param world Entity storage. It must outlive this runtime, or be replaced by another call.
      */
     void attach_world(core::EntityManager& world);
+
+    /**
+     * @brief Gives scripts the `cvar` table to register, read and change console variables.
+     *
+     * Call it before loading scripts that register variables at load time.
+     *
+     * @param cvars Registry of the console variables. It must outlive this runtime.
+     * @note Without it, scripts calling `cvar` fail with "attempt to index a nil value".
+     */
+    void attach_cvars(core::console::CVars& cvars);
+
+    /**
+     * @brief Runs a line typed in the developer console.
+     *
+     * The line is first compiled as an expression, then as a statement. It reads and writes the
+     * globals of the game's main.lua, or the shared globals before scripts are loaded. `print`
+     * is captured instead of written to the standard output.
+     *
+     * @return Whether the line ran, and the printed lines followed by the returned values, or the
+     * error message.
+     * @note Never throws; an error in the line never stops the game.
+     */
+    [[nodiscard]] core::console::ExecutionResult evaluate(std::string_view code) noexcept;
 
     /**
      * @brief The component fields scripts read and write, filled with the engine-core and

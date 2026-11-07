@@ -19,6 +19,7 @@ public:
     [[nodiscard]] engine::graphics::Key last_key_pressed() override {
         return engine::graphics::Key::Unknown;
     }
+    [[nodiscard]] char32_t next_character() override { return U'\0'; }
     [[nodiscard]] engine::core::Vec2 mouse_position() const override { return {}; }
     [[nodiscard]] bool is_mouse_down(engine::graphics::MouseButton) const override { return false; }
     [[nodiscard]] bool is_mouse_pressed(engine::graphics::MouseButton) const override {

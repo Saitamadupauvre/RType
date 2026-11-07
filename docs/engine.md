@@ -32,6 +32,7 @@ The foundation every other module builds on.
 | Events | `event/EventBus.hpp` | Typed publish/subscribe; a `Subscription` unsubscribes when destroyed |
 | Time | `time/IClock.hpp`, `SteadyClock.hpp`, `ManualClock.hpp`, `FixedStepLoop.hpp` | Fixed-step loop (60 Hz by default) over an injectable clock, so tests control time |
 | Logging | `log/Log.hpp`, `log/Sink.hpp`, `log/MemorySink.hpp` | `log::debug/info/warn/error` with `std::format` syntax; `MemorySink` captures logs in tests |
+| Console | `console/Console.hpp`, `console/CVars.hpp`, `console/LogCapture.hpp` | Developer console logic without display (input line, history, scrollback, `help` / `clear` / `cvar` commands), typed console variables and a log sink feeding the console. See [Developer console](#developer-console) |
 | Metrics | `metrics/Metrics.hpp`, `metrics/ProcessUsage.hpp` | Timers, counters and gauges with one sample per frame in a fixed-size history; `ScopedTimer`; process CPU and memory. See [Metrics](#metrics) |
 | Plugins | `DynamicLibrary.hpp` | RAII wrapper over `dlopen` / `LoadLibrary` |
 
@@ -218,7 +219,7 @@ runs any game folder (`game.json`, `scripts/`, `scenes/` and `assets/`, see
 | Header | What it gives |
 |---|---|
 | `ServerApp.hpp` | Authoritative server over any `ServerTransport`: loads the game folder (scripts, then the start scene) with the server API, string table, 60 Hz tick (scripts, physics, collisions, systems, replication, audio and events) |
-| `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, asset preloading behind a loading screen, snapshot drawing, audio, local input to Lua and to the server, [metrics overlay](#metrics-overlay) on `F3` |
+| `ClientApp.hpp` | Client over any `ClientTransport`, with injected `IRenderer`, `IInput` and `IAudio`: Lua with the client API, asset preloading behind a loading screen, snapshot drawing, audio, local input to Lua and to the server, [metrics overlay](#metrics-overlay) on `F3`, [developer console](#developer-console) on `` ` `` or `F1` |
 | `Launch.hpp` | `Mode` (`dedicated`, `client`, `host`, `solo`), `LaunchOptions` and `launch()`: picks the transports, loads the plugins and runs the apps; `host` runs the server on a background thread, `solo` runs both in one thread over a `LoopbackNetwork` |
 
 Its private helpers (`SnapshotView`, `WorldDraw`, `AudioPlayer`,
@@ -338,6 +339,35 @@ it during `frame()`, and so do `show_metrics_overlay(bool)` and
 The layout lives in the private helper `render/MetricsOverlay`
 (`metrics_overlay_lines()` and `draw_metrics_overlay()`). It is tested with a
 recording renderer in `tests/engine/app/render/MetricsOverlayTest.cpp`.
+
+## Developer console
+
+The console is split so that every part is tested without a window:
+
+| Part | Where | Role |
+|---|---|---|
+| `core::console::CVars` | `engine-core` | Registry of console variables: name, kind (`bool`, `int`, `number`, `string`, taken from the default), default, description, optional range. `add`, `set`, `set_from_string`, `reset`, `get`, `find`, `list`, listeners called on change. Bad names, duplicates, wrong kinds and values out of range return a `CVarResult` with the reason, never throw |
+| `core::console::Console` | `engine-core` | Input line edited at a cursor (UTF-8 aware), bounded history and scrollback, built-in commands, then `/server <lua>` and plain Lua through two injected executors. Errors become red lines |
+| `core::console::LogCapture` | `engine-core` | Log sink that forwards to the previous sink and keeps a thread-safe copy for the console |
+| `ScriptRuntime::evaluate` and `attach_cvars` | `engine-script` | Runs a console line (expression first, then statement) in the globals of `main.lua`, capturing `print`; gives scripts the `cvar` table |
+| `ServerApp::submit_lua`, `take_lua_results`, `cvars` | `engine-app` | Thread-safe queue run at the start of the next `update()`, so `/server` works in `host` mode where the server has its own thread. The server registers `sv.tick_rate` |
+| `ClientApp::console`, `cvars`, `attach_local_server` | `engine-app` | Keyboard and text input, drawing (`render/ConsoleOverlay`), log capture and the client variables. `launch()` attaches the local server in `host` and `solo` modes |
+
+Text comes from `IInput::next_character()` (graphics plugin API version 7),
+which follows the keyboard layout, unlike keys.
+
+Engine variables:
+
+| Name | Kind | Owner | Effect |
+|---|---|---|---|
+| `debug.metrics` | bool | client | Shows the [metrics overlay](#metrics-overlay); `F3` flips it |
+| `debug.hitboxes` | bool | client | Outlines the colliders of the client's local entities (`render/HitboxDraw`). Server entities are not outlined: their colliders are not replicated |
+| `audio.music_volume`, `audio.effects_volume` | number, 0 to 1 | client | Music and effects volume |
+| `audio.muted` | bool | client | Mutes every sound |
+| `sv.tick_rate` | int, 1 to 240 | server | Ticks per second, from the next `update()` (`FixedStepLoop::set_step`) |
+
+The audio variables follow `ClientApi::audio_settings()` both ways: a script
+calling `audio.set_muted(true)` also changes `audio.muted`.
 
 ## The contract
 

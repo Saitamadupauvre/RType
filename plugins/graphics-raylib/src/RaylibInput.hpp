@@ -9,6 +9,7 @@ public:
     [[nodiscard]] bool is_key_pressed(engine::graphics::Key key) const override;
     [[nodiscard]] bool is_key_released(engine::graphics::Key key) const override;
     [[nodiscard]] engine::graphics::Key last_key_pressed() override;
+    [[nodiscard]] char32_t next_character() override;
     [[nodiscard]] engine::core::Vec2 mouse_position() const override;
     [[nodiscard]] bool is_mouse_down(engine::graphics::MouseButton button) const override;
     [[nodiscard]] bool is_mouse_pressed(engine::graphics::MouseButton button) const override;

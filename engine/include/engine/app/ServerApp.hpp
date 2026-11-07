@@ -4,9 +4,13 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <string>
 #include <system_error>
+#include <vector>
 
 #include "engine/app/Export.hpp"
+#include "engine/core/console/CVars.hpp"
+#include "engine/core/console/Console.hpp"
 #include "engine/core/ecs/EntityManager.hpp"
 #include "engine/core/ecs/SystemScheduler.hpp"
 #include "engine/core/event/EventBus.hpp"
@@ -121,6 +125,32 @@ public:
      * @note Unlike the rest of this class, the returned object may be read from any thread.
      */
     [[nodiscard]] core::metrics::Metrics& metrics() noexcept;
+
+    /**
+     * @return The console variables of the server, also reachable from its scripts as `cvar`.
+     *
+     * The engine registers `sv.tick_rate` (int, 1 to 240, default 60): the ticks run per second,
+     * applied from the next update().
+     * @note Not thread safe: use it from the thread running update(), e.g. through submit_lua().
+     */
+    [[nodiscard]] core::console::CVars& cvars() noexcept;
+
+    /** @return The duration of one tick, set by `sv.tick_rate`. */
+    [[nodiscard]] core::time::Duration tick_step() const noexcept;
+
+    /**
+     * @brief Queues a line of Lua typed in a developer console, run by the next update().
+     *
+     * The line runs like ScriptRuntime::evaluate(), before the ticks of that update.
+     * @note Thread safe: a client may call it while another thread runs the server.
+     */
+    void submit_lua(std::string code);
+
+    /**
+     * @return The results of the lines run since the last call, in submission order.
+     * @note Thread safe.
+     */
+    [[nodiscard]] std::vector<core::console::ExecutionResult> take_lua_results();
 
 private:
     struct Impl;

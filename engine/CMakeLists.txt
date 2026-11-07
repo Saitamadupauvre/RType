@@ -19,6 +19,9 @@ engine_add_module(core
         src/core/FieldRegistry.cpp
         src/core/SystemScheduler.cpp
         src/core/Transform.cpp
+        src/core/console/Console.cpp
+        src/core/console/CVars.cpp
+        src/core/console/LogCapture.cpp
         src/core/event/EventBus.cpp
         src/core/log/Log.cpp
         src/core/log/MemorySink.cpp
@@ -58,6 +61,7 @@ engine_add_module(script
         src/script/assets/DeclaredAssets.cpp
         src/script/audio/Audio.cpp
         src/script/client/ClientAudio.cpp
+        src/script/console/ConsoleLua.cpp
         src/script/client/ClientCamera.cpp
         src/script/client/ClientEvents.cpp
         src/script/client/HudCanvas.cpp
@@ -148,8 +152,10 @@ engine_add_module(app
         src/app/assets/AudioPlayer.cpp
         src/app/simulation/CameraFollow.cpp
         src/app/render/CameraRig.cpp
+        src/app/render/ConsoleOverlay.cpp
         src/app/ClientApp.cpp
         src/app/Fields.cpp
+        src/app/render/HitboxDraw.cpp
         src/app/render/HudDraw.cpp
         src/app/Launch.cpp
         src/app/render/LoadingScreen.cpp

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <system_error>
@@ -15,6 +16,8 @@
 #include "assets/AudioPlayer.hpp"
 #include "assets/ShaderLibrary.hpp"
 #include "assets/TextureLibrary.hpp"
+#include "engine/app/ServerApp.hpp"
+#include "engine/core/console/LogCapture.hpp"
 #include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/log/Log.hpp"
@@ -25,6 +28,8 @@
 #include "engine/network/Events.hpp"
 #include "engine/script/EventCommand.hpp"
 #include "render/CameraRig.hpp"
+#include "render/ConsoleOverlay.hpp"
+#include "render/HitboxDraw.hpp"
 #include "render/HudDraw.hpp"
 #include "render/LoadingScreen.hpp"
 #include "render/MetricsOverlay.hpp"
@@ -36,9 +41,50 @@ namespace engine::app {
 
 namespace {
 
-script::ScriptRuntime load_game(core::EntityManager& local, const std::filesystem::path& scripts) {
+namespace console = core::console;
+
+constexpr std::string_view metrics_cvar = "debug.metrics";
+constexpr std::string_view hitboxes_cvar = "debug.hitboxes";
+constexpr std::string_view music_cvar = "audio.music_volume";
+constexpr std::string_view effects_cvar = "audio.effects_volume";
+constexpr std::string_view muted_cvar = "audio.muted";
+constexpr int console_page = 5;
+
+class ConsoleLog {
+public:
+    ConsoleLog() : _capture(std::make_shared<console::LogCapture>(core::log::current_sink())) {
+        core::log::set_sink(_capture);
+    }
+
+    ConsoleLog(const ConsoleLog&) = delete;
+    ConsoleLog& operator=(const ConsoleLog&) = delete;
+    ConsoleLog(ConsoleLog&&) = delete;
+    ConsoleLog& operator=(ConsoleLog&&) = delete;
+
+    ~ConsoleLog() {
+        if (core::log::current_sink() == _capture) {
+            core::log::set_sink(_capture->next());
+        }
+    }
+
+    void print_to(console::Console& target) {
+        for (const auto& record : _capture->take()) {
+            const bool failure =
+                record.level == core::log::Level::Warn || record.level == core::log::Level::Error;
+            target.print(failure ? console::LineKind::error : console::LineKind::log,
+                         record.message);
+        }
+    }
+
+private:
+    std::shared_ptr<console::LogCapture> _capture;
+};
+
+script::ScriptRuntime load_game(core::EntityManager& local, console::CVars& cvars,
+                                const std::filesystem::path& scripts) {
     auto runtime = script::ScriptRuntime::builder().with<script::ClientApi>().build();
     runtime.attach_world(local);
+    runtime.attach_cvars(cvars);
     if (!scripts.empty()) {
         runtime.load_scripts(scripts);
     }
@@ -68,13 +114,16 @@ void add_all(AssetPreloader& preloader, const network::StringTable& strings,
 
 struct ClientApp::Impl {
     std::reference_wrapper<graphics::IRenderer> renderer;
-    std::reference_wrapper<const graphics::IInput> input;
+    std::reference_wrapper<graphics::IInput> input;
     std::reference_wrapper<audio::IAudio> audio;
     ClientAppOptions options;
     core::event::EventBus events;
     core::FieldRegistry fields;
     network::NetworkClient network;
     core::EntityManager local;
+    ConsoleLog console_log;
+    console::CVars cvars;
+    console::Console console{cvars};
     script::ScriptRuntime runtime;
     script::ClientApi& client;
     PhysicsStep local_physics;
@@ -93,12 +142,12 @@ struct ClientApp::Impl {
     std::optional<core::time::Duration> previous_frame_at;
     std::optional<std::uint32_t> previous_server_tick;
     const core::metrics::Metrics* server_metrics{nullptr};
-    bool overlay_shown{false};
+    ServerApp* local_server{nullptr};
     bool preload_queued{false};
     bool started{false};
 
     Impl(const core::time::IClock& clock, network::ClientTransport& transport,
-         graphics::IRenderer& window, const graphics::IInput& keys, audio::IAudio& speakers,
+         graphics::IRenderer& window, graphics::IInput& keys, audio::IAudio& speakers,
          ClientAppOptions settings);
 
     bool start(std::string& error);
@@ -115,19 +164,32 @@ private:
     void measure_frame_interval();
     void toggle_overlay();
     void publish_network_gauges();
+    void register_cvars();
+    void add_cvar(console::CVarSpec spec, console::CVars::Listener on_change = {});
+    void apply_audio_cvars();
+    void follow_audio_settings();
+    void update_console();
+    void toggle_console();
+    void edit_console();
+    void type_into_console();
+    void drop_typed_characters();
+    void print_server_results();
+    [[nodiscard]] core::InputState game_input() const;
 };
 
 ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport& transport,
-                      graphics::IRenderer& window, const graphics::IInput& keys,
-                      audio::IAudio& speakers, ClientAppOptions settings)
+                      graphics::IRenderer& window, graphics::IInput& keys, audio::IAudio& speakers,
+                      ClientAppOptions settings)
     : renderer(window), input(keys), audio(speakers), options(std::move(settings)),
       fields(replicated_fields()), network(clock, events, fields, transport),
-      runtime(load_game(local, options.scripts)), client(runtime.api<script::ClientApi>()),
+      runtime(load_game(local, cvars, options.scripts)), client(runtime.api<script::ClientApi>()),
       local_physics(local, events, runtime), sound(speakers, options.assets),
       textures(window, options.assets), shaders(window, options.assets),
       world_draw(window, textures, shaders), hud_draw(window, textures), view(fields),
       time_source(clock), started_at(clock.now()), loop(clock), metrics(clock), process(metrics) {
     client.set_audio_settings(options.audio);
+    register_cvars();
+    console.set_lua([this](std::string_view code) { return runtime.evaluate(code); });
     events.subscribe<network::SoundPlayed>([this](const network::SoundPlayed& played) {
         sound.play_sound(network.strings(), played.sound_id);
     });
@@ -158,8 +220,153 @@ bool ClientApp::Impl::start(std::string& error) {
     return true;
 }
 
+void ClientApp::Impl::register_cvars() {
+    const script::AudioSettings audio_levels = client.audio_settings();
+    const console::CVarRange volume{.min = 0.0, .max = 1.0};
+    const auto on_audio = [this](const console::CVarValue&) { apply_audio_cvars(); };
+    add_cvar({.name = std::string(metrics_cvar),
+              .default_value = false,
+              .description = "show the metrics overlay (F3)",
+              .range = std::nullopt});
+    add_cvar({.name = std::string(hitboxes_cvar),
+              .default_value = false,
+              .description = "outline the colliders of the client's local entities",
+              .range = std::nullopt});
+    add_cvar({.name = std::string(music_cvar),
+              .default_value = static_cast<double>(audio_levels.music_volume),
+              .description = "music volume",
+              .range = volume},
+             on_audio);
+    add_cvar({.name = std::string(effects_cvar),
+              .default_value = static_cast<double>(audio_levels.effects_volume),
+              .description = "sound effects volume",
+              .range = volume},
+             on_audio);
+    add_cvar({.name = std::string(muted_cvar),
+              .default_value = audio_levels.muted,
+              .description = "mute every sound",
+              .range = std::nullopt},
+             on_audio);
+}
+
+void ClientApp::Impl::add_cvar(console::CVarSpec spec, console::CVars::Listener on_change) {
+    std::string name = spec.name;
+    if (const auto added = cvars.add(std::move(spec), std::move(on_change)); !added) {
+        core::log::error("client: cannot register {}: {}", name, added.error);
+    }
+}
+
+void ClientApp::Impl::apply_audio_cvars() {
+    client.set_audio_settings(
+        {.music_volume = static_cast<float>(cvars.get_number(music_cvar, 1.0)),
+         .effects_volume = static_cast<float>(cvars.get_number(effects_cvar, 1.0)),
+         .muted = cvars.get_bool(muted_cvar, false)});
+}
+
+void ClientApp::Impl::follow_audio_settings() {
+    const script::AudioSettings levels = client.audio_settings();
+    static_cast<void>(cvars.set(music_cvar, static_cast<double>(levels.music_volume)));
+    static_cast<void>(cvars.set(effects_cvar, static_cast<double>(levels.effects_volume)));
+    static_cast<void>(cvars.set(muted_cvar, levels.muted));
+}
+
+void ClientApp::Impl::update_console() {
+    console_log.print_to(console);
+    print_server_results();
+    toggle_console();
+    if (console.is_open()) {
+        edit_console();
+        type_into_console();
+    } else {
+        drop_typed_characters();
+    }
+}
+
+void ClientApp::Impl::toggle_console() {
+    const graphics::IInput& keys = input.get();
+    const bool toggle =
+        keys.is_key_pressed(core::Key::GraveAccent) || keys.is_key_pressed(core::Key::F1);
+    if (toggle || (console.is_open() && keys.is_key_pressed(core::Key::Escape))) {
+        console.set_open(toggle && !console.is_open());
+        drop_typed_characters();
+    }
+}
+
+void ClientApp::Impl::edit_console() {
+    const graphics::IInput& keys = input.get();
+    const auto pressed = [&keys](core::Key key) { return keys.is_key_pressed(key); };
+    if (pressed(core::Key::Backspace)) {
+        console.erase_before();
+    }
+    if (pressed(core::Key::Delete)) {
+        console.erase_after();
+    }
+    if (pressed(core::Key::Left)) {
+        console.move_left();
+    }
+    if (pressed(core::Key::Right)) {
+        console.move_right();
+    }
+    if (pressed(core::Key::Home)) {
+        console.move_home();
+    }
+    if (pressed(core::Key::End)) {
+        console.move_end();
+    }
+    if (pressed(core::Key::Up)) {
+        console.history_previous();
+    }
+    if (pressed(core::Key::Down)) {
+        console.history_next();
+    }
+    if (pressed(core::Key::PageUp)) {
+        console.scroll(console_page);
+    }
+    if (pressed(core::Key::PageDown)) {
+        console.scroll(-console_page);
+    }
+}
+
+void ClientApp::Impl::type_into_console() {
+    for (char32_t typed = input.get().next_character(); typed != U'\0';
+         typed = input.get().next_character()) {
+        console.type(typed);
+    }
+    const graphics::IInput& keys = input.get();
+    if (keys.is_key_pressed(core::Key::Enter) || keys.is_key_pressed(core::Key::NumpadEnter)) {
+        console.submit();
+    }
+}
+
+void ClientApp::Impl::drop_typed_characters() {
+    char32_t typed = input.get().next_character();
+    while (typed != U'\0') {
+        typed = input.get().next_character();
+    }
+}
+
+void ClientApp::Impl::print_server_results() {
+    if (local_server == nullptr) {
+        return;
+    }
+    for (const auto& result : local_server->take_lua_results()) {
+        if (!result.output.empty()) {
+            console.print(result.ok ? console::LineKind::output : console::LineKind::error,
+                          result.output);
+        }
+    }
+}
+
+core::InputState ClientApp::Impl::game_input() const {
+    if (console.is_open()) {
+        return {};
+    }
+    return graphics::capture_input(input.get());
+}
+
 void ClientApp::Impl::frame() {
     measure_frame_interval();
+    update_console();
     toggle_overlay();
     {
         const core::metrics::ScopedTimer timer(metrics, "network.update");
@@ -171,6 +378,7 @@ void ClientApp::Impl::frame() {
     if (playing) {
         run_ticks(entities);
     }
+    follow_audio_settings();
     sound.apply(client.audio_settings());
     {
         const core::metrics::ScopedTimer timer(metrics, "draw");
@@ -182,8 +390,8 @@ void ClientApp::Impl::frame() {
 }
 
 void ClientApp::Impl::toggle_overlay() {
-    if (input.get().is_key_pressed(core::Key::F3)) {
-        overlay_shown = !overlay_shown;
+    if (!console.is_open() && input.get().is_key_pressed(core::Key::F3)) {
+        static_cast<void>(cvars.set(metrics_cvar, !cvars.get_bool(metrics_cvar, false)));
     }
 }
 
@@ -253,7 +461,7 @@ void ClientApp::Impl::update_camera(const std::vector<network::EntitySnapshot>& 
 }
 
 void ClientApp::Impl::run_ticks(const std::vector<network::EntitySnapshot>& entities) {
-    const auto held = graphics::capture_input(input.get());
+    const auto held = game_input();
     update_camera(entities);
     loop.run_frame([&](core::time::Duration step) {
         const float dt = std::chrono::duration<float>(step).count();
@@ -279,8 +487,11 @@ void ClientApp::Impl::draw(const std::vector<network::EntitySnapshot>& entities,
     } else {
         draw_loading_screen(renderer.get(), preloader.loaded(), preloader.total());
     }
-    if (overlay_shown) {
+    if (cvars.get_bool(metrics_cvar, false)) {
         draw_metrics_overlay(renderer.get(), {.client = metrics, .server = server_metrics});
+    }
+    if (console.is_open()) {
+        draw_console(renderer.get(), console);
     }
     renderer.get().end_frame();
 }
@@ -293,6 +504,9 @@ void ClientApp::Impl::draw_world(const std::vector<network::EntitySnapshot>& ent
     renderer.get().begin_world(camera);
     world_draw.draw({std::ref(view.mirror(entities)), std::ref(local)},
                     std::chrono::duration<float>(time_source.get().now() - started_at).count());
+    if (cvars.get_bool(hitboxes_cvar, false)) {
+        draw_hitboxes(renderer.get(), local);
+    }
     renderer.get().end_world();
 }
 
@@ -307,8 +521,8 @@ void ClientApp::Impl::stop() {
 }
 
 ClientApp::ClientApp(const core::time::IClock& clock, network::ClientTransport& transport,
-                     graphics::IRenderer& renderer, const graphics::IInput& input,
-                     audio::IAudio& audio, ClientAppOptions options)
+                     graphics::IRenderer& renderer, graphics::IInput& input, audio::IAudio& audio,
+                     ClientAppOptions options)
     : _impl(std::make_unique<Impl>(clock, transport, renderer, input, audio, std::move(options))) {}
 
 ClientApp::~ClientApp() { _impl->stop(); }
@@ -336,12 +550,29 @@ script::ClientApi& ClientApp::script_client() noexcept { return _impl->client; }
 
 core::metrics::Metrics& ClientApp::metrics() noexcept { return _impl->metrics; }
 
-void ClientApp::show_metrics_overlay(bool shown) noexcept { _impl->overlay_shown = shown; }
+void ClientApp::show_metrics_overlay(bool shown) {
+    static_cast<void>(_impl->cvars.set(metrics_cvar, shown));
+}
 
-bool ClientApp::metrics_overlay_shown() const noexcept { return _impl->overlay_shown; }
+bool ClientApp::metrics_overlay_shown() const noexcept {
+    return _impl->cvars.get_bool(metrics_cvar, false);
+}
 
 void ClientApp::show_server_metrics(const core::metrics::Metrics* server) noexcept {
     _impl->server_metrics = server;
 }
+
+void ClientApp::attach_local_server(ServerApp& server) {
+    _impl->server_metrics = &server.metrics();
+    _impl->local_server = &server;
+    _impl->console.set_server_lua([&server](std::string_view code) {
+        server.submit_lua(std::string(code));
+        return core::console::ExecutionResult{};
+    });
+}
+
+core::console::Console& ClientApp::console() noexcept { return _impl->console; }
+
+core::console::CVars& ClientApp::cvars() noexcept { return _impl->cvars; }
 
 } // namespace engine::app
