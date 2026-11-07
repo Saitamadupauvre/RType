@@ -149,12 +149,14 @@ TEST_F(SceneItems, HandlesFollowTheTransformComponents) {
     EXPECT_TRUE(item_of("rock").rotates);
 }
 
-TEST_F(SceneItems, BoxColliderIsLaidOutFromThePosition) {
+TEST_F(SceneItems, BoxColliderIsCenteredOnPositionPlusOffsetLikeThePhysics) {
     place_crate({100.F, 100.F});
     const SceneItem crate = item_of("crate");
 
     ASSERT_TRUE(crate.box_collider.has_value());
-    EXPECT_EQ(crate.box_collider.value_or(editor::WorldBox{}).size, Vec2(32.F, 16.F));
+    const editor::WorldBox box = crate.box_collider.value_or(editor::WorldBox{});
+    EXPECT_EQ(box.size, Vec2(32.F, 16.F));
+    EXPECT_EQ(box.top_left, Vec2(100.F, 100.F));
     EXPECT_FALSE(item_of("ship").box_collider.has_value());
 }
 

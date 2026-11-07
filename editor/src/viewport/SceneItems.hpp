@@ -62,6 +62,7 @@ struct SceneItem {
     /** @brief Whether the entity has a Rotation or a Scale the handles can edit. */
     bool rotates = false;
     bool scales = false;
+    /** @brief As the physics reads it: Position plus the offset is the center of the box. */
     std::optional<WorldBox> box_collider;
     std::optional<WorldCircle> circle_collider;
 

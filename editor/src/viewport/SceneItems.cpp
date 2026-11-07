@@ -31,7 +31,8 @@ Vec2 base_size(const engine::core::Sprite& sprite, const TextureSize& texture_si
 
 void add_colliders(const EntityManager& world, Entity entity, SceneItem& item) {
     if (const auto* box = world.find<engine::physics::AABBCollider>(entity)) {
-        item.box_collider = WorldBox{.top_left = item.top_left + box->offset, .size = box->size};
+        item.box_collider = WorldBox{.top_left = item.top_left + box->offset - (box->size / 2.F),
+                                     .size = box->size};
     }
     if (const auto* circle = world.find<engine::physics::CircleCollider>(entity)) {
         item.circle_collider =
