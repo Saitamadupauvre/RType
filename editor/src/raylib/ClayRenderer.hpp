@@ -4,6 +4,7 @@
 #include <raylib.h>
 
 #include <filesystem>
+#include <functional>
 #include <string_view>
 
 #include "raylib/FontCache.hpp"
@@ -13,7 +14,11 @@ namespace editor {
 
 class ClayRenderer {
 public:
+    using CustomPainter = std::function<void(const Clay_RenderCommand&)>;
+
     explicit ClayRenderer(std::filesystem::path font_directory);
+
+    void set_custom_painter(CustomPainter painter);
 
     [[nodiscard]] Clay_Dimensions measure(std::string_view text,
                                           const Clay_TextElementConfig& config);
@@ -28,6 +33,7 @@ private:
     void end_scissor();
 
     FontCache _fonts;
+    CustomPainter _custom;
     ScissorStack _scissors;
 };
 

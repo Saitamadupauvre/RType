@@ -27,7 +27,8 @@ protected:
     editor::Platform _platform{
         .measure = fixed_measure,
         .read_clipboard = [this] { return _clipboard; },
-        .write_clipboard = [this](std::string_view text) { _clipboard = std::string(text); }};
+        .write_clipboard = [this](std::string_view text) { _clipboard = std::string(text); },
+        .texture_size = {}};
 
     template <typename Draw> void frame(const editor::UiInput& input, Draw&& draw) {
         editor::Ui ui(editor::Theme{}, input, _widgets, _platform);

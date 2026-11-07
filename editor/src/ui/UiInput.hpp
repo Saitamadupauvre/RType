@@ -36,6 +36,7 @@ enum class Key : std::uint8_t {
 struct UiInput {
     Clay_Vector2 pointer{};
     bool primary_down = false;
+    bool middle_down = false;
     /** True only on the frame the primary button went down. */
     bool primary_pressed = false;
     /** Rank of this frame's press in a series of quick clicks: 2 for a double click. */
@@ -51,6 +52,7 @@ struct UiInput {
     /** Ctrl, or Cmd on macOS. */
     bool primary_modifier = false;
     bool shift = false;
+    bool alt = false;
 };
 
 /** @brief Whether the key went down or repeated this frame. */

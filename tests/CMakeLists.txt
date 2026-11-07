@@ -269,6 +269,7 @@ editor_add_test(core
         editor/ui/SmoothScrollTest.cpp
         editor/ui/ThemeTest.cpp
         editor/ui/sections/InspectorTest.cpp
+        editor/ui/sections/ViewportTest.cpp
         editor/ui/widgets/CheckboxTest.cpp
         editor/ui/widgets/DropdownTest.cpp
         editor/ui/widgets/NumberFieldTest.cpp

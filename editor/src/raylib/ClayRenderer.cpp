@@ -34,6 +34,8 @@ bool uniform(Clay_BorderWidth width) {
 ClayRenderer::ClayRenderer(std::filesystem::path font_directory)
     : _fonts(std::move(font_directory)) {}
 
+void ClayRenderer::set_custom_painter(CustomPainter painter) { _custom = std::move(painter); }
+
 Clay_Dimensions ClayRenderer::measure(std::string_view text, const Clay_TextElementConfig& config) {
     const std::string terminated(text);
     const Vector2 size = MeasureTextEx(font_for(config.fontId, config.fontSize), terminated.c_str(),
@@ -65,9 +67,13 @@ void ClayRenderer::render(Clay_RenderCommandArray commands) {
         case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END:
             end_scissor();
             break;
+        case CLAY_RENDER_COMMAND_TYPE_CUSTOM:
+            if (_custom) {
+                _custom(command);
+            }
+            break;
         case CLAY_RENDER_COMMAND_TYPE_NONE:
         case CLAY_RENDER_COMMAND_TYPE_IMAGE:
-        case CLAY_RENDER_COMMAND_TYPE_CUSTOM:
             break;
         }
     }
