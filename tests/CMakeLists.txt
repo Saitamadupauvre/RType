@@ -257,6 +257,7 @@ editor_add_test(core
         editor/action/OpenEditorTest.cpp
         editor/clay/ClayContextTest.cpp
         editor/cli/CliTest.cpp
+        editor/exporter/GameExportTest.cpp
         editor/render/GeometryTest.cpp
         editor/render/ScissorStackTest.cpp
         editor/play/PlaySessionTest.cpp

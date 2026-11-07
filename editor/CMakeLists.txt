@@ -26,6 +26,7 @@ add_library(editor-core STATIC
     src/action/OpenEditor.cpp
     src/clay/ClayContext.cpp
     src/cli/Cli.cpp
+    src/exporter/GameExport.cpp
     src/play/PlaySession.cpp
     src/play/ProcessLauncher.cpp
     src/render/Geometry.cpp
