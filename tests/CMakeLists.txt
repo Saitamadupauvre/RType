@@ -264,6 +264,7 @@ editor_add_test(core
         editor/play/ProcessLauncherTest.cpp
         editor/text/CaretScrollTest.cpp
         editor/text/FitTextTest.cpp
+        editor/text/FuzzyMatchTest.cpp
         editor/text/TextEditTest.cpp
         editor/ui/ClickCounterTest.cpp
         editor/ui/CommandTableTest.cpp
