@@ -114,3 +114,13 @@ TEST_F(CommandTable, ShortcutsAreIgnoredWhileAFieldHasTheKeyboard) {
     _widgets.focus(CLAY_ID("SomeField"), "text");
     EXPECT_TRUE(press(Key::v).empty());
 }
+
+TEST(CommandTableEntries, ShortcutLabelsNameTheModifierAndTheKey) {
+#if defined(__APPLE__)
+    EXPECT_EQ(editor::shortcut_label({.key = Key::s, .primary_modifier = true}), "Cmd+S");
+#else
+    EXPECT_EQ(editor::shortcut_label({.key = Key::s, .primary_modifier = true}), "Ctrl+S");
+#endif
+    EXPECT_EQ(editor::shortcut_label({.key = Key::del}), "Del");
+    EXPECT_EQ(editor::shortcut_label({.key = Key::z, .shift = true}), "Shift+Z");
+}

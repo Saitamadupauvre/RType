@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <string>
 #include <utility>
 
 namespace editor {
@@ -39,8 +40,63 @@ std::optional<Action> delete_selection(const Editor& editor) {
     return edit::Remove{.id = *selection};
 }
 
+std::optional<Action> discard(const Editor& editor) {
+    if (!editing(editor) || !editor.session().unsaved()) {
+        return std::nullopt;
+    }
+    return command::DiscardChanges{};
+}
+
+std::optional<Action> open_script(const Editor& editor) {
+    const auto& inspector = editor.state().inspector;
+    if (!inspector || inspector->script.empty()) {
+        return std::nullopt;
+    }
+    return command::OpenScript{.file = inspector->script};
+}
+
 template <Tool tool> std::optional<Action> use_tool(const Editor&) {
     return command::SetTool{.tool = tool};
+}
+
+template <Tool tool> bool uses_tool(const Editor& editor) { return editor.state().tool == tool; }
+
+std::optional<Action> toggle_snap(const Editor& editor) {
+    return command::SetSnap{.enabled = !editor.state().view.snap};
+}
+
+bool snaps(const Editor& editor) { return editor.state().view.snap; }
+
+bool shows(const Editor& editor, Overlay overlay) {
+    const ViewSettings& view = editor.state().view;
+    return overlay == Overlay::hitboxes ? view.show_hitboxes : view.show_names;
+}
+
+template <Overlay overlay> std::optional<Action> toggle_overlay(const Editor& editor) {
+    return command::SetOverlay{.overlay = overlay, .visible = !shows(editor, overlay)};
+}
+
+template <Overlay overlay> bool showing(const Editor& editor) { return shows(editor, overlay); }
+
+std::optional<Action> play(const Editor& editor) {
+    if (editor.state().mode == Mode::playing) {
+        return std::nullopt;
+    }
+    return command::Play{};
+}
+
+std::optional<Action> pause(const Editor& editor) {
+    if (editor.state().mode != Mode::playing) {
+        return std::nullopt;
+    }
+    return command::Pause{};
+}
+
+std::optional<Action> stop(const Editor& editor) {
+    if (editing(editor)) {
+        return std::nullopt;
+    }
+    return command::Stop{};
 }
 
 constexpr Shortcut primary(Key key) { return {.key = key, .primary_modifier = true}; }
@@ -48,15 +104,98 @@ constexpr Shortcut primary(Key key) { return {.key = key, .primary_modifier = tr
 constexpr Shortcut plain(Key key) { return {.key = key}; }
 
 constexpr std::array table{
-    CommandEntry{.label = "Save scene", .shortcut = primary(Key::s), .make = save},
-    CommandEntry{.label = "Undo", .shortcut = primary(Key::z), .make = undo},
-    CommandEntry{.label = "Redo", .shortcut = primary(Key::y), .make = redo},
+    CommandEntry{.label = "Save scene", .menu = Menu::file, .shortcut = primary(Key::s), .make = save},
+    CommandEntry{.label = "Discard changes", .menu = Menu::file, .shortcut = std::nullopt, .make = discard},
+    CommandEntry{.label = "Open script", .menu = Menu::file, .shortcut = std::nullopt, .make = open_script},
+    CommandEntry{.label = "Undo", .menu = Menu::edit, .shortcut = primary(Key::z), .make = undo},
+    CommandEntry{.label = "Redo", .menu = Menu::edit, .shortcut = primary(Key::y), .make = redo},
+    CommandEntry{.label = "Delete selection",
+                 .menu = Menu::edit,
+                 .shortcut = plain(Key::del),
+                 .make = delete_selection},
+    CommandEntry{.label = "Select tool",
+                 .menu = Menu::view,
+                 .shortcut = plain(Key::v),
+                 .make = use_tool<Tool::select>,
+                 .checked = uses_tool<Tool::select>},
+    CommandEntry{.label = "Move tool",
+                 .menu = Menu::view,
+                 .shortcut = plain(Key::g),
+                 .make = use_tool<Tool::move>,
+                 .checked = uses_tool<Tool::move>},
+    CommandEntry{.label = "Pan tool",
+                 .menu = Menu::view,
+                 .shortcut = plain(Key::h),
+                 .make = use_tool<Tool::pan>,
+                 .checked = uses_tool<Tool::pan>},
     CommandEntry{
-        .label = "Delete selection", .shortcut = plain(Key::del), .make = delete_selection},
-    CommandEntry{.label = "Select tool", .shortcut = plain(Key::v), .make = use_tool<Tool::select>},
-    CommandEntry{.label = "Move tool", .shortcut = plain(Key::g), .make = use_tool<Tool::move>},
-    CommandEntry{.label = "Pan tool", .shortcut = plain(Key::h), .make = use_tool<Tool::pan>},
+        .label = "Snap to grid", .menu = Menu::view, .shortcut = std::nullopt, .make = toggle_snap, .checked = snaps},
+    CommandEntry{.label = "Show hitboxes",
+                 .menu = Menu::view,
+                 .shortcut = std::nullopt,
+                 .make = toggle_overlay<Overlay::hitboxes>,
+                 .checked = showing<Overlay::hitboxes>},
+    CommandEntry{.label = "Show names",
+                 .menu = Menu::view,
+                 .shortcut = std::nullopt,
+                 .make = toggle_overlay<Overlay::names>,
+                 .checked = showing<Overlay::names>},
+    CommandEntry{.label = "Play", .menu = Menu::scene, .shortcut = std::nullopt, .make = play},
+    CommandEntry{.label = "Pause", .menu = Menu::scene, .shortcut = std::nullopt, .make = pause},
+    CommandEntry{.label = "Stop", .menu = Menu::scene, .shortcut = std::nullopt, .make = stop},
 };
+
+#if defined(__APPLE__)
+constexpr std::string_view primary_name = "Cmd";
+#else
+constexpr std::string_view primary_name = "Ctrl";
+#endif
+
+std::string_view key_name(Key key) {
+    switch (key) {
+    case Key::a:
+        return "A";
+    case Key::c:
+        return "C";
+    case Key::s:
+        return "S";
+    case Key::v:
+        return "V";
+    case Key::x:
+        return "X";
+    case Key::y:
+        return "Y";
+    case Key::z:
+        return "Z";
+    case Key::g:
+        return "G";
+    case Key::h:
+        return "H";
+    case Key::del:
+        return "Del";
+    case Key::backspace:
+        return "Backspace";
+    case Key::enter:
+        return "Enter";
+    case Key::escape:
+        return "Esc";
+    case Key::tab:
+        return "Tab";
+    case Key::left:
+        return "Left";
+    case Key::right:
+        return "Right";
+    case Key::up:
+        return "Up";
+    case Key::down:
+        return "Down";
+    case Key::home:
+        return "Home";
+    case Key::end:
+        return "End";
+    }
+    return "";
+}
 
 bool pressed(const UiInput& input, const Shortcut& shortcut) {
     return input.primary_modifier == shortcut.primary_modifier && input.shift == shortcut.shift &&
@@ -66,6 +205,17 @@ bool pressed(const UiInput& input, const Shortcut& shortcut) {
 } // namespace
 
 std::span<const CommandEntry> command_table() { return table; }
+
+std::string shortcut_label(const Shortcut& shortcut) {
+    std::string label;
+    if (shortcut.primary_modifier) {
+        label.append(primary_name).append("+");
+    }
+    if (shortcut.shift) {
+        label.append("Shift+");
+    }
+    return label.append(key_name(shortcut.key));
+}
 
 void emit_shortcuts(Ui& ui, const Editor& editor) {
     if (ui.widgets().wants_keyboard()) {
