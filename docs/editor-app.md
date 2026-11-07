@@ -84,7 +84,8 @@ action, so the UI never queries the session.
 - **Name** and **Position** edit the instance (`Rename`, `Move`). Type is read
   only.
 - **Components** lists the registry fields of the components the prefab's
-  entity owns, in registration order. `Position.pos` is left out: it is the
+  entity owns, in registration order, under one sub-header per component.
+  Labels show the field name as words (`resolve collisions`) and wrap. `Position.pos` is left out: it is the
   position above.
 - **Script** lists the fields the prefab script declares.
 - Each field shows its override, or the prefab value when there is none. An
