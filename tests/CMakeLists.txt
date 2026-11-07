@@ -259,6 +259,7 @@ editor_add_test(core
         editor/cli/CliTest.cpp
         editor/render/GeometryTest.cpp
         editor/render/ScissorStackTest.cpp
+        editor/play/PlaySessionTest.cpp
         editor/play/ProcessLauncherTest.cpp
         editor/text/FitTextTest.cpp
         editor/text/TextEditTest.cpp

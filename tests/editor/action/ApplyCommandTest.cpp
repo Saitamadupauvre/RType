@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "../GameFixture.hpp"
+#include "../play/FakeLauncher.hpp"
 #include "action/ApplyCommand.hpp"
 #include "action/ApplyEdit.hpp"
 #include "action/EditorState.hpp"
@@ -27,9 +28,16 @@ class ApplyCommand : public GameFixture {
 protected:
     EditorSession _session = open_level();
     EditorState _state;
+    editor::PlaySession _play{_game.path() / ".scratch"};
     InstanceId _rock = id_of(_session, "rock");
 
-    bool run(const editor::Command& command) { return apply_command(_session, _state, command).ok; }
+    void SetUp() override {
+        _play.attach(std::make_unique<FakeLauncher>(std::make_shared<FakeGame>()));
+    }
+
+    bool run(const editor::Command& command) {
+        return apply_command(_session, _state, _play, command).ok;
+    }
 
     void move_rock() {
         ASSERT_TRUE(apply_edit(_session, editor::edit::Move{.id = _rock, .position = {9, 9}}).ok);
@@ -164,7 +172,7 @@ TEST_F(ApplyCommand, PrefabFilterChangesTheState) {
 
 TEST_F(ApplyCommand, InvalidInputIsRefusedWithItsMessage) {
     const auto result =
-        apply_command(_session, _state, command::ReportInvalidInput{.message = "bad"});
+        apply_command(_session, _state, _play, command::ReportInvalidInput{.message = "bad"});
     EXPECT_FALSE(result.ok);
     EXPECT_EQ(result.message, "bad");
 }

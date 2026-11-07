@@ -9,6 +9,8 @@ namespace editor {
 
 struct EditorConfig {
     std::filesystem::path game;
+    /** @brief Program that plays the game; empty for the default next to the editor. */
+    std::filesystem::path runtime{};
 
     bool operator==(const EditorConfig&) const = default;
 };

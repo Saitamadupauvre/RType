@@ -32,33 +32,10 @@ CommandResult set_grid_size(ViewSettings& view, float size) {
     return CommandResult::done();
 }
 
-CommandResult play(Mode& mode) {
-    if (mode == Mode::playing) {
-        return CommandResult::refused("The game is already playing.");
-    }
-    mode = Mode::playing;
-    return CommandResult::done();
-}
-
-CommandResult pause(Mode& mode) {
-    if (mode != Mode::playing) {
-        return CommandResult::refused("Only a playing game can be paused.");
-    }
-    mode = Mode::paused;
-    return CommandResult::done();
-}
-
-CommandResult stop(Mode& mode) {
-    if (mode == Mode::editing) {
-        return CommandResult::refused("The game is not running.");
-    }
-    mode = Mode::editing;
-    return CommandResult::done();
-}
-
 } // namespace
 
-CommandResult apply_command(EditorSession& session, EditorState& state, const Command& command) {
+CommandResult apply_command(EditorSession& session, EditorState& state, PlaySession& play,
+                            const Command& command) {
     return std::visit(
         Overloaded{
             [&](const command::Select& select) { return session.select(select.id); },
@@ -99,9 +76,9 @@ CommandResult apply_command(EditorSession& session, EditorState& state, const Co
                 state.prefab_filter = filter.text;
                 return CommandResult::done();
             },
-            [&](const command::Play&) { return play(state.mode); },
-            [&](const command::Pause&) { return pause(state.mode); },
-            [&](const command::Stop&) { return stop(state.mode); },
+            [&](const command::Play&) { return play.play(session, state.mode); },
+            [&](const command::Pause&) { return play.pause(state.mode); },
+            [&](const command::Stop&) { return play.stop(state.mode); },
         },
         command);
 }
