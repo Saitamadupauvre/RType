@@ -181,3 +181,24 @@ TEST_F(CommandPalette, TabKeepsTheKeyboardInThePalette) {
     EXPECT_TRUE(is_open());
     EXPECT_TRUE(_widgets.is_focused(CLAY_ID("PaletteQuery")));
 }
+
+TEST_F(CommandPalette, ListsEveryCommandWhenTheWindowHasRoom) {
+    open_palette();
+
+    for (const auto& entry : editor::command_table()) {
+        EXPECT_TRUE(shows(entry.label)) << entry.label;
+    }
+}
+
+TEST_F(CommandPalette, ShortWindowsShowOnlyTheRowsThatFit) {
+    constexpr Clay_Dimensions short_window{.width = 1440, .height = 300};
+    frame(UiInput{.keys_pressed = {Key::p}, .primary_modifier = true, .shift = true}, {},
+          short_window);
+    const auto texts = frame({}, {}, short_window).texts;
+    frame({}, {}, short_window);
+
+    EXPECT_NE(std::ranges::find(texts, "Open script"), texts.end());
+    EXPECT_EQ(std::ranges::find(texts, "Export game..."), texts.end());
+    const Clay_BoundingBox last = box_of(row("Open script"));
+    EXPECT_LE(last.y + last.height, short_window.height);
+}

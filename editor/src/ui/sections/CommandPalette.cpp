@@ -22,7 +22,8 @@ constexpr std::int16_t palette_layer = 300;
 constexpr std::int16_t field_layer = palette_layer + 1;
 constexpr float palette_width = 560.F;
 constexpr float palette_top = 80.F;
-constexpr std::size_t max_rows = 12;
+constexpr float row_gap = 4.F;
+constexpr float panel_padding = 6.F;
 constexpr Clay_Color backdrop{.r = 0, .g = 0, .b = 0, .a = 90};
 
 Clay_ElementId query_id() { return CLAY_ID("PaletteQuery"); }
@@ -53,7 +54,15 @@ void close(Ui& ui) {
     }
 }
 
-std::vector<std::size_t> matches(std::string_view query) {
+std::size_t rows_that_fit(const Theme& theme, Clay_Dimensions window) {
+    const float row = theme.px(size::row) + theme.px(row_gap);
+    const float taken =
+        (2.F * theme.px(palette_top)) + (2.F * theme.px(panel_padding)) + theme.px(size::row);
+    const float room = window.height - taken;
+    return room < row ? 1 : static_cast<std::size_t>(room / row);
+}
+
+std::vector<std::size_t> matches(std::string_view query, std::size_t max_rows) {
     const auto table = command_table();
     std::vector<std::string_view> labels;
     labels.reserve(table.size());
@@ -142,8 +151,8 @@ Drawn draw(Ui& ui, const Editor& editor, Clay_Dimensions window,
           .floating = {.zIndex = palette_layer, .attachTo = CLAY_ATTACH_TO_ROOT}}) {
         CLAY({.id = panel_id(),
               .layout = {.sizing = {.width = CLAY_SIZING_FIXED(theme.px(palette_width))},
-                         .padding = CLAY_PADDING_ALL(theme.px16(6.F)),
-                         .childGap = theme.px16(4.F),
+                         .padding = CLAY_PADDING_ALL(theme.px16(panel_padding)),
+                         .childGap = theme.px16(row_gap),
                          .layoutDirection = CLAY_TOP_TO_BOTTOM},
               .backgroundColor = color::panel,
               .cornerRadius = CLAY_CORNER_RADIUS(theme.px(size::radius)),
@@ -203,7 +212,8 @@ void command_palette(Ui& ui, const Editor& editor, Clay_Dimensions window) {
         }
         open(ui);
     }
-    const std::vector<std::size_t> ranked = matches(palette.query);
+    const std::vector<std::size_t> ranked =
+        matches(palette.query, rows_that_fit(ui.theme(), window));
     palette.highlighted = std::min(palette.highlighted, ranked.empty() ? 0 : ranked.size() - 1);
     move_highlight(ui.input(), ranked.size(), palette.highlighted);
     const bool clicked_outside = ui.input().primary_pressed && !Ui::hovered(panel_id());
