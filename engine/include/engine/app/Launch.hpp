@@ -29,6 +29,9 @@ struct LaunchOptions {
     Mode mode{Mode::solo};
     /** @brief Game folder, holding `scripts/` and `assets/`. */
     std::filesystem::path game;
+    /** @brief Scene file the server starts from instead of `game.json`'s `start_scene`; empty keeps
+     * it. */
+    std::filesystem::path start_scene_file{};
     /** @brief Graphics plugin file; unused by Mode::dedicated. */
     std::filesystem::path graphics_plugin;
     /** @brief Audio plugin file; when it cannot be loaded the game runs silent. */
