@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include "engine/core/log/Log.hpp"
+
 namespace editor {
 
 namespace {
@@ -59,6 +61,11 @@ const Font& FontCache::get(Face face, std::uint16_t size) {
     const std::string path = (_directory / files.at(static_cast<std::size_t>(face))).string();
     std::vector<int> glyphs = codepoints();
     Font font = LoadFontEx(path.c_str(), size, glyphs.data(), static_cast<int>(glyphs.size()));
+    if (font.texture.id == GetFontDefault().texture.id) {
+        engine::core::log::warn("editor: cannot load font {}", path);
+    } else {
+        engine::core::log::debug("editor: font {} at {} px", path, size);
+    }
     SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
     return _fonts.emplace(key, font).first->second;
 }

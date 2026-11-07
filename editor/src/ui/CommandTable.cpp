@@ -5,6 +5,8 @@
 #include <string>
 #include <utility>
 
+#include "engine/core/log/Log.hpp"
+
 namespace editor {
 
 namespace {
@@ -230,8 +232,22 @@ std::string shortcut_label(const Shortcut& shortcut) {
     return label.append(key_name(shortcut.key));
 }
 
+void trace_keys(const UiInput& input) {
+    for (const Key key : input.keys_pressed) {
+        engine::core::log::trace("editor: key {}", shortcut_label({.key = key,
+                                                                    .primary_modifier =
+                                                                        input.primary_modifier,
+                                                                    .shift = input.shift}));
+    }
+}
+
 void emit_shortcuts(Ui& ui, const Editor& editor) {
+    namespace logging = engine::core::log;
+    trace_keys(ui.input());
     if (ui.widgets().wants_keyboard() || editor.state().export_dialog) {
+        if (!ui.input().keys_pressed.empty()) {
+            logging::trace("editor: shortcuts ignored, a field or dialog has the keyboard");
+        }
         return;
     }
     for (const CommandEntry& entry : table) {
@@ -239,7 +255,12 @@ void emit_shortcuts(Ui& ui, const Editor& editor) {
             continue;
         }
         if (auto action = entry.make(editor)) {
+            logging::trace("editor: shortcut {} runs {}", shortcut_label(*entry.shortcut),
+                           entry.label);
             ui.emit(std::move(*action));
+        } else {
+            logging::trace("editor: shortcut {} skipped, {} is disabled",
+                           shortcut_label(*entry.shortcut), entry.label);
         }
     }
 }
