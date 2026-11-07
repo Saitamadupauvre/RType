@@ -14,6 +14,25 @@ The argument is required and must be a folder that contains a `game.json`
 (see [Game folder and scenes](game-folder.md)). Opening the editor without a
 project, and creating one, come with the launcher (#158).
 
+### Developer logs
+
+The in-app console is for users. What the editor does goes to the engine log
+on stderr, at the level given by `--log-level` (`trace`, `debug`, `info`,
+`warn`, `error` or `off`; `info` by default):
+
+| Level | Logged |
+|---|---|
+| `info` | The game folder and the start scene at startup; every refused action with its reason (`editor: refused command::Undo: ...`) |
+| `debug` | Every handled action with its fields (`editor: edit::Move id=3 position=(9, 9)`), each font loaded |
+| `trace` | Every key pressed with its modifiers, and the shortcut it ran, skipped because it is disabled, or ignored because a field or dialog has the keyboard |
+
+```sh
+editor game --log-level trace    # see every key, shortcut and action
+```
+
+`action/ActionText` names each action and its fields. A font that cannot be
+loaded is a warning at any level.
+
 ## Window
 
 | Area | Shows | Does |
