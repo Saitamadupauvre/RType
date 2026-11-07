@@ -22,7 +22,7 @@ project, and creating one, come with the launcher (#158).
 | Toolbar | Tools, snap, grid size, overlays | Switch tool, toggle snap and overlays, Undo, Redo |
 | Sidebar | Prefabs, scenes (start scene marked), instances | Open a scene, select an instance |
 | Viewport | The scene (#155) | |
-| Inspector | Name, type, position and overrides of the selection | Field editing comes with #156 |
+| Inspector | Name, type, position and fields of the selection | Rename, move, edit and reset fields |
 | Bottom panel | Console, Problems | Switch tab |
 | Status bar | Mode, instance count, game folder, scene | |
 
@@ -35,6 +35,35 @@ project, and creating one, come with the launcher (#158).
 | F11 | Clay debug view |
 
 On macOS, Cmd replaces Ctrl.
+
+## Inspector
+
+The inspector shows the selected instance. `Editor` caches what it shows in
+`EditorState::inspector` (`inspect_selection`) and refreshes it after every
+action, so the UI never queries the session.
+
+- **Name** and **Position** edit the instance (`Rename`, `Move`). Type is read
+  only.
+- **Components** lists the registry fields of the components the prefab's
+  entity owns, in registration order. `Position.pos` is left out: it is the
+  position above.
+- **Script** lists the fields the prefab script declares.
+- Each field shows its override, or the prefab value when there is none. An
+  overridden field has an accent label and a Reset button (`ResetField`).
+  **Reset all** (`ResetAll`) appears when the instance has overrides.
+
+| Kind | Edited with |
+|---|---|
+| float, int | number field |
+| bool | checkbox |
+| string | text field |
+| vec2 | two number fields, x and y |
+| color | swatch and a hex text field: `#RRGGBB` or `#RRGGBBAA` |
+| asset, list | read only for now |
+
+Committing a value emits `SetField` only when it differs from the shown one.
+Invalid input emits `ReportInvalidInput`, which logs
+`<field>: expected ...` in the console and changes nothing.
 
 ## One-way flow
 
@@ -123,7 +152,7 @@ if (name.event == FieldEvent::committed) {
 | Widget | Returns |
 |---|---|
 | `text_field(ui, id, value, options)` | `TextResult`: the draft (`changed`), the text (`committed`) or the restored value (`cancelled`) |
-| `number_field(ui, id, float or int, options)` | `FieldResult<float or int>`: the parsed value on a valid commit, `cancelled` otherwise |
+| `number_field(ui, id, float, int or int64_t, options)` | `FieldResult<...>`: the parsed value on a valid commit (`committed`), `rejected` when the text is not a number, `cancelled` on Esc |
 | `checkbox(ui, id, value, label)` | `true` when clicked; the caller emits `!value` |
 | `dropdown(ui, id, selected, options)` | the index picked this frame, if any |
 
@@ -169,6 +198,15 @@ frame loop owns it and lends it to each frame's `Ui`; `build_frame` calls
 text measuring and clipboard read/write. The raylib loop fills it; tests pass
 fakes. `UiInput` carries the typed UTF-8 text and the pressed and repeated
 keys.
+
+### Scrolling
+
+A vertical scroll container takes `.clip = scroll_clip(ui.widgets().scroll(), id)`.
+`SmoothScroll` eases the hovered container toward its target, 40 px per wheel
+notch times the UI scale, and keeps it inside the content. Clay still tracks
+the containers but gets a zero wheel delta. The F11 debug view scrolls the
+same way. Content that must stay visible, such as the prefab filter, goes
+above the container, not inside it.
 
 ## Code layout
 
