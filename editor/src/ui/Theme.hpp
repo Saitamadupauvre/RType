@@ -32,8 +32,11 @@ namespace size {
 inline constexpr float menu_bar = 36.F;
 inline constexpr float toolbar = 40.F;
 inline constexpr float sidebar = 260.F;
+inline constexpr float sidebar_min = 180.F;
 inline constexpr float inspector = 340.F;
+inline constexpr float inspector_min = 240.F;
 inline constexpr float bottom_panel = 150.F;
+inline constexpr float bottom_panel_min = 60.F;
 inline constexpr float tabs = 30.F;
 inline constexpr float status_bar = 24.F;
 inline constexpr float panel_header = 32.F;

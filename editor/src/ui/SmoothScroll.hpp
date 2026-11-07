@@ -35,7 +35,10 @@ private:
     std::unordered_map<std::uint32_t, float> _targets;
 };
 
-/** @brief The clip of a vertical scroll container, registered with the frame's SmoothScroll. */
+/**
+ * @brief The clip of a vertical scroll container, registered with the frame's SmoothScroll. It
+ * clips both axes, so wide content never widens the panel.
+ */
 [[nodiscard]] Clay_ClipElementConfig scroll_clip(SmoothScroll& scroll, Clay_ElementId id);
 
 } // namespace editor

@@ -12,6 +12,7 @@
 
 #include "ui/FieldText.hpp"
 #include "ui/Labels.hpp"
+#include "ui/SmoothScroll.hpp"
 #include "ui/Text.hpp"
 #include "ui/sections/InspectorFields.hpp"
 #include "ui/sections/PanelHeader.hpp"
@@ -151,7 +152,8 @@ void inspector(Ui& ui, const Editor& editor) {
     const std::optional<InspectorModel>& model = editor.state().inspector;
     const auto* selected = model ? editor.session().document().find(model->id) : nullptr;
     CLAY({.id = CLAY_ID("Inspector"),
-          .layout = {.sizing = {.width = CLAY_SIZING_FIXED(theme.px(size::inspector)),
+          .layout = {.sizing = {.width = CLAY_SIZING_GROW(theme.px(size::inspector_min),
+                                                  theme.px(size::inspector)),
                                 .height = CLAY_SIZING_GROW()},
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::panel,
@@ -159,11 +161,17 @@ void inspector(Ui& ui, const Editor& editor) {
         panel_header(theme, selected ? ui.keep(std::format("INSPECTOR · {}",
                                                            instance_label(selected->instance)))
                                      : CLAY_STRING("INSPECTOR"));
-        if (model && selected) {
-            instance_rows(ui, selected->instance, model->id);
-            field_rows(ui, *model);
-        } else {
-            nothing_selected(theme);
+        CLAY({.id = CLAY_ID("InspectorBody"),
+              .layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
+                         .padding = {.bottom = theme.px16(size::gutter)},
+                         .layoutDirection = CLAY_TOP_TO_BOTTOM},
+              .clip = scroll_clip(ui.widgets().scroll(), CLAY_ID("InspectorBody"))}) {
+            if (model && selected) {
+                instance_rows(ui, selected->instance, model->id);
+                field_rows(ui, *model);
+            } else {
+                nothing_selected(theme);
+            }
         }
     }
 }

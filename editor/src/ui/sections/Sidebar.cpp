@@ -120,7 +120,7 @@ void instances(Ui& ui, const engine::editor::EditorSession& session) {
 void sidebar(Ui& ui, const Editor& editor) {
     const Theme& theme = ui.theme();
     CLAY({.id = CLAY_ID("Sidebar"),
-          .layout = {.sizing = {.width = CLAY_SIZING_FIXED(theme.px(size::sidebar)),
+          .layout = {.sizing = {.width = CLAY_SIZING_GROW(theme.px(size::sidebar_min), theme.px(size::sidebar)),
                                 .height = CLAY_SIZING_GROW()},
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::panel,

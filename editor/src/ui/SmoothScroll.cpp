@@ -45,7 +45,7 @@ void SmoothScroll::update(float wheel, float notch, float delta_time) {
 
 Clay_ClipElementConfig scroll_clip(SmoothScroll& scroll, Clay_ElementId id) {
     scroll.add(id);
-    return {.horizontal = false, .vertical = true, .childOffset = Clay_GetScrollOffset()};
+    return {.horizontal = true, .vertical = true, .childOffset = Clay_GetScrollOffset()};
 }
 
 } // namespace editor

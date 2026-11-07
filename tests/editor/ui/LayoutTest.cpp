@@ -68,3 +68,35 @@ TEST_P(LayoutAtScale, PanelsScaleAndTheViewportKeepsTheRest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Layout, LayoutAtScale, testing::Values(1.F, 1.5F, 2.F));
+
+TEST_F(Layout, ShortWindowKeepsTheConsoleAndTheStatusBarVisible) {
+    _editor.handle(editor::command::Select{.id = id_of(_editor.session(), "ship")});
+    const Clay_Dimensions size{.width = 1440.F, .height = 300.F};
+    frame({}, {}, size);
+    frame({}, {}, size);
+
+    const Clay_BoundingBox status = box_of(CLAY_ID("StatusBar"));
+    EXPECT_LE(status.y + status.height, size.height + 0.5F);
+    EXPECT_GE(box_of(CLAY_ID("BottomPanel")).height, 60.F);
+}
+
+TEST_F(Layout, InspectorScrollsWhenItsFieldsDoNotFit) {
+    _editor.handle(editor::command::Select{.id = id_of(_editor.session(), "ship")});
+    const Clay_Dimensions size{.width = 1440.F, .height = 300.F};
+    frame({}, {}, size);
+    frame({}, {}, size);
+
+    const Clay_ScrollContainerData body = Clay_GetScrollContainerData(CLAY_ID("InspectorBody"));
+    ASSERT_TRUE(body.found);
+    EXPECT_GT(body.contentDimensions.height, body.scrollContainerDimensions.height);
+}
+
+TEST_F(Layout, SelectionAndDebugViewStayWithinClayLimits) {
+    _editor.handle(editor::command::Select{.id = id_of(_editor.session(), "ship")});
+    Clay_SetDebugModeEnabled(true);
+    frame();
+    frame();
+    Clay_SetDebugModeEnabled(false);
+
+    EXPECT_TRUE(_clay.errors().empty());
+}
