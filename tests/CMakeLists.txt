@@ -273,6 +273,8 @@ editor_add_test(core
         editor/ui/widgets/DropdownTest.cpp
         editor/ui/widgets/NumberFieldTest.cpp
         editor/ui/widgets/TextFieldTest.cpp
+        editor/viewport/SnapTest.cpp
+        editor/viewport/ViewCameraTest.cpp
     LINKS editor-core
 )
 
