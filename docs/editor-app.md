@@ -55,6 +55,7 @@ show as a crossed outline so they can still be selected. Textures load from
 | Middle drag, or drag with the Pan tool (H) | Pan |
 | Wheel | Zoom around the cursor (0.1x to 10x) |
 | Drag a prefab from PREFABS into the viewport | Place it under the cursor, snapped (`Place`) |
+| Click a prefab, then click in the viewport | Same; the prefab stays highlighted until placed, Esc or a click elsewhere cancels |
 | Drag the square handle of the selection | Scale it (`SetField` on `Scale.x`, `Scale.y`) |
 | Drag the round handle of the selection | Rotate it, by 15° steps with snap on (`SetField` on `Rotation.degrees`) |
 | Delete | Delete the selection |
@@ -66,7 +67,7 @@ Handles only appear when the entity has the component they edit (`Scale`,
 |---|---|
 | Camera frame (always) | What the game shows at start: the view of the first instance with a `Camera`, or the 1920x1080 game screen from the origin |
 | Names (toolbar) | Each instance's name, or its type, above it |
-| Hitboxes (toolbar) | `AABBCollider` and `CircleCollider` outlines |
+| Hitboxes (toolbar) | `AABBCollider` and `CircleCollider` outlines, where the physics puts them: Position plus the offset is the center of the box or circle |
 
 With snap on, a dragged instance's top-left corner lands on the grid. Grid
 lines are drawn unless they would be closer than 6 px on screen; the world
