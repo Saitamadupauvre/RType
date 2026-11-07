@@ -118,7 +118,7 @@ public:
 class FakeInput final : public engine::graphics::IInput {
 public:
     [[nodiscard]] bool is_key_down(Key key) const override { return held.contains(key); }
-    [[nodiscard]] bool is_key_pressed(Key) const override { return false; }
+    [[nodiscard]] bool is_key_pressed(Key key) const override { return pressed.contains(key); }
     [[nodiscard]] bool is_key_released(Key) const override { return false; }
     [[nodiscard]] Key last_key_pressed() override { return Key::Unknown; }
     [[nodiscard]] Vec2 mouse_position() const override { return {}; }
@@ -127,6 +127,7 @@ public:
     [[nodiscard]] bool is_mouse_released(MouseButton) const override { return false; }
 
     std::set<Key> held;
+    std::set<Key> pressed;
 };
 
 class FakeAudio final : public engine::audio::IAudio {
@@ -584,4 +585,73 @@ TEST_F(ClientAppTest, DisabledMetricsRecordNothing) {
     play(session_frames);
 
     EXPECT_TRUE(_client.metrics().names().empty());
+}
+
+TEST_F(ClientAppTest, TheMetricsOverlayIsHiddenAndDrawsNothingByDefault) {
+    start_client();
+    play(session_frames);
+    const auto hidden_calls = _renderer.calls;
+
+    EXPECT_FALSE(_client.metrics_overlay_shown());
+    EXPECT_FALSE(std::ranges::any_of(
+        _renderer.texts, [](const std::string& text) { return text.starts_with("FPS"); }));
+    _client.show_metrics_overlay(true);
+    play(1);
+    EXPECT_GT(_renderer.calls.size(), hidden_calls.size());
+}
+
+TEST_F(ClientAppTest, F3TogglesTheMetricsOverlay) {
+    start_client();
+    play(session_frames);
+
+    _input.pressed = {Key::F3};
+    play(1);
+    _input.pressed.clear();
+    play(1);
+
+    EXPECT_TRUE(_client.metrics_overlay_shown());
+    ASSERT_FALSE(_renderer.texts.empty());
+    EXPECT_TRUE(_renderer.texts.front().starts_with("FPS"));
+    EXPECT_FALSE(_renderer.texts_in_world.front());
+
+    _input.pressed = {Key::F3};
+    play(1);
+
+    EXPECT_FALSE(_client.metrics_overlay_shown());
+    EXPECT_TRUE(_renderer.texts.empty());
+}
+
+TEST_F(ClientAppTest, TheMetricsOverlayIsDrawnOverTheGame) {
+    start_client();
+    _client.show_metrics_overlay(true);
+
+    play(session_frames);
+
+    const auto& calls = _renderer.calls;
+    const auto overlay = std::ranges::find_if(
+        calls, [](const std::string& call) { return call.starts_with("text FPS"); });
+    ASSERT_NE(overlay, calls.end());
+    EXPECT_EQ(std::find(overlay, calls.end(), std::string("sprite")), calls.end());
+    EXPECT_EQ(_renderer.sprites.size(), 1U);
+}
+
+TEST_F(ClientAppTest, TheMetricsOverlayShowsTheServerOfTheSameProcess) {
+    _client.show_server_metrics(&_server.metrics());
+    _client.show_metrics_overlay(true);
+    start_client();
+
+    play(session_frames);
+
+    EXPECT_TRUE(std::ranges::any_of(
+        _renderer.texts, [](const std::string& text) { return text.starts_with("Server tick"); }));
+}
+
+TEST_F(ClientAppTest, TheMetricsOverlayIsAlsoDrawnWhileLoading) {
+    _client.show_metrics_overlay(true);
+    start_client();
+
+    _client.frame();
+
+    EXPECT_TRUE(std::ranges::any_of(
+        _renderer.texts, [](const std::string& text) { return text.starts_with("FPS"); }));
 }

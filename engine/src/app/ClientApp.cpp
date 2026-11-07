@@ -27,6 +27,7 @@
 #include "render/CameraRig.hpp"
 #include "render/HudDraw.hpp"
 #include "render/LoadingScreen.hpp"
+#include "render/MetricsOverlay.hpp"
 #include "render/SnapshotView.hpp"
 #include "render/WorldDraw.hpp"
 #include "simulation/PhysicsStep.hpp"
@@ -91,6 +92,8 @@ struct ClientApp::Impl {
     core::metrics::ProcessMonitor process;
     std::optional<core::time::Duration> previous_frame_at;
     std::optional<std::uint32_t> previous_server_tick;
+    const core::metrics::Metrics* server_metrics{nullptr};
+    bool overlay_shown{false};
     bool preload_queued{false};
     bool started{false};
 
@@ -110,6 +113,7 @@ private:
     void draw_world(const std::vector<network::EntitySnapshot>& entities);
     void update_camera(const std::vector<network::EntitySnapshot>& entities);
     void measure_frame_interval();
+    void toggle_overlay();
     void publish_network_gauges();
 };
 
@@ -156,6 +160,7 @@ bool ClientApp::Impl::start(std::string& error) {
 
 void ClientApp::Impl::frame() {
     measure_frame_interval();
+    toggle_overlay();
     {
         const core::metrics::ScopedTimer timer(metrics, "network.update");
         network.update();
@@ -174,6 +179,12 @@ void ClientApp::Impl::frame() {
     publish_network_gauges();
     process.update();
     metrics.end_frame();
+}
+
+void ClientApp::Impl::toggle_overlay() {
+    if (input.get().is_key_pressed(core::Key::F3)) {
+        overlay_shown = !overlay_shown;
+    }
 }
 
 void ClientApp::Impl::measure_frame_interval() {
@@ -268,6 +279,9 @@ void ClientApp::Impl::draw(const std::vector<network::EntitySnapshot>& entities,
     } else {
         draw_loading_screen(renderer.get(), preloader.loaded(), preloader.total());
     }
+    if (overlay_shown) {
+        draw_metrics_overlay(renderer.get(), {.client = metrics, .server = server_metrics});
+    }
     renderer.get().end_frame();
 }
 
@@ -321,5 +335,13 @@ script::ScriptRuntime& ClientApp::script() noexcept { return _impl->runtime; }
 script::ClientApi& ClientApp::script_client() noexcept { return _impl->client; }
 
 core::metrics::Metrics& ClientApp::metrics() noexcept { return _impl->metrics; }
+
+void ClientApp::show_metrics_overlay(bool shown) noexcept { _impl->overlay_shown = shown; }
+
+bool ClientApp::metrics_overlay_shown() const noexcept { return _impl->overlay_shown; }
+
+void ClientApp::show_server_metrics(const core::metrics::Metrics* server) noexcept {
+    _impl->server_metrics = server;
+}
 
 } // namespace engine::app

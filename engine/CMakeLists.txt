@@ -153,6 +153,7 @@ engine_add_module(app
         src/app/render/HudDraw.cpp
         src/app/Launch.cpp
         src/app/render/LoadingScreen.cpp
+        src/app/render/MetricsOverlay.cpp
         src/app/simulation/PhysicsStep.cpp
         src/app/ServerApp.cpp
         src/app/assets/ShaderLibrary.cpp

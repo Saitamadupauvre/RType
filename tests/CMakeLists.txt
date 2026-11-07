@@ -136,6 +136,7 @@ engine_add_test(app SOURCES
     engine/app/ClientAppTest.cpp
     engine/app/render/HudDrawTest.cpp
     engine/app/render/LoadingScreenTest.cpp
+    engine/app/render/MetricsOverlayTest.cpp
     engine/app/ServerAppTest.cpp
     engine/app/assets/ShaderLibraryTest.cpp
     engine/app/render/SnapshotViewTest.cpp
