@@ -234,6 +234,9 @@ Each row has GoogleTest coverage under `tests/engine/network/` and
 loss (sequence gaps), reordering and the latest round-trip time.
 `NetworkServer::stats()` (per player) and `NetworkClient::stats()` expose it,
 and both log a summary every 10 seconds.
+`NetworkServer::last_snapshot_bytes()` gives the size of the latest snapshot,
+headers included, counted once whatever the number of players. `ServerApp`
+and `ClientApp` publish these values as [metrics](engine.md#metrics).
 
 ## Known limits
 

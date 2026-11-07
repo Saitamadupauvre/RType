@@ -2,7 +2,9 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -16,6 +18,8 @@
 #include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/core/log/Log.hpp"
+#include "engine/core/metrics/Metrics.hpp"
+#include "engine/core/metrics/ProcessUsage.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/graphics/InputCapture.hpp"
 #include "engine/network/Events.hpp"
@@ -83,6 +87,10 @@ struct ClientApp::Impl {
     core::time::Duration started_at;
     core::time::FixedStepLoop loop;
     AssetPreloader preloader;
+    core::metrics::Metrics metrics;
+    core::metrics::ProcessMonitor process;
+    std::optional<core::time::Duration> previous_frame_at;
+    std::optional<std::uint32_t> previous_server_tick;
     bool preload_queued{false};
     bool started{false};
 
@@ -101,6 +109,8 @@ private:
     void draw(const std::vector<network::EntitySnapshot>& entities, bool playing);
     void draw_world(const std::vector<network::EntitySnapshot>& entities);
     void update_camera(const std::vector<network::EntitySnapshot>& entities);
+    void measure_frame_interval();
+    void publish_network_gauges();
 };
 
 ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport& transport,
@@ -112,7 +122,7 @@ ClientApp::Impl::Impl(const core::time::IClock& clock, network::ClientTransport&
       local_physics(local, events, runtime), sound(speakers, options.assets),
       textures(window, options.assets), shaders(window, options.assets),
       world_draw(window, textures, shaders), hud_draw(window, textures), view(fields),
-      time_source(clock), started_at(clock.now()), loop(clock) {
+      time_source(clock), started_at(clock.now()), loop(clock), metrics(clock), process(metrics) {
     client.set_audio_settings(options.audio);
     events.subscribe<network::SoundPlayed>([this](const network::SoundPlayed& played) {
         sound.play_sound(network.strings(), played.sound_id);
@@ -145,7 +155,11 @@ bool ClientApp::Impl::start(std::string& error) {
 }
 
 void ClientApp::Impl::frame() {
-    network.update();
+    measure_frame_interval();
+    {
+        const core::metrics::ScopedTimer timer(metrics, "network.update");
+        network.update();
+    }
     audio.get().update();
     const bool playing = assets_ready();
     const auto entities = network.entities();
@@ -153,7 +167,49 @@ void ClientApp::Impl::frame() {
         run_ticks(entities);
     }
     sound.apply(client.audio_settings());
-    draw(entities, playing);
+    {
+        const core::metrics::ScopedTimer timer(metrics, "draw");
+        draw(entities, playing);
+    }
+    publish_network_gauges();
+    process.update();
+    metrics.end_frame();
+}
+
+void ClientApp::Impl::measure_frame_interval() {
+    if (!metrics.enabled()) {
+        previous_frame_at.reset();
+        return;
+    }
+    const core::time::Duration now = time_source.get().now();
+    if (previous_frame_at && now > *previous_frame_at) {
+        const core::time::Duration interval = now - *previous_frame_at;
+        metrics.record_time("frame", interval);
+        metrics.set_gauge("fps", 1.0 / std::chrono::duration<double>(interval).count());
+    }
+    previous_frame_at = now;
+}
+
+void ClientApp::Impl::publish_network_gauges() {
+    if (!metrics.enabled()) {
+        return;
+    }
+    const network::NetworkStats stats = network.stats();
+    if (stats.round_trip_time) {
+        metrics.set_gauge(
+            "network.rtt",
+            std::chrono::duration<double, std::milli>(*stats.round_trip_time).count());
+    }
+    metrics.set_gauge("network.packets_lost", static_cast<double>(stats.packets_lost));
+    metrics.set_gauge("network.packets_in", static_cast<double>(stats.packets_received_per_second));
+    metrics.set_gauge("network.packets_out", static_cast<double>(stats.packets_sent_per_second));
+    metrics.set_gauge("network.bytes_in", static_cast<double>(stats.bytes_received_per_second));
+    metrics.set_gauge("network.bytes_out", static_cast<double>(stats.bytes_sent_per_second));
+    const auto server_tick = network.server_tick();
+    if (server_tick && server_tick != previous_server_tick) {
+        metrics.count("network.snapshots");
+    }
+    previous_server_tick = server_tick;
 }
 
 bool ClientApp::Impl::assets_ready() {
@@ -191,9 +247,15 @@ void ClientApp::Impl::run_ticks(const std::vector<network::EntitySnapshot>& enti
     loop.run_frame([&](core::time::Duration step) {
         const float dt = std::chrono::duration<float>(step).count();
         client.set_input(held);
-        runtime.update(dt);
-        local_physics.step(dt);
-        runtime.flush_destroyed();
+        {
+            const core::metrics::ScopedTimer timer(metrics, "lua.update");
+            runtime.update(dt);
+        }
+        {
+            const core::metrics::ScopedTimer timer(metrics, "physics");
+            local_physics.step(dt);
+            runtime.flush_destroyed();
+        }
         network.send_input(held);
     });
 }
@@ -213,6 +275,7 @@ void ClientApp::Impl::draw_world(const std::vector<network::EntitySnapshot>& ent
     const core::Vec2 viewport = renderer.get().virtual_size();
     const core::CameraView camera = resolve_camera(entities, client.camera_override(), viewport);
     client.set_camera_view(camera, viewport);
+    metrics.set_gauge("entities", static_cast<double>(entities.size()));
     renderer.get().begin_world(camera);
     world_draw.draw({std::ref(view.mirror(entities)), std::ref(local)},
                     std::chrono::duration<float>(time_source.get().now() - started_at).count());
@@ -256,5 +319,7 @@ network::NetworkClient& ClientApp::network() noexcept { return _impl->network; }
 script::ScriptRuntime& ClientApp::script() noexcept { return _impl->runtime; }
 
 script::ClientApi& ClientApp::script_client() noexcept { return _impl->client; }
+
+core::metrics::Metrics& ClientApp::metrics() noexcept { return _impl->metrics; }
 
 } // namespace engine::app

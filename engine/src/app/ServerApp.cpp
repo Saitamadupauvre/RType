@@ -17,6 +17,8 @@
 #include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/log/Log.hpp"
 #include "engine/core/math/Camera.hpp"
+#include "engine/core/metrics/Metrics.hpp"
+#include "engine/core/metrics/ProcessUsage.hpp"
 #include "engine/core/time/FixedStepLoop.hpp"
 #include "engine/network/Events.hpp"
 #include "engine/network/Replicated.hpp"
@@ -103,11 +105,15 @@ struct ServerApp::Impl {
     network::NetworkServer network;
     PhysicsStep physics;
     core::time::FixedStepLoop loop;
+    core::metrics::Metrics metrics;
+    core::metrics::ProcessMonitor process;
 
     Impl(const core::time::IClock& clock, network::ServerTransport& transport,
          const ServerAppOptions& options);
 
     void tick(core::time::Duration step);
+    void simulate(float dt);
+    void publish_gauges();
     void apply_inputs();
     void replicate();
     void publish_audio();
@@ -120,7 +126,7 @@ ServerApp::Impl::Impl(const core::time::IClock& clock, network::ServerTransport&
       strings(strings_of(runtime)), fields(replicated_fields()),
       network(clock, events, fields, transport,
               network::ServerOptions{.max_players = options.max_players, .strings = strings}),
-      physics(world, events, runtime), loop(clock) {
+      physics(world, events, runtime), loop(clock), metrics(clock), process(metrics) {
     register_if_missing<network::Replicated>(world);
     events.subscribe<network::PlayerJoined>(
         [this](const network::PlayerJoined& joined) { server.player_joined(joined.player_id); });
@@ -129,19 +135,50 @@ ServerApp::Impl::Impl(const core::time::IClock& clock, network::ServerTransport&
 }
 
 void ServerApp::Impl::tick(core::time::Duration step) {
-    const float dt = std::chrono::duration<float>(step).count();
-    network.receive();
-    apply_inputs();
-    runtime.update(dt);
-    physics.step(dt);
-    runtime.flush_destroyed();
+    {
+        const core::metrics::ScopedTimer timer(metrics, "tick");
+        simulate(std::chrono::duration<float>(step).count());
+    }
+    publish_gauges();
+    metrics.end_frame();
+}
+
+void ServerApp::Impl::simulate(float dt) {
+    {
+        const core::metrics::ScopedTimer timer(metrics, "network.receive");
+        network.receive();
+        apply_inputs();
+    }
+    {
+        const core::metrics::ScopedTimer timer(metrics, "lua.update");
+        runtime.update(dt);
+    }
+    {
+        const core::metrics::ScopedTimer timer(metrics, "physics");
+        physics.step(dt);
+        runtime.flush_destroyed();
+    }
     runtime.flush_scene();
-    systems.run(world, dt);
-    follow_cameras(world);
+    {
+        const core::metrics::ScopedTimer timer(metrics, "systems");
+        systems.run(world, dt);
+        follow_cameras(world);
+    }
+    const core::metrics::ScopedTimer timer(metrics, "network.send");
     replicate();
     publish_audio();
     publish_events();
     network.send_snapshot(world);
+}
+
+void ServerApp::Impl::publish_gauges() {
+    if (!metrics.enabled()) {
+        return;
+    }
+    metrics.set_gauge("entities", static_cast<double>(world.size()));
+    metrics.set_gauge("players", static_cast<double>(network.player_count()));
+    metrics.set_gauge("snapshot.bytes", static_cast<double>(network.last_snapshot_bytes()));
+    process.update();
 }
 
 void ServerApp::Impl::apply_inputs() {
@@ -247,5 +284,7 @@ script::ScriptRuntime& ServerApp::script() noexcept { return _impl->runtime; }
 script::ServerApi& ServerApp::script_server() noexcept { return _impl->server; }
 
 const network::StringTable& ServerApp::strings() const noexcept { return _impl->strings; }
+
+core::metrics::Metrics& ServerApp::metrics() noexcept { return _impl->metrics; }
 
 } // namespace engine::app

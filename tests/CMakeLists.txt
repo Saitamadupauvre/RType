@@ -24,6 +24,8 @@ engine_add_test(core SOURCES
     engine/core/event/EventBusTest.cpp
     engine/core/log/LogTest.cpp
     engine/core/log/MemorySinkTest.cpp
+    engine/core/metrics/MetricsTest.cpp
+    engine/core/metrics/ProcessUsageTest.cpp
     engine/core/NonCopyableNonMovableTest.cpp
     engine/core/time/ManualClockTest.cpp
     engine/core/time/FixedStepLoopTest.cpp

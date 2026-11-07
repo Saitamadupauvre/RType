@@ -10,6 +10,7 @@
 #include "engine/core/ecs/EntityManager.hpp"
 #include "engine/core/ecs/SystemScheduler.hpp"
 #include "engine/core/event/EventBus.hpp"
+#include "engine/core/metrics/Metrics.hpp"
 #include "engine/core/time/IClock.hpp"
 #include "engine/network/Server.hpp"
 #include "engine/network/StringTable.hpp"
@@ -110,6 +111,16 @@ public:
     [[nodiscard]] script::ServerApi& script_server() noexcept;
     /** @return The names sent to clients when they connect. */
     [[nodiscard]] const network::StringTable& strings() const noexcept;
+    /**
+     * @return The timings of every tick: one frame per tick.
+     *
+     * Timers (ms): `tick`, `network.receive` (packets and inputs), `lua.update`, `physics`
+     * (movement, collisions and their script callbacks, destroyed entities), `systems`,
+     * `network.send` (replication, audio, events and snapshot). Gauges: `entities`, `players`,
+     * `snapshot.bytes`, `process.cpu` (% of one core) and `process.memory` (MiB).
+     * @note Unlike the rest of this class, the returned object may be read from any thread.
+     */
+    [[nodiscard]] core::metrics::Metrics& metrics() noexcept;
 
 private:
     struct Impl;

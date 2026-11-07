@@ -68,6 +68,9 @@ public:
      */
     [[nodiscard]] ENGINE_CORE_EXPORT bool alive(Entity entity) const noexcept;
 
+    /** @return The number of living entities. */
+    [[nodiscard]] ENGINE_CORE_EXPORT std::size_t size() const noexcept;
+
     /**
      * @brief Makes a component type usable in this manager.
      * @tparam T Component type.

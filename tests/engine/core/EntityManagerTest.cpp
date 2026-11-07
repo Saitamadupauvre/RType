@@ -48,6 +48,19 @@ TEST(EntityManager, SpawnsDistinctLivingEntities) {
     EXPECT_TRUE(manager.alive(second));
 }
 
+TEST(EntityManager, SizeCountsOnlyLivingEntities) {
+    EntityManager manager;
+    EXPECT_EQ(manager.size(), 0U);
+    const Entity first = manager.spawn();
+    manager.spawn();
+    EXPECT_EQ(manager.size(), 2U);
+
+    manager.kill(first);
+    manager.kill(first);
+
+    EXPECT_EQ(manager.size(), 1U);
+}
+
 TEST(EntityManager, KillRemovesAllComponents) {
     EntityManager manager = make_manager();
     const Entity entity = manager.spawn();

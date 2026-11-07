@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <set>
 #include <string>
@@ -21,6 +22,7 @@
 #include "PayloadSamples.hpp"
 #include "TestFields.hpp"
 #include "protocol/Messages.hpp"
+#include "stats/TrafficMeter.hpp"
 #include "transport/Link.hpp"
 #include "transport/LoopbackLinks.hpp"
 
@@ -361,4 +363,40 @@ TEST(NetworkServerPeers, ForgetsAPlayerOnceItsSessionEnds) {
 
     EXPECT_EQ(server.player_count(), 0U);
     EXPECT_EQ(transport.spy.forgotten, std::vector<PeerId>{PeerId{1}});
+}
+
+TEST_F(NetworkServerTest, LastSnapshotBytesIsZeroWhileNobodyIsConnected) {
+    EntityManager registry;
+    registry.register_component<Replicated>();
+    registry.add(registry.spawn(), Replicated{.type_id = 1});
+    ASSERT_TRUE(loopback.start());
+
+    EXPECT_EQ(server.last_snapshot_bytes(), 0U);
+    server.send_snapshot(registry);
+    EXPECT_EQ(server.last_snapshot_bytes(), 0U);
+}
+
+TEST_F(NetworkServerTest, LastSnapshotBytesCountsOneCopyOfTheSnapshot) {
+    EntityManager registry;
+    registry.register_component<Replicated>();
+    registry.register_component<Position>();
+    const auto entity = registry.spawn();
+    registry.add(entity, Replicated{.type_id = 1});
+    registry.add(entity, Position{3.0F, 4.0F});
+    ASSERT_TRUE(loopback.start());
+    auto& first = loopback.join();
+    auto& second = loopback.join();
+    static_cast<void>(messages(first));
+    static_cast<void>(messages(second));
+
+    server.send_snapshot(registry);
+
+    std::size_t snapshot_bytes = 0;
+    for (const auto& message : messages(first)) {
+        if (std::holds_alternative<SnapshotPayload>(message)) {
+            snapshot_bytes += engine::network::datagram_size(message);
+        }
+    }
+    EXPECT_GT(snapshot_bytes, 0U);
+    EXPECT_EQ(server.last_snapshot_bytes(), snapshot_bytes);
 }

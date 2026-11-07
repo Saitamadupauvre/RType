@@ -32,6 +32,7 @@ The foundation every other module builds on.
 | Events | `event/EventBus.hpp` | Typed publish/subscribe; a `Subscription` unsubscribes when destroyed |
 | Time | `time/IClock.hpp`, `SteadyClock.hpp`, `ManualClock.hpp`, `FixedStepLoop.hpp` | Fixed-step loop (60 Hz by default) over an injectable clock, so tests control time |
 | Logging | `log/Log.hpp`, `log/Sink.hpp`, `log/MemorySink.hpp` | `log::debug/info/warn/error` with `std::format` syntax; `MemorySink` captures logs in tests |
+| Metrics | `metrics/Metrics.hpp`, `metrics/ProcessUsage.hpp` | Timers, counters and gauges with one sample per frame in a fixed-size history; `ScopedTimer`; process CPU and memory. See [Metrics](#metrics) |
 | Plugins | `DynamicLibrary.hpp` | RAII wrapper over `dlopen` / `LoadLibrary` |
 
 Component types are identified by stable names registered in a `.cpp` of
@@ -233,6 +234,88 @@ edits with undo and redo, and runs the scene commands; every command returns a
 `ScriptRuntime::preview_instances()`, which builds prototypes only, so no Lua
 callback runs. See [Editor backend](editor.md). Tested in
 `tests/engine/editor/` with the fixture game `tests/fixtures/editor/game/`.
+
+## Metrics
+
+`engine::core::metrics::Metrics` measures where time goes. `ServerApp` and
+`ClientApp` each own one, returned by `metrics()`, for the metrics overlay and
+the developer console to read.
+
+```cpp
+using namespace engine::core::metrics;
+
+Metrics metrics(clock);
+{
+    const ScopedTimer timer(metrics, "lua.update");
+    runtime.update(dt);
+}
+metrics.count("network.snapshots");
+metrics.set_gauge("entities", 42);
+metrics.end_frame();
+
+const auto lua = metrics.summary("lua.update");
+const std::vector<double> frame_times = metrics.history("frame");
+```
+
+| Kind | Written with | Sample of a frame |
+|---|---|---|
+| timer | `record_time(name, duration)`, `ScopedTimer` | Sum of the durations of the frame, in milliseconds; 0 if none |
+| counter | `count(name, amount = 1)` | Sum of the amounts of the frame; 0 if none |
+| gauge | `set_gauge(name, value)` | Last value set, kept until set again |
+
+- `end_frame()` adds one sample to every known metric. The latest `capacity`
+  samples (120 by default, 2 s at 60 Hz) are kept in a ring buffer.
+- `summary(name)` gives `last`, `average`, `max` and the sample count, and
+  `history(name)` gives the samples from oldest to newest (for a graph).
+  `names()` lists every metric.
+- A metric keeps the kind of its first write. A write of another kind, an
+  empty name or a non-finite value is dropped and logged once per name.
+- Thread safe. In host mode the client thread can read the server's metrics
+  while the server thread writes them.
+- `set_enabled(false)` makes every write and `end_frame()` return at once,
+  without locking. A `ScopedTimer` then does not read the clock. The history
+  already recorded is kept.
+- The clock is injected, so with a `ManualClock` tests control every duration.
+- `ProcessMonitor` samples the process at most every 500 ms (with
+  `sample_process()` or an injected sampler). It publishes `process.cpu`, in
+  percent of one core, and `process.memory`, in MiB.
+
+### ServerApp metrics
+
+One frame per tick.
+
+| Name | Kind | What |
+|---|---|---|
+| `tick` | timer | Whole tick |
+| `network.receive` | timer | Packets received and inputs handed to the scripts |
+| `lua.update` | timer | `update(dt)` of the scripts |
+| `physics` | timer | Movement, collisions and their script callbacks, destroyed entities |
+| `systems` | timer | Native systems and camera follow |
+| `network.send` | timer | Replication, audio, events and snapshot |
+| `entities` | gauge | Living entities |
+| `players` | gauge | Connected players |
+| `snapshot.bytes` | gauge | Bytes of the latest snapshot, sent once to every player |
+| `process.cpu`, `process.memory` | gauge | CPU (% of one core) and resident memory (MiB) |
+
+### ClientApp metrics
+
+One frame per call to `frame()`.
+
+| Name | Kind | What |
+|---|---|---|
+| `frame` | timer | Time since the previous frame (frame time) |
+| `fps` | gauge | `1 / frame` |
+| `network.update` | timer | Network read and write of the frame |
+| `lua.update` | timer | `update(dt)` of the scripts, every tick of the frame |
+| `physics` | timer | Movement of the local entities and destroyed entities, every tick of the frame |
+| `draw` | timer | Loading screen or world drawing |
+| `entities` | gauge | Entities of the latest snapshot |
+| `network.snapshots` | counter | 1 on a frame showing a newer snapshot |
+| `network.rtt` | gauge | Round-trip time in ms, once the server answered a heartbeat |
+| `network.packets_lost` | gauge | Packets lost since connecting |
+| `network.packets_in`, `network.packets_out` | gauge | Packets per second |
+| `network.bytes_in`, `network.bytes_out` | gauge | Bytes per second |
+| `process.cpu`, `process.memory` | gauge | CPU (% of one core) and resident memory (MiB) |
 
 ## The contract
 
