@@ -42,6 +42,8 @@ void Editor::attach_launcher(std::unique_ptr<GameLauncher> launcher) {
     _play.attach(std::move(launcher));
 }
 
+void Editor::attach_file_opener(FileOpener opener) { _open_file = std::move(opener); }
+
 void Editor::update() {
     for (ConsoleLine& line : _play.update(_state.mode)) {
         _state.console.push_back(std::move(line));
@@ -72,7 +74,7 @@ CommandResult Editor::apply(const Command& command) {
     if (_state.mode != Mode::editing && !allowed_while_running(command)) {
         return stop_first();
     }
-    CommandResult result = apply_command(_session, _state, _play, command);
+    CommandResult result = apply_command(_session, _state, {.play = _play, .open_file = _open_file}, command);
     refresh_lists();
     return result;
 }

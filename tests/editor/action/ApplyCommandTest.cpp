@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <limits>
 #include <optional>
+#include <string>
+#include <vector>
 
 #include "../GameFixture.hpp"
 #include "../play/FakeLauncher.hpp"
@@ -29,6 +32,11 @@ protected:
     EditorSession _session = open_level();
     EditorState _state;
     editor::PlaySession _play{_game.path() / ".scratch"};
+    std::vector<std::filesystem::path> _opened;
+    editor::FileOpener _open_file = [this](const std::filesystem::path& file) {
+        _opened.push_back(file);
+        return file.filename() != "locked.lua";
+    };
     InstanceId _rock = id_of(_session, "rock");
 
     void SetUp() override {
@@ -36,7 +44,8 @@ protected:
     }
 
     bool run(const editor::Command& command) {
-        return apply_command(_session, _state, _play, command).ok;
+        return apply_command(_session, _state, {.play = _play, .open_file = _open_file}, command)
+            .ok;
     }
 
     void move_rock() {
@@ -171,8 +180,27 @@ TEST_F(ApplyCommand, PrefabFilterChangesTheState) {
 }
 
 TEST_F(ApplyCommand, InvalidInputIsRefusedWithItsMessage) {
-    const auto result =
-        apply_command(_session, _state, _play, command::ReportInvalidInput{.message = "bad"});
+    const auto result = apply_command(_session, _state, {.play = _play, .open_file = _open_file},
+                                      command::ReportInvalidInput{.message = "bad"});
     EXPECT_FALSE(result.ok);
     EXPECT_EQ(result.message, "bad");
+}
+
+TEST_F(ApplyCommand, OpenScriptOpensTheFile) {
+    ASSERT_TRUE(run(command::OpenScript{.file = "/game/scripts/rock.lua"}));
+    EXPECT_EQ(_opened, (std::vector<std::filesystem::path>{"/game/scripts/rock.lua"}));
+}
+
+TEST_F(ApplyCommand, OpenScriptFailureIsReported) {
+    const auto result = apply_command(_session, _state, {.play = _play, .open_file = _open_file},
+                                      command::OpenScript{.file = "/game/scripts/locked.lua"});
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.message.find("locked.lua"), std::string::npos);
+}
+
+TEST_F(ApplyCommand, OpenScriptWithoutAnOpenerIsRefused) {
+    const editor::FileOpener none;
+    EXPECT_FALSE(apply_command(_session, _state, {.play = _play, .open_file = none},
+                               command::OpenScript{.file = "/game/scripts/rock.lua"})
+                     .ok);
 }

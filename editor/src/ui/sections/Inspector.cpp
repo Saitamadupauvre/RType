@@ -6,7 +6,10 @@
 #include <format>
 #include <utility>
 #include <string>
+#include <algorithm>
 #include <cstddef>
+#include <vector>
+#include <filesystem>
 #include <optional>
 #include <string_view>
 
@@ -17,6 +20,7 @@
 #include "ui/sections/InspectorFields.hpp"
 #include "ui/sections/PanelHeader.hpp"
 #include "ui/widgets/Button.hpp"
+#include "ui/widgets/Dropdown.hpp"
 #include "ui/widgets/ListRow.hpp"
 #include "ui/widgets/NumberField.hpp"
 #include "ui/widgets/TextField.hpp"
@@ -83,11 +87,43 @@ void position_row(Ui& ui, engine::core::Vec2 position, InstanceId id) {
     });
 }
 
-void instance_rows(Ui& ui, const engine::script::Instance& instance, InstanceId id) {
-    name_row(ui, instance, id);
+void type_row(Ui& ui, const Editor& editor, const engine::script::Instance& instance,
+              InstanceId id) {
+    const std::vector<std::string>& prefabs = editor.state().prefabs;
+    const auto current = std::ranges::find(prefabs, instance.type);
     row(ui, CLAY_STRING("Type"), [&] {
-        text(ui.theme(), view_of(instance.type), size::text, color::text_soft);
+        if (current == prefabs.end()) {
+            text(ui.theme(), view_of(instance.type), size::text, color::text_soft);
+            return;
+        }
+        const std::vector<std::string_view> options(prefabs.begin(), prefabs.end());
+        const auto picked = dropdown(ui, CLAY_ID("InspectorType"),
+                                     static_cast<std::size_t>(current - prefabs.begin()), options);
+        if (picked && prefabs[*picked] != instance.type) {
+            ui.emit(edit::ChangeType{.id = id, .type = prefabs[*picked]});
+        }
     });
+}
+
+void script_row(Ui& ui, const std::filesystem::path& script) {
+    if (script.empty()) {
+        return;
+    }
+    row(ui, CLAY_STRING("Script"), [&] {
+        CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()}}}) {
+            text(ui.theme(), ui.keep(script.filename().string()), size::text, color::text_soft);
+        }
+        if (button(ui, CLAY_ID("InspectorOpenScript"), CLAY_STRING("Open"),
+                   {.background = color::field, .foreground = color::text_soft})) {
+            ui.emit(command::OpenScript{.file = script});
+        }
+    });
+}
+
+void instance_rows(Ui& ui, const Editor& editor, const engine::script::Instance& instance,
+                   InstanceId id) {
+    name_row(ui, instance, id);
+    type_row(ui, editor, instance, id);
     position_row(ui, instance.position, id);
     if (instance.overrides.empty()) {
         return;
@@ -167,7 +203,8 @@ void inspector(Ui& ui, const Editor& editor) {
                          .layoutDirection = CLAY_TOP_TO_BOTTOM},
               .clip = scroll_clip(ui.widgets().scroll(), CLAY_ID("InspectorBody"))}) {
             if (model && selected) {
-                instance_rows(ui, selected->instance, model->id);
+                instance_rows(ui, editor, selected->instance, model->id);
+            script_row(ui, model->script);
                 field_rows(ui, *model);
             } else {
                 nothing_selected(theme);

@@ -301,3 +301,26 @@ TEST_F(Inspector, FocusedFieldShowsTheWholeValue) {
     }
     EXPECT_EQ(letters, 2 * std::ranges::ssize(name));
 }
+
+TEST_F(Inspector, PickingAnotherTypeEmitsChangeType) {
+    select("ship");
+    click(CLAY_ID("InspectorType"));
+    frame();
+    const auto actions = click(CLAY_IDI("DropdownOption", 0));
+
+    const auto* change = only_edit<edit::ChangeType>(actions);
+    ASSERT_NE(change, nullptr);
+    EXPECT_EQ(change->id, id_of(_editor.session(), "ship"));
+    EXPECT_EQ(change->type, "rock");
+}
+
+TEST_F(Inspector, ShowsTheScriptAndOpensIt) {
+    select("rock");
+    EXPECT_TRUE(shows("rock.lua"));
+
+    const auto actions = click(CLAY_ID("InspectorOpenScript"));
+
+    const auto* open = only<command::OpenScript>(actions);
+    ASSERT_NE(open, nullptr);
+    EXPECT_EQ(open->file, _game.path() / "scripts" / "rock.lua");
+}

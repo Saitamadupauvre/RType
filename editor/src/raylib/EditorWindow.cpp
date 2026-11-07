@@ -183,6 +183,10 @@ void run_frames(Editor& editor) {
 } // namespace
 
 bool run_editor_window(Editor& editor) {
+    editor.attach_file_opener([](const std::filesystem::path& file) {
+        OpenURL(file.string().c_str());
+        return true;
+    });
     SetConfigFlags(window_flags);
     InitWindow(initial_width, initial_height, "Editor");
     if (!IsWindowReady()) {

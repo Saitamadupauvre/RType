@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <variant>
@@ -56,6 +57,12 @@ struct ResetAll {
     InstanceId id;
 };
 
+/** @brief Turns an instance into another prefab, keeping the overrides the new one accepts. */
+struct ChangeType {
+    InstanceId id;
+    std::string type;
+};
+
 } // namespace edit
 
 /**
@@ -63,7 +70,7 @@ struct ResetAll {
  * Mode::editing.
  */
 using Edit = std::variant<edit::Place, edit::Move, edit::Remove, edit::Rename, edit::SetField,
-                          edit::ResetField, edit::ResetAll>;
+                          edit::ResetField, edit::ResetAll, edit::ChangeType>;
 
 enum class Overlay : std::uint8_t { hitboxes, names };
 enum class Tool : std::uint8_t { select, move, pan };
@@ -180,6 +187,12 @@ struct Play {
     static constexpr bool while_running = true;
 };
 
+/** @brief Opens a script file with the program the system uses for it. */
+struct OpenScript {
+    static constexpr bool while_running = true;
+    std::filesystem::path file;
+};
+
 /** @brief Pauses a playing game; refused otherwise. */
 struct Pause {
     static constexpr bool while_running = true;
@@ -198,7 +211,7 @@ using Command = std::variant<command::Select, command::Undo, command::Redo, comm
                              command::SetStartScene, command::SetSnap, command::SetGridSize,
                              command::SetOverlay, command::SetTool, command::ShowTab,
                              command::ReportInvalidInput, command::SetPrefabFilter,
-                             command::Play, command::Pause, command::Stop>;
+                             command::OpenScript, command::Play, command::Pause, command::Stop>;
 
 /** @brief What the UI emits; applied after the frame by Editor::handle(). */
 using Action = std::variant<Edit, Command>;

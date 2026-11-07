@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
+
 #include <algorithm>
 #include <cstdint>
 #include <iterator>
@@ -149,4 +151,11 @@ TEST_F(InspectorState, ClearsWhenTheSelectedInstanceIsRemoved) {
     _editor.handle(command::Select{.id = rock});
     _editor.handle(edit::Remove{.id = rock});
     EXPECT_FALSE(_editor.state().inspector.has_value());
+}
+
+TEST_F(InspectorModel, KnowsTheScriptOfThePrefab) {
+    const auto model = inspect("rock");
+    ASSERT_TRUE(model.has_value());
+    EXPECT_EQ(model->script.filename(), "rock.lua");
+    EXPECT_TRUE(std::filesystem::is_regular_file(model->script));
 }

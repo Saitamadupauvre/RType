@@ -94,3 +94,15 @@ TEST_F(ApplyEdit, UnknownInstanceIsRefused) {
     EXPECT_FALSE(apply_edit(_session, editor::edit::ResetAll{.id = unknown}).ok);
     EXPECT_FALSE(_session.unsaved());
 }
+
+TEST_F(ApplyEdit, ChangeTypeTurnsTheInstanceIntoAnotherPrefab) {
+    ASSERT_TRUE(apply_edit(_session, editor::edit::ChangeType{.id = _rock, .type = "ship"}).ok);
+
+    EXPECT_EQ(instance(_session, _rock).type, "ship");
+    EXPECT_TRUE(_session.can_undo());
+}
+
+TEST_F(ApplyEdit, ChangeTypeToAnUnknownPrefabIsRefused) {
+    EXPECT_FALSE(apply_edit(_session, editor::edit::ChangeType{.id = _rock, .type = "ghost"}).ok);
+    EXPECT_EQ(instance(_session, _rock).type, "rock");
+}
