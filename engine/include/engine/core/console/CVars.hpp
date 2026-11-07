@@ -29,8 +29,8 @@ struct CVarRange {
 struct CVarSpec {
     std::string name;
     CVarValue default_value;
-    std::string description;
-    std::optional<CVarRange> range;
+    std::string description{};
+    std::optional<CVarRange> range{};
 };
 
 /** @brief State of a registered console variable. */
