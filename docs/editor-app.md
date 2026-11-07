@@ -75,6 +75,32 @@ axes are brighter. The camera, the drag and the pan live in
 `WidgetState::viewport()`; the renderer paints the frame's `ViewportFrame`,
 passed through the Clay element's custom data.
 
+## Play
+
+Play runs the open scene in the game itself, in its own window, without
+leaving the editor:
+
+1. The scene document, unsaved changes included, is written to
+   `<temp>/engine-editor/played-scene.json`. The scene files of the game are
+   never touched, and the document is never changed by playing.
+2. The runtime starts as `<runtime> --solo --game <game folder> --scene-file
+   <that file>`: server and client in one process over loopback, starting
+   from the played scene instead of the `start_scene` of `game.json`.
+3. Everything the game prints, errors included, goes to the console. A Lua
+   error in the game shows there and never closes the editor.
+
+| Command | Effect |
+|---|---|
+| Play | Start the open scene; on a paused game, continue it |
+| Pause | Freeze the game process (`SIGSTOP`) |
+| Stop | Ask the game to quit (`SIGTERM`), kill it after one second, delete the played file |
+
+While the game runs, edits and project commands are refused ("Stop the game
+to change the project."). Closing the game window ends Play too, with its
+exit code in the console. The runtime is `r-type_client` next to the editor,
+or the program given with `--runtime`. `PlaySession` owns the game;
+`ProcessLauncher` is the POSIX launcher and tests give a fake one.
+
 ## Inspector
 
 The inspector shows the selected instance. `Editor` caches what it shows in
@@ -277,6 +303,7 @@ editor/
   src/text/       TextEdit: UTF-8 caret, selection and editing, no UI
   src/ui/         layout, sections, widgets, widget state, command table
   src/viewport/   editor camera, snapping, scene layout and hit testing
+  src/play/       Play: the played scene file and the game process
   src/render/     geometry and scissor helpers for the renderer
   src/raylib/     window, input, Clay renderer, font cache: the only raylib code
 ```
