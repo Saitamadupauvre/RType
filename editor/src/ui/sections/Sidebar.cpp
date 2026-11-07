@@ -57,10 +57,14 @@ void prefabs(Ui& ui, const EditorState& state) {
         return;
     }
     bool any = false;
-    for (const std::string& type : state.prefabs) {
-        if (matches_filter(type, state.prefab_filter)) {
-            list_item(theme, {.label = view_of(type)});
-            any = true;
+    for (std::uint32_t index = 0; index < state.prefabs.size(); ++index) {
+        const std::string& type = state.prefabs[index];
+        if (!matches_filter(type, state.prefab_filter)) {
+            continue;
+        }
+        any = true;
+        if (list_row(ui, CLAY_IDI("PrefabRow", index), {.label = view_of(type)})) {
+            ui.widgets().viewport().placing = type;
         }
     }
     if (!any) {
