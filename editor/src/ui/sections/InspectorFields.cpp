@@ -95,7 +95,9 @@ void color_value(Ui& ui, const ValueSlot& slot, engine::core::Rgba value) {
 }
 
 void text_value(Ui& ui, const ValueSlot& slot, std::string_view value, auto make) {
-    const TextResult result = text_field(ui, slot.id, value, {.placeholder = "none"});
+    const Clay_String kept = ui.keep(std::string(value));
+    const TextResult result = text_field(
+        ui, slot.id, {kept.chars, static_cast<std::size_t>(kept.length)}, {.placeholder = "none"});
     if (result.event == FieldEvent::committed) {
         slot.commit(make(result.value));
     }
