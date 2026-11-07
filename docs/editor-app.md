@@ -18,7 +18,7 @@ project, and creating one, come with the launcher (#158).
 
 | Area | Shows | Does |
 |---|---|---|
-| Menu bar | Open scene, `•` when unsaved | Play, Stop |
+| Menu bar | File, Edit, View, Scene and Help menus; open scene, `•` when unsaved | Every command of the command table, Play, Stop |
 | Toolbar | Tools, snap, grid size, overlays | Switch tool, toggle snap and overlays, Undo, Redo |
 | Play band | While playing or paused: the mode and what is blocked | |
 | Sidebar | Prefabs, scenes (start scene marked), instances, each with its count | Open a scene, select or place an instance |
@@ -192,11 +192,24 @@ branch, so an action without a handler does not compile.
 
 ## Command table
 
-`ui/CommandTable.cpp` lists the commands users can name: a label, an optional
-shortcut, and a `make` function that returns the action, or `std::nullopt`
-when the command is disabled (nothing to undo, no selection...). Keyboard
-shortcuts read it today; menus and the command palette (#185) will read the
-same table, so they never disagree.
+`ui/CommandTable.cpp` lists the commands users can name: a label, the menu it
+belongs to, an optional shortcut, a `make` function that returns the action, or
+`std::nullopt` when the command is disabled (nothing to undo, no selection...),
+and for toggles a `checked` function. Keyboard shortcuts and the menu bar read
+the same table, so they never disagree; the command palette (#185) will too.
+
+### Menus
+
+- Clicking a title opens its menu; clicking it again, pressing Esc or clicking
+  outside closes it. While a menu is open, hovering another title opens that
+  one instead.
+- Each entry shows its shortcut (`Ctrl+S`, `Cmd+S` on macOS). A disabled entry
+  is greyed out and does nothing. A toggle that is on shows a check mark.
+- File: save, discard changes, open the selection's script. Edit: undo, redo,
+  delete. View: tools, snap and overlays. Scene: play, pause, stop.
+- Help lists the viewport controls that have no entry: pan, zoom, placing,
+  moving without snap.
+- To add an entry, add a `CommandEntry` with its `menu`; nothing else changes.
 
 ## Writing UI
 
