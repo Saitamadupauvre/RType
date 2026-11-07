@@ -6,9 +6,11 @@
 #include <cstdlib>
 #include <format>
 #include <limits>
+#include <memory>
 #include <system_error>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 namespace engine::core::console {
 
@@ -52,9 +54,10 @@ std::optional<CVarValue> convert(const CVarValue& value, CVarKind kind) {
             return static_cast<double>(*integer);
         }
     }
-    if (kind == CVarKind::integer) {
-        if (const auto* number = std::get_if<double>(&value); number != nullptr && whole(*number)) {
-            return static_cast<std::int64_t>(*number);
+    if (kind == CVarKind::integer && std::holds_alternative<double>(value)) {
+        const double number = std::get<double>(value);
+        if (whole(number)) {
+            return static_cast<std::int64_t>(number);
         }
     }
     return std::nullopt;
@@ -81,8 +84,9 @@ std::optional<bool> parse_bool(std::string_view text) {
 
 std::optional<std::int64_t> parse_integer(std::string_view text) {
     std::int64_t parsed{};
-    const char* end = text.data() + text.size();
-    const auto [stop, error] = std::from_chars(text.data(), end, parsed);
+    const char* begin = std::to_address(text.begin());
+    const char* end = std::to_address(text.end());
+    const auto [stop, error] = std::from_chars(begin, end, parsed);
     if (error != std::errc{} || stop != end || text.empty()) {
         return std::nullopt;
     }
