@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "ui/Labels.hpp"
+#include "ui/SmoothScroll.hpp"
 #include "ui/Text.hpp"
 #include "ui/widgets/ListRow.hpp"
 
@@ -100,7 +101,7 @@ void bottom_panel(Ui& ui, const Editor& editor) {
                          .padding = {.top = theme.px16(4.F), .bottom = theme.px16(4.F)},
                          .childGap = theme.px16(2.F),
                          .layoutDirection = CLAY_TOP_TO_BOTTOM},
-              .clip = {.vertical = true, .childOffset = Clay_GetScrollOffset()}}) {
+              .clip = scroll_clip(ui.widgets().scroll(), CLAY_ID("BottomContent"))}) {
             if (editor.state().bottom_tab == BottomTab::console) {
                 console(theme, editor.state().console);
             } else {

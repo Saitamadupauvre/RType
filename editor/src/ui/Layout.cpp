@@ -1,6 +1,7 @@
 #include "ui/Layout.hpp"
 
 #include "ui/CommandTable.hpp"
+#include "ui/SmoothScroll.hpp"
 #include "ui/sections/BottomPanel.hpp"
 #include "ui/sections/Inspector.hpp"
 #include "ui/sections/MenuBar.hpp"
@@ -13,16 +14,22 @@ namespace editor {
 
 namespace {
 
-void feed_input(const UiInput& input) {
+void feed_input(Ui& ui) {
+    const UiInput& input = ui.input();
     Clay_SetPointerState(input.pointer, input.primary_down);
-    Clay_UpdateScrollContainers(false, input.wheel, input.delta_time);
+    Clay_UpdateScrollContainers(false, {}, input.delta_time);
+    SmoothScroll& scroll = ui.widgets().scroll();
+    if (Clay_IsDebugModeEnabled()) {
+        scroll.add(CLAY_ID("Clay__DebugViewOuterScrollPane"));
+    }
+    scroll.update(input.wheel.y, ui.theme().px(SmoothScroll::step), input.delta_time);
 }
 
 } // namespace
 
 Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimensions window) {
     Clay_SetLayoutDimensions(window);
-    feed_input(ui.input());
+    feed_input(ui);
     emit_shortcuts(ui, editor);
     Clay_BeginLayout();
     CLAY({.id = CLAY_ID("Root"),

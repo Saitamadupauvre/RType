@@ -40,6 +40,7 @@ add_library(editor-core STATIC
     src/ui/Theme.cpp
     src/ui/Ui.cpp
     src/ui/UiInput.cpp
+    src/ui/SmoothScroll.cpp
     src/ui/WidgetState.cpp
     src/ui/sections/BottomPanel.cpp
     src/ui/sections/Inspector.cpp

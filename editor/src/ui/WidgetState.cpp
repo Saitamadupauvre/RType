@@ -80,4 +80,6 @@ void WidgetState::resolve_tab() {
 
 bool WidgetState::drawn(std::uint32_t id) const { return std::ranges::find(_tab_order, id) != _tab_order.end(); }
 
+SmoothScroll& WidgetState::scroll() noexcept { return _scroll; }
+
 } // namespace editor
