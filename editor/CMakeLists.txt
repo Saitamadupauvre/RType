@@ -19,6 +19,7 @@ target_include_directories(editor-clay SYSTEM PUBLIC ${CLAY_INCLUDE_DIR})
 set_target_properties(editor-clay PROPERTIES CXX_CLANG_TIDY "")
 
 add_library(editor-core STATIC
+    src/action/ActionText.cpp
     src/action/ApplyCommand.cpp
     src/action/ApplyEdit.cpp
     src/action/Editor.cpp
