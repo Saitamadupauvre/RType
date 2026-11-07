@@ -179,6 +179,13 @@ public:
     CommandResult reset_field(InstanceId id, std::string_view key);
     /** @brief Removes every override of an instance. */
     CommandResult reset_all(InstanceId id);
+    /**
+     * @brief Turns an instance into another declared entity, keeping its name, its position and
+     * the overrides the new type still accepts. Undoable like any edit.
+     * @return Refused for an unknown instance or a type that is not a declared entity; done with
+     * a note naming the dropped overrides, if any. The same type changes nothing.
+     */
+    CommandResult change_type(InstanceId id, std::string_view type);
     /** @brief Goes back one edit. Refused when there is none. */
     CommandResult undo();
     /** @brief Applies again the last undone edit. Refused when there is none. */

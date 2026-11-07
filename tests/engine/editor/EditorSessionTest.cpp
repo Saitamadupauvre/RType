@@ -294,3 +294,42 @@ TEST_F(EditorSessionStart, ProblemsNameTheInstanceAndField) {
     ASSERT_TRUE(session().reset_field(instances[1].id, "PhysicsBody.type").ok);
     EXPECT_TRUE(session().problems().empty());
 }
+
+TEST_F(EditorSessionTest, ChangeTypeKeepsWhatTheNewTypeAccepts) {
+    ASSERT_TRUE(session().set_field(_hero, "Rotation.degrees", FieldValue{45.F}).ok);
+
+    const CommandResult result = session().change_type(_hero, "rock");
+
+    ASSERT_TRUE(result.ok) << result.message;
+    EXPECT_EQ(instance(_hero).type, "rock");
+    EXPECT_EQ(instance(_hero).name, "hero");
+    EXPECT_EQ(instance(_hero).overrides, (std::vector<FieldOverride>{{.field = "Rotation.degrees",
+                                                                      .value = FieldValue{45.F}}}));
+    EXPECT_NE(result.message.find("Script.health"), std::string::npos);
+    EXPECT_TRUE(session().entity_of(_hero).has_value());
+}
+
+TEST_F(EditorSessionTest, ChangeTypeIsUndoable) {
+    const auto before = instance(_hero);
+    ASSERT_TRUE(session().change_type(_hero, "rock").ok);
+
+    ASSERT_TRUE(session().undo().ok);
+
+    EXPECT_EQ(instance(_hero), before);
+}
+
+TEST_F(EditorSessionTest, ChangeTypeToTheSameTypeChangesNothing) {
+    ASSERT_TRUE(session().change_type(_hero, "ship").ok);
+
+    EXPECT_FALSE(session().can_undo());
+    EXPECT_FALSE(session().unsaved());
+}
+
+TEST_F(EditorSessionTest, ChangeTypeRefusesWhatIsNotADeclaredEntity) {
+    EXPECT_FALSE(session().change_type(_hero, "ghost").ok);
+    EXPECT_FALSE(session().change_type(_hero, "").ok);
+    EXPECT_FALSE(session().change_type(InstanceId{}, "rock").ok);
+
+    EXPECT_EQ(instance(_hero).type, "ship");
+    EXPECT_FALSE(session().can_undo());
+}
