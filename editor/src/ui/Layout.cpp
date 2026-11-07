@@ -43,7 +43,7 @@ Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimension
             viewport(ui, editor);
             inspector(ui, editor);
         }
-        bottom_panel(ui, editor);
+        bottom_panel(ui, editor, bottom_panel_height(ui.theme(), window.height));
         status_bar(ui, editor);
     }
     const Clay_RenderCommandArray commands = Clay_EndLayout();

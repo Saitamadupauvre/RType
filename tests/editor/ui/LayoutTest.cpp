@@ -2,6 +2,7 @@
 
 #include "FrameFixture.hpp"
 #include "ui/Theme.hpp"
+#include "ui/sections/BottomPanel.hpp"
 
 using editor::Theme;
 
@@ -99,4 +100,32 @@ TEST_F(Layout, SelectionAndDebugViewStayWithinClayLimits) {
     Clay_SetDebugModeEnabled(false);
 
     EXPECT_TRUE(_clay.errors().empty());
+}
+
+TEST_F(Layout, SelectingAnInstanceNeverMovesThePanels) {
+    const Clay_Dimensions size{.width = 1440.F, .height = 500.F};
+    frame({}, {}, size);
+    frame({}, {}, size);
+    const Clay_BoundingBox before = box_of(CLAY_ID("Viewport"));
+    _editor.handle(editor::command::Select{.id = id_of(_editor.session(), "ship")});
+    frame({}, {}, size);
+    frame({}, {}, size);
+
+    const Clay_ScrollContainerData body = Clay_GetScrollContainerData(CLAY_ID("InspectorBody"));
+    ASSERT_GT(body.contentDimensions.height, body.scrollContainerDimensions.height);
+    EXPECT_FLOAT_EQ(box_of(CLAY_ID("Viewport")).height, before.height);
+    EXPECT_FLOAT_EQ(box_of(CLAY_ID("BottomPanel")).height, 150.F);
+}
+
+TEST(BottomPanelHeight, KeepsTheDesignHeightWhenThereIsRoom) {
+    EXPECT_FLOAT_EQ(editor::bottom_panel_height(Theme{}, 900.F), 150.F);
+}
+
+TEST(BottomPanelHeight, ShrinksToItsMinimumInAShortWindow) {
+    EXPECT_FLOAT_EQ(editor::bottom_panel_height(Theme{}, 330.F), 94.F);
+    EXPECT_FLOAT_EQ(editor::bottom_panel_height(Theme{}, 200.F), 60.F);
+}
+
+TEST(BottomPanelHeight, FollowsTheUiScale) {
+    EXPECT_FLOAT_EQ(editor::bottom_panel_height(Theme{.scale = 2.F}, 1800.F), 300.F);
 }

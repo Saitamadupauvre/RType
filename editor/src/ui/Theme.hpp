@@ -37,6 +37,7 @@ inline constexpr float inspector = 340.F;
 inline constexpr float inspector_min = 240.F;
 inline constexpr float bottom_panel = 150.F;
 inline constexpr float bottom_panel_min = 60.F;
+inline constexpr float workspace_min = 136.F;
 inline constexpr float tabs = 30.F;
 inline constexpr float status_bar = 24.F;
 inline constexpr float panel_header = 32.F;

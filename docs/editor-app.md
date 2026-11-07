@@ -261,7 +261,10 @@ Clay starts); one more corrupts its memory. The editor stays under it:
 
 In a small window the sidebar and the inspector shrink to 180 and 240 px and
 the console to 60 px, so the console and the status bar stay visible down to
-about 290 px of height.
+about 290 px of height. The console height comes from the window height only
+(`bottom_panel_height`): a growing console would trade space with the
+workspace, and Clay weighs that trade by content, so selecting an instance
+with many fields would move every panel.
 
 ## Code layout
 
