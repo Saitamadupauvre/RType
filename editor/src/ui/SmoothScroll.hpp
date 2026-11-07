@@ -37,8 +37,11 @@ private:
 
 /**
  * @brief The clip of a vertical scroll container, registered with the frame's SmoothScroll. It
- * clips both axes, so wide content never widens the panel.
+ * clips both axes by default, so wide content never widens the panel.
+ * @note Clay grows the children of a horizontal clip to their widest content: a panel whose
+ * rows must keep the panel width passes `clip_horizontally = false` and keeps its texts wrapped.
  */
-[[nodiscard]] Clay_ClipElementConfig scroll_clip(SmoothScroll& scroll, Clay_ElementId id);
+[[nodiscard]] Clay_ClipElementConfig scroll_clip(SmoothScroll& scroll, Clay_ElementId id,
+                                                bool clip_horizontally = true);
 
 } // namespace editor

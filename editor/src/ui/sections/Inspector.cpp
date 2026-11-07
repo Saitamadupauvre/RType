@@ -13,6 +13,7 @@
 #include <optional>
 #include <string_view>
 
+#include "text/FitText.hpp"
 #include "ui/FieldText.hpp"
 #include "ui/Labels.hpp"
 #include "ui/SmoothScroll.hpp"
@@ -30,7 +31,6 @@ namespace editor {
 namespace {
 
 constexpr float label_width = 120.F;
-constexpr float component_gap = 8.F;
 
 void nothing_selected(const Theme& theme) {
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
@@ -106,20 +106,75 @@ void type_row(Ui& ui, const Editor& editor, const engine::script::Instance& inst
     });
 }
 
-void script_row(Ui& ui, const std::filesystem::path& script) {
-    if (script.empty()) {
-        return;
+std::filesystem::path shown_script(const Editor& editor, const std::filesystem::path& script) {
+    const std::filesystem::path relative =
+        script.lexically_relative(editor.session().game() / "scripts");
+    return relative.empty() ? script.filename() : relative;
+}
+
+Clay_String fitted_name(Ui& ui, std::string_view name) {
+    const Clay_ElementData panel = Clay_GetElementData(CLAY_ID("Inspector"));
+    if (!panel.found) {
+        return view_of(name);
     }
-    row(ui, CLAY_STRING("Script"), [&] {
-        CLAY({.id = CLAY_ID("InspectorScriptName"),
-              .layout = {.sizing = {.width = CLAY_SIZING_GROW()}}}) {
-            text(ui.theme(), ui.keep(script.filename().string()), size::text, color::text_soft);
+    const Theme& theme = ui.theme();
+    Clay_TextElementConfig font{};
+    font.fontId = static_cast<std::uint16_t>(Face::bold);
+    font.fontSize = theme.px16(size::text);
+    const float width = panel.boundingBox.width - (2.F * theme.px(size::gutter));
+    return ui.keep(fit_text(name, width, [&ui, &font](std::string_view prefix) {
+        return ui.platform().measure(prefix, font).width;
+    }));
+}
+
+void identity(Ui& ui, const Editor& editor, const engine::script::Instance& instance,
+              const InspectorModel& model) {
+    const Theme& theme = ui.theme();
+    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
+                     .padding = {.left = theme.px16(size::gutter),
+                                 .right = theme.px16(size::gutter),
+                                 .top = theme.px16(size::gutter),
+                                 .bottom = theme.px16(size::gutter)},
+                     .childGap = theme.px16(4.F),
+                     .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
+        text(theme, fitted_name(ui, instance_label(instance)), size::text, color::text, Face::bold);
+        const std::string subtitle =
+            model.script.empty()
+                ? std::format("instance of {}", instance.type)
+                : std::format("instance of {} · {}", instance.type,
+                              shown_script(editor, model.script).generic_string());
+        wrapped_text(theme, ui.keep(subtitle), size::small_text, color::text_muted);
+        wrapped_text(theme, CLAY_STRING("orange = overridden, saved in the scene · grey = prefab value"),
+                     size::small_text, color::text_dim);
+    }
+}
+
+bool wide_button(Ui& ui, Clay_ElementId id, Clay_String label) {
+    const Theme& theme = ui.theme();
+    bool clicked = false;
+    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
+                     .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)}}}) {
+        clicked = button(ui, id, label, {.background = color::field, .foreground = color::text_soft});
+    }
+    return clicked;
+}
+
+void footer(Ui& ui, const engine::script::Instance& instance, const InspectorModel& model) {
+    const Theme& theme = ui.theme();
+    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
+                     .padding = {.top = theme.px16(size::gutter)},
+                     .childGap = theme.px16(6.F),
+                     .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
+        if (!instance.overrides.empty() &&
+            wide_button(ui, CLAY_ID("InspectorResetAll"), CLAY_STRING("Reset all to prefab"))) {
+            ui.emit(edit::ResetAll{.id = model.id});
         }
-        if (button(ui, CLAY_ID("InspectorOpenScript"), CLAY_STRING("Open"),
-                   {.background = color::field, .foreground = color::text_soft})) {
-            ui.emit(command::OpenScript{.file = script});
+        if (!model.script.empty() &&
+            wide_button(ui, CLAY_ID("InspectorOpenScript"),
+                        ui.keep(std::format("Open {}", model.script.filename().string())))) {
+            ui.emit(command::OpenScript{.file = model.script});
         }
-    });
+    }
 }
 
 void instance_rows(Ui& ui, const Editor& editor, const engine::script::Instance& instance,
@@ -127,15 +182,6 @@ void instance_rows(Ui& ui, const Editor& editor, const engine::script::Instance&
     name_row(ui, instance, id);
     type_row(ui, editor, instance, id);
     position_row(ui, instance.position, id);
-    if (instance.overrides.empty()) {
-        return;
-    }
-    row(ui, CLAY_STRING("Overrides"), [&] {
-        if (button(ui, CLAY_ID("InspectorResetAll"), CLAY_STRING("Reset all"),
-                   {.background = color::field, .foreground = color::text_soft})) {
-            ui.emit(edit::ResetAll{.id = id});
-        }
-    });
 }
 
 std::string_view kept(Ui& ui, std::string text) {
@@ -143,11 +189,26 @@ std::string_view kept(Ui& ui, std::string text) {
     return {stored.chars, static_cast<std::size_t>(stored.length)};
 }
 
-void component_header(const Theme& theme, std::string_view component) {
-    CLAY({.layout = {.padding = {.left = theme.px16(size::gutter),
-                                 .top = theme.px16(component_gap),
-                                 .bottom = theme.px16(row_padding)}}}) {
-        text(theme, view_of(component), size::small_text, color::text_soft);
+std::size_t overridden_in(const std::vector<InspectorField>& fields, std::string_view component) {
+    return static_cast<std::size_t>(std::ranges::count_if(fields, [&](const InspectorField& field) {
+        return field.overridden && component_of(field.key) == component;
+    }));
+}
+
+void band(Ui& ui, Clay_String name, std::size_t overridden) {
+    const Theme& theme = ui.theme();
+    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(),
+                                .height = CLAY_SIZING_FIXED(theme.px(size::band))},
+                     .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)},
+                     .childAlignment = {.y = CLAY_ALIGN_Y_CENTER}},
+          .backgroundColor = color::band,
+          .border = {.color = color::border, .width = {.top = theme.px16(1.F)}}}) {
+        text(theme, name, size::small_text, color::text, Face::bold);
+        spacer();
+        if (overridden > 0) {
+            text(theme, ui.keep(std::format("{} overridden", overridden)), size::small_text,
+                 color::accent);
+        }
     }
 }
 
@@ -158,14 +219,11 @@ void field_rows(Ui& ui, const InspectorModel& model) {
         return;
     }
     std::uint32_t index = 0;
-    if (!model.fields.empty()) {
-        panel_header(ui.theme(), CLAY_STRING("COMPONENTS"));
-    }
     std::string_view component;
     for (const InspectorField& field : model.fields) {
         if (component_of(field.key) != component) {
             component = component_of(field.key);
-            component_header(ui.theme(), component);
+            band(ui, view_of(component), overridden_in(model.fields, component));
         }
         field_row(ui, {.id = model.id,
                        .field = field,
@@ -173,7 +231,7 @@ void field_rows(Ui& ui, const InspectorModel& model) {
                        .label = kept(ui, field_label(field.key))});
     }
     if (!model.script_fields.empty()) {
-        panel_header(ui.theme(), CLAY_STRING("SCRIPT"));
+        band(ui, CLAY_STRING("Script fields"), overridden_in(model.script_fields, "Script"));
     }
     for (const InspectorField& field : model.script_fields) {
         field_row(ui, {.id = model.id,
@@ -196,18 +254,17 @@ void inspector(Ui& ui, const Editor& editor) {
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::panel,
           .border = {.color = color::border, .width = {.left = theme.px16(1.F)}}}) {
-        panel_header(theme, selected ? ui.keep(std::format("INSPECTOR · {}",
-                                                           instance_label(selected->instance)))
-                                     : CLAY_STRING("INSPECTOR"));
+        panel_header(theme, CLAY_STRING("INSPECTOR"));
         CLAY({.id = CLAY_ID("InspectorBody"),
               .layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
                          .padding = {.bottom = theme.px16(size::gutter)},
                          .layoutDirection = CLAY_TOP_TO_BOTTOM},
-              .clip = scroll_clip(ui.widgets().scroll(), CLAY_ID("InspectorBody"))}) {
+              .clip = scroll_clip(ui.widgets().scroll(), CLAY_ID("InspectorBody"), false)}) {
             if (model && selected) {
+                identity(ui, editor, selected->instance, *model);
                 instance_rows(ui, editor, selected->instance, model->id);
-            script_row(ui, model->script);
                 field_rows(ui, *model);
+                footer(ui, selected->instance, *model);
             } else {
                 nothing_selected(theme);
             }

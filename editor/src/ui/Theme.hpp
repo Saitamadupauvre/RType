@@ -23,6 +23,7 @@ inline constexpr Clay_Color accent{.r = 240, .g = 160, .b = 75, .a = 255};
 inline constexpr Clay_Color focus{.r = 76, .g = 154, .b = 255, .a = 255};
 inline constexpr Clay_Color selected{.r = 47, .g = 58, .b = 77, .a = 255};
 inline constexpr Clay_Color hover{.r = 42, .g = 46, .b = 54, .a = 255};
+inline constexpr Clay_Color band{.r = 42, .g = 45, .b = 53, .a = 255};
 inline constexpr Clay_Color error{.r = 229, .g = 83, .b = 75, .a = 255};
 
 } // namespace color
@@ -41,6 +42,7 @@ inline constexpr float workspace_min = 136.F;
 inline constexpr float tabs = 30.F;
 inline constexpr float status_bar = 24.F;
 inline constexpr float panel_header = 32.F;
+inline constexpr float band = 28.F;
 inline constexpr float button = 26.F;
 inline constexpr float tool_button = 28.F;
 inline constexpr float separator = 20.F;

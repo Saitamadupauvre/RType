@@ -146,8 +146,9 @@ TEST_F(FrameTest, InspectorShowsTheSelection) {
     _editor.handle(command::Select{.id = id_of(_editor.session(), "ship")});
     const auto texts = frame().texts;
 
-    EXPECT_TRUE(contains(texts, "INSPECTOR · hero"));
-    EXPECT_TRUE(contains(texts, "SCRIPT"));
+    EXPECT_TRUE(contains(texts, "INSPECTOR"));
+    EXPECT_TRUE(contains(texts, "hero"));
+    EXPECT_TRUE(contains(texts, "Script fields"));
     EXPECT_TRUE(contains(texts, "health"));
 }
 
@@ -194,4 +195,46 @@ TEST_F(FrameTest, EmptyPrefabFilterShowsEveryPrefab) {
 TEST_F(FrameTest, PrefabFilterWithoutMatchShowsAHint) {
     _editor.handle(command::SetPrefabFilter{.text = "zzz"});
     EXPECT_TRUE(shows("No prefab matches"));
+}
+
+TEST_F(FrameTest, PlayingShowsTheBanner) {
+    EXPECT_FALSE(shows("PLAYING"));
+
+    _editor.handle(command::Play{});
+    EXPECT_TRUE(shows("PLAYING"));
+
+    _editor.handle(command::Pause{});
+    EXPECT_TRUE(shows("PAUSED"));
+
+    _editor.handle(command::Stop{});
+    EXPECT_FALSE(shows("PAUSED"));
+}
+
+TEST_F(FrameTest, StatusBarShowsTheSelectionSnapAndUnsavedChanges) {
+    _editor.handle(command::Select{.id = id_of(_editor.session(), "ship")});
+    _editor.handle(edit::Move{.id = id_of(_editor.session(), "ship"), .position = {64, 64}});
+    const auto texts = frame().texts;
+
+    EXPECT_TRUE(contains(texts, "selected: hero (ship)"));
+    EXPECT_TRUE(contains(texts, "snap 16"));
+    EXPECT_TRUE(contains(texts, "unsaved changes · Ctrl+S"));
+
+    _editor.handle(command::SetSnap{.enabled = false});
+    EXPECT_TRUE(contains(frame().texts, "snap off"));
+}
+
+TEST_F(FrameTest, PanelHeadersCountTheirItems) {
+    const auto texts = frame().texts;
+
+    EXPECT_EQ(count(texts, "PREFABS"), 1);
+    EXPECT_TRUE(contains(texts, "4"));
+    EXPECT_TRUE(contains(texts, "2"));
+}
+
+TEST_F(FrameTest, ConsoleLinesShowTheirTime) {
+    _editor.attach_clock([] { return std::string("12:04:31"); });
+    _editor.handle(command::Undo{});
+
+    const auto texts = frame().texts;
+    EXPECT_TRUE(contains(texts, "12:04:31"));
 }
