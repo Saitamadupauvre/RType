@@ -195,14 +195,58 @@ TEST_F(Viewport, DraggingAPrefabIntoTheViewportPlacesIt) {
     EXPECT_EQ(place->position, Vec2(64.F, 64.F));
 }
 
-TEST_F(Viewport, ReleasingAPrefabOutsideTheViewportPlacesNothing) {
+TEST_F(Viewport, ClickingAPrefabArmsIt) {
     const auto row = CLAY_IDI("PrefabRow", 0);
     click(row);
     const Clay_BoundingBox box = box_of(row);
     const auto actions = frame({.pointer = {.x = box.x + 2.F, .y = box.y + 2.F}}).actions;
 
     EXPECT_TRUE(actions.empty());
+    ASSERT_TRUE(state().placing.has_value());
+    EXPECT_TRUE(state().placing.value_or(editor::Placing{}).armed);
+}
+
+TEST_F(Viewport, ArmedPrefabIsPlacedByAClickInTheViewport) {
+    const auto row = CLAY_IDI("PrefabRow", 1);
+    click(row);
+    frame();
+    frame({.pointer = screen({100.F, 100.F})});
+    ASSERT_TRUE(state().frame.ghost.has_value());
+    const auto actions =
+        frame({.pointer = screen({100.F, 100.F}), .primary_down = true, .primary_pressed = true})
+            .actions;
+
+    const auto* place = only_edit<edit::Place>(actions);
+    ASSERT_NE(place, nullptr);
+    EXPECT_EQ(place->type, "ship");
+    EXPECT_EQ(place->position, Vec2(64.F, 64.F));
     EXPECT_FALSE(state().placing.has_value());
+}
+
+TEST_F(Viewport, EscapeDisarmsThePrefab) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame();
+    frame({.keys_pressed = {editor::Key::escape}});
+
+    EXPECT_FALSE(state().placing.has_value());
+}
+
+TEST_F(Viewport, ClickingElsewhereDisarmsThePrefab) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame();
+    const auto actions = click(CLAY_ID("PlayButton"));
+
+    EXPECT_FALSE(state().placing.has_value());
+    for (const auto& action : actions) {
+        EXPECT_EQ(std::get_if<editor::Edit>(&action), nullptr);
+    }
+}
+
+TEST_F(Viewport, ArmedPrefabIsTheClickedOne) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame();
+
+    EXPECT_EQ(state().placing.value_or(editor::Placing{}).type, "rock");
 }
 
 TEST_F(Viewport, RotateHandleEmitsTheRotation) {

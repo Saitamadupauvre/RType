@@ -20,6 +20,15 @@ struct ViewDrag {
     engine::core::Vec2 preview;
 };
 
+/**
+ * @brief A prefab picked in the sidebar: dragged while the button is held, then armed until a
+ * click in the viewport places it.
+ */
+struct Placing {
+    std::string type;
+    bool armed = false;
+};
+
 /** @brief A scale or rotate handle being dragged, with the item as it was when grabbed. */
 struct HandleDrag {
     Handle handle = Handle::scale;
@@ -46,8 +55,7 @@ struct ViewportState {
     std::optional<ViewCamera> camera;
     std::optional<ViewDrag> drag;
     std::optional<HandleDrag> handle;
-    /** @brief The prefab dragged from the sidebar, until the button is released. */
-    std::optional<std::string> placing;
+    std::optional<Placing> placing;
     std::optional<engine::core::Vec2> pan_from;
     ViewportFrame frame;
 };

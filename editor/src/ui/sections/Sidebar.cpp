@@ -63,8 +63,10 @@ void prefabs(Ui& ui, const EditorState& state) {
             continue;
         }
         any = true;
-        if (list_row(ui, CLAY_IDI("PrefabRow", index), {.label = view_of(type)})) {
-            ui.widgets().viewport().placing = type;
+        auto& placing = ui.widgets().viewport().placing;
+        const bool picked = placing && placing->type == type;
+        if (list_row(ui, CLAY_IDI("PrefabRow", index), {.label = view_of(type), .selected = picked})) {
+            placing = Placing{.type = type};
         }
     }
     if (!any) {

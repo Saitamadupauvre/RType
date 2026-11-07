@@ -114,20 +114,30 @@ bool drag_handle(Ui& ui, const Editor& editor, Vec2 world, HandleDrag& dragged) 
     return true;
 }
 
-void place(Ui& ui, const Editor& editor, Vec2 world, bool over, ViewportState& state) {
+bool pressed(const UiInput& input, Key key) {
+    return std::ranges::find(input.keys_pressed, key) != input.keys_pressed.end();
+}
+
+void place(Ui& ui, const Editor& editor, Vec2 world, bool over, ViewportState& state,
+           Placing& placing) {
+    const UiInput& input = ui.input();
     const ViewSettings& view = editor.state().view;
     const Vec2 half{square_size / 2.F, square_size / 2.F};
-    const Vec2 top_left = drop_position(world - half, view.grid_size, view.snap, ui.input().alt);
-    if (ui.input().primary_down) {
+    const Vec2 top_left = drop_position(world - half, view.grid_size, view.snap, input.alt);
+    if (over) {
+        state.frame.ghost = WorldBox{.top_left = top_left, .size = half * 2.F};
+    }
+    const bool drops = placing.armed ? input.primary_pressed : !input.primary_down;
+    if (pressed(input, Key::escape)) {
+        state.placing.reset();
+    } else if (drops && (over || placing.armed)) {
         if (over) {
-            state.frame.ghost = WorldBox{.top_left = top_left, .size = half * 2.F};
+            ui.emit(edit::Place{.type = placing.type, .position = top_left});
         }
-        return;
+        state.placing.reset();
+    } else if (drops) {
+        placing.armed = true;
     }
-    if (over && state.placing) {
-        ui.emit(edit::Place{.type = *state.placing, .position = top_left});
-    }
-    state.placing.reset();
 }
 
 void interact(Ui& ui, const Editor& editor, const std::vector<SceneItem>& items,
@@ -140,7 +150,7 @@ void interact(Ui& ui, const Editor& editor, const std::vector<SceneItem>& items,
     pan(input, editor.state().tool, over, state, camera);
     const Vec2 world = to_world(camera, box, pointer_of(input));
     if (state.placing) {
-        place(ui, editor, world, over, state);
+        place(ui, editor, world, over, state, *state.placing);
     } else if (state.handle) {
         if (drag_handle(ui, editor, world, *state.handle)) {
             state.handle.reset();
