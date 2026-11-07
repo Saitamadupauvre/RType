@@ -59,6 +59,8 @@ struct SceneItem {
     std::int32_t z_index = 0;
     /** @brief The instance name, or its type when it has none. */
     std::string label;
+    /** @brief The prefab of the instance. */
+    std::string type;
     /** @brief Whether the entity has a Rotation or a Scale the handles can edit. */
     bool rotates = false;
     bool scales = false;

@@ -36,6 +36,8 @@ ClayRenderer::ClayRenderer(std::filesystem::path font_directory)
 
 void ClayRenderer::set_custom_painter(CustomPainter painter) { _custom = std::move(painter); }
 
+const Font& ClayRenderer::font(Face face, std::uint16_t size) { return _fonts.get(face, size); }
+
 Clay_Dimensions ClayRenderer::measure(std::string_view text, const Clay_TextElementConfig& config) {
     const std::string terminated(text);
     const Vector2 size = MeasureTextEx(font_for(config.fontId, config.fontSize), terminated.c_str(),

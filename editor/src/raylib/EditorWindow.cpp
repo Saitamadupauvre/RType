@@ -5,6 +5,8 @@
 #include <raylib.h>
 
 #include <array>
+#include <format>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -31,6 +33,7 @@ namespace editor {
 namespace {
 
 constexpr int initial_width = 1440;
+constexpr std::size_t time_length = 9;
 constexpr int initial_height = 900;
 constexpr unsigned int window_flags = static_cast<unsigned int>(FLAG_WINDOW_RESIZABLE) |
                                       static_cast<unsigned int>(FLAG_VSYNC_HINT) |
@@ -144,6 +147,14 @@ UiInput read_input(ClickCounter& clicks) {
             .alt = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)};
 }
 
+std::string local_time() {
+    const std::time_t now = std::time(nullptr);
+    std::tm local{};
+    localtime_r(&now, &local);
+    std::array<char, time_length> stamp{};
+    return {stamp.data(), std::strftime(stamp.data(), stamp.size(), "%H:%M:%S", &local)};
+}
+
 void toggle_debug_view() { Clay_SetDebugModeEnabled(!Clay_IsDebugModeEnabled()); }
 
 void run_frames(Editor& editor) {
@@ -152,7 +163,9 @@ void run_frames(Editor& editor) {
         return renderer.measure(text, config);
     };
     const ClayContext clay(window_size(), measure);
-    ViewportPainter painter(editor.session().game() / "assets");
+    ViewportPainter painter(editor.session().game() / "assets", [&renderer](std::uint16_t size) -> const Font& {
+        return renderer.font(Face::regular, size);
+    });
     renderer.set_custom_painter([&painter](const Clay_RenderCommand& command) { painter.paint(command); });
     const Platform platform{.measure = measure,
                             .read_clipboard = read_clipboard,
@@ -183,6 +196,7 @@ void run_frames(Editor& editor) {
 } // namespace
 
 bool run_editor_window(Editor& editor) {
+    editor.attach_clock(local_time);
     editor.attach_file_opener([](const std::filesystem::path& file) {
         OpenURL(file.string().c_str());
         return true;

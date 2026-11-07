@@ -149,6 +149,7 @@ void interact(Ui& ui, const Editor& editor, const std::vector<SceneItem>& items,
     }
     pan(input, editor.state().tool, over, state, camera);
     const Vec2 world = to_world(camera, box, pointer_of(input));
+    state.frame.cursor = over ? std::optional<Vec2>(world) : std::nullopt;
     if (state.placing) {
         place(ui, editor, world, over, state, *state.placing);
     } else if (state.handle) {
@@ -197,6 +198,7 @@ void viewport(Ui& ui, const Editor& editor) {
     std::vector<SceneItem> items = scene_items(editor.session(), ui.platform().texture_size);
     const Clay_ElementData previous = Clay_GetElementData(viewport_id());
     state.frame.ghost.reset();
+    state.frame.cursor.reset();
     if (previous.found) {
         ViewCamera& camera = state.camera ? *state.camera
                                           : state.camera.emplace(initial_camera(previous.boundingBox));

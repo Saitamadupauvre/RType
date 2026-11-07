@@ -48,6 +48,8 @@ struct ViewportFrame {
     bool show_hitboxes = false;
     /** @brief Where a prefab dragged from the sidebar would be placed. */
     std::optional<WorldBox> ghost;
+    /** @brief The world point under the pointer, while it is over the viewport. */
+    std::optional<engine::core::Vec2> cursor;
 };
 
 /** @brief The viewport's state kept between frames: the editor camera, a drag or a pan. */
