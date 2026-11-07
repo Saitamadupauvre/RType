@@ -18,7 +18,8 @@ void request_stop(int) { stop_requested = 1; }
 engine::app::LaunchOptions launch_options(const rtype::client::ClientConfig& config,
                                           const fs::path& executable_dir) {
     return {.mode = config.mode,
-            .game = executable_dir,
+            .game = config.game.empty() ? executable_dir : fs::path(config.game),
+            .start_scene_file = config.scene_file,
             .graphics_plugin = executable_dir / "plugins" / GRAPHICS_PLUGIN_FILE,
             .audio_plugin = executable_dir / "plugins" / AUDIO_PLUGIN_FILE,
             .server_ip = config.host,

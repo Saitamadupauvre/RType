@@ -148,3 +148,22 @@ TEST(ClientCli, RejectsHostWithoutAValidPort) {
     expect_rejected(args({"--host", "0"}));
     expect_rejected(args({"--host", "70000"}));
 }
+
+TEST(ClientCli, GameAndSceneFileDefaultToEmpty) {
+    const auto result = parse_cli(args({"--solo"}));
+
+    ASSERT_TRUE(result.config.has_value());
+    EXPECT_TRUE(result.config->game.empty());
+    EXPECT_TRUE(result.config->scene_file.empty());
+}
+
+TEST(ClientCli, AcceptsAGameFolderAndASceneFile) {
+    const auto result =
+        parse_cli(args({"--solo", "--game", "../my-game", "--scene-file", "/tmp/level.json"}));
+
+    ASSERT_TRUE(result.config.has_value());
+    EXPECT_EQ(result.config->game, "../my-game");
+    EXPECT_EQ(result.config->scene_file, "/tmp/level.json");
+}
+
+TEST(ClientCli, RejectsAnEmptySceneFile) { expect_rejected(args({"--solo", "--scene-file", ""})); }
