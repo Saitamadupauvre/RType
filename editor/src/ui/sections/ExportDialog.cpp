@@ -20,6 +20,7 @@ namespace editor {
 namespace {
 
 constexpr std::int16_t dialog_layer = 200;
+constexpr std::int16_t field_layer = dialog_layer + 1;
 constexpr float dialog_width = 520.F;
 constexpr float label_width = 110.F;
 constexpr Clay_Color backdrop{.r = 0, .g = 0, .b = 0, .a = 150};
@@ -41,7 +42,8 @@ template <typename Field> void labelled(const Theme& theme, Clay_String label, F
 
 void name_row(Ui& ui, const ExportSettings& settings) {
     labelled(ui.theme(), CLAY_STRING("Name"), [&] {
-        const TextResult result = text_field(ui, CLAY_ID("ExportName"), settings.name);
+        const TextResult result =
+            text_field(ui, CLAY_ID("ExportName"), settings.name, {.layer = field_layer});
         if (result.event != FieldEvent::none && result.value != settings.name) {
             ExportSettings changed = settings;
             changed.name = result.value;
@@ -55,7 +57,8 @@ void output_row(Ui& ui, const ExportSettings& settings) {
         const Clay_String kept = ui.keep(settings.output.string());
         const std::string_view output{kept.chars, static_cast<std::size_t>(kept.length)};
         const TextResult result =
-            text_field(ui, CLAY_ID("ExportOutput"), output, {.placeholder = "folder to create"});
+            text_field(ui, CLAY_ID("ExportOutput"), output,
+                       {.placeholder = "folder to create", .layer = field_layer});
         if (result.event != FieldEvent::none && result.value != output) {
             ExportSettings changed = settings;
             changed.output = result.value;

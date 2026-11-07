@@ -163,6 +163,7 @@ void shown_text(Ui& ui, std::optional<float> field_width, std::string_view shown
 void shown_content(Ui& ui, std::optional<float> field_width, std::string_view shown,
                    const TextFieldOptions& options) {
     CLAY({.floating = {.offset = {.x = ui.theme().px(padding), .y = 0.F},
+                       .zIndex = options.layer,
                        .attachPoints = {.element = CLAY_ATTACH_POINT_LEFT_CENTER,
                                         .parent = CLAY_ATTACH_POINT_LEFT_CENTER},
                        .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,

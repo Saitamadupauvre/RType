@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <string_view>
 #include <vector>
 
 #include "../FrameFixture.hpp"
@@ -92,4 +95,33 @@ TEST_F(ExportDialog, ShortcutsAreIgnoredWhileOpen) {
     open_dialog();
 
     EXPECT_TRUE(frame({.keys_pressed = {editor::Key::del}}).actions.empty());
+}
+
+TEST_F(ExportDialog, FieldTextIsDrawnAboveTheDialog) {
+    open_dialog();
+    const editor::Theme theme;
+    const editor::UiInput input;
+    editor::Ui ui(theme, input, _widgets, _platform);
+    Clay_RenderCommandArray commands = editor::build_frame(ui, _editor, window);
+
+    std::int32_t dialog = -1;
+    std::int32_t name = -1;
+    for (std::int32_t index = 0; index < commands.length; ++index) {
+        const Clay_RenderCommand& command = *Clay_RenderCommandArray_Get(&commands, index);
+        if (command.commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE &&
+            command.id == CLAY_ID("ExportDialog").id) {
+            dialog = index;
+        }
+        if (command.commandType == CLAY_RENDER_COMMAND_TYPE_TEXT) {
+            const Clay_StringSlice slice = command.renderData.text.stringContents;
+            if (std::string_view(slice.chars, static_cast<std::size_t>(slice.length)) ==
+                "editor-test") {
+                name = index;
+            }
+        }
+    }
+
+    ASSERT_GE(dialog, 0);
+    ASSERT_GE(name, 0);
+    EXPECT_GT(name, dialog);
 }
