@@ -21,7 +21,7 @@ project, and creating one, come with the launcher (#158).
 | Menu bar | Open scene, `•` when unsaved | Play, Stop |
 | Toolbar | Tools, snap, grid size, overlays | Switch tool, toggle snap and overlays, Undo, Redo |
 | Sidebar | Prefabs, scenes (start scene marked), instances | Open a scene, select an instance |
-| Viewport | The scene (#155) | |
+| Viewport | The scene, drawn like the game, the grid and the selection | Select, move, pan, zoom |
 | Inspector | Name, type, position and fields of the selection | Rename, move, edit and reset fields |
 | Bottom panel | Console, Problems | Switch tab |
 | Status bar | Mode, instance count, game folder, scene | |
@@ -35,6 +35,32 @@ project, and creating one, come with the launcher (#158).
 | F11 | Clay debug view |
 
 On macOS, Cmd replaces Ctrl.
+
+## Viewport
+
+The viewport draws the open scene through an editor camera, separate from the
+game camera. Instances are laid out like the game's renderer: Position is the
+top-left corner, a sprite takes its texture size times Scale, an entity
+without a texture is a 64 px square tinted by its color, and Layer `z_index`
+orders the drawing. Entities without a Sprite, which the game does not draw,
+show as a thin outline so they can still be selected. Textures load from
+`<game>/assets/`; a missing one is drawn as the tinted square.
+
+| Input | Effect |
+|---|---|
+| Click an instance | Select it (the topmost one when they overlap) |
+| Click empty space | Clear the selection |
+| Drag with the Move tool (G) | Move the instance; one `Move` on release, undoable |
+| Alt while dragging | Drop without snapping |
+| Middle drag, or drag with the Pan tool (H) | Pan |
+| Wheel | Zoom around the cursor (0.1x to 10x) |
+| Delete | Delete the selection |
+
+With snap on, a dragged instance's top-left corner lands on the grid. Grid
+lines are drawn unless they would be closer than 6 px on screen; the world
+axes are brighter. The camera, the drag and the pan live in
+`WidgetState::viewport()`; the renderer paints the frame's `ViewportFrame`,
+passed through the Clay element's custom data.
 
 ## Inspector
 
@@ -218,6 +244,7 @@ editor/
   src/clay/       Clay context
   src/text/       TextEdit: UTF-8 caret, selection and editing, no UI
   src/ui/         layout, sections, widgets, widget state, command table
+  src/viewport/   editor camera, snapping, scene layout and hit testing
   src/render/     geometry and scissor helpers for the renderer
   src/raylib/     window, input, Clay renderer, font cache: the only raylib code
 ```
