@@ -17,7 +17,10 @@ project, and creating one, come with the launcher (#158).
 ### Settings
 
 Personal preferences live in a `settings.json` that the editor reads once, at
-startup, and never writes:
+startup. File > Open settings, also in the command palette, opens it with the
+system's program for JSON files; when it does not exist yet, it is created
+holding `{}` first. That is the only time the editor writes it. Changes apply
+the next time the editor starts.
 
 | System | File |
 |---|---|

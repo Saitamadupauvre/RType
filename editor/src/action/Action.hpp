@@ -194,6 +194,14 @@ struct OpenScript {
     std::filesystem::path file;
 };
 
+/**
+ * @brief Opens the user's settings file with the program the system uses for it, creating an
+ * empty one first when it does not exist.
+ */
+struct OpenSettings {
+    static constexpr bool while_running = true;
+};
+
 /** @brief Pauses a playing game; refused otherwise. */
 struct Pause {
     static constexpr bool while_running = true;
@@ -233,7 +241,7 @@ using Command = std::variant<command::Select, command::Undo, command::Redo, comm
                              command::SetStartScene, command::SetSnap, command::SetGridSize,
                              command::SetOverlay, command::SetTool, command::ShowTab,
                              command::ReportInvalidInput, command::SetPrefabFilter,
-                             command::OpenScript, command::Play, command::Pause, command::Stop,
+                             command::OpenScript, command::OpenSettings, command::Play, command::Pause, command::Stop,
                              command::OpenExport, command::SetExport, command::CloseExport,
                              command::RunExport>;
 

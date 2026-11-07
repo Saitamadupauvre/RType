@@ -173,3 +173,40 @@ TEST(SettingsPath, FallsBackToDotConfig) {
 TEST(SettingsPath, NothingWithoutAHome) {
     EXPECT_EQ(editor::settings_path(environment({})), std::nullopt);
 }
+
+TEST(Settings, LoadRemembersTheFile) {
+    TempFolder folder;
+
+    EXPECT_EQ(editor::load_settings(folder.path() / "settings.json").file,
+              folder.path() / "settings.json");
+}
+
+TEST(SettingsFile, CreatesAnEmptyObjectAndItsFolder) {
+    TempFolder folder;
+    const auto file = folder.path() / "engine-editor" / "settings.json";
+
+    const auto result = editor::create_settings_file(file);
+
+    ASSERT_TRUE(result.ok) << result.message;
+    EXPECT_EQ(folder.read("engine-editor/settings.json"), "{}\n");
+    EXPECT_TRUE(editor::load_settings(file).problems.empty());
+}
+
+TEST(SettingsFile, NeverChangesAnExistingFile) {
+    TempFolder folder;
+    folder.write("settings.json", R"({"ui.scale": 2})");
+
+    ASSERT_TRUE(editor::create_settings_file(folder.path() / "settings.json").ok);
+
+    EXPECT_EQ(folder.read("settings.json"), R"({"ui.scale": 2})");
+}
+
+TEST(SettingsFile, ReportsAFolderThatCannotBeMade) {
+    TempFolder folder;
+    folder.write("blocked", "a file, not a folder");
+
+    const auto result = editor::create_settings_file(folder.path() / "blocked" / "settings.json");
+
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.message.find("cannot create"), std::string::npos);
+}

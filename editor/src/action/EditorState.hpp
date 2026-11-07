@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -62,6 +63,8 @@ struct EditorState {
     std::string prefab_filter;
     std::optional<InspectorModel> inspector;
     std::optional<ExportDialog> export_dialog;
+    /** The user's settings file; empty when no config folder was found. */
+    std::filesystem::path settings_file;
 };
 
 } // namespace editor

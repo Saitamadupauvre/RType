@@ -6,6 +6,7 @@
 #include <variant>
 
 #include "action/Overloaded.hpp"
+#include "settings/Settings.hpp"
 
 namespace editor {
 
@@ -42,6 +43,16 @@ CommandResult open_script(const FileOpener& open_file, const std::filesystem::pa
         return CommandResult::refused(std::format("Cannot open {}.", file.string()));
     }
     return CommandResult::done();
+}
+
+CommandResult open_settings(const FileOpener& open_file, const std::filesystem::path& file) {
+    if (file.empty()) {
+        return CommandResult::refused("No settings folder: neither XDG_CONFIG_HOME nor HOME is set.");
+    }
+    if (CommandResult created = create_settings_file(file); !created.ok) {
+        return created;
+    }
+    return open_script(open_file, file);
 }
 
 CommandResult export_game(EditorState& state) {
@@ -106,6 +117,9 @@ CommandResult apply_command(EditorSession& session, EditorState& state, EditorSe
             },
             [&](const command::OpenScript& open) {
                 return open_script(services.open_file, open.file);
+            },
+            [&](const command::OpenSettings&) {
+                return open_settings(services.open_file, state.settings_file);
             },
             [&](const command::Play&) { return play.play(session, state.mode); },
             [&](const command::Pause&) { return play.pause(state.mode); },

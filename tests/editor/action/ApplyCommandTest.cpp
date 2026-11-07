@@ -301,3 +301,26 @@ TEST_F(ApplyExport, ExportWritesTheGameAndClosesTheDialog) {
     EXPECT_TRUE(std::filesystem::exists(_output / "scenes" / "level1.json"));
     EXPECT_TRUE(std::filesystem::exists(_output / "README.txt"));
 }
+
+TEST_F(ApplyCommand, OpenSettingsWithoutAFileIsRefused) {
+    EXPECT_FALSE(run(command::OpenSettings{}));
+    EXPECT_TRUE(_opened.empty());
+}
+
+TEST_F(ApplyCommand, OpenSettingsCreatesTheFileAndOpensIt) {
+    _state.settings_file = _game.path() / ".config" / "engine-editor" / "settings.json";
+
+    ASSERT_TRUE(run(command::OpenSettings{}));
+
+    EXPECT_EQ(_opened, (std::vector<std::filesystem::path>{_state.settings_file}));
+    EXPECT_EQ(_game.read(".config/engine-editor/settings.json"), "{}\n");
+}
+
+TEST_F(ApplyCommand, OpenSettingsKeepsAnExistingFile) {
+    _game.write("settings.json", R"({"view.snap": false})");
+    _state.settings_file = _game.path() / "settings.json";
+
+    ASSERT_TRUE(run(command::OpenSettings{}));
+
+    EXPECT_EQ(_game.read("settings.json"), R"({"view.snap": false})");
+}

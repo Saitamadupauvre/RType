@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "action/EditorState.hpp"
+#include "engine/editor/CommandResult.hpp"
 
 namespace editor {
 
@@ -28,6 +29,8 @@ struct LoadedSettings {
     Settings settings;
     /** One line per problem, naming the key; the settings keep their default for it. */
     std::vector<ConsoleLine> problems;
+    /** The file the settings come from; empty when no config folder was found. */
+    std::filesystem::path file{};
 };
 
 /** @brief Reads an environment variable; std::nullopt when it is not set. */
@@ -52,5 +55,11 @@ using Environment = std::function<std::optional<std::string>(std::string_view na
  * @note Never throws and never writes the file.
  */
 [[nodiscard]] LoadedSettings load_settings(const std::filesystem::path& file);
+
+/**
+ * @brief Creates @p file holding an empty JSON object, and its folder, when it does not exist yet.
+ * @return Refused, with the reason, when it cannot be created; an existing file is never changed.
+ */
+[[nodiscard]] engine::editor::CommandResult create_settings_file(const std::filesystem::path& file);
 
 } // namespace editor

@@ -109,6 +109,24 @@ private:
     LoadedSettings _loaded;
 };
 
+LoadedSettings read_settings(const std::filesystem::path& file) {
+    std::error_code error;
+    if (!std::filesystem::exists(file, error)) {
+        return {};
+    }
+    std::ifstream stream(file, std::ios::binary);
+    const std::string text{std::istreambuf_iterator<char>(stream), {}};
+    if (!stream && !stream.eof()) {
+        LoadedSettings unreadable;
+        unreadable.problems.push_back(
+            {.severity = Severity::error,
+             .text = std::format("{}: cannot be read; using the default settings",
+                                 file.generic_string())});
+        return unreadable;
+    }
+    return parse_settings(text, file.generic_string());
+}
+
 } // namespace
 
 std::optional<std::filesystem::path> settings_path(const Environment& environment) {
@@ -147,21 +165,24 @@ LoadedSettings parse_settings(std::string_view text, std::string_view source) {
 }
 
 LoadedSettings load_settings(const std::filesystem::path& file) {
+    LoadedSettings loaded = read_settings(file);
+    loaded.file = file;
+    return loaded;
+}
+
+engine::editor::CommandResult create_settings_file(const std::filesystem::path& file) {
     std::error_code error;
-    if (!std::filesystem::exists(file, error)) {
-        return {};
+    if (std::filesystem::exists(file, error)) {
+        return engine::editor::CommandResult::done();
     }
-    std::ifstream stream(file, std::ios::binary);
-    const std::string text{std::istreambuf_iterator<char>(stream), {}};
-    if (!stream && !stream.eof()) {
-        LoadedSettings unreadable;
-        unreadable.problems.push_back(
-            {.severity = Severity::error,
-             .text = std::format("{}: cannot be read; using the default settings",
-                                 file.generic_string())});
-        return unreadable;
+    std::filesystem::create_directories(file.parent_path(), error);
+    std::ofstream stream(file, std::ios::binary);
+    stream << "{}\n";
+    if (error || !stream) {
+        return engine::editor::CommandResult::refused(
+            std::format("cannot create {}", file.generic_string()));
     }
-    return parse_settings(text, file.generic_string());
+    return engine::editor::CommandResult::done(std::format("created {}", file.generic_string()));
 }
 
 } // namespace editor

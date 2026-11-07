@@ -60,6 +60,7 @@ void Editor::attach_runtime(std::filesystem::path folder) { _runtime = std::move
 void Editor::apply_settings(const LoadedSettings& loaded) {
     namespace logging = engine::core::log;
     _state.view = loaded.settings.view;
+    _state.settings_file = loaded.file;
     for (const ConsoleLine& problem : loaded.problems) {
         if (problem.severity == Severity::error) {
             logging::error("editor: {}", problem.text);

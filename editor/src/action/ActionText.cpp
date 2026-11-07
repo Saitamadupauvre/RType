@@ -142,6 +142,7 @@ std::string command_text(const Command& command) {
             [](const command::OpenScript& open) {
                 return std::format("command::OpenScript file={}", open.file.generic_string());
             },
+            [](const command::OpenSettings&) { return std::string("command::OpenSettings"); },
             [](const command::Play&) { return std::string("command::Play"); },
             [](const command::Pause&) { return std::string("command::Pause"); },
             [](const command::Stop&) { return std::string("command::Stop"); },
