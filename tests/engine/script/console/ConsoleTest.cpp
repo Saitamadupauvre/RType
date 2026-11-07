@@ -93,7 +93,9 @@ TEST_F(ScriptConsoleTest, ScriptsRegisterVariablesAtLoadTime) {
     EXPECT_EQ(lives->description, "lives at start");
     ASSERT_TRUE(lives->range.has_value());
     EXPECT_DOUBLE_EQ(lives->range->max, 9.0);
-    EXPECT_EQ(_cvars.find("game.speed")->kind, CVarKind::number);
+    const auto speed = _cvars.find("game.speed");
+    ASSERT_TRUE(speed.has_value());
+    EXPECT_EQ(speed.value_or(engine::core::console::CVarInfo{}).kind, CVarKind::number);
     EXPECT_EQ(errors(), 0U);
 }
 
