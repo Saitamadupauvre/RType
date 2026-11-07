@@ -22,6 +22,7 @@ add_library(editor-core STATIC
     src/action/ApplyCommand.cpp
     src/action/ApplyEdit.cpp
     src/action/Editor.cpp
+    src/action/InspectorModel.cpp
     src/action/OpenEditor.cpp
     src/clay/ClayContext.cpp
     src/cli/Cli.cpp

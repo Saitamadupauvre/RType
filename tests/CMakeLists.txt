@@ -253,6 +253,7 @@ editor_add_test(core
         editor/action/ApplyCommandTest.cpp
         editor/action/ApplyEditTest.cpp
         editor/action/EditorTest.cpp
+        editor/action/InspectorModelTest.cpp
         editor/action/OpenEditorTest.cpp
         editor/clay/ClayContextTest.cpp
         editor/cli/CliTest.cpp

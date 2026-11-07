@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "action/Action.hpp"
+#include "action/InspectorModel.hpp"
 
 namespace editor {
 
@@ -35,7 +37,8 @@ struct ConsoleLine {
  * @brief Everything the UI shows besides the session, owned and changed only by Editor.
  *
  * `prefabs` and `scenes` cache EditorSession::prefabs() and EditorSession::scenes(), which scan
- * the disk, and are refreshed after every command.
+ * the disk, and are refreshed after every command. `inspector` caches inspect_selection() and is
+ * refreshed after every action.
  */
 struct EditorState {
     Mode mode = Mode::editing;
@@ -46,6 +49,7 @@ struct EditorState {
     std::vector<std::string> prefabs;
     std::vector<std::string> scenes;
     std::string prefab_filter;
+    std::optional<InspectorModel> inspector;
 };
 
 } // namespace editor

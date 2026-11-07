@@ -24,7 +24,10 @@ CommandResult stop_first() {
 
 } // namespace
 
-Editor::Editor(EditorSession session) : _session(std::move(session)) { refresh_lists(); }
+Editor::Editor(EditorSession session) : _session(std::move(session)) {
+    refresh_lists();
+    refresh_inspector();
+}
 
 void Editor::handle(const Action& action) {
     report(std::visit(Overloaded{
@@ -32,6 +35,7 @@ void Editor::handle(const Action& action) {
                           [&](const Command& command) { return apply(command); },
                       },
                       action));
+    refresh_inspector();
 }
 
 const EditorState& Editor::state() const noexcept { return _state; }
@@ -53,6 +57,8 @@ CommandResult Editor::apply(const Command& command) {
     refresh_lists();
     return result;
 }
+
+void Editor::refresh_inspector() { _state.inspector = inspect_selection(_session); }
 
 void Editor::refresh_lists() {
     _state.prefabs = _session.prefabs();

@@ -32,6 +32,7 @@ private:
     [[nodiscard]] engine::editor::CommandResult apply(const Edit& edit);
     [[nodiscard]] engine::editor::CommandResult apply(const Command& command);
     void refresh_lists();
+    void refresh_inspector();
     void report(const engine::editor::CommandResult& result);
 
     engine::editor::EditorSession _session;
