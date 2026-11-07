@@ -43,7 +43,7 @@ game camera. Instances are laid out like the game's renderer: Position is the
 top-left corner, a sprite takes its texture size times Scale, an entity
 without a texture is a 64 px square tinted by its color, and Layer `z_index`
 orders the drawing. Entities without a Sprite, which the game does not draw,
-show as a thin outline so they can still be selected. Textures load from
+show as a crossed outline so they can still be selected. Textures load from
 `<game>/assets/`; a missing one is drawn as the tinted square.
 
 | Input | Effect |
@@ -54,7 +54,19 @@ show as a thin outline so they can still be selected. Textures load from
 | Alt while dragging | Drop without snapping |
 | Middle drag, or drag with the Pan tool (H) | Pan |
 | Wheel | Zoom around the cursor (0.1x to 10x) |
+| Drag a prefab from PREFABS into the viewport | Place it under the cursor, snapped (`Place`) |
+| Drag the square handle of the selection | Scale it (`SetField` on `Scale.x`, `Scale.y`) |
+| Drag the round handle of the selection | Rotate it, by 15° steps with snap on (`SetField` on `Rotation.degrees`) |
 | Delete | Delete the selection |
+
+Handles only appear when the entity has the component they edit (`Scale`,
+`Rotation`). Alt skips snapping for handles too.
+
+| Overlay | Shows |
+|---|---|
+| Camera frame (always) | What the game shows at start: the view of the first instance with a `Camera`, or the 1920x1080 game screen from the origin |
+| Names (toolbar) | Each instance's name, or its type, above it |
+| Hitboxes (toolbar) | `AABBCollider` and `CircleCollider` outlines |
 
 With snap on, a dragged instance's top-left corner lands on the grid. Grid
 lines are drawn unless they would be closer than 6 px on screen; the world
