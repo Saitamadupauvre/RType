@@ -51,6 +51,7 @@ add_library(editor-core STATIC
     src/ui/sections/StatusBar.cpp
     src/ui/sections/Toolbar.cpp
     src/ui/sections/Viewport.cpp
+    src/viewport/SceneItems.cpp
     src/viewport/Snap.cpp
     src/viewport/ViewCamera.cpp
     src/ui/widgets/Button.cpp
