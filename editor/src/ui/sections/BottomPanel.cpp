@@ -57,6 +57,18 @@ void line(const Theme& theme, Clay_String content, Clay_Color tint) {
     }
 }
 
+Clay_Color line_color(Severity severity) {
+    switch (severity) {
+    case Severity::error:
+        return color::error;
+    case Severity::warning:
+        return color::accent;
+    case Severity::info:
+        break;
+    }
+    return color::text_soft;
+}
+
 void console_line(const Theme& theme, const ConsoleLine& entry) {
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
                      .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)},
@@ -64,8 +76,7 @@ void console_line(const Theme& theme, const ConsoleLine& entry) {
         if (!entry.time.empty()) {
             text(theme, view_of(entry.time), size::small_text, color::text_dim, Face::regular);
         }
-        text(theme, view_of(entry.text), size::small_text,
-             entry.severity == Severity::error ? color::error : color::text_soft);
+        text(theme, view_of(entry.text), size::small_text, line_color(entry.severity));
     }
 }
 

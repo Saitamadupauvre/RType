@@ -24,7 +24,7 @@ struct ViewSettings {
     bool operator==(const ViewSettings&) const = default;
 };
 
-enum class Severity : std::uint8_t { info, error };
+enum class Severity : std::uint8_t { info, warning, error };
 
 /** @brief A line of the editor console, usually the message of a refused command. */
 struct ConsoleLine {
