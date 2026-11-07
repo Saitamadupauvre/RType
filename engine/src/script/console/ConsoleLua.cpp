@@ -269,6 +269,7 @@ ExecutionResult evaluate(sol::state& lua, const sol::table& scope, std::string_v
         return {.ok = false, .output = join(*output, "\n")};
     }
     std::vector<std::string> returned;
+    returned.reserve(static_cast<std::size_t>(result.return_count()));
     const sol::protected_function tostring = lua["tostring"];
     for (int index = 0; index < result.return_count(); ++index) {
         returned.push_back(text_of(tostring, result.get<sol::object>(index)));
