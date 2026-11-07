@@ -324,3 +324,13 @@ TEST_F(Inspector, ShowsTheScriptAndOpensIt) {
     ASSERT_NE(open, nullptr);
     EXPECT_EQ(open->file, _game.path() / "scripts" / "rock.lua");
 }
+
+TEST_F(Inspector, ScriptNameIsCenteredOnTheOpenButton) {
+    select("rock");
+    frame();
+    frame();
+
+    const Clay_BoundingBox name = box_of(CLAY_ID("InspectorScriptName"));
+    const Clay_BoundingBox open = box_of(CLAY_ID("InspectorOpenScript"));
+    EXPECT_FLOAT_EQ(name.y + (name.height / 2.F), open.y + (open.height / 2.F));
+}

@@ -53,7 +53,8 @@ void row(Ui& ui, Clay_String name, auto&& content) {
             text(theme, name, size::small_text, color::text_muted);
         }
         CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
-                         .childGap = theme.px16(4.F)}}) {
+                         .childGap = theme.px16(4.F),
+                         .childAlignment = {.y = CLAY_ALIGN_Y_CENTER}}}) {
             content();
         }
         CLAY({.layout = {.sizing = {.width = CLAY_SIZING_FIXED(theme.px(reset_width))}}}) {}
@@ -110,7 +111,8 @@ void script_row(Ui& ui, const std::filesystem::path& script) {
         return;
     }
     row(ui, CLAY_STRING("Script"), [&] {
-        CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()}}}) {
+        CLAY({.id = CLAY_ID("InspectorScriptName"),
+              .layout = {.sizing = {.width = CLAY_SIZING_GROW()}}}) {
             text(ui.theme(), ui.keep(script.filename().string()), size::text, color::text_soft);
         }
         if (button(ui, CLAY_ID("InspectorOpenScript"), CLAY_STRING("Open"),
