@@ -248,6 +248,21 @@ the containers but gets a zero wheel delta. The F11 debug view scrolls the
 same way. Content that must stay visible, such as the prefab filter, goes
 above the container, not inside it.
 
+Clay tracks at most 10 clip containers (`scrollContainerDatas`, fixed when
+Clay starts); one more corrupts its memory. The editor stays under it:
+
+- only the leaf lists scroll: prefabs, scenes, instances, console and the
+  inspector body; panels and bars never clip;
+- an unfocused text field shortens its text with `...` (`fit_text`) and
+  draws it as a floating child, which does not widen the field; only the
+  focused field clips;
+- `Layout.SelectionAndDebugViewStayWithinClayLimits` fails if a change goes
+  over.
+
+In a small window the sidebar and the inspector shrink to 180 and 240 px and
+the console to 60 px, so the console and the status bar stay visible down to
+about 290 px of height.
+
 ## Code layout
 
 ```
