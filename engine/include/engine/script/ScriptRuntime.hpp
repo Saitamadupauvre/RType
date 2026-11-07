@@ -140,12 +140,15 @@ public:
      * `on_start()` still runs.
      *
      * @param game Game folder. Every file is found relative to it, never the working directory.
+     * @param start_scene_file Scene file spawned instead of the `start_scene` of `game.json`, such
+     * as a scene an editor plays; empty keeps `game.json`'s.
      * @return true if the scripts loaded as for load_scripts(), `game.json` is valid and the start
      * scene, if any, was read; false otherwise. Skipped instances and overrides are logged but do
      * not make it fail.
      * @note Can be called once per runtime, instead of load_scripts(). Never throws.
      */
-    bool load_game(const std::filesystem::path& game) noexcept;
+    bool load_game(const std::filesystem::path& game,
+                   const std::filesystem::path& start_scene_file = {}) noexcept;
 
     /**
      * @brief Loads the declarations of a script folder without starting the game.

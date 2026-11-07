@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -231,4 +232,28 @@ TEST_F(GameFolderTest, ListScenesOfAGameWithoutScenesIsEmpty) {
     std::filesystem::remove_all(_game.path() / "scenes");
 
     EXPECT_TRUE(engine::script::list_scenes(_game.path()).empty());
+}
+
+TEST_F(GameFolderTest, StartSceneFileReplacesTheStartScene) {
+    std::filesystem::copy_file(game_fixture() / "game.json", _game.path() / "game.json");
+    const std::filesystem::path played = _game.path() / "played.json";
+    std::filesystem::copy_file(game_fixture() / "scenes" / "stage1.json", played);
+    std::ofstream(_game.path() / "scenes" / "stage1.json") << R"({"version": 1, "instances": []})";
+
+    ASSERT_TRUE(_runtime.load_game(_game.path(), played));
+
+    EXPECT_EQ(spawned_types(), (std::vector<std::string>{"early", "late"}));
+}
+
+TEST_F(GameFolderTest, EmptyStartSceneFileKeepsTheGameStartScene) {
+    ASSERT_TRUE(_runtime.load_game(game_fixture(), {}));
+
+    EXPECT_EQ(spawned_types(), (std::vector<std::string>{"early", "late"}));
+}
+
+TEST_F(GameFolderTest, MissingStartSceneFileIsReportedAndSpawnsNoScene) {
+    std::filesystem::copy_file(game_fixture() / "game.json", _game.path() / "game.json");
+
+    EXPECT_FALSE(_runtime.load_game(_game.path(), _game.path() / "missing.json"));
+    EXPECT_EQ(std::ranges::count(spawned_types(), "early"), 0);
 }

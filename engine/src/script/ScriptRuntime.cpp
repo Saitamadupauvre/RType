@@ -99,7 +99,7 @@ struct ScriptRuntime::Impl {
     void bind_core();
     sol::object declare(sol::this_state state, DeclarationKind kind, const std::string& name);
     sol::object require(sol::this_state state, const std::string& name);
-    bool load_game(const fs::path& game);
+    bool load_game(const fs::path& game, const fs::path& start_scene_file);
     bool load_scripts(const fs::path& root, const std::optional<GameStart>& game_start);
     bool load_all(const fs::path& root, const std::vector<fs::path>& files,
                   const std::optional<GameStart>& game_start);
@@ -199,10 +199,12 @@ sol::object ScriptRuntime::Impl::require(sol::this_state state, const std::strin
     }
 }
 
-bool ScriptRuntime::Impl::load_game(const fs::path& game) {
+bool ScriptRuntime::Impl::load_game(const fs::path& game, const fs::path& start_scene_file) {
     const std::optional<GameProject> project = read_project(game);
     GameStart game_start;
-    if (project && project->start_scene) {
+    if (!start_scene_file.empty()) {
+        game_start.scene = start_scene_file;
+    } else if (project && project->start_scene) {
         game_start.scene = scene_file(game, *project->start_scene);
     }
     context.game = game;
@@ -445,9 +447,10 @@ bool ScriptRuntime::load_scripts(const std::filesystem::path& root) noexcept {
     return false;
 }
 
-bool ScriptRuntime::load_game(const std::filesystem::path& game) noexcept {
+bool ScriptRuntime::load_game(const std::filesystem::path& game,
+                              const std::filesystem::path& start_scene_file) noexcept {
     try {
-        return _impl->load_game(game);
+        return _impl->load_game(game, start_scene_file);
     } catch (const std::exception& exception) {
         log::error("lua: {}: {}", game.string(), exception.what());
     } catch (...) {
