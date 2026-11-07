@@ -182,6 +182,8 @@ std::string_view key_name(Key key) {
         return "G";
     case Key::h:
         return "H";
+    case Key::p:
+        return "P";
     case Key::del:
         return "Del";
     case Key::backspace:

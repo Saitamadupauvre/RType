@@ -49,6 +49,7 @@ add_library(editor-core STATIC
     src/ui/SmoothScroll.cpp
     src/ui/WidgetState.cpp
     src/ui/sections/BottomPanel.cpp
+    src/ui/sections/CommandPalette.cpp
     src/ui/sections/ExportDialog.cpp
     src/ui/sections/Inspector.cpp
     src/ui/sections/InspectorFields.cpp

@@ -21,6 +21,13 @@ struct FocusRequest {
     std::optional<float> click_x;
 };
 
+/** @brief The command palette: whether it is open, what was typed and the highlighted row. */
+struct PaletteState {
+    bool open = false;
+    std::string query;
+    std::size_t highlighted = 0;
+};
+
 /**
  * @brief The only widget state kept between frames: focus, the focused field's draft, the
  * open popup, the scroll targets and the viewport camera.
@@ -44,6 +51,8 @@ public:
     void blur() noexcept;
     /** @brief Moves focus to the next (or previous) field drawn this frame, at the end of it. */
     void request_tab(bool backward) noexcept;
+    /** @brief Drops the Tab move requested this frame, keeping focus where it is. */
+    void cancel_tab() noexcept;
 
     /** @pre A field is focused. */
     [[nodiscard]] TextEdit& draft() noexcept;
@@ -67,6 +76,7 @@ public:
     /** @pre A popup is open. */
     [[nodiscard]] std::size_t& highlighted() noexcept;
 
+    [[nodiscard]] PaletteState& palette() noexcept;
     [[nodiscard]] SmoothScroll& scroll() noexcept;
     [[nodiscard]] ViewportState& viewport() noexcept;
 
@@ -88,6 +98,7 @@ private:
     std::vector<std::uint32_t> _tab_order;
     std::optional<std::uint32_t> _popup;
     std::size_t _highlighted = 0;
+    PaletteState _palette;
     SmoothScroll _scroll;
     ViewportState _viewport;
 };

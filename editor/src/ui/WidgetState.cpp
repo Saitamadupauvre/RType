@@ -55,6 +55,8 @@ void WidgetState::open(Clay_ElementId id, std::size_t highlighted) noexcept {
     _highlighted = highlighted;
 }
 
+void WidgetState::cancel_tab() noexcept { _tab_backward.reset(); }
+
 void WidgetState::close() noexcept { _popup.reset(); }
 
 std::size_t& WidgetState::highlighted() noexcept { return _highlighted; }
@@ -82,6 +84,8 @@ void WidgetState::resolve_tab() {
 }
 
 bool WidgetState::drawn(std::uint32_t id) const { return std::ranges::find(_tab_order, id) != _tab_order.end(); }
+
+PaletteState& WidgetState::palette() noexcept { return _palette; }
 
 SmoothScroll& WidgetState::scroll() noexcept { return _scroll; }
 
