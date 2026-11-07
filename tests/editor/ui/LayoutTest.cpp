@@ -129,3 +129,14 @@ TEST(BottomPanelHeight, ShrinksToItsMinimumInAShortWindow) {
 TEST(BottomPanelHeight, FollowsTheUiScale) {
     EXPECT_FLOAT_EQ(editor::bottom_panel_height(Theme{.scale = 2.F}, 1800.F), 300.F);
 }
+
+TEST(ThemeFor, MultipliesTheDpiScaleAndCarriesTheScrollSpeed) {
+    editor::EditorState state;
+    state.ui_scale = 1.5F;
+    state.scroll_speed = 2.F;
+
+    const editor::Theme theme = editor::theme_for(state, 2.F);
+
+    EXPECT_FLOAT_EQ(theme.scale, 3.F);
+    EXPECT_FLOAT_EQ(theme.scroll_speed, 2.F);
+}

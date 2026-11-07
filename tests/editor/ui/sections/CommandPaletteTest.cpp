@@ -219,3 +219,13 @@ TEST_F(CommandPalette, OpenSettingsIsDisabledWithoutAConfigFolder) {
 
     EXPECT_TRUE(press(Key::enter).empty());
 }
+
+TEST_F(CommandPalette, ReloadsTheSettings) {
+    editor::LoadedSettings loaded;
+    loaded.file = _game.path() / "settings.json";
+    _editor.apply_settings(loaded);
+    open_palette();
+    type("reload");
+
+    EXPECT_NE(only<command::ReloadSettings>(press(Key::enter)), nullptr);
+}

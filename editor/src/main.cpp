@@ -42,5 +42,5 @@ int main(int argc, char** argv) {
     editor->apply_settings(settings);
     editor->attach_runtime(runtime.parent_path());
     editor->attach_launcher(std::make_unique<editor::ProcessLauncher>(runtime));
-    return editor::run_editor_window(*editor, settings.settings) ? 0 : 84;
+    return editor::run_editor_window(*editor) ? 0 : 84;
 }

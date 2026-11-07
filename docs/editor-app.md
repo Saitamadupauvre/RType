@@ -19,8 +19,10 @@ project, and creating one, come with the launcher (#158).
 Personal preferences live in a `settings.json` that the editor reads once, at
 startup. File > Open settings, also in the command palette, opens it with the
 system's program for JSON files; when it does not exist yet, it is created
-holding `{}` first. That is the only time the editor writes it. Changes apply
-the next time the editor starts.
+holding `{}` first. That is the only time the editor writes it. File > Reload
+settings, also in the palette, reads it again and applies it at once: the scale
+and scroll speed change on the next frame, the `view.*` keys reset the toolbar
+to the file's values, and problems go to the console as at startup.
 
 | System | File |
 |---|---|
@@ -47,8 +49,9 @@ the next time the editor starts.
 | `view.show_hitboxes` | bool | | false | Show hitboxes when the editor starts |
 | `view.show_names` | bool | | true | Show names when the editor starts |
 
-- The `view.*` keys are where the toolbar starts; toggling it changes the
-  session only and never writes the file.
+- The `view.*` keys are where the toolbar starts, and where Reload settings
+  puts it back; toggling it changes the session only and never writes the
+  file.
 - A bad file never stops the editor. A missing file means the defaults.
   Invalid JSON, or JSON that is not an object, gives one error in the console
   and the defaults. An unknown key, a wrong type or a value out of range gives

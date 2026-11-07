@@ -202,6 +202,14 @@ struct OpenSettings {
     static constexpr bool while_running = true;
 };
 
+/**
+ * @brief Reads the settings file again and applies it now: scale, scroll speed and view; its
+ * problems go to the console.
+ */
+struct ReloadSettings {
+    static constexpr bool while_running = true;
+};
+
 /** @brief Pauses a playing game; refused otherwise. */
 struct Pause {
     static constexpr bool while_running = true;
@@ -241,7 +249,7 @@ using Command = std::variant<command::Select, command::Undo, command::Redo, comm
                              command::SetStartScene, command::SetSnap, command::SetGridSize,
                              command::SetOverlay, command::SetTool, command::ShowTab,
                              command::ReportInvalidInput, command::SetPrefabFilter,
-                             command::OpenScript, command::OpenSettings, command::Play, command::Pause, command::Stop,
+                             command::OpenScript, command::OpenSettings, command::ReloadSettings, command::Play, command::Pause, command::Stop,
                              command::OpenExport, command::SetExport, command::CloseExport,
                              command::RunExport>;
 

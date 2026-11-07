@@ -158,7 +158,7 @@ std::string local_time() {
 
 void toggle_debug_view() { Clay_SetDebugModeEnabled(!Clay_IsDebugModeEnabled()); }
 
-void run_frames(Editor& editor, const Settings& settings) {
+void run_frames(Editor& editor) {
     ClayRenderer renderer(font_directory());
     const MeasureText measure = [&renderer](auto text, const auto& config) {
         return renderer.measure(text, config);
@@ -181,8 +181,7 @@ void run_frames(Editor& editor, const Settings& settings) {
         if (IsKeyPressed(KEY_F11)) {
             toggle_debug_view();
         }
-        const Theme theme{.scale = GetWindowScaleDPI().x * settings.ui_scale,
-                          .scroll_speed = settings.scroll_speed};
+        const Theme theme = theme_for(editor.state(), GetWindowScaleDPI().x);
         Ui ui(theme, read_input(clicks), widgets, platform);
         const Clay_RenderCommandArray commands = build_frame(ui, editor, window_size());
         BeginDrawing();
@@ -198,7 +197,7 @@ void run_frames(Editor& editor, const Settings& settings) {
 
 } // namespace
 
-bool run_editor_window(Editor& editor, const Settings& settings) {
+bool run_editor_window(Editor& editor) {
     editor.attach_clock(local_time);
     editor.attach_file_opener([](const std::filesystem::path& file) {
         OpenURL(file.string().c_str());
@@ -211,7 +210,7 @@ bool run_editor_window(Editor& editor, const Settings& settings) {
         return false;
     }
     SetExitKey(KEY_NULL);
-    run_frames(editor, settings);
+    run_frames(editor);
     CloseWindow();
     return true;
 }

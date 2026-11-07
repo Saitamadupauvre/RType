@@ -72,6 +72,7 @@ public:
 private:
     [[nodiscard]] engine::editor::CommandResult apply(const Edit& edit);
     [[nodiscard]] engine::editor::CommandResult apply(const Command& command);
+    [[nodiscard]] engine::editor::CommandResult reload_settings();
     void refresh_lists();
     void refresh_inspector();
     void report(const engine::editor::CommandResult& result);

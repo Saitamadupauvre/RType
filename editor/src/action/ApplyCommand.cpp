@@ -121,6 +121,9 @@ CommandResult apply_command(EditorSession& session, EditorState& state, EditorSe
             [&](const command::OpenSettings&) {
                 return open_settings(services.open_file, state.settings_file);
             },
+            [&](const command::ReloadSettings&) {
+                return CommandResult::refused("Reloading settings needs the editor.");
+            },
             [&](const command::Play&) { return play.play(session, state.mode); },
             [&](const command::Pause&) { return play.pause(state.mode); },
             [&](const command::Stop&) { return play.stop(state.mode); },

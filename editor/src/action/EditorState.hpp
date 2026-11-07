@@ -65,6 +65,10 @@ struct EditorState {
     std::optional<ExportDialog> export_dialog;
     /** The user's settings file; empty when no config folder was found. */
     std::filesystem::path settings_file;
+    /** `ui.scale` of the settings: multiplies the screen's DPI scale. */
+    float ui_scale = 1.F;
+    /** `ui.scroll_speed` of the settings: multiplies the wheel step. */
+    float scroll_speed = 1.F;
 };
 
 } // namespace editor
