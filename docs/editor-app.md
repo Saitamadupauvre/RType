@@ -14,6 +14,45 @@ The argument is required and must be a folder that contains a `game.json`
 (see [Game folder and scenes](game-folder.md)). Opening the editor without a
 project, and creating one, come with the launcher (#158).
 
+### Settings
+
+Personal preferences live in a `settings.json` that the editor reads once, at
+startup, and never writes:
+
+| System | File |
+|---|---|
+| Linux | `$XDG_CONFIG_HOME/engine-editor/settings.json`, or `~/.config/engine-editor/settings.json` |
+| macOS | `~/Library/Application Support/engine-editor/settings.json` |
+
+```json
+{
+    "ui.scale": 1.25,
+    "ui.scroll_speed": 1,
+    "view.snap": true,
+    "view.grid_size": 16,
+    "view.show_hitboxes": false,
+    "view.show_names": true
+}
+```
+
+| Key | Type | Range | Default | Effect |
+|---|---|---|---|---|
+| `ui.scale` | number | 0.5 to 3 | 1 | Multiplies the screen's DPI scale: every panel, font and row |
+| `ui.scroll_speed` | number | 0.25 to 4 | 1 | Multiplies the 40 px one wheel notch scrolls |
+| `view.snap` | bool | | true | Snap to the grid when the editor starts |
+| `view.grid_size` | number | 1 to 512 | 16 | Grid size, in pixels, when the editor starts |
+| `view.show_hitboxes` | bool | | false | Show hitboxes when the editor starts |
+| `view.show_names` | bool | | true | Show names when the editor starts |
+
+- The `view.*` keys are where the toolbar starts; toggling it changes the
+  session only and never writes the file.
+- A bad file never stops the editor. A missing file means the defaults.
+  Invalid JSON, or JSON that is not an object, gives one error in the console
+  and the defaults. An unknown key, a wrong type or a value out of range gives
+  a warning naming the key, and that key keeps its default.
+- Settings are about the tool, for one person. What belongs to the game (its
+  window, scenes, controls) lives in the game folder.
+
 ### Developer logs
 
 The in-app console is for users. What the editor does goes to the engine log
