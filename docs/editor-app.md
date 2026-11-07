@@ -107,8 +107,13 @@ The inspector shows the selected instance. `Editor` caches what it shows in
 `EditorState::inspector` (`inspect_selection`) and refreshes it after every
 action, so the UI never queries the session.
 
-- **Name** and **Position** edit the instance (`Rename`, `Move`). Type is read
-  only.
+- **Name** and **Position** edit the instance (`Rename`, `Move`).
+- **Type** is a dropdown of the prefabs: picking one emits `ChangeType`, which
+  keeps the name, the position and the overrides the new prefab accepts; the
+  console names the dropped ones. Undo brings everything back.
+- **Script** names the file declaring the prefab; **Open** opens it with the
+  system's program for `.lua` files (`OpenScript`). The editor never edits
+  code: behavior, controls and spawning live in the scripts.
 - **Components** lists the registry fields of the components the prefab's
   entity owns, in registration order, under one sub-header per component.
   Labels show the field name as words (`resolve collisions`) and wrap. `Position.pos` is left out: it is the
@@ -125,7 +130,8 @@ action, so the UI never queries the session.
 | string | text field |
 | vec2 | two number fields, x and y |
 | color | swatch and a hex text field: `#RRGGBB` or `#RRGGBBAA` |
-| asset, list | read only for now |
+| asset | text field holding the path, relative to `assets/` |
+| list | one row per item with its kind's widget and `x` to remove it, then `+ Add` (the default of the item kind) |
 
 Committing a value emits `SetField` only when it differs from the shown one.
 Invalid input emits `ReportInvalidInput`, which logs
