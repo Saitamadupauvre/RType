@@ -265,3 +265,30 @@ TEST(EntityManager, ReportsWhetherComponentIsRegistered) {
     EXPECT_TRUE(manager.is_registered<Position>());
     EXPECT_FALSE(manager.is_registered<Velocity>());
 }
+
+TEST(EntityManager, ConstFindReadsAComponent) {
+    EntityManager manager = make_manager();
+    const Entity entity = manager.spawn();
+    manager.add(entity, Position{.x = 3, .y = 4});
+
+    const EntityManager& world = manager;
+    const auto* position = world.find<Position>(entity);
+    ASSERT_NE(position, nullptr);
+    EXPECT_EQ(position->x, 3);
+}
+
+TEST(EntityManager, ConstFindIsNullWithoutTheComponent) {
+    EntityManager manager = make_manager();
+    const Entity entity = manager.spawn();
+
+    const EntityManager& world = manager;
+    EXPECT_EQ(world.find<Velocity>(entity), nullptr);
+}
+
+TEST(EntityManager, ConstFindIsNullForAnUnregisteredType) {
+    EntityManager manager;
+    const Entity entity = manager.spawn();
+
+    const EntityManager& world = manager;
+    EXPECT_EQ(world.find<Position>(entity), nullptr);
+}
