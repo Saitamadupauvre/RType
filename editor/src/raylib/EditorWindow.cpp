@@ -23,6 +23,7 @@
 #include "ui/Layout.hpp"
 #include "ui/LetterKey.hpp"
 #include "ui/Platform.hpp"
+#include "raylib/RaylibLog.hpp"
 #include "ui/Theme.hpp"
 #include "ui/Ui.hpp"
 #include "ui/UiInput.hpp"
@@ -203,6 +204,7 @@ bool run_editor_window(Editor& editor, const Settings& settings) {
         OpenURL(file.string().c_str());
         return true;
     });
+    route_raylib_log();
     SetConfigFlags(window_flags);
     InitWindow(initial_width, initial_height, "Editor");
     if (!IsWindowReady()) {

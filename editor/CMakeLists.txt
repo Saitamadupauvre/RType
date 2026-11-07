@@ -92,6 +92,7 @@ add_executable(editor
     src/raylib/ClayRenderer.cpp
     src/raylib/EditorWindow.cpp
     src/raylib/FontCache.cpp
+    src/raylib/RaylibLog.cpp
     src/raylib/ViewportPainter.cpp
 )
 target_link_libraries(editor PRIVATE editor-core raylib glfw)

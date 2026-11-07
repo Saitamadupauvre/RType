@@ -65,7 +65,7 @@ on stderr, at the level given by `--log-level` (`trace`, `debug`, `info`,
 | Level | Logged |
 |---|---|
 | `info` | The game folder and the start scene at startup; every refused action with its reason (`editor: refused command::Undo: ...`) |
-| `debug` | Every handled action with its fields (`editor: edit::Move id=3 position=(9, 9)`), each font loaded |
+| `debug` | Every handled action with its fields (`editor: edit::Move id=3 position=(9, 9)`), each font loaded, and raylib's own messages (`raylib: ...`) |
 | `trace` | Every key pressed with its modifiers, and the shortcut it ran, skipped because it is disabled, or ignored because a field or dialog has the keyboard |
 
 ```sh
@@ -73,7 +73,9 @@ editor game --log-level trace    # see every key, shortcut and action
 ```
 
 `action/ActionText` names each action and its fields. A font that cannot be
-loaded is a warning at any level.
+loaded is a warning at any level, and so are raylib's warnings and errors.
+Programs the editor opens, such as the text editor for scripts, may still
+print to the same terminal.
 
 ## Window
 
