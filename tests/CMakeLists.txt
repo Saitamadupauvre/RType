@@ -258,10 +258,17 @@ editor_add_test(core
         editor/cli/CliTest.cpp
         editor/render/GeometryTest.cpp
         editor/render/ScissorStackTest.cpp
+        editor/text/TextEditTest.cpp
+        editor/ui/ClickCounterTest.cpp
         editor/ui/CommandTableTest.cpp
         editor/ui/FrameTest.cpp
         editor/ui/LayoutTest.cpp
+        editor/ui/LetterKeyTest.cpp
         editor/ui/ThemeTest.cpp
+        editor/ui/widgets/CheckboxTest.cpp
+        editor/ui/widgets/DropdownTest.cpp
+        editor/ui/widgets/NumberFieldTest.cpp
+        editor/ui/widgets/TextFieldTest.cpp
     LINKS editor-core
 )
 

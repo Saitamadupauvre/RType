@@ -45,6 +45,7 @@ struct EditorState {
     std::vector<ConsoleLine> console;
     std::vector<std::string> prefabs;
     std::vector<std::string> scenes;
+    std::string prefab_filter;
 };
 
 } // namespace editor

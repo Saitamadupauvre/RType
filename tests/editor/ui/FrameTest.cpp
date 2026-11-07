@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <string>
 
 #include "FrameFixture.hpp"
@@ -18,6 +19,10 @@ namespace edit = editor::edit;
 namespace {
 
 using FrameTest = FrameFixture;
+
+std::ptrdiff_t count(const std::vector<std::string>& texts, std::string_view text) {
+    return std::ranges::count(texts, text);
+}
 
 bool contains(const std::vector<std::string>& texts, std::string_view part) {
     return std::ranges::any_of(
@@ -159,4 +164,34 @@ TEST_F(FrameTest, ProblemsTabListsProblems) {
 
     EXPECT_TRUE(contains(texts, "Problems 1"));
     EXPECT_TRUE(contains(texts, "PhysicsBody.type"));
+}
+
+TEST_F(FrameTest, TypingInThePrefabFilterEmitsSetPrefabFilter) {
+    click(CLAY_ID("PrefabFilter"));
+    frame();
+    const auto actions = frame({.typed = "ro"}).actions;
+
+    const auto* filter = only<command::SetPrefabFilter>(actions);
+    ASSERT_NE(filter, nullptr);
+    EXPECT_EQ(filter->text, "ro");
+}
+
+TEST_F(FrameTest, PrefabFilterHidesPrefabsThatDoNotMatch) {
+    const std::ptrdiff_t ships = count(frame().texts, "ship");
+    _editor.handle(command::SetPrefabFilter{.text = "RO"});
+
+    const auto texts = frame().texts;
+    EXPECT_EQ(count(texts, "ship"), ships - 1);
+    EXPECT_FALSE(contains(texts, "No prefab matches"));
+}
+
+TEST_F(FrameTest, EmptyPrefabFilterShowsEveryPrefab) {
+    const auto texts = frame().texts;
+    EXPECT_EQ(count(texts, "rock"), 2);
+    EXPECT_FALSE(contains(texts, "No prefab matches"));
+}
+
+TEST_F(FrameTest, PrefabFilterWithoutMatchShowsAHint) {
+    _editor.handle(command::SetPrefabFilter{.text = "zzz"});
+    EXPECT_TRUE(shows("No prefab matches"));
 }

@@ -39,7 +39,9 @@ Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimension
         bottom_panel(ui, editor);
         status_bar(ui, editor);
     }
-    return Clay_EndLayout();
+    const Clay_RenderCommandArray commands = Clay_EndLayout();
+    ui.widgets().end_frame();
+    return commands;
 }
 
 } // namespace editor

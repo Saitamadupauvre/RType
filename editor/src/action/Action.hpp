@@ -163,6 +163,12 @@ struct ShowTab {
     BottomTab tab = BottomTab::console;
 };
 
+/** @brief Shows only the prefabs whose type contains `text`, ignoring case; empty shows all. */
+struct SetPrefabFilter {
+    static constexpr bool while_running = true;
+    std::string text;
+};
+
 /** @brief Plays from edit mode or resumes from pause; refused while playing. */
 struct Play {
     static constexpr bool while_running = true;
@@ -184,8 +190,9 @@ using Command = std::variant<command::Select, command::Undo, command::Redo, comm
                              command::DiscardChanges, command::CreateScene, command::OpenScene,
                              command::DuplicateScene, command::RenameScene, command::DeleteScene,
                              command::SetStartScene, command::SetSnap, command::SetGridSize,
-                             command::SetOverlay, command::SetTool, command::ShowTab, command::Play,
-                             command::Pause, command::Stop>;
+                             command::SetOverlay, command::SetTool, command::ShowTab,
+                             command::SetPrefabFilter, command::Play, command::Pause,
+                             command::Stop>;
 
 /** @brief What the UI emits; applied after the frame by Editor::handle(). */
 using Action = std::variant<Edit, Command>;

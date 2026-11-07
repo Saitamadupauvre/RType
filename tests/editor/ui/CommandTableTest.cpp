@@ -109,3 +109,8 @@ TEST_F(CommandTable, SaveIsDisabledWithoutAnOpenScene) {
 
     EXPECT_TRUE(press(Key::s, true).empty());
 }
+
+TEST_F(CommandTable, ShortcutsAreIgnoredWhileAFieldHasTheKeyboard) {
+    _widgets.focus(CLAY_ID("SomeField"), "text");
+    EXPECT_TRUE(press(Key::v).empty());
+}

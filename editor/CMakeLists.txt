@@ -27,12 +27,18 @@ add_library(editor-core STATIC
     src/cli/Cli.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
+    src/text/TextEdit.cpp
+    src/text/Utf8.cpp
+    src/ui/ClickCounter.cpp
     src/ui/CommandTable.cpp
     src/ui/Labels.cpp
     src/ui/Layout.cpp
+    src/ui/LetterKey.cpp
     src/ui/Text.cpp
     src/ui/Theme.cpp
     src/ui/Ui.cpp
+    src/ui/UiInput.cpp
+    src/ui/WidgetState.cpp
     src/ui/sections/BottomPanel.cpp
     src/ui/sections/Inspector.cpp
     src/ui/sections/MenuBar.cpp
@@ -42,7 +48,12 @@ add_library(editor-core STATIC
     src/ui/sections/Toolbar.cpp
     src/ui/sections/Viewport.cpp
     src/ui/widgets/Button.cpp
+    src/ui/widgets/Checkbox.cpp
+    src/ui/widgets/Dropdown.cpp
+    src/ui/widgets/FieldKeys.cpp
     src/ui/widgets/ListRow.cpp
+    src/ui/widgets/NumberField.cpp
+    src/ui/widgets/TextField.cpp
     src/ui/widgets/Toggle.cpp
 )
 target_include_directories(editor-core PUBLIC src)
@@ -64,5 +75,6 @@ add_executable(editor
     src/raylib/FontCache.cpp
 )
 target_link_libraries(editor PRIVATE editor-core raylib glfw)
+target_compile_definitions(editor PRIVATE GLFW_INCLUDE_NONE)
 add_dependencies(editor editor-assets)
 editor_set_warnings(editor)

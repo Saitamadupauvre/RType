@@ -15,4 +15,6 @@ namespace editor {
 
 [[nodiscard]] std::string scene_title(const engine::editor::EditorSession& session);
 
+[[nodiscard]] bool matches_filter(std::string_view label, std::string_view filter);
+
 } // namespace editor

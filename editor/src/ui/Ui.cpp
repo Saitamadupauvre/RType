@@ -6,11 +6,18 @@
 
 namespace editor {
 
-Ui::Ui(Theme theme, UiInput input) : _theme(theme), _input(std::move(input)) {}
+Ui::Ui(Theme theme, UiInput input, WidgetState& widgets, const Platform& platform)
+    : _theme(theme), _input(std::move(input)), _widgets(&widgets), _platform(&platform) {}
 
 const Theme& Ui::theme() const noexcept { return _theme; }
 
 const UiInput& Ui::input() const noexcept { return _input; }
+
+WidgetState& Ui::widgets() noexcept { return *_widgets; }
+
+const WidgetState& Ui::widgets() const noexcept { return *_widgets; }
+
+const Platform& Ui::platform() const noexcept { return *_platform; }
 
 bool Ui::hovered(Clay_ElementId id) { return Clay_PointerOver(id); }
 

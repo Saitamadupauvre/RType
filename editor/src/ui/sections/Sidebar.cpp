@@ -9,7 +9,9 @@
 #include "ui/Labels.hpp"
 #include "ui/Text.hpp"
 #include "ui/sections/PanelHeader.hpp"
+#include "ui/widgets/FieldEvent.hpp"
 #include "ui/widgets/ListRow.hpp"
+#include "ui/widgets/TextField.hpp"
 
 namespace editor {
 
@@ -29,12 +31,34 @@ void panel_section(const Theme& theme, Clay_ElementId id, Clay_String title, Con
     }
 }
 
-void prefabs(const Theme& theme, const std::vector<std::string>& types) {
-    if (types.empty()) {
-        empty_hint(theme, CLAY_STRING("No prefabs declared"));
+void prefab_filter(Ui& ui, const std::string& filter) {
+    const Theme& theme = ui.theme();
+    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
+                     .padding = CLAY_PADDING_ALL(theme.px16(6.F))}}) {
+        const TextResult result = text_field(ui, CLAY_ID("PrefabFilter"), filter,
+                                             {.placeholder = "Filter prefabs"});
+        if (result.event != FieldEvent::none && result.value != filter) {
+            ui.emit(command::SetPrefabFilter{.text = result.value});
+        }
     }
-    for (const std::string& type : types) {
-        list_item(theme, {.label = view_of(type)});
+}
+
+void prefabs(Ui& ui, const EditorState& state) {
+    const Theme& theme = ui.theme();
+    prefab_filter(ui, state.prefab_filter);
+    if (state.prefabs.empty()) {
+        empty_hint(theme, CLAY_STRING("No prefabs declared"));
+        return;
+    }
+    bool any = false;
+    for (const std::string& type : state.prefabs) {
+        if (matches_filter(type, state.prefab_filter)) {
+            list_item(theme, {.label = view_of(type)});
+            any = true;
+        }
+    }
+    if (!any) {
+        empty_hint(theme, CLAY_STRING("No prefab matches"));
     }
 }
 
@@ -90,7 +114,7 @@ void sidebar(Ui& ui, const Editor& editor) {
           .backgroundColor = color::panel,
           .border = {.color = color::border, .width = {.right = theme.px16(1.F)}}}) {
         panel_section(theme, CLAY_ID("Prefabs"), CLAY_STRING("PREFABS"),
-                      [&] { prefabs(theme, editor.state().prefabs); });
+                      [&] { prefabs(ui, editor.state()); });
         panel_section(theme, CLAY_ID("Scenes"), CLAY_STRING("SCENES"), [&] { scenes(ui, editor); });
         panel_section(theme, CLAY_ID("Instances"), CLAY_STRING("INSTANCES"),
                       [&] { instances(ui, editor.session()); });
