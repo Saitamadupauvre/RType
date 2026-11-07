@@ -262,6 +262,7 @@ editor_add_test(core
         editor/text/TextEditTest.cpp
         editor/ui/ClickCounterTest.cpp
         editor/ui/CommandTableTest.cpp
+        editor/ui/FieldTextTest.cpp
         editor/ui/FrameTest.cpp
         editor/ui/LayoutTest.cpp
         editor/ui/LetterKeyTest.cpp

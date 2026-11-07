@@ -32,6 +32,7 @@ add_library(editor-core STATIC
     src/text/Utf8.cpp
     src/ui/ClickCounter.cpp
     src/ui/CommandTable.cpp
+    src/ui/FieldText.cpp
     src/ui/Labels.cpp
     src/ui/Layout.cpp
     src/ui/LetterKey.cpp
