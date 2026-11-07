@@ -31,6 +31,7 @@ add_library(editor-core STATIC
     src/play/ProcessLauncher.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
+    src/text/CaretScroll.cpp
     src/text/FitText.cpp
     src/text/TextEdit.cpp
     src/text/Utf8.cpp

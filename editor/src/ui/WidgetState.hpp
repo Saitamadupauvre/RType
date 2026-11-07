@@ -50,6 +50,9 @@ public:
     /** @pre A field is focused. */
     [[nodiscard]] const std::string& original() const noexcept;
 
+    /** @brief How far the focused field's text is scrolled left, in pixels; 0 on focus. */
+    [[nodiscard]] float& text_offset() noexcept;
+
     /** @brief Whether the focused field is selecting with the primary button held. */
     [[nodiscard]] bool dragging() const noexcept;
     void set_dragging(bool dragging) noexcept;
@@ -80,6 +83,7 @@ private:
     std::optional<FocusRequest> _requested;
     std::optional<FocusRequest> _pending;
     std::optional<bool> _tab_backward;
+    float _text_offset = 0.F;
     bool _dragging = false;
     std::vector<std::uint32_t> _tab_order;
     std::optional<std::uint32_t> _popup;

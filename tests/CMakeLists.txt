@@ -262,6 +262,7 @@ editor_add_test(core
         editor/render/ScissorStackTest.cpp
         editor/play/PlaySessionTest.cpp
         editor/play/ProcessLauncherTest.cpp
+        editor/text/CaretScrollTest.cpp
         editor/text/FitTextTest.cpp
         editor/text/TextEditTest.cpp
         editor/ui/ClickCounterTest.cpp
