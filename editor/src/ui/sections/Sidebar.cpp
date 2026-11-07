@@ -2,6 +2,7 @@
 
 #include <clay.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -19,10 +20,11 @@ namespace editor {
 namespace {
 
 template <typename Pinned, typename Content>
-void panel_section(Ui& ui, Clay_ElementId id, Clay_String title, Pinned pinned, Content content) {
+void panel_section(Ui& ui, Clay_ElementId id, Clay_String title, Clay_String detail, Pinned pinned,
+                   Content content) {
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
                      .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
-        panel_header(ui.theme(), title);
+        panel_header(ui.theme(), title, detail);
         pinned();
         CLAY({.id = id,
               .layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
@@ -34,9 +36,12 @@ void panel_section(Ui& ui, Clay_ElementId id, Clay_String title, Pinned pinned, 
 }
 
 template <typename Content>
-void panel_section(Ui& ui, Clay_ElementId id, Clay_String title, Content content) {
-    panel_section(ui, id, title, [] {}, content);
+void panel_section(Ui& ui, Clay_ElementId id, Clay_String title, Clay_String detail,
+                   Content content) {
+    panel_section(ui, id, title, detail, [] {}, content);
 }
+
+Clay_String count(Ui& ui, std::size_t number) { return ui.keep(std::to_string(number)); }
 
 void prefab_filter(Ui& ui, const std::string& filter) {
     const Theme& theme = ui.theme();
@@ -126,11 +131,13 @@ void sidebar(Ui& ui, const Editor& editor) {
           .backgroundColor = color::panel,
           .border = {.color = color::border, .width = {.right = theme.px16(1.F)}}}) {
         panel_section(
-            ui, CLAY_ID("Prefabs"), CLAY_STRING("PREFABS"),
+            ui, CLAY_ID("Prefabs"), CLAY_STRING("PREFABS"), count(ui, editor.state().prefabs.size()),
             [&] { prefab_filter(ui, editor.state().prefab_filter); },
             [&] { prefabs(ui, editor.state()); });
-        panel_section(ui, CLAY_ID("Scenes"), CLAY_STRING("SCENES"), [&] { scenes(ui, editor); });
+        panel_section(ui, CLAY_ID("Scenes"), CLAY_STRING("SCENES"),
+                      count(ui, editor.state().scenes.size()), [&] { scenes(ui, editor); });
         panel_section(ui, CLAY_ID("Instances"), CLAY_STRING("INSTANCES"),
+                      count(ui, editor.session().document().instances.size()),
                       [&] { instances(ui, editor.session()); });
     }
 }
