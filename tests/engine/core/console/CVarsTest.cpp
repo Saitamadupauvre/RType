@@ -3,10 +3,12 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "engine/core/console/CVars.hpp"
 
+using engine::core::console::CVarInfo;
 using engine::core::console::CVarKind;
 using engine::core::console::CVarRange;
 using engine::core::console::CVars;
@@ -16,6 +18,12 @@ using engine::core::console::kind_name;
 using engine::core::console::to_string;
 
 namespace {
+
+CVarInfo info_of(const CVars& cvars, std::string_view name) {
+    const auto found = cvars.find(name);
+    EXPECT_TRUE(found.has_value()) << name;
+    return found.value_or(CVarInfo{});
+}
 
 CVarSpec volume_spec() {
     return {.name = "audio.volume",
@@ -33,12 +41,12 @@ TEST(CVars, KeepsTheKindOfTheDefaultValue) {
     ASSERT_TRUE(cvars.add(volume_spec()));
     ASSERT_TRUE(cvars.add({.name = "player.name", .default_value = std::string("ace")}));
 
-    EXPECT_EQ(cvars.find("debug.flag")->kind, CVarKind::boolean);
-    EXPECT_EQ(cvars.find("sv.rate")->kind, CVarKind::integer);
-    EXPECT_EQ(cvars.find("audio.volume")->kind, CVarKind::number);
-    EXPECT_EQ(cvars.find("player.name")->kind, CVarKind::string);
+    EXPECT_EQ(info_of(cvars, "debug.flag").kind, CVarKind::boolean);
+    EXPECT_EQ(info_of(cvars, "sv.rate").kind, CVarKind::integer);
+    EXPECT_EQ(info_of(cvars, "audio.volume").kind, CVarKind::number);
+    EXPECT_EQ(info_of(cvars, "player.name").kind, CVarKind::string);
     EXPECT_EQ(cvars.get("sv.rate"), CVarValue(std::int64_t{60}));
-    EXPECT_EQ(cvars.find("audio.volume")->description, "master volume");
+    EXPECT_EQ(info_of(cvars, "audio.volume").description, "master volume");
 }
 
 TEST(CVars, ListsVariablesSortedByName) {
