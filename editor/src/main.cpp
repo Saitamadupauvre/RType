@@ -1,12 +1,17 @@
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 
 #include "action/OpenEditor.hpp"
 #include "engine/core/log/Log.hpp"
 #include "cli/Cli.hpp"
 #include "play/ProcessLauncher.hpp"
 #include "raylib/EditorWindow.hpp"
+#include "settings/Settings.hpp"
 
 int main(int argc, char** argv) {
     const auto result = editor::parse_cli({argv, argv + argc});
@@ -24,7 +29,18 @@ int main(int argc, char** argv) {
         result.config->runtime.empty()
             ? std::filesystem::path(argv[0]).parent_path() / "r-type_client"
             : result.config->runtime;
+    const auto settings_file = editor::settings_path([](std::string_view name) {
+        const std::string key(name);
+        const char* value = std::getenv(key.c_str());
+        return value ? std::optional<std::string>(value) : std::nullopt;
+    });
+    const editor::LoadedSettings settings =
+        settings_file ? editor::load_settings(*settings_file) : editor::LoadedSettings{};
+    if (settings_file) {
+        engine::core::log::info("editor: settings {}", settings_file->generic_string());
+    }
+    editor->apply_settings(settings);
     editor->attach_runtime(runtime.parent_path());
     editor->attach_launcher(std::make_unique<editor::ProcessLauncher>(runtime));
-    return editor::run_editor_window(*editor) ? 0 : 84;
+    return editor::run_editor_window(*editor, settings.settings) ? 0 : 84;
 }

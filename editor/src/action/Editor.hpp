@@ -12,6 +12,7 @@
 #include "engine/editor/EditorSession.hpp"
 #include "play/GameLauncher.hpp"
 #include "play/PlaySession.hpp"
+#include "settings/Settings.hpp"
 
 
 
@@ -43,6 +44,11 @@ public:
 
     /** @brief Lets OpenScript open files; without it OpenScript is refused. */
     void attach_file_opener(FileOpener opener);
+    /**
+     * @brief Starts the view with the settings' defaults and writes each settings problem to the
+     * console and the log.
+     */
+    void apply_settings(const LoadedSettings& loaded);
     /** @brief Sets the folder of the runtime binaries an export copies. */
     void attach_runtime(std::filesystem::path folder);
 

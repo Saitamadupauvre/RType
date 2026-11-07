@@ -177,3 +177,17 @@ TEST_F(EditorLog, RefusedActionsAreLoggedAtInfoWithTheReason) {
     EXPECT_TRUE(logged(logging::Level::Debug, "editor: command::Undo"));
     EXPECT_TRUE(logged(logging::Level::Info, "editor: refused command::Undo: "));
 }
+
+TEST_F(EditorLog, SettingsSetTheViewAndReportProblems) {
+    editor::LoadedSettings loaded;
+    loaded.settings.view = {.snap = false, .grid_size = 8.F, .show_hitboxes = true};
+    loaded.problems.push_back(
+        {.severity = Severity::warning, .text = "settings.json: unknown key"});
+
+    _editor.apply_settings(loaded);
+
+    EXPECT_EQ(_editor.state().view, loaded.settings.view);
+    ASSERT_FALSE(_editor.state().console.empty());
+    EXPECT_EQ(_editor.state().console.back().severity, Severity::warning);
+    EXPECT_TRUE(logged(logging::Level::Warn, "editor: settings.json: unknown key"));
+}

@@ -57,6 +57,19 @@ void Editor::log(ConsoleLine line) {
 
 void Editor::attach_runtime(std::filesystem::path folder) { _runtime = std::move(folder); }
 
+void Editor::apply_settings(const LoadedSettings& loaded) {
+    namespace logging = engine::core::log;
+    _state.view = loaded.settings.view;
+    for (const ConsoleLine& problem : loaded.problems) {
+        if (problem.severity == Severity::error) {
+            logging::error("editor: {}", problem.text);
+        } else {
+            logging::warn("editor: {}", problem.text);
+        }
+        log(problem);
+    }
+}
+
 void Editor::update() {
     for (ConsoleLine& line : _play.update(_state.mode)) {
         log(std::move(line));
