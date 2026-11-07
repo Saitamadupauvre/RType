@@ -18,7 +18,7 @@ project, and creating one, come with the launcher (#158).
 
 | Area | Shows | Does |
 |---|---|---|
-| Menu bar | File, Edit, View, Scene and Help menus; open scene, `•` when unsaved | Every command of the command table, Play, Stop |
+| Menu bar | File, Edit, View, Scene and Help menus; open scene, `•` when unsaved | Every command of the command table, Play, Stop, Export |
 | Toolbar | Tools, snap, grid size, overlays | Switch tool, toggle snap and overlays, Undo, Redo |
 | Play band | While playing or paused: the mode and what is blocked | |
 | Sidebar | Prefabs, scenes (start scene marked), instances, each with its count | Open a scene, select or place an instance |
@@ -101,6 +101,39 @@ to change the project."). Closing the game window ends Play too, with its
 exit code in the console. The runtime is `r-type_client` next to the editor,
 or the program given with `--runtime`. `PlaySession` owns the game;
 `ProcessLauncher` is the POSIX launcher and tests give a fake one.
+
+## Export
+
+**Export...** in the menu bar (or File > Export game...) opens a dialog that
+writes a folder holding the game and everything it needs to run without the
+editor:
+
+| Setting | Default |
+|---|---|
+| Name | `name` of `game.json` as a file name (`Space Game` gives `space-game`), or the folder name |
+| Output folder | `<name>-export` next to the game folder |
+| Binaries | Client + server, or client only |
+
+The export copies:
+
+- the runtime, renamed: `r-type_client` becomes `<name>`, `r-type_server`
+  becomes `<name>-server`;
+- the `libengine-*` libraries and `plugins/` from the editor's folder;
+- `game.json`, `scripts/`, and `assets/` and `scenes/` when they exist;
+- a `README.txt` telling how to run every mode: `--solo`, `--host <port>`,
+  `<server-ip> <port>`, and the dedicated server.
+
+The dialog lists what it will copy, or each problem that blocks the export: a
+name that is not 1 to 63 letters, digits, `_` or `-`; no output folder; an
+output inside the game folder; an output that exists and is not empty; a
+missing runtime binary, `plugins/` or `scripts/`. Export stays disabled until
+there are none. It never overwrites anything. The binaries find their
+libraries, plugins and game next to themselves, so the folder can be moved or
+zipped as it is.
+
+`exporter/GameExport` plans and runs the export without a display:
+`plan_export()` only reads the disk, `run_export()` writes it. While the dialog
+is open, it takes the mouse and the keyboard shortcuts.
 
 ## Inspector
 
