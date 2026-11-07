@@ -25,6 +25,7 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 
 add_subdirectory(engine)
 add_subdirectory(plugins)
+add_subdirectory(editor)
 add_subdirectory(game)
 
 # Added by project-bootstrap

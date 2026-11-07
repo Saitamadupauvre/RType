@@ -179,7 +179,7 @@ and are not written back.
 
 ## Not covered yet
 
-- Changing the type of an instance (#151).
+- Changing the type of an instance (#156).
 - Play and stop from the editor (#157).
 
 ## Threading

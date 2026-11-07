@@ -1,0 +1,34 @@
+#pragma once
+
+#include <clay.h>
+#include <raylib.h>
+
+#include <filesystem>
+#include <string_view>
+
+#include "raylib/FontCache.hpp"
+#include "render/ScissorStack.hpp"
+
+namespace editor {
+
+class ClayRenderer {
+public:
+    explicit ClayRenderer(std::filesystem::path font_directory);
+
+    [[nodiscard]] Clay_Dimensions measure(std::string_view text,
+                                          const Clay_TextElementConfig& config);
+    void render(Clay_RenderCommandArray commands);
+
+private:
+    const Font& font_for(std::uint16_t font_id, std::uint16_t size);
+    void draw_rectangle(const Clay_RenderCommand& command) const;
+    void draw_border(const Clay_RenderCommand& command) const;
+    void draw_text(const Clay_RenderCommand& command);
+    void begin_scissor(const Clay_RenderCommand& command);
+    void end_scissor();
+
+    FontCache _fonts;
+    ScissorStack _scissors;
+};
+
+} // namespace editor

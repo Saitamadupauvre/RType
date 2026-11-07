@@ -29,6 +29,7 @@ engine/                     C++ engine, shared libraries engine-<module>
   include/engine/<module>/  public headers
   src/<module>/             implementation and private headers
 plugins/<name>/             runtime plugins (bin/plugins/), e.g. graphics-raylib
+editor/                     editor app: Clay layout, raylib only in editor/src/raylib/
 game/server, game/client    r-type_server / r-type_client entry points
 game/sandbox/               r-type_sandbox: scratch executable to try the engine out
 game/scripts/               Lua game code (main.lua is the entry point)
@@ -36,6 +37,7 @@ assets/                     sprites, sounds, music
 tests/engine/<module>/      tests of one engine module
 tests/game/<target>/        tests of one game target (server, client)
 tests/plugins/<name>/       tests of one plugin's backend-free code
+tests/editor/               tests of the editor's raylib-free code
 tests/fixtures/             test data: packets, Lua scripts...
 docs/                       documentation (English, MkDocs sources; mkdocs.yml at the root)
 ```
@@ -55,6 +57,9 @@ docs/                       documentation (English, MkDocs sources; mkdocs.yml a
   static library linked by the plugin (e.g. `graphics-raylib-letterbox`),
   tested in `tests/plugins/<name>/` and registered with
   `plugin_add_test(<name> SOURCES ... LINKS <library>)`.
+- Editor code under test must not need raylib: it lives in `editor-core`, built
+  from everything outside `editor/src/raylib/`, tested in `tests/editor/` and
+  registered with `editor_add_test(<name> SOURCES ... LINKS editor-core)`.
 - Test names: `TEST(Feature, ExpectedBehaviour)`, e.g.
   `TEST(PacketParser, RejectsTruncatedHeader)`.
 - Test the failure paths, not only the happy path: truncated or random packets,
@@ -71,7 +76,8 @@ docs/                       documentation (English, MkDocs sources; mkdocs.yml a
   Symbols are hidden by default: mark public API with the generated
   `ENGINE_<MODULE>_EXPORT` macro from `<engine/<module>/Export.hpp>`.
 - Third-party headers never appear in public headers (`engine/include/`).
-  `raylib.h` is included only in `plugins/graphics-raylib/`; POSIX socket
+  `raylib.h` is included only in `plugins/graphics-raylib/` and
+  `editor/src/raylib/`; `clay.h` only in `editor/`; POSIX socket
   headers only in `engine/src/network/`. Link third-party libraries with
   `PRIVATE_DEPENDS`.
 - No global state in headers (no `static` variables in templates): registries
@@ -92,7 +98,8 @@ docs/                       documentation (English, MkDocs sources; mkdocs.yml a
   explaining code, no commented-out code, no TODOs in the source (open an
   issue instead). Code must explain itself through names and small functions.
 - **The only exception is professional Doxygen**, and only where it is
-  important: public API in `engine/include/` and plugin interfaces. Use
+  important: public API in `engine/include/`, plugin interfaces and the
+  editor's contract headers (actions, `Editor`, `Ui`, widgets). Use
   `/** ... */` blocks with `@brief`, `@param`, `@return`, `@throws` and
   `@note` as needed. Document the contract (what, preconditions, errors,
   thread safety), never the implementation.

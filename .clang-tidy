@@ -12,8 +12,9 @@ Checks: >
   performance-*,
   readability-const-return-type,
   readability-container-size-empty,
-  readability-redundant-*
+  readability-redundant-*,
+  -readability-redundant-member-init
 WarningsAsErrors: ''
-HeaderFilterRegex: '.*/rtype/(engine|game|tests|plugins)/.*'
+HeaderFilterRegex: '.*/(engine|game|tests|plugins|editor)/.*'
 SystemHeaders: false
 FormatStyle: file

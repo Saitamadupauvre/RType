@@ -37,7 +37,7 @@ public:
     [[nodiscard]] std::vector<T> wait_and_drain(std::stop_token stop_token) {
         std::vector<T> drained;
         std::unique_lock lock(mutex_);
-        ready_.wait(lock, stop_token, [this] { return !items_.empty(); });
+        ready_.wait(lock, std::move(stop_token), [this] { return !items_.empty(); });
         drained.swap(items_);
         return drained;
     }

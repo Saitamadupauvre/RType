@@ -94,9 +94,9 @@ struct WindowConfig {
 };
 
 /** @brief Mouse buttons, independent of any backend. */
-using MouseButton = core::MouseButton;
+using core::MouseButton;
 
 /** @brief Physical keyboard keys, independent of any backend. */
-using Key = core::Key;
+using core::Key;
 
 } // namespace engine::graphics

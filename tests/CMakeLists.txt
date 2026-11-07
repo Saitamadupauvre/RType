@@ -234,6 +234,37 @@ plugin_add_test(audio-raylib
     LINKS audio-raylib-mixer
 )
 
+function(editor_add_test name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
+    set(target editor_${name}_tests)
+
+    add_executable(${target} ${arg_SOURCES})
+    target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
+    target_compile_definitions(${target} PRIVATE
+        RTYPE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+    )
+    editor_set_warnings(${target})
+    set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
+    gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "editor.${name}.")
+endfunction()
+
+editor_add_test(core
+    SOURCES
+        editor/action/ApplyCommandTest.cpp
+        editor/action/ApplyEditTest.cpp
+        editor/action/EditorTest.cpp
+        editor/action/OpenEditorTest.cpp
+        editor/clay/ClayContextTest.cpp
+        editor/cli/CliTest.cpp
+        editor/render/GeometryTest.cpp
+        editor/render/ScissorStackTest.cpp
+        editor/ui/CommandTableTest.cpp
+        editor/ui/FrameTest.cpp
+        editor/ui/LayoutTest.cpp
+        editor/ui/ThemeTest.cpp
+    LINKS editor-core
+)
+
 game_add_test(server SOURCES game/server/CliTest.cpp
     game/server/ShipTest.cpp game/server/MissileTest.cpp game/server/BydoTest.cpp
     game/server/BydoShotTest.cpp game/server/SpawnerTest.cpp game/server/CollisionTest.cpp

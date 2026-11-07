@@ -1,0 +1,72 @@
+#include "action/Editor.hpp"
+
+#include <utility>
+#include <variant>
+
+#include "action/ApplyCommand.hpp"
+#include "action/ApplyEdit.hpp"
+#include "action/Overloaded.hpp"
+
+namespace editor {
+
+using engine::editor::CommandResult;
+using engine::editor::EditorSession;
+
+namespace {
+
+bool allowed_while_running(const Command& command) {
+    return std::visit([](const auto& known) { return known.while_running; }, command);
+}
+
+CommandResult stop_first() {
+    return CommandResult::refused("Stop the game to change the project.");
+}
+
+} // namespace
+
+Editor::Editor(EditorSession session) : _session(std::move(session)) { refresh_lists(); }
+
+void Editor::handle(const Action& action) {
+    report(std::visit(Overloaded{
+                          [&](const Edit& edit) { return apply(edit); },
+                          [&](const Command& command) { return apply(command); },
+                      },
+                      action));
+}
+
+const EditorState& Editor::state() const noexcept { return _state; }
+
+const EditorSession& Editor::session() const noexcept { return _session; }
+
+CommandResult Editor::apply(const Edit& edit) {
+    if (_state.mode != Mode::editing) {
+        return stop_first();
+    }
+    return apply_edit(_session, edit);
+}
+
+CommandResult Editor::apply(const Command& command) {
+    if (_state.mode != Mode::editing && !allowed_while_running(command)) {
+        return stop_first();
+    }
+    CommandResult result = apply_command(_session, _state, command);
+    refresh_lists();
+    return result;
+}
+
+void Editor::refresh_lists() {
+    _state.prefabs = _session.prefabs();
+    _state.scenes = _session.scenes();
+}
+
+void Editor::report(const CommandResult& result) {
+    if (!result.ok) {
+        _state.console.push_back({.severity = Severity::error, .text = result.message});
+        return;
+    }
+    if (!result.message.empty()) {
+        _state.console.push_back({.severity = Severity::info, .text = result.message});
+    }
+}
+
+} // namespace editor
