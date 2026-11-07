@@ -12,6 +12,8 @@ namespace engine::script {
 
 /** @brief What `game.json` says about a game folder. */
 struct GameProject {
+    /** Name of the game, or std::nullopt when `game.json` names none or it is not a string. */
+    std::optional<std::string> name;
     /** Scene spawned when the game starts, or std::nullopt when `game.json` names none. */
     std::optional<std::string> start_scene;
 

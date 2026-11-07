@@ -197,6 +197,20 @@ TEST_F(GameFolderTest, WriteStartSceneKeepsTheOtherKeys) {
     EXPECT_EQ(engine::script::read_project(_game.path())->start_scene, "stage2");
 }
 
+TEST_F(GameFolderTest, ProjectNameIsRead) {
+    _game.write("game.json", R"({ "name": "Space Game", "start_scene": "stage1" })");
+
+    EXPECT_EQ(engine::script::read_project(_game.path())->name, "Space Game");
+}
+
+TEST_F(GameFolderTest, ProjectNameThatIsNotAStringIsIgnored) {
+    _game.write("game.json", R"({ "name": 4 })");
+
+    const auto project = engine::script::read_project(_game.path());
+    ASSERT_TRUE(project.has_value());
+    EXPECT_FALSE(project->name.has_value());
+}
+
 TEST_F(GameFolderTest, WriteStartSceneCreatesTheProjectAndRemovesTheKey) {
     ASSERT_TRUE(engine::script::write_start_scene(_game.path(), "stage1"));
     EXPECT_EQ(engine::script::read_project(_game.path())->start_scene, "stage1");
