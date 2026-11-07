@@ -43,6 +43,7 @@ add_library(editor-core STATIC
     src/ui/WidgetState.cpp
     src/ui/sections/BottomPanel.cpp
     src/ui/sections/Inspector.cpp
+    src/ui/sections/InspectorFields.cpp
     src/ui/sections/MenuBar.cpp
     src/ui/sections/PanelHeader.cpp
     src/ui/sections/Sidebar.cpp

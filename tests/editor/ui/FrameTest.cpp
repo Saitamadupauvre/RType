@@ -147,8 +147,8 @@ TEST_F(FrameTest, InspectorShowsTheSelection) {
     const auto texts = frame().texts;
 
     EXPECT_TRUE(contains(texts, "INSPECTOR · hero"));
-    EXPECT_TRUE(contains(texts, "1, 2"));
-    EXPECT_TRUE(contains(texts, "Script.health"));
+    EXPECT_TRUE(contains(texts, "SCRIPT"));
+    EXPECT_TRUE(contains(texts, "health"));
 }
 
 TEST_F(FrameTest, ConsoleShowsRefusedCommands) {
