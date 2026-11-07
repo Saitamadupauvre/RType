@@ -5,12 +5,16 @@
 #include <string>
 #include <vector>
 
+#include "engine/core/log/Level.hpp"
+
 namespace editor {
 
 struct EditorConfig {
     std::filesystem::path game;
     /** @brief Program that plays the game; empty for the default next to the editor. */
     std::filesystem::path runtime{};
+    /** @brief Lowest level the developer log writes to stderr. */
+    engine::core::log::Level log_level = engine::core::log::Level::Info;
 
     bool operator==(const EditorConfig&) const = default;
 };
