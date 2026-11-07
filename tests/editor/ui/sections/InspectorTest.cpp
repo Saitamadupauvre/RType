@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -261,4 +263,41 @@ TEST_F(Inspector, EmptyAssetShowsNone) {
                                   .value = FieldValue{engine::core::AssetName{}}});
 
     EXPECT_TRUE(shows("none"));
+}
+
+TEST_F(Inspector, FieldsShowTheirValuesAfterLayout) {
+    select("ship");
+    frame();
+
+    EXPECT_TRUE(shows("hero"));
+    EXPECT_TRUE(shows("7"));
+}
+
+TEST_F(Inspector, LongValuesAreShortenedToFitTheirField) {
+    select("ship");
+    const std::string name(40, 'n');
+    _editor.handle(edit::Rename{.id = id_of(_editor.session(), "ship"), .name = name});
+    frame();
+    const auto texts = frame().texts;
+
+    EXPECT_EQ(std::ranges::count(texts, name), 1);
+    EXPECT_TRUE(std::ranges::any_of(texts, [](const std::string& text) {
+        return text.starts_with("nnn") && text.ends_with("...");
+    }));
+}
+
+TEST_F(Inspector, FocusedFieldShowsTheWholeValue) {
+    select("ship");
+    const std::string name(40, 'n');
+    _editor.handle(edit::Rename{.id = id_of(_editor.session(), "ship"), .name = name});
+    click(CLAY_ID("InspectorName"));
+    frame();
+
+    std::ptrdiff_t letters = 0;
+    for (const std::string& text : frame().texts) {
+        if (!text.empty() && std::ranges::count(text, 'n') == std::ranges::ssize(text)) {
+            letters += std::ranges::ssize(text);
+        }
+    }
+    EXPECT_EQ(letters, 2 * std::ranges::ssize(name));
 }
