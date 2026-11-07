@@ -36,8 +36,4 @@ bool button(Ui& ui, Clay_ElementId id, Clay_String label, ButtonStyle style, boo
     return enabled && ui.clicked(id);
 }
 
-void disabled_button(const Theme& theme, Clay_String label) {
-    draw(theme, Clay_ElementId{}, label, resolve({}, false, false));
-}
-
 } // namespace editor

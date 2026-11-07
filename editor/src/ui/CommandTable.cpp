@@ -55,6 +55,13 @@ std::optional<Action> open_script(const Editor& editor) {
     return command::OpenScript{.file = inspector->script};
 }
 
+std::optional<Action> open_export(const Editor& editor) {
+    if (!editing(editor) || editor.state().export_dialog) {
+        return std::nullopt;
+    }
+    return command::OpenExport{};
+}
+
 template <Tool tool> std::optional<Action> use_tool(const Editor&) {
     return command::SetTool{.tool = tool};
 }
@@ -107,6 +114,10 @@ constexpr std::array table{
     CommandEntry{.label = "Save scene", .menu = Menu::file, .shortcut = primary(Key::s), .make = save},
     CommandEntry{.label = "Discard changes", .menu = Menu::file, .shortcut = std::nullopt, .make = discard},
     CommandEntry{.label = "Open script", .menu = Menu::file, .shortcut = std::nullopt, .make = open_script},
+    CommandEntry{.label = "Export game...",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = open_export},
     CommandEntry{.label = "Undo", .menu = Menu::edit, .shortcut = primary(Key::z), .make = undo},
     CommandEntry{.label = "Redo", .menu = Menu::edit, .shortcut = primary(Key::y), .make = redo},
     CommandEntry{.label = "Delete selection",
@@ -218,7 +229,7 @@ std::string shortcut_label(const Shortcut& shortcut) {
 }
 
 void emit_shortcuts(Ui& ui, const Editor& editor) {
-    if (ui.widgets().wants_keyboard()) {
+    if (ui.widgets().wants_keyboard() || editor.state().export_dialog) {
         return;
     }
     for (const CommandEntry& entry : table) {

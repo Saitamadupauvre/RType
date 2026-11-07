@@ -18,7 +18,5 @@ struct ButtonStyle {
 [[nodiscard]] bool button(Ui& ui, Clay_ElementId id, Clay_String label, ButtonStyle style,
                           bool enabled = true);
 
-/** @brief Draws a button that is never clickable, for commands not available yet. */
-void disabled_button(const Theme& theme, Clay_String label);
 
 } // namespace editor

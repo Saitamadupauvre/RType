@@ -7,6 +7,7 @@
 
 #include "action/Action.hpp"
 #include "action/InspectorModel.hpp"
+#include "exporter/GameExport.hpp"
 
 namespace editor {
 
@@ -35,6 +36,14 @@ struct ConsoleLine {
     bool operator==(const ConsoleLine&) const = default;
 };
 
+/** @brief The open export dialog: what the user chose and what exporting it would do. */
+struct ExportDialog {
+    ExportSettings settings;
+    ExportPlan plan;
+
+    bool operator==(const ExportDialog&) const = default;
+};
+
 /**
  * @brief Everything the UI shows besides the session, owned and changed only by Editor.
  *
@@ -52,6 +61,7 @@ struct EditorState {
     std::vector<std::string> scenes;
     std::string prefab_filter;
     std::optional<InspectorModel> inspector;
+    std::optional<ExportDialog> export_dialog;
 };
 
 } // namespace editor

@@ -3,7 +3,9 @@
 #include <filesystem>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "../GameFixture.hpp"
@@ -37,6 +39,7 @@ protected:
         _opened.push_back(file);
         return file.filename() != "locked.lua";
     };
+    std::filesystem::path _runtime;
     InstanceId _rock = id_of(_session, "rock");
 
     void SetUp() override {
@@ -44,7 +47,8 @@ protected:
     }
 
     bool run(const editor::Command& command) {
-        return apply_command(_session, _state, {.play = _play, .open_file = _open_file}, command)
+        return apply_command(_session, _state,
+                             {.play = _play, .open_file = _open_file, .runtime = _runtime}, command)
             .ok;
     }
 
@@ -180,7 +184,8 @@ TEST_F(ApplyCommand, PrefabFilterChangesTheState) {
 }
 
 TEST_F(ApplyCommand, InvalidInputIsRefusedWithItsMessage) {
-    const auto result = apply_command(_session, _state, {.play = _play, .open_file = _open_file},
+    const auto result = apply_command(_session, _state,
+                                      {.play = _play, .open_file = _open_file, .runtime = _runtime},
                                       command::ReportInvalidInput{.message = "bad"});
     EXPECT_FALSE(result.ok);
     EXPECT_EQ(result.message, "bad");
@@ -192,7 +197,8 @@ TEST_F(ApplyCommand, OpenScriptOpensTheFile) {
 }
 
 TEST_F(ApplyCommand, OpenScriptFailureIsReported) {
-    const auto result = apply_command(_session, _state, {.play = _play, .open_file = _open_file},
+    const auto result = apply_command(_session, _state,
+                                      {.play = _play, .open_file = _open_file, .runtime = _runtime},
                                       command::OpenScript{.file = "/game/scripts/locked.lua"});
     EXPECT_FALSE(result.ok);
     EXPECT_NE(result.message.find("locked.lua"), std::string::npos);
@@ -200,7 +206,98 @@ TEST_F(ApplyCommand, OpenScriptFailureIsReported) {
 
 TEST_F(ApplyCommand, OpenScriptWithoutAnOpenerIsRefused) {
     const editor::FileOpener none;
-    EXPECT_FALSE(apply_command(_session, _state, {.play = _play, .open_file = none},
+    EXPECT_FALSE(apply_command(_session, _state,
+                               {.play = _play, .open_file = none, .runtime = _runtime},
                                command::OpenScript{.file = "/game/scripts/rock.lua"})
                      .ok);
+}
+
+namespace {
+
+class ApplyExport : public ApplyCommand {
+protected:
+    std::filesystem::path _output = _game.path().string() + "-export";
+
+    ApplyExport() {
+        _runtime = _game.path() / ".runtime";
+        _game.write(".runtime/r-type_client", "client");
+        _game.write(".runtime/r-type_server", "server");
+        _game.write(".runtime/plugins/graphics-raylib.so", "graphics");
+    }
+
+    void TearDown() override {
+        std::error_code ignored;
+        std::filesystem::remove_all(_output, ignored);
+    }
+
+    [[nodiscard]] const editor::ExportDialog& dialog() const {
+        if (!_state.export_dialog) {
+            throw std::logic_error("the export dialog is not open");
+        }
+        return *_state.export_dialog;
+    }
+
+    void choose_output(const std::filesystem::path& output) {
+        editor::ExportSettings settings = dialog().settings;
+        settings.output = output;
+        ASSERT_TRUE(run(command::SetExport{.settings = settings}));
+    }
+};
+
+} // namespace
+
+TEST_F(ApplyExport, OpenExportPlansTheDefaults) {
+    ASSERT_TRUE(run(command::OpenExport{}));
+
+    ASSERT_TRUE(_state.export_dialog.has_value());
+    EXPECT_EQ(dialog().settings.name, "editor-test");
+    EXPECT_TRUE(dialog().plan.problems.empty());
+    EXPECT_FALSE(dialog().plan.steps.empty());
+}
+
+TEST_F(ApplyExport, SetExportPlansAgain) {
+    ASSERT_TRUE(run(command::OpenExport{}));
+    choose_output({});
+
+    EXPECT_TRUE(dialog().settings.output.empty());
+    EXPECT_FALSE(dialog().plan.problems.empty());
+}
+
+TEST_F(ApplyExport, DialogCommandsNeedTheDialog) {
+    EXPECT_FALSE(run(command::SetExport{}));
+    EXPECT_FALSE(run(command::RunExport{}));
+}
+
+TEST_F(ApplyExport, CloseExportClosesTheDialog) {
+    ASSERT_TRUE(run(command::OpenExport{}));
+    ASSERT_TRUE(run(command::CloseExport{}));
+
+    EXPECT_FALSE(_state.export_dialog.has_value());
+}
+
+TEST_F(ApplyExport, ExportWithProblemsIsRefusedAndKeepsTheDialog) {
+    ASSERT_TRUE(run(command::OpenExport{}));
+    choose_output(_game.path() / "inside");
+
+    const auto result = apply_command(_session, _state,
+                                      {.play = _play, .open_file = _open_file, .runtime = _runtime},
+                                      command::RunExport{});
+
+    EXPECT_FALSE(result.ok);
+    EXPECT_NE(result.message.find("inside the game folder"), std::string::npos);
+    EXPECT_TRUE(_state.export_dialog.has_value());
+    EXPECT_FALSE(std::filesystem::exists(_game.path() / "inside"));
+}
+
+TEST_F(ApplyExport, ExportWritesTheGameAndClosesTheDialog) {
+    ASSERT_TRUE(run(command::OpenExport{}));
+    choose_output(_output);
+
+    ASSERT_TRUE(run(command::RunExport{}));
+
+    EXPECT_FALSE(_state.export_dialog.has_value());
+    EXPECT_TRUE(std::filesystem::exists(_output / "editor-test"));
+    EXPECT_TRUE(std::filesystem::exists(_output / "editor-test-server"));
+    EXPECT_TRUE(std::filesystem::exists(_output / "scenes" / "level1.json"));
+    EXPECT_TRUE(std::filesystem::exists(_output / "README.txt"));
 }

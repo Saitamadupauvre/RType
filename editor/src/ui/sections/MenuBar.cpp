@@ -231,7 +231,10 @@ void menu_bar(Ui& ui, const Editor& editor) {
         text(theme, ui.keep(scene_title(editor.session())), size::small_text, color::text_muted);
         spacer();
         run_buttons(ui, editor.state().mode);
-        disabled_button(theme, CLAY_STRING("Export..."));
+        if (button(ui, CLAY_ID("ExportButton"), CLAY_STRING("Export..."), secondary,
+                   editor.state().mode == Mode::editing)) {
+            ui.emit(command::OpenExport{});
+        }
     }
 }
 
