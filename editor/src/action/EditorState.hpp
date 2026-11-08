@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -56,6 +57,18 @@ struct NameDialog {
     bool operator==(const NameDialog&) const = default;
 };
 
+/** @brief The console keeps this many lines and drops the oldest ones beyond it. */
+inline constexpr std::size_t max_console_lines = 500;
+
+/** @brief The last refused action, so the UI can flash it where the user is looking. */
+struct Refusal {
+    /** Counts refusals; a new value means a new refusal, even with the same text. */
+    std::uint64_t count = 0;
+    std::string text;
+
+    bool operator==(const Refusal&) const = default;
+};
+
 /**
  * @brief Everything the UI shows besides the session, owned and changed only by Editor.
  *
@@ -68,7 +81,9 @@ struct EditorState {
     Tool tool = Tool::select;
     BottomTab bottom_tab = BottomTab::console;
     ViewSettings view;
+    /** The last max_console_lines lines, oldest first. */
     std::vector<ConsoleLine> console;
+    Refusal refusal;
     std::vector<std::string> prefabs;
     std::vector<std::string> scenes;
     /** The files of `<game>/assets/`, refreshed with `prefabs` and `scenes`. */

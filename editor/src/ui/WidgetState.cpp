@@ -93,4 +93,6 @@ SmoothScroll& WidgetState::scroll() noexcept { return _scroll; }
 
 ViewportState& WidgetState::viewport() noexcept { return _viewport; }
 
+ToastState& WidgetState::toast() noexcept { return _toast; }
+
 } // namespace editor

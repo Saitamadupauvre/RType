@@ -61,6 +61,7 @@ add_library(editor-core STATIC
     src/ui/sections/InspectorFields.cpp
     src/ui/sections/MenuBar.cpp
     src/ui/sections/NameDialog.cpp
+    src/ui/sections/Overlays.cpp
     src/ui/sections/PanelHeader.cpp
     src/ui/sections/Sidebar.cpp
     src/ui/sections/StatusBar.cpp
