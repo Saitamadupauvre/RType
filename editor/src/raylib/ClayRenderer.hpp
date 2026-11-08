@@ -19,6 +19,8 @@ public:
     explicit ClayRenderer(std::filesystem::path font_directory);
 
     void set_custom_painter(CustomPainter painter);
+    /** @brief Draws Clay image elements; without one they are skipped. */
+    void set_image_painter(CustomPainter painter);
 
     /** @brief The editor font of `face` at `size` pixels, loaded on first use. */
     [[nodiscard]] const Font& font(Face face, std::uint16_t size);
@@ -37,6 +39,7 @@ private:
 
     FontCache _fonts;
     CustomPainter _custom;
+    CustomPainter _image;
     ScissorStack _scissors;
 };
 

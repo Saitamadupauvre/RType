@@ -31,7 +31,15 @@ std::string_view tool_name(Tool tool) {
 }
 
 std::string_view tab_name(BottomTab tab) {
-    return tab == BottomTab::console ? "console" : "problems";
+    switch (tab) {
+    case BottomTab::console:
+        return "console";
+    case BottomTab::problems:
+        return "problems";
+    case BottomTab::assets:
+        return "assets";
+    }
+    return "";
 }
 
 std::string_view overlay_name(Overlay overlay) {

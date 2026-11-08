@@ -8,6 +8,7 @@
 
 #include "action/Action.hpp"
 #include "action/InspectorModel.hpp"
+#include "assets/AssetList.hpp"
 #include "exporter/GameExport.hpp"
 
 namespace editor {
@@ -58,9 +59,9 @@ struct NameDialog {
 /**
  * @brief Everything the UI shows besides the session, owned and changed only by Editor.
  *
- * `prefabs` and `scenes` cache EditorSession::prefabs() and EditorSession::scenes(), which scan
- * the disk, and are refreshed after every command. `inspector` caches inspect_selection() and is
- * refreshed after every action.
+ * `prefabs`, `scenes` and `assets` cache EditorSession::prefabs(), EditorSession::scenes() and
+ * list_assets(), which scan the disk, and are refreshed after every command. `inspector` caches
+ * inspect_selection() and is refreshed after every action.
  */
 struct EditorState {
     Mode mode = Mode::editing;
@@ -70,6 +71,8 @@ struct EditorState {
     std::vector<ConsoleLine> console;
     std::vector<std::string> prefabs;
     std::vector<std::string> scenes;
+    /** The files of `<game>/assets/`, refreshed with `prefabs` and `scenes`. */
+    std::vector<AssetEntry> assets;
     std::string prefab_filter;
     std::optional<InspectorModel> inspector;
     std::optional<ExportDialog> export_dialog;

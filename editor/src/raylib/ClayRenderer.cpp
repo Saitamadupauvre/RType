@@ -36,6 +36,8 @@ ClayRenderer::ClayRenderer(std::filesystem::path font_directory)
 
 void ClayRenderer::set_custom_painter(CustomPainter painter) { _custom = std::move(painter); }
 
+void ClayRenderer::set_image_painter(CustomPainter painter) { _image = std::move(painter); }
+
 const Font& ClayRenderer::font(Face face, std::uint16_t size) { return _fonts.get(face, size); }
 
 Clay_Dimensions ClayRenderer::measure(std::string_view text, const Clay_TextElementConfig& config) {
@@ -74,8 +76,12 @@ void ClayRenderer::render(Clay_RenderCommandArray commands) {
                 _custom(command);
             }
             break;
-        case CLAY_RENDER_COMMAND_TYPE_NONE:
         case CLAY_RENDER_COMMAND_TYPE_IMAGE:
+            if (_image) {
+                _image(command);
+            }
+            break;
+        case CLAY_RENDER_COMMAND_TYPE_NONE:
             break;
         }
     }

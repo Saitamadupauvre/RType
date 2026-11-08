@@ -41,6 +41,8 @@ TEST(ActionText, CommandsShowTheirFields) {
         describe_action(command::SetOverlay{.overlay = editor::Overlay::names, .visible = true}),
         "command::SetOverlay overlay=names visible=true");
     EXPECT_EQ(describe_action(command::ReloadScripts{}), "command::ReloadScripts");
+    EXPECT_EQ(describe_action(command::ShowTab{.tab = editor::BottomTab::assets}),
+              "command::ShowTab tab=assets");
     EXPECT_EQ(describe_action(command::CreatePrefab{.name = "crate"}),
               "command::CreatePrefab name=crate");
     EXPECT_EQ(describe_action(command::OpenNameDialog{.item = editor::NewItem::scene}),

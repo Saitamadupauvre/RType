@@ -30,6 +30,14 @@ struct Placing {
     bool armed = false;
 };
 
+/** @brief An asset dragged from the Assets tab, dropped on an instance to set its sprite or shader.
+ */
+struct AssetDrag {
+    std::string path;
+    std::string value;
+    std::string key;
+};
+
 /** @brief A scale or rotate handle being dragged, with the item as it was when grabbed. */
 struct HandleDrag {
     Handle handle = Handle::scale;
@@ -59,6 +67,7 @@ struct ViewportState {
     std::optional<ViewDrag> drag;
     std::optional<HandleDrag> handle;
     std::optional<Placing> placing;
+    std::optional<AssetDrag> asset_drag;
     std::optional<engine::core::Vec2> pan_from;
     ViewportFrame frame;
 };

@@ -43,4 +43,10 @@ inline constexpr std::size_t max_assets = 2000;
  */
 [[nodiscard]] std::optional<std::string_view> asset_field(AssetKind kind);
 
+/**
+ * @return The value an asset gives the field of asset_field(): its path, without the extension
+ * for a shader (`shaders/space.fs` is the shader `shaders/space`).
+ */
+[[nodiscard]] std::string asset_value(const AssetEntry& entry);
+
 } // namespace editor

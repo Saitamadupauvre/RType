@@ -29,6 +29,9 @@ public:
 
     [[nodiscard]] std::optional<engine::core::Vec2> texture_size(std::string_view path);
     void paint(const Clay_RenderCommand& command);
+    /** @brief Draws the texture of the AssetEntry an image element points at, fitted and centred.
+     */
+    void paint_thumbnail(const Clay_RenderCommand& command);
 
 private:
     [[nodiscard]] const Texture2D* texture(std::string_view path);

@@ -279,6 +279,7 @@ editor_add_test(core
         editor/ui/LetterKeyTest.cpp
         editor/ui/SmoothScrollTest.cpp
         editor/ui/ThemeTest.cpp
+        editor/ui/sections/AssetsTabTest.cpp
         editor/ui/sections/CommandPaletteTest.cpp
         editor/ui/sections/ExportDialogTest.cpp
         editor/ui/sections/InspectorFieldsTest.cpp

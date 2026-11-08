@@ -144,6 +144,7 @@ void Editor::refresh_inspector() { _state.inspector = inspect_selection(_session
 void Editor::refresh_lists() {
     _state.prefabs = _session.prefabs();
     _state.scenes = _session.scenes();
+    _state.assets = list_assets(_session.game());
 }
 
 void Editor::report(const CommandResult& result) {

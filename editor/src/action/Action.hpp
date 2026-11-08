@@ -81,7 +81,7 @@ using Edit = std::variant<edit::Place, edit::Move, edit::Remove, edit::Rename, e
 
 enum class Overlay : std::uint8_t { hitboxes, names };
 enum class Tool : std::uint8_t { select, move, pan };
-enum class BottomTab : std::uint8_t { console, problems };
+enum class BottomTab : std::uint8_t { console, problems, assets };
 /** @brief What the name dialog creates. */
 enum class NewItem : std::uint8_t { prefab, scene };
 

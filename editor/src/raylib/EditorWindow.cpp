@@ -164,6 +164,8 @@ void run_frames(Editor& editor) {
                             });
     renderer.set_custom_painter(
         [&painter](const Clay_RenderCommand& command) { painter.paint(command); });
+    renderer.set_image_painter(
+        [&painter](const Clay_RenderCommand& command) { painter.paint_thumbnail(command); });
     const Platform platform{
         .measure = measure,
         .read_clipboard = read_clipboard,

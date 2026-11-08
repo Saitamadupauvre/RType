@@ -141,6 +141,28 @@ void place(Ui& ui, const Editor& editor, Vec2 world, bool over, ViewportState& s
     }
 }
 
+void drop_asset(Ui& ui, const std::vector<SceneItem>& items, Vec2 world, bool over,
+                ViewportState& state, const AssetDrag& dragged) {
+    const UiInput& input = ui.input();
+    const std::optional<engine::editor::InstanceId> target =
+        over ? item_at(items, world) : std::nullopt;
+    const auto item = target ? std::ranges::find(items, *target, &SceneItem::id) : items.end();
+    if (item != items.end()) {
+        state.frame.ghost = WorldBox{.top_left = item->top_left, .size = item->size};
+    }
+    if (pressed(input, Key::escape)) {
+        state.asset_drag.reset();
+    } else if (!input.primary_down) {
+        if (item != items.end()) {
+            ui.emit(edit::SetField{
+                .id = item->id,
+                .key = dragged.key,
+                .value = engine::core::FieldValue{engine::core::AssetName{.path = dragged.value}}});
+        }
+        state.asset_drag.reset();
+    }
+}
+
 void interact(Ui& ui, const Editor& editor, const std::vector<SceneItem>& items,
               Clay_BoundingBox box, ViewportState& state, ViewCamera& camera) {
     const UiInput& input = ui.input();
@@ -151,7 +173,9 @@ void interact(Ui& ui, const Editor& editor, const std::vector<SceneItem>& items,
     pan(input, editor.state().tool, over, state, camera);
     const Vec2 world = to_world(camera, box, pointer_of(input));
     state.frame.cursor = over ? std::optional<Vec2>(world) : std::nullopt;
-    if (state.placing) {
+    if (state.asset_drag) {
+        drop_asset(ui, items, world, over, state, *state.asset_drag);
+    } else if (state.placing) {
         place(ui, editor, world, over, state, *state.placing);
     } else if (state.handle) {
         if (drag_handle(ui, editor, world, *state.handle)) {

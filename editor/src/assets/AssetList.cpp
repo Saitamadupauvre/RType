@@ -87,6 +87,13 @@ std::string_view kind_label(AssetKind kind) {
     return "file";
 }
 
+std::string asset_value(const AssetEntry& entry) {
+    if (entry.kind != AssetKind::shader) {
+        return entry.path;
+    }
+    return fs::path(entry.path).replace_extension().generic_string();
+}
+
 std::optional<std::string_view> asset_field(AssetKind kind) {
     switch (kind) {
     case AssetKind::sprite:

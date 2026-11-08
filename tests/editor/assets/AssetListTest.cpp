@@ -69,6 +69,13 @@ TEST(AssetList, OnlySpritesAndShadersSetAField) {
     EXPECT_EQ(asset_field(AssetKind::other), std::nullopt);
 }
 
+TEST(AssetList, ShadersAreNamedWithoutTheirExtension) {
+    EXPECT_EQ(editor::asset_value({.path = "shaders/space.fs", .kind = AssetKind::shader}),
+              "shaders/space");
+    EXPECT_EQ(editor::asset_value({.path = "sprites/ship.png", .kind = AssetKind::sprite}),
+              "sprites/ship.png");
+}
+
 TEST(AssetList, KindsHaveLabels) {
     EXPECT_EQ(kind_label(AssetKind::sprite), "sprite");
     EXPECT_EQ(kind_label(AssetKind::other), "file");
