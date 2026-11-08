@@ -323,3 +323,56 @@ TEST_F(ApplyCommand, OpenSettingsKeepsAnExistingFile) {
 
     EXPECT_EQ(_game.read("settings.json"), R"({"view.snap": false})");
 }
+
+TEST_F(ApplyCommand, CreatePrefabWritesReloadsAndOpensTheScript) {
+    _state.name_dialog = editor::NameDialog{.item = editor::NewItem::prefab, .name = "crate"};
+
+    ASSERT_TRUE(run(command::CreatePrefab{.name = "crate"}));
+
+    const auto file = _game.path() / "scripts" / "crate.lua";
+    EXPECT_TRUE(std::filesystem::is_regular_file(file));
+    EXPECT_EQ(_session.prefabs(), (std::vector<std::string>{"crate", "rock", "ship"}));
+    EXPECT_EQ(_opened, (std::vector<std::filesystem::path>{file}));
+    EXPECT_FALSE(_state.name_dialog.has_value());
+}
+
+TEST_F(ApplyCommand, CreatePrefabRefusesADeclaredName) {
+    _state.name_dialog = editor::NameDialog{.item = editor::NewItem::prefab, .name = "rock"};
+    std::filesystem::rename(_game.path() / "scripts" / "rock.lua",
+                            _game.path() / "scripts" / "stones.lua");
+
+    EXPECT_FALSE(run(command::CreatePrefab{.name = "rock"}));
+
+    EXPECT_FALSE(std::filesystem::exists(_game.path() / "scripts" / "rock.lua"));
+    EXPECT_TRUE(_state.name_dialog.has_value());
+    EXPECT_TRUE(_opened.empty());
+}
+
+TEST_F(ApplyCommand, CreatePrefabRefusesABadName) {
+    _state.name_dialog = editor::NameDialog{.item = editor::NewItem::prefab, .name = "a b"};
+
+    EXPECT_FALSE(run(command::CreatePrefab{.name = "a b"}));
+
+    EXPECT_TRUE(_state.name_dialog.has_value());
+}
+
+TEST_F(ApplyCommand, CreateSceneClosesTheNameDialog) {
+    _state.name_dialog = editor::NameDialog{.item = editor::NewItem::scene, .name = "boss"};
+
+    ASSERT_TRUE(run(command::CreateScene{.name = "boss"}));
+
+    EXPECT_FALSE(_state.name_dialog.has_value());
+    EXPECT_EQ(_session.open_scene_name(), "boss");
+}
+
+TEST_F(ApplyCommand, NameDialogOpensChangesAndCloses) {
+    EXPECT_FALSE(run(command::SetNameDialogText{.name = "x"}));
+
+    ASSERT_TRUE(run(command::OpenNameDialog{.item = editor::NewItem::scene}));
+    ASSERT_TRUE(run(command::SetNameDialogText{.name = "boss"}));
+    EXPECT_EQ(_state.name_dialog,
+              (editor::NameDialog{.item = editor::NewItem::scene, .name = "boss"}));
+
+    ASSERT_TRUE(run(command::CloseNameDialog{}));
+    EXPECT_FALSE(_state.name_dialog.has_value());
+}

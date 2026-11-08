@@ -45,6 +45,14 @@ struct ExportDialog {
     bool operator==(const ExportDialog&) const = default;
 };
 
+/** @brief The open name dialog: what it creates and the name typed so far. */
+struct NameDialog {
+    NewItem item = NewItem::prefab;
+    std::string name;
+
+    bool operator==(const NameDialog&) const = default;
+};
+
 /**
  * @brief Everything the UI shows besides the session, owned and changed only by Editor.
  *
@@ -63,6 +71,7 @@ struct EditorState {
     std::string prefab_filter;
     std::optional<InspectorModel> inspector;
     std::optional<ExportDialog> export_dialog;
+    std::optional<NameDialog> name_dialog;
     /** The user's settings file; empty when no config folder was found. */
     std::filesystem::path settings_file;
     /** `ui.scale` of the settings: multiplies the screen's DPI scale. */

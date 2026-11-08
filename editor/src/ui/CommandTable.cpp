@@ -82,8 +82,19 @@ std::optional<Action> reload_settings(const Editor& editor) {
 
 std::optional<Action> reload_scripts(const Editor&) { return command::ReloadScripts{}; }
 
+bool dialog_open(const Editor& editor) {
+    return editor.state().export_dialog || editor.state().name_dialog;
+}
+
+template <NewItem item> std::optional<Action> open_name_dialog(const Editor& editor) {
+    if (!editing(editor) || dialog_open(editor)) {
+        return std::nullopt;
+    }
+    return command::OpenNameDialog{.item = item};
+}
+
 std::optional<Action> open_export(const Editor& editor) {
-    if (!editing(editor) || editor.state().export_dialog) {
+    if (!editing(editor) || dialog_open(editor)) {
         return std::nullopt;
     }
     return command::OpenExport{};
@@ -138,6 +149,14 @@ constexpr Shortcut primary(Key key) { return {.key = key, .primary_modifier = tr
 constexpr Shortcut plain(Key key) { return {.key = key}; }
 
 constexpr std::array table{
+    CommandEntry{.label = "New prefab...",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = open_name_dialog<NewItem::prefab>},
+    CommandEntry{.label = "New scene...",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = open_name_dialog<NewItem::scene>},
     CommandEntry{
         .label = "Save scene", .menu = Menu::file, .shortcut = primary(Key::s), .make = save},
     CommandEntry{
@@ -293,7 +312,7 @@ void trace_keys(const UiInput& input) {
 void emit_shortcuts(Ui& ui, const Editor& editor) {
     namespace logging = engine::core::log;
     trace_keys(ui.input());
-    if (ui.widgets().wants_keyboard() || editor.state().export_dialog) {
+    if (ui.widgets().wants_keyboard() || dialog_open(editor)) {
         if (!ui.input().keys_pressed.empty()) {
             logging::trace("editor: shortcuts ignored, a field or dialog has the keyboard");
         }

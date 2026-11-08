@@ -8,6 +8,7 @@
 #include "ui/sections/ExportDialog.hpp"
 #include "ui/sections/Inspector.hpp"
 #include "ui/sections/MenuBar.hpp"
+#include "ui/sections/NameDialog.hpp"
 #include "ui/sections/Sidebar.hpp"
 #include "ui/sections/StatusBar.hpp"
 #include "ui/sections/Toolbar.hpp"
@@ -79,6 +80,7 @@ Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimension
         bottom_panel(ui, editor, bottom_panel_height(ui.theme(), window.height));
         status_bar(ui, editor);
         export_dialog(ui, editor, window);
+        name_dialog(ui, editor, window);
         command_palette(ui, editor, window);
     }
     const Clay_RenderCommandArray commands = Clay_EndLayout();

@@ -1,11 +1,15 @@
 #include "action/ApplyCommand.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <format>
+#include <string>
 #include <variant>
+#include <vector>
 
 #include "action/Overloaded.hpp"
+#include "project/ProjectFiles.hpp"
 #include "settings/Settings.hpp"
 
 namespace editor {
@@ -56,6 +60,34 @@ CommandResult open_settings(const FileOpener& open_file, const std::filesystem::
     return open_script(open_file, file);
 }
 
+CommandResult new_prefab(EditorSession& session, EditorState& state, const FileOpener& open_file,
+                         const std::string& name) {
+    const std::vector<std::string> prefabs = session.prefabs();
+    if (std::ranges::find(prefabs, name) != prefabs.end()) {
+        return CommandResult::refused(std::format("A prefab named '{}' already exists.", name));
+    }
+    CommandResult created = create_prefab(session.game(), name);
+    if (!created.ok) {
+        return created;
+    }
+    state.name_dialog.reset();
+    if (const CommandResult reloaded = session.reload_scripts(); !session.scripts_loaded()) {
+        return CommandResult::done(std::format("{}; {}", created.message, reloaded.message));
+    }
+    if (open_file && !open_file(prefab_file(session.game(), name))) {
+        return CommandResult::done(std::format("{}; cannot open it", created.message));
+    }
+    return created;
+}
+
+CommandResult new_scene(EditorSession& session, EditorState& state, const std::string& name) {
+    CommandResult result = session.create_scene(name);
+    if (result.ok) {
+        state.name_dialog.reset();
+    }
+    return result;
+}
+
 CommandResult export_game(EditorState& state) {
     if (!state.export_dialog) {
         return CommandResult::refused("the export dialog is not open");
@@ -83,7 +115,27 @@ CommandResult apply_command(EditorSession& session, EditorState& state, EditorSe
             [&](const command::Redo&) { return session.redo(); },
             [&](const command::Save&) { return session.save(); },
             [&](const command::DiscardChanges&) { return session.discard_changes(); },
-            [&](const command::CreateScene& scene) { return session.create_scene(scene.name); },
+            [&](const command::CreateScene& scene) {
+                return new_scene(session, state, scene.name);
+            },
+            [&](const command::CreatePrefab& prefab) {
+                return new_prefab(session, state, services.open_file, prefab.name);
+            },
+            [&](const command::OpenNameDialog& open) {
+                state.name_dialog = NameDialog{.item = open.item, .name = ""};
+                return CommandResult::done();
+            },
+            [&](const command::SetNameDialogText& text) {
+                if (!state.name_dialog) {
+                    return CommandResult::refused("the name dialog is not open");
+                }
+                state.name_dialog->name = text.name;
+                return CommandResult::done();
+            },
+            [&](const command::CloseNameDialog&) {
+                state.name_dialog.reset();
+                return CommandResult::done();
+            },
             [&](const command::OpenScene& scene) { return session.open_scene(scene.name); },
             [&](const command::DuplicateScene& scene) {
                 return session.duplicate_scene(scene.from, scene.to);

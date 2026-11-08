@@ -37,6 +37,7 @@ Clay_ElementId row_id(std::size_t entry) {
 bool opens(Ui& ui, const Editor& editor) {
     const UiInput& input = ui.input();
     return !ui.widgets().wants_keyboard() && !editor.state().export_dialog &&
+           !editor.state().name_dialog &&
            input.primary_modifier == palette_shortcut.primary_modifier &&
            input.shift == palette_shortcut.shift &&
            std::ranges::find(input.keys_pressed, palette_shortcut.key) != input.keys_pressed.end();

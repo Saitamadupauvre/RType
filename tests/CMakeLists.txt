@@ -282,6 +282,7 @@ editor_add_test(core
         editor/ui/sections/InspectorFieldsTest.cpp
         editor/ui/sections/InspectorTest.cpp
         editor/ui/sections/MenuBarTest.cpp
+        editor/ui/sections/NameDialogTest.cpp
         editor/ui/sections/ViewportTest.cpp
         editor/ui/widgets/CheckboxTest.cpp
         editor/ui/widgets/DropdownTest.cpp
