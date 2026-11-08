@@ -4,12 +4,17 @@
 #include <cmath>
 #include <exception>
 #include <format>
+#include <memory>
+#include <mutex>
 #include <span>
+#include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 
 #include "SessionState.hpp"
 #include "engine/core/log/Log.hpp"
+#include "engine/core/log/Sink.hpp"
 #include "engine/script/EditorApi.hpp"
 #include "engine/script/GameFolder.hpp"
 
@@ -61,6 +66,33 @@ void write_override(std::vector<script::FieldOverride>& overrides, std::string_v
     }
 }
 
+constexpr std::string_view lua_prefix = "lua: ";
+
+class ScriptMessageSink final : public log::Sink {
+public:
+    explicit ScriptMessageSink(std::shared_ptr<log::Sink> next) : _next(std::move(next)) {}
+
+    void write(const log::Record& record) override {
+        _next->write(record);
+        if (record.level < log::Level::Warn || !record.message.starts_with(lua_prefix)) {
+            return;
+        }
+        const std::scoped_lock lock(_mutex);
+        _messages.push_back({.error = record.level >= log::Level::Error,
+                             .text = std::string(record.message.substr(lua_prefix.size()))});
+    }
+
+    std::vector<ScriptMessage> take() {
+        const std::scoped_lock lock(_mutex);
+        return std::exchange(_messages, {});
+    }
+
+private:
+    std::shared_ptr<log::Sink> _next;
+    std::mutex _mutex;
+    std::vector<ScriptMessage> _messages;
+};
+
 script::ScriptRuntime editor_runtime() {
     return script::ScriptRuntime::builder().with<script::EditorApi>().build();
 }
@@ -72,8 +104,13 @@ bool finite(core::Vec2 point) { return std::isfinite(point.x) && std::isfinite(p
 EditorSession::Impl::Impl(fs::path folder) : game(std::move(folder)), runtime(editor_runtime()) {}
 
 void EditorSession::Impl::load_scripts() {
+    const std::shared_ptr<log::Sink> previous = log::current_sink();
+    const auto capture = std::make_shared<ScriptMessageSink>(previous);
+    log::set_sink(capture);
     script::ScriptRuntime fresh = editor_runtime();
     scripts_loaded = fresh.load_declarations(script::scripts_folder(game));
+    log::set_sink(previous);
+    script_messages = capture->take();
     runtime = std::move(fresh);
     const auto project = script::read_project(game);
     start_scene = project ? project->start_scene : std::nullopt;
@@ -150,6 +187,10 @@ EditorSession& EditorSession::operator=(EditorSession&&) noexcept = default;
 const fs::path& EditorSession::game() const noexcept { return _impl->game; }
 
 bool EditorSession::scripts_loaded() const noexcept { return _impl->scripts_loaded; }
+
+const std::vector<ScriptMessage>& EditorSession::script_messages() const noexcept {
+    return _impl->script_messages;
+}
 
 std::vector<std::string> EditorSession::prefabs() const {
     std::vector<std::string> types = _impl->runtime.entity_types();
