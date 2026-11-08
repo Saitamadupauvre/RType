@@ -180,6 +180,24 @@ TEST_F(ScriptDeclarationsTest, DoesNotWarnOnCustomMethods) {
     EXPECT_FALSE(logged(logger::Level::Warn, {"'on_collide' is never called"}));
 }
 
+TEST_F(ScriptDeclarationsTest, ExplainsCallsToPlannedFunctions) {
+    ASSERT_TRUE(_runtime.load_scripts(declarations_fixture("short_form")));
+
+    EXPECT_FALSE(_runtime.run_string("after(2, function() end)", "check"));
+
+    EXPECT_TRUE(logged(logger::Level::Error,
+                       {"global 'after') ('after' is planned but not implemented yet"}));
+}
+
+TEST_F(ScriptDeclarationsTest, LeavesOtherNilErrorsAlone) {
+    ASSERT_TRUE(_runtime.load_scripts(declarations_fixture("short_form")));
+
+    EXPECT_FALSE(_runtime.run_string("undefined_thing()", "check"));
+
+    EXPECT_TRUE(logged(logger::Level::Error, {"global 'undefined_thing'"}));
+    EXPECT_FALSE(logged(logger::Level::Error, {"not implemented"}));
+}
+
 TEST_F(ScriptDeclarationsTest, WarnsOnFileDeclaringNothing) {
     EXPECT_TRUE(_runtime.load_scripts(declarations_fixture("empty_file")));
 
