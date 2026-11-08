@@ -26,6 +26,7 @@ constexpr auto symbols = std::to_array<int>({
     0x2192,
     0x25BE,
     0x25CF,
+    0x2713,
 });
 
 std::vector<int> codepoints() {
