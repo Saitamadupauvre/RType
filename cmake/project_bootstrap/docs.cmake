@@ -10,7 +10,7 @@ if(DOXYGEN_FOUND)
     set(DOXYGEN_WARN_AS_ERROR NO)
 
     set(workspace_doc_inputs "${PROJECT_SOURCE_DIR}/README.md")
-    foreach(dir engine/include engine/src plugins game)
+    foreach(dir engine/include engine/src plugins editor/src runtime/src)
         if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/${dir}")
             list(APPEND workspace_doc_inputs "${PROJECT_SOURCE_DIR}/${dir}")
         endif()
