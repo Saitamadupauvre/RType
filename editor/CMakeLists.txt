@@ -22,6 +22,7 @@ add_library(editor-core STATIC
     src/action/ApplyCommand.cpp
     src/action/ApplyEdit.cpp
     src/action/Editor.cpp
+    src/action/InspectorModel.cpp
     src/action/OpenEditor.cpp
     src/clay/ClayContext.cpp
     src/cli/Cli.cpp
@@ -31,6 +32,7 @@ add_library(editor-core STATIC
     src/text/Utf8.cpp
     src/ui/ClickCounter.cpp
     src/ui/CommandTable.cpp
+    src/ui/FieldText.cpp
     src/ui/Labels.cpp
     src/ui/Layout.cpp
     src/ui/LetterKey.cpp
@@ -38,9 +40,11 @@ add_library(editor-core STATIC
     src/ui/Theme.cpp
     src/ui/Ui.cpp
     src/ui/UiInput.cpp
+    src/ui/SmoothScroll.cpp
     src/ui/WidgetState.cpp
     src/ui/sections/BottomPanel.cpp
     src/ui/sections/Inspector.cpp
+    src/ui/sections/InspectorFields.cpp
     src/ui/sections/MenuBar.cpp
     src/ui/sections/PanelHeader.cpp
     src/ui/sections/Sidebar.cpp

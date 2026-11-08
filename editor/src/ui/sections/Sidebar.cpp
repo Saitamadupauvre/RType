@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "ui/Labels.hpp"
+#include "ui/SmoothScroll.hpp"
 #include "ui/Text.hpp"
 #include "ui/sections/PanelHeader.hpp"
 #include "ui/widgets/FieldEvent.hpp"
@@ -17,18 +18,24 @@ namespace editor {
 
 namespace {
 
-template <typename Content>
-void panel_section(const Theme& theme, Clay_ElementId id, Clay_String title, Content content) {
+template <typename Pinned, typename Content>
+void panel_section(Ui& ui, Clay_ElementId id, Clay_String title, Pinned pinned, Content content) {
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
                      .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
-        panel_header(theme, title);
+        panel_header(ui.theme(), title);
+        pinned();
         CLAY({.id = id,
               .layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
                          .layoutDirection = CLAY_TOP_TO_BOTTOM},
-              .clip = {.vertical = true, .childOffset = Clay_GetScrollOffset()}}) {
+              .clip = scroll_clip(ui.widgets().scroll(), id)}) {
             content();
         }
     }
+}
+
+template <typename Content>
+void panel_section(Ui& ui, Clay_ElementId id, Clay_String title, Content content) {
+    panel_section(ui, id, title, [] {}, content);
 }
 
 void prefab_filter(Ui& ui, const std::string& filter) {
@@ -45,7 +52,6 @@ void prefab_filter(Ui& ui, const std::string& filter) {
 
 void prefabs(Ui& ui, const EditorState& state) {
     const Theme& theme = ui.theme();
-    prefab_filter(ui, state.prefab_filter);
     if (state.prefabs.empty()) {
         empty_hint(theme, CLAY_STRING("No prefabs declared"));
         return;
@@ -113,10 +119,12 @@ void sidebar(Ui& ui, const Editor& editor) {
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::panel,
           .border = {.color = color::border, .width = {.right = theme.px16(1.F)}}}) {
-        panel_section(theme, CLAY_ID("Prefabs"), CLAY_STRING("PREFABS"),
-                      [&] { prefabs(ui, editor.state()); });
-        panel_section(theme, CLAY_ID("Scenes"), CLAY_STRING("SCENES"), [&] { scenes(ui, editor); });
-        panel_section(theme, CLAY_ID("Instances"), CLAY_STRING("INSTANCES"),
+        panel_section(
+            ui, CLAY_ID("Prefabs"), CLAY_STRING("PREFABS"),
+            [&] { prefab_filter(ui, editor.state().prefab_filter); },
+            [&] { prefabs(ui, editor.state()); });
+        panel_section(ui, CLAY_ID("Scenes"), CLAY_STRING("SCENES"), [&] { scenes(ui, editor); });
+        panel_section(ui, CLAY_ID("Instances"), CLAY_STRING("INSTANCES"),
                       [&] { instances(ui, editor.session()); });
     }
 }

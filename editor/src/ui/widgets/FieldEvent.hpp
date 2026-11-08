@@ -14,6 +14,8 @@ enum class FieldEvent : std::uint8_t {
     committed,
     /** Esc restored the value the field had when it took focus. */
     cancelled,
+    /** The draft was committed but is not a valid value: the field shows the value again. */
+    rejected,
 };
 
 /** @brief Result of a field: the event and the value it carries. */

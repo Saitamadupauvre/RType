@@ -253,6 +253,7 @@ editor_add_test(core
         editor/action/ApplyCommandTest.cpp
         editor/action/ApplyEditTest.cpp
         editor/action/EditorTest.cpp
+        editor/action/InspectorModelTest.cpp
         editor/action/OpenEditorTest.cpp
         editor/clay/ClayContextTest.cpp
         editor/cli/CliTest.cpp
@@ -261,10 +262,13 @@ editor_add_test(core
         editor/text/TextEditTest.cpp
         editor/ui/ClickCounterTest.cpp
         editor/ui/CommandTableTest.cpp
+        editor/ui/FieldTextTest.cpp
         editor/ui/FrameTest.cpp
         editor/ui/LayoutTest.cpp
         editor/ui/LetterKeyTest.cpp
+        editor/ui/SmoothScrollTest.cpp
         editor/ui/ThemeTest.cpp
+        editor/ui/sections/InspectorTest.cpp
         editor/ui/widgets/CheckboxTest.cpp
         editor/ui/widgets/DropdownTest.cpp
         editor/ui/widgets/NumberFieldTest.cpp
