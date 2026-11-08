@@ -82,4 +82,6 @@ bool WidgetState::drawn(std::uint32_t id) const { return std::ranges::find(_tab_
 
 SmoothScroll& WidgetState::scroll() noexcept { return _scroll; }
 
+ViewportState& WidgetState::viewport() noexcept { return _viewport; }
+
 } // namespace editor

@@ -51,6 +51,9 @@ add_library(editor-core STATIC
     src/ui/sections/StatusBar.cpp
     src/ui/sections/Toolbar.cpp
     src/ui/sections/Viewport.cpp
+    src/viewport/SceneItems.cpp
+    src/viewport/Snap.cpp
+    src/viewport/ViewCamera.cpp
     src/ui/widgets/Button.cpp
     src/ui/widgets/Checkbox.cpp
     src/ui/widgets/Dropdown.cpp
@@ -77,6 +80,7 @@ add_executable(editor
     src/raylib/ClayRenderer.cpp
     src/raylib/EditorWindow.cpp
     src/raylib/FontCache.cpp
+    src/raylib/ViewportPainter.cpp
 )
 target_link_libraries(editor PRIVATE editor-core raylib glfw)
 target_compile_definitions(editor PRIVATE GLFW_INCLUDE_NONE)

@@ -128,6 +128,15 @@ public:
     template <typename T> [[nodiscard]] T& get(Entity entity) { return pool_of<T>().get(entity); }
 
     /**
+     * @brief Reads a component without changing the world.
+     * @return Pointer to the component of the entity, or nullptr if the entity has none or T is
+     * not registered.
+     */
+    template <typename T> [[nodiscard]] const T* find(Entity entity) const noexcept {
+        return is_registered<T>() ? pool_of<T>().find(entity) : nullptr;
+    }
+
+    /**
      * @brief Checks if an entity has a component.
      * @tparam T Component type.
      * @param entity Entity to check.

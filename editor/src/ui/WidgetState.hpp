@@ -11,6 +11,7 @@
 
 #include "text/TextEdit.hpp"
 #include "ui/SmoothScroll.hpp"
+#include "viewport/ViewportState.hpp"
 
 namespace editor {
 
@@ -22,7 +23,7 @@ struct FocusRequest {
 
 /**
  * @brief The only widget state kept between frames: focus, the focused field's draft, the
- * open popup and the scroll targets.
+ * open popup, the scroll targets and the viewport camera.
  *
  * Owned by the frame loop and lent to each frame's Ui. Focus changes requested during a frame
  * apply on the next one, so the field losing focus always gets to commit first.
@@ -64,6 +65,7 @@ public:
     [[nodiscard]] std::size_t& highlighted() noexcept;
 
     [[nodiscard]] SmoothScroll& scroll() noexcept;
+    [[nodiscard]] ViewportState& viewport() noexcept;
 
     /** @brief Applies Tab moves, drops focus from fields not drawn and starts the next frame. */
     void end_frame();
@@ -83,6 +85,7 @@ private:
     std::optional<std::uint32_t> _popup;
     std::size_t _highlighted = 0;
     SmoothScroll _scroll;
+    ViewportState _viewport;
 };
 
 } // namespace editor

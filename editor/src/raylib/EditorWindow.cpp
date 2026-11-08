@@ -16,6 +16,7 @@
 
 #include "clay/ClayContext.hpp"
 #include "raylib/ClayRenderer.hpp"
+#include "raylib/ViewportPainter.hpp"
 #include "ui/ClickCounter.hpp"
 #include "ui/Layout.hpp"
 #include "ui/LetterKey.hpp"
@@ -130,6 +131,7 @@ UiInput read_input(ClickCounter& clicks) {
     const bool pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     return {.pointer = pointer,
             .primary_down = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
+            .middle_down = IsMouseButtonDown(MOUSE_BUTTON_MIDDLE),
             .primary_pressed = pressed,
             .click_count = pressed ? clicks.press(pointer, GetTime()) : std::uint8_t{1},
             .wheel = to_clay(GetMouseWheelMoveV()),
@@ -138,7 +140,8 @@ UiInput read_input(ClickCounter& clicks) {
             .keys_repeated = keys_where(letters, IsKeyPressedRepeat),
             .typed = typed_text(),
             .primary_modifier = IsKeyDown(primary_left) || IsKeyDown(primary_right),
-            .shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)};
+            .shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT),
+            .alt = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)};
 }
 
 void toggle_debug_view() { Clay_SetDebugModeEnabled(!Clay_IsDebugModeEnabled()); }
@@ -149,8 +152,14 @@ void run_frames(Editor& editor) {
         return renderer.measure(text, config);
     };
     const ClayContext clay(window_size(), measure);
-    const Platform platform{
-        .measure = measure, .read_clipboard = read_clipboard, .write_clipboard = write_clipboard};
+    ViewportPainter painter(editor.session().game() / "assets");
+    renderer.set_custom_painter([&painter](const Clay_RenderCommand& command) { painter.paint(command); });
+    const Platform platform{.measure = measure,
+                            .read_clipboard = read_clipboard,
+                            .write_clipboard = write_clipboard,
+                            .texture_size = [&painter](std::string_view path) {
+                                return painter.texture_size(path);
+                            }};
     WidgetState widgets;
     ClickCounter clicks;
 

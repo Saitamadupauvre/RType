@@ -40,7 +40,7 @@ Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimension
         CLAY({.id = CLAY_ID("Workspace"),
               .layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()}}}) {
             sidebar(ui, editor);
-            viewport();
+            viewport(ui, editor);
             inspector(ui, editor);
         }
         bottom_panel(ui, editor);
