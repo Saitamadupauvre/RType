@@ -33,6 +33,8 @@ struct ConsoleLine {
     std::string text;
     /** @brief When the line was written, as "HH:MM:SS"; empty when no clock is attached. */
     std::string time{};
+    /** @brief The script the line names (`player.lua:12:`) when it exists; clicking opens it. */
+    std::filesystem::path script{};
 
     bool operator==(const ConsoleLine&) const = default;
 };

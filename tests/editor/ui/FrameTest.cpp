@@ -158,6 +158,17 @@ TEST_F(FrameTest, ConsoleShowsRefusedCommands) {
     EXPECT_TRUE(contains(frame().texts, _editor.state().console.front().text));
 }
 
+TEST_F(FrameTest, ClickingAConsoleLineThatNamesAScriptOpensIt) {
+    _editor.handle(editor::command::ReportInvalidInput{.message = "rock.lua:2: boom"});
+    _editor.handle(editor::command::ReportInvalidInput{.message = "no script here"});
+
+    const auto actions = click(CLAY_IDI("ConsoleLine", 0));
+    const auto* open = only<editor::command::OpenScript>(actions);
+    ASSERT_NE(open, nullptr);
+    EXPECT_EQ(open->file, _game.path() / "scripts" / "rock.lua");
+    EXPECT_TRUE(click(CLAY_IDI("ConsoleLine", 1)).empty());
+}
+
 TEST_F(FrameTest, ProblemsTabListsProblems) {
     _editor.handle(command::OpenScene{.name = "faulty"});
     _editor.handle(command::ShowTab{.tab = BottomTab::problems});

@@ -3,6 +3,7 @@
 #include <clay.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string>
@@ -69,24 +70,31 @@ Clay_Color line_color(Severity severity) {
     return color::text_soft;
 }
 
-void console_line(const Theme& theme, const ConsoleLine& entry) {
-    CLAY({.layout = {
-              .sizing = {.width = CLAY_SIZING_GROW()},
-              .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)},
-              .childGap = theme.px16(12.F)}}) {
+void console_line(Ui& ui, Clay_ElementId id, const ConsoleLine& entry) {
+    const Theme& theme = ui.theme();
+    const bool opens = !entry.script.empty();
+    CLAY({.id = id,
+          .layout = {.sizing = {.width = CLAY_SIZING_GROW()},
+                     .padding = {.left = theme.px16(size::gutter),
+                                 .right = theme.px16(size::gutter)},
+                     .childGap = theme.px16(12.F)},
+          .backgroundColor = opens && Ui::hovered(id) ? color::hover : Clay_Color{}}) {
         if (!entry.time.empty()) {
             text(theme, view_of(entry.time), size::small_text, color::text_dim, Face::regular);
         }
         text(theme, view_of(entry.text), size::small_text, line_color(entry.severity));
     }
+    if (opens && ui.clicked(id)) {
+        ui.emit(command::OpenScript{.file = entry.script});
+    }
 }
 
-void console(const Theme& theme, const std::vector<ConsoleLine>& lines) {
+void console(Ui& ui, const std::vector<ConsoleLine>& lines) {
     if (lines.empty()) {
-        empty_hint(theme, CLAY_STRING("Nothing to report"));
+        empty_hint(ui.theme(), CLAY_STRING("Nothing to report"));
     }
-    for (const ConsoleLine& entry : lines) {
-        console_line(theme, entry);
+    for (std::size_t index = 0; index < lines.size(); ++index) {
+        console_line(ui, CLAY_IDI("ConsoleLine", static_cast<std::uint32_t>(index)), lines[index]);
     }
 }
 
@@ -133,7 +141,7 @@ void bottom_panel(Ui& ui, const Editor& editor, float height) {
                          .layoutDirection = CLAY_TOP_TO_BOTTOM},
               .clip = scroll_clip(ui.widgets().scroll(), CLAY_ID("BottomContent"))}) {
             if (editor.state().bottom_tab == BottomTab::console) {
-                console(theme, editor.state().console);
+                console(ui, editor.state().console);
             } else {
                 problems(ui, editor.session());
             }
