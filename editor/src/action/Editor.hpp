@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "action/Action.hpp"
+#include "action/ApplyCommand.hpp"
 #include "action/EditorState.hpp"
 #include "engine/editor/CommandResult.hpp"
 #include "engine/editor/EditorSession.hpp"
@@ -35,6 +36,9 @@ public:
     /** @brief Lets Play start games; without a launcher Play is refused. */
     void attach_launcher(std::unique_ptr<GameLauncher> launcher);
 
+    /** @brief Lets OpenScript open files; without it OpenScript is refused. */
+    void attach_file_opener(FileOpener opener);
+
     /**
      * @brief Follows the played game: its output goes to the console, and its end brings the
      * editor back to Mode::editing. Called once per frame by the loop.
@@ -62,6 +66,7 @@ private:
     engine::editor::EditorSession _session;
     EditorState _state;
     PlaySession _play;
+    FileOpener _open_file;
 };
 
 } // namespace editor

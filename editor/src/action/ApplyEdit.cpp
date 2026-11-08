@@ -21,6 +21,9 @@ CommandResult apply_edit(EditorSession& session, const Edit& edit) {
             },
             [&](const edit::ResetField& reset) { return session.reset_field(reset.id, reset.key); },
             [&](const edit::ResetAll& reset) { return session.reset_all(reset.id); },
+            [&](const edit::ChangeType& change) {
+                return session.change_type(change.id, change.type);
+            },
         },
         edit);
 }

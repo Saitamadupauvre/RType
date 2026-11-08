@@ -1,6 +1,8 @@
 #include "action/ApplyCommand.hpp"
 
 #include <cmath>
+#include <filesystem>
+#include <format>
 #include <variant>
 
 #include "action/Overloaded.hpp"
@@ -32,10 +34,21 @@ CommandResult set_grid_size(ViewSettings& view, float size) {
     return CommandResult::done();
 }
 
+CommandResult open_script(const FileOpener& open_file, const std::filesystem::path& file) {
+    if (!open_file) {
+        return CommandResult::refused("Opening files is not available here.");
+    }
+    if (!open_file(file)) {
+        return CommandResult::refused(std::format("Cannot open {}.", file.string()));
+    }
+    return CommandResult::done();
+}
+
 } // namespace
 
-CommandResult apply_command(EditorSession& session, EditorState& state, PlaySession& play,
+CommandResult apply_command(EditorSession& session, EditorState& state, EditorServices services,
                             const Command& command) {
+    PlaySession& play = services.play;
     return std::visit(
         Overloaded{
             [&](const command::Select& select) { return session.select(select.id); },
@@ -75,6 +88,9 @@ CommandResult apply_command(EditorSession& session, EditorState& state, PlaySess
             [&](const command::SetPrefabFilter& filter) {
                 state.prefab_filter = filter.text;
                 return CommandResult::done();
+            },
+            [&](const command::OpenScript& open) {
+                return open_script(services.open_file, open.file);
             },
             [&](const command::Play&) { return play.play(session, state.mode); },
             [&](const command::Pause&) { return play.pause(state.mode); },

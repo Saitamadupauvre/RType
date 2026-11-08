@@ -1,6 +1,7 @@
 #include "action/InspectorModel.hpp"
 
 #include <algorithm>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -62,6 +63,14 @@ std::vector<InspectorField> script_fields(EditorSession& session, const Instance
     return fields;
 }
 
+std::filesystem::path script_of(const EditorSession& session, std::string_view type) {
+    const auto declaration = session.runtime().find_declaration(type);
+    if (!declaration) {
+        return {};
+    }
+    return session.game() / "scripts" / declaration->source;
+}
+
 } // namespace
 
 std::optional<InspectorModel> inspect_selection(EditorSession& session) {
@@ -73,7 +82,8 @@ std::optional<InspectorModel> inspect_selection(EditorSession& session) {
     }
     return InspectorModel{.id = *id,
                           .fields = registry_fields(session, entry->instance, *entity),
-                          .script_fields = script_fields(session, entry->instance)};
+                          .script_fields = script_fields(session, entry->instance),
+                          .script = script_of(session, entry->instance.type)};
 }
 
 } // namespace editor

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -26,6 +27,8 @@ struct InspectorModel {
     engine::editor::InstanceId id;
     std::vector<InspectorField> fields;
     std::vector<InspectorField> script_fields;
+    /** File declaring the instance's prefab; empty when the runtime does not know it. */
+    std::filesystem::path script;
 
     bool operator==(const InspectorModel&) const = default;
 };

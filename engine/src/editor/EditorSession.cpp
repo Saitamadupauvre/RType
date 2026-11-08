@@ -283,6 +283,42 @@ CommandResult EditorSession::reset_all(InstanceId id) {
     return _impl->commit(std::move(next));
 }
 
+CommandResult EditorSession::change_type(InstanceId id, std::string_view type) {
+    const DocumentInstance* current = _impl->document.find(id);
+    if (current == nullptr) {
+        return unknown_instance(id);
+    }
+    const auto declaration = _impl->runtime.find_declaration(type);
+    if (!declaration || declaration->kind != script::DeclarationKind::Entity) {
+        return CommandResult::refused(std::format("'{}' is not a declared entity", type));
+    }
+    if (current->instance.type == type) {
+        return CommandResult::done();
+    }
+    SceneDocument next = _impl->document;
+    script::Instance& instance = next.find(id)->instance;
+    instance.type = std::string(type);
+    std::vector<script::FieldOverride> kept;
+    std::vector<std::string> dropped;
+    for (script::FieldOverride& item : instance.overrides) {
+        if (override_problem(_impl->runtime, instance, item.field, item.value)) {
+            dropped.push_back(item.field);
+        } else {
+            kept.push_back(std::move(item));
+        }
+    }
+    instance.overrides = std::move(kept);
+    CommandResult result = _impl->commit(std::move(next));
+    if (result.ok && !dropped.empty()) {
+        std::string names;
+        for (const std::string& name : dropped) {
+            names += (names.empty() ? "" : ", ") + name;
+        }
+        return CommandResult::done(std::format("dropped what '{}' does not have: {}", type, names));
+    }
+    return result;
+}
+
 CommandResult EditorSession::undo() {
     auto previous = _impl->history.undo(_impl->document);
     if (!previous) {
