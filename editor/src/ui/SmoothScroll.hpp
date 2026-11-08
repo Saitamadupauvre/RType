@@ -42,6 +42,6 @@ private:
  * rows must keep the panel width passes `clip_horizontally = false` and keeps its texts wrapped.
  */
 [[nodiscard]] Clay_ClipElementConfig scroll_clip(SmoothScroll& scroll, Clay_ElementId id,
-                                                bool clip_horizontally = true);
+                                                 bool clip_horizontally = true);
 
 } // namespace editor

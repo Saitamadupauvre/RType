@@ -18,5 +18,4 @@ struct ButtonStyle {
 [[nodiscard]] bool button(Ui& ui, Clay_ElementId id, Clay_String label, ButtonStyle style,
                           bool enabled = true);
 
-
 } // namespace editor

@@ -20,21 +20,25 @@ constexpr std::string_view position_key = "Position.pos";
 constexpr std::string_view script_prefix = "Script.";
 
 const FieldValue* override_of(const Instance& instance, std::string_view key) {
-    const auto found = std::ranges::find(instance.overrides, key,
-                                         &engine::script::FieldOverride::field);
+    const auto found =
+        std::ranges::find(instance.overrides, key, &engine::script::FieldOverride::field);
     return found == instance.overrides.end() ? nullptr : &found->value;
 }
 
 void add_field(std::vector<InspectorField>& fields, EditorSession& session,
                const Instance& instance, std::string key) {
     if (const FieldValue* value = override_of(instance, key)) {
-        fields.push_back({.key = std::move(key), .kind = engine::core::kind_of(*value),
-                          .value = *value, .overridden = true});
+        fields.push_back({.key = std::move(key),
+                          .kind = engine::core::kind_of(*value),
+                          .value = *value,
+                          .overridden = true});
         return;
     }
     if (std::optional<FieldValue> value = session.default_value(instance.type, key)) {
-        fields.push_back({.key = std::move(key), .kind = engine::core::kind_of(*value),
-                          .value = std::move(*value), .overridden = false});
+        fields.push_back({.key = std::move(key),
+                          .kind = engine::core::kind_of(*value),
+                          .value = std::move(*value),
+                          .overridden = false});
     }
 }
 

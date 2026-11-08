@@ -47,8 +47,8 @@ void prefab_filter(Ui& ui, const std::string& filter) {
     const Theme& theme = ui.theme();
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
                      .padding = CLAY_PADDING_ALL(theme.px16(6.F))}}) {
-        const TextResult result = text_field(ui, CLAY_ID("PrefabFilter"), filter,
-                                             {.placeholder = "Filter prefabs"});
+        const TextResult result =
+            text_field(ui, CLAY_ID("PrefabFilter"), filter, {.placeholder = "Filter prefabs"});
         if (result.event != FieldEvent::none && result.value != filter) {
             ui.emit(command::SetPrefabFilter{.text = result.value});
         }
@@ -70,7 +70,8 @@ void prefabs(Ui& ui, const EditorState& state) {
         any = true;
         auto& placing = ui.widgets().viewport().placing;
         const bool picked = placing && placing->type == type;
-        if (list_row(ui, CLAY_IDI("PrefabRow", index), {.label = view_of(type), .selected = picked})) {
+        if (list_row(ui, CLAY_IDI("PrefabRow", index),
+                     {.label = view_of(type), .selected = picked})) {
             placing = Placing{.type = type};
         }
     }
@@ -125,13 +126,15 @@ void instances(Ui& ui, const engine::editor::EditorSession& session) {
 void sidebar(Ui& ui, const Editor& editor) {
     const Theme& theme = ui.theme();
     CLAY({.id = CLAY_ID("Sidebar"),
-          .layout = {.sizing = {.width = CLAY_SIZING_GROW(theme.px(size::sidebar_min), theme.px(size::sidebar)),
+          .layout = {.sizing = {.width = CLAY_SIZING_GROW(theme.px(size::sidebar_min),
+                                                          theme.px(size::sidebar)),
                                 .height = CLAY_SIZING_GROW()},
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::panel,
           .border = {.color = color::border, .width = {.right = theme.px16(1.F)}}}) {
         panel_section(
-            ui, CLAY_ID("Prefabs"), CLAY_STRING("PREFABS"), count(ui, editor.state().prefabs.size()),
+            ui, CLAY_ID("Prefabs"), CLAY_STRING("PREFABS"),
+            count(ui, editor.state().prefabs.size()),
             [&] { prefab_filter(ui, editor.state().prefab_filter); },
             [&] { prefabs(ui, editor.state()); });
         panel_section(ui, CLAY_ID("Scenes"), CLAY_STRING("SCENES"),

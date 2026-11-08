@@ -14,8 +14,6 @@
 #include "play/PlaySession.hpp"
 #include "settings/Settings.hpp"
 
-
-
 namespace editor {
 
 /**

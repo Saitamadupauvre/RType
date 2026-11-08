@@ -156,8 +156,7 @@ Drawn draw(Ui& ui, const Editor& editor, Clay_Dimensions window,
                          .layoutDirection = CLAY_TOP_TO_BOTTOM},
               .backgroundColor = color::panel,
               .cornerRadius = CLAY_CORNER_RADIUS(theme.px(size::radius)),
-              .border = {.color = color::border,
-                         .width = CLAY_BORDER_OUTSIDE(theme.px16(1.F))}}) {
+              .border = {.color = color::border, .width = CLAY_BORDER_OUTSIDE(theme.px16(1.F))}}) {
             drawn.query = text_field(ui, query_id(), palette.query,
                                      {.placeholder = "Type a command", .layer = field_layer});
             rows(ui, editor, ranked, palette.highlighted, drawn);
@@ -183,8 +182,8 @@ void keep_focus(Ui& ui) {
     }
 }
 
-void react(Ui& ui, const Editor& editor, const std::vector<std::size_t>& ranked,
-           const Drawn& drawn, bool clicked_outside) {
+void react(Ui& ui, const Editor& editor, const std::vector<std::size_t>& ranked, const Drawn& drawn,
+           bool clicked_outside) {
     PaletteState& palette = ui.widgets().palette();
     const FieldEvent event = drawn.query.event;
     if (drawn.clicked) {

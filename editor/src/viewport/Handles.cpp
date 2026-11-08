@@ -25,9 +25,7 @@ float axis_scale(float extent, float base, float current) {
     return sign_of(current) * std::max(extent / base, min_scale);
 }
 
-float base_extent(float size, float scale) {
-    return scale == 0.F ? 0.F : size / std::abs(scale);
-}
+float base_extent(float size, float scale) { return scale == 0.F ? 0.F : size / std::abs(scale); }
 
 } // namespace
 

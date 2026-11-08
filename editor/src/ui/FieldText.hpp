@@ -23,7 +23,8 @@ namespace editor {
 /** @brief The part of a "Component.field" key before the dot; empty without a dot. */
 [[nodiscard]] std::string_view component_of(std::string_view key);
 
-/** @brief The field part of a key, as words: "PhysicsBody.resolve_collisions" is "resolve collisions". */
+/** @brief The field part of a key, as words: "PhysicsBody.resolve_collisions" is "resolve
+ * collisions". */
 [[nodiscard]] std::string field_label(std::string_view key);
 
 } // namespace editor

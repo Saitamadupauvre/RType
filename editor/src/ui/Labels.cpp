@@ -30,9 +30,7 @@ std::string scene_title(const engine::editor::EditorSession& session) {
 }
 
 bool matches_filter(std::string_view label, std::string_view filter) {
-    const auto lower = [](char letter) {
-        return std::tolower(static_cast<unsigned char>(letter));
-    };
+    const auto lower = [](char letter) { return std::tolower(static_cast<unsigned char>(letter)); };
     return filter.empty() || !std::ranges::search(label, filter, {}, lower, lower).empty();
 }
 

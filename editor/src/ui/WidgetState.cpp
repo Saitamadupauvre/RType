@@ -83,7 +83,9 @@ void WidgetState::resolve_tab() {
     _pending = FocusRequest{.id = _tab_order[static_cast<std::size_t>(next)], .click_x = {}};
 }
 
-bool WidgetState::drawn(std::uint32_t id) const { return std::ranges::find(_tab_order, id) != _tab_order.end(); }
+bool WidgetState::drawn(std::uint32_t id) const {
+    return std::ranges::find(_tab_order, id) != _tab_order.end();
+}
 
 PaletteState& WidgetState::palette() noexcept { return _palette; }
 

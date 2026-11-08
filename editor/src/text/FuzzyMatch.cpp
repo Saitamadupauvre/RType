@@ -49,8 +49,8 @@ std::optional<int> fuzzy_score(std::string_view query, std::string_view label) {
                 if (!best[before]) {
                     continue;
                 }
-                const int link = before + 1 == index ? consecutive_bonus
-                                                     : -static_cast<int>(index - before - 1);
+                const int link =
+                    before + 1 == index ? consecutive_bonus : -static_cast<int>(index - before - 1);
                 const int score = best[before].value_or(0) + link + at(index);
                 next[index] = std::max(next[index].value_or(score), score);
             }
@@ -74,9 +74,8 @@ std::vector<std::size_t> fuzzy_rank(std::string_view query,
             scored.emplace_back(*score, index);
         }
     }
-    std::ranges::stable_sort(scored, [](const auto& left, const auto& right) {
-        return left.first > right.first;
-    });
+    std::ranges::stable_sort(
+        scored, [](const auto& left, const auto& right) { return left.first > right.first; });
     std::vector<std::size_t> ranked;
     ranked.reserve(scored.size());
     for (const auto& [score, index] : scored) {

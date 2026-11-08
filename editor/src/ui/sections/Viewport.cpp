@@ -75,7 +75,8 @@ bool drag(Ui& ui, const Editor& editor, Vec2 world, ViewDrag& dragged) {
 bool start_handle(const Editor& editor, const std::vector<SceneItem>& items, Vec2 pointer,
                   const ViewCamera& camera, Clay_BoundingBox box, ViewportState& state) {
     const std::optional<engine::editor::InstanceId> selection = editor.session().selection();
-    const auto item = selection ? std::ranges::find(items, *selection, &SceneItem::id) : items.end();
+    const auto item =
+        selection ? std::ranges::find(items, *selection, &SceneItem::id) : items.end();
     if (item == items.end()) {
         return false;
     }
@@ -200,8 +201,9 @@ void viewport(Ui& ui, const Editor& editor) {
     state.frame.ghost.reset();
     state.frame.cursor.reset();
     if (previous.found) {
-        ViewCamera& camera = state.camera ? *state.camera
-                                          : state.camera.emplace(initial_camera(previous.boundingBox));
+        ViewCamera& camera = state.camera
+                                 ? *state.camera
+                                 : state.camera.emplace(initial_camera(previous.boundingBox));
         interact(ui, editor, items, previous.boundingBox, state, camera);
         state.frame.grid = grid_lines(camera, previous.boundingBox, editor.state().view.grid_size);
     }

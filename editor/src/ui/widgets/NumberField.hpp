@@ -30,8 +30,7 @@ struct NumberFieldOptions {
 [[nodiscard]] FieldResult<int> number_field(Ui& ui, Clay_ElementId id, int value,
                                             const NumberFieldOptions& options = {});
 /** @copydoc number_field(Ui&, Clay_ElementId, float, const NumberFieldOptions&) */
-[[nodiscard]] FieldResult<std::int64_t> number_field(Ui& ui, Clay_ElementId id,
-                                                     std::int64_t value,
+[[nodiscard]] FieldResult<std::int64_t> number_field(Ui& ui, Clay_ElementId id, std::int64_t value,
                                                      const NumberFieldOptions& options = {});
 
 } // namespace editor

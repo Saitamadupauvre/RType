@@ -63,7 +63,8 @@ std::string describe(const engine::core::FieldValue& value) {
             [](engine::core::Rgba color) { return color_to_hex(color); },
             [](const engine::core::AssetName& asset) { return asset.path; },
             [](const engine::core::FieldList& list) {
-                return std::format("{} item{}", list.items.size(), list.items.size() == 1 ? "" : "s");
+                return std::format("{} item{}", list.items.size(),
+                                   list.items.size() == 1 ? "" : "s");
             },
         },
         value);

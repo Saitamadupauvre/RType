@@ -70,9 +70,10 @@ Clay_Color line_color(Severity severity) {
 }
 
 void console_line(const Theme& theme, const ConsoleLine& entry) {
-    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
-                     .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)},
-                     .childGap = theme.px16(12.F)}}) {
+    CLAY({.layout = {
+              .sizing = {.width = CLAY_SIZING_GROW()},
+              .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)},
+              .childGap = theme.px16(12.F)}}) {
         if (!entry.time.empty()) {
             text(theme, view_of(entry.time), size::small_text, color::text_dim, Face::regular);
         }
@@ -111,8 +112,8 @@ void problems(Ui& ui, const engine::editor::EditorSession& session) {
 } // namespace
 
 float bottom_panel_height(const Theme& theme, float window_height) {
-    const float others = theme.px(size::menu_bar + size::toolbar + size::status_bar +
-                                  size::workspace_min);
+    const float others =
+        theme.px(size::menu_bar + size::toolbar + size::status_bar + size::workspace_min);
     return std::clamp(window_height - others, theme.px(size::bottom_panel_min),
                       theme.px(size::bottom_panel));
 }
@@ -120,8 +121,7 @@ float bottom_panel_height(const Theme& theme, float window_height) {
 void bottom_panel(Ui& ui, const Editor& editor, float height) {
     const Theme& theme = ui.theme();
     CLAY({.id = CLAY_ID("BottomPanel"),
-          .layout = {.sizing = {.width = CLAY_SIZING_GROW(),
-                                .height = CLAY_SIZING_FIXED(height)},
+          .layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_FIXED(height)},
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::toolbar,
           .border = {.color = color::border, .width = {.top = theme.px16(1.F)}}}) {

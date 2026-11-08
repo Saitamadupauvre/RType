@@ -28,8 +28,7 @@ inline constexpr float rotation_step = 15.F;
 
 /** @brief The handle of `item` under `pointer`, if the item can be edited that way. */
 [[nodiscard]] std::optional<Handle> handle_at(const SceneItem& item, engine::core::Vec2 pointer,
-                                              const ViewCamera& camera,
-                                              Clay_BoundingBox viewport);
+                                              const ViewCamera& camera, Clay_BoundingBox viewport);
 
 /** @brief The size of `item` at a scale of 1; zero on an axis whose scale is 0. */
 [[nodiscard]] engine::core::Vec2 unscaled_size(const SceneItem& item);

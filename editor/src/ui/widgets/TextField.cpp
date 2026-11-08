@@ -158,8 +158,7 @@ void shown_text(Ui& ui, std::optional<float> field_width, std::string_view shown
         return;
     }
     const Clay_Color color = options.read_only ? color::text_muted : color::text;
-    text(ui.theme(), fitted(ui, field_width, shown, options.face), size::text, color,
-         options.face);
+    text(ui.theme(), fitted(ui, field_width, shown, options.face), size::text, color, options.face);
 }
 
 void shown_content(Ui& ui, std::optional<float> field_width, std::string_view shown,
@@ -196,10 +195,9 @@ void draw(Ui& ui, Clay_ElementId id, std::string_view shown, const TextFieldOpti
     const Theme& theme = ui.theme();
     const bool focused = ui.widgets().is_focused(id);
     const Clay_ElementData previous = Clay_GetElementData(id);
-    const std::optional<float> field_width =
-        previous.found && previous.boundingBox.width > 0.F
-            ? std::optional<float>(previous.boundingBox.width)
-            : std::nullopt;
+    const std::optional<float> field_width = previous.found && previous.boundingBox.width > 0.F
+                                                 ? std::optional<float>(previous.boundingBox.width)
+                                                 : std::nullopt;
     CLAY({.id = id,
           .layout = {.sizing = {.width = CLAY_SIZING_GROW(),
                                 .height = CLAY_SIZING_FIXED(theme.px(size::row))},

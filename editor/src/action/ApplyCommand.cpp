@@ -47,7 +47,8 @@ CommandResult open_script(const FileOpener& open_file, const std::filesystem::pa
 
 CommandResult open_settings(const FileOpener& open_file, const std::filesystem::path& file) {
     if (file.empty()) {
-        return CommandResult::refused("No settings folder: neither XDG_CONFIG_HOME nor HOME is set.");
+        return CommandResult::refused(
+            "No settings folder: neither XDG_CONFIG_HOME nor HOME is set.");
     }
     if (CommandResult created = create_settings_file(file); !created.ok) {
         return created;
@@ -129,9 +130,9 @@ CommandResult apply_command(EditorSession& session, EditorState& state, EditorSe
             [&](const command::Stop&) { return play.stop(state.mode); },
             [&](const command::OpenExport&) {
                 const ExportSettings settings = default_export(session.game());
-                state.export_dialog = ExportDialog{
-                    .settings = settings,
-                    .plan = plan_export(session.game(), services.runtime, settings)};
+                state.export_dialog =
+                    ExportDialog{.settings = settings,
+                                 .plan = plan_export(session.game(), services.runtime, settings)};
                 return CommandResult::done();
             },
             [&](const command::SetExport& change) {
