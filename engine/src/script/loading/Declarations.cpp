@@ -2,9 +2,14 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <format>
+#include <optional>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "engine/core/log/Log.hpp"
 #include "lua/LuaErrors.hpp"
@@ -40,9 +45,44 @@ constexpr std::array<std::string_view, 14> engine_owned_fields{"age",
 constexpr std::array<std::string_view, 6> callbacks{"on_spawn",   "update",   "on_collide",
                                                     "on_destroy", "behavior", "on_arrive"};
 
+constexpr std::size_t callback_prefix_distance = 4;
+constexpr std::size_t callback_distance = 2;
+
 template <std::size_t Size>
 bool contains(const std::array<std::string_view, Size>& names, std::string_view name) {
     return std::ranges::find(names, name) != names.end();
+}
+
+std::size_t edit_distance(std::string_view from, std::string_view to) {
+    std::vector<std::size_t> row(to.size() + 1);
+    for (std::size_t column = 0; column < row.size(); ++column) {
+        row[column] = column;
+    }
+    for (std::size_t line = 1; line <= from.size(); ++line) {
+        std::size_t diagonal = row[0];
+        row[0] = line;
+        for (std::size_t column = 1; column <= to.size(); ++column) {
+            const std::size_t above = row[column];
+            const std::size_t change = from[line - 1] == to[column - 1] ? 0 : 1;
+            row[column] = std::min({above + 1, row[column - 1] + 1, diagonal + change});
+            diagonal = above;
+        }
+    }
+    return row[to.size()];
+}
+
+std::optional<std::string_view> misspelled_callback(std::string_view name) {
+    const std::size_t limit =
+        name.starts_with("on_") ? callback_prefix_distance : callback_distance;
+    std::optional<std::string_view> closest;
+    std::size_t best = limit + 1;
+    for (const std::string_view callback : callbacks) {
+        if (const std::size_t distance = edit_distance(name, callback); distance < best) {
+            best = distance;
+            closest = callback;
+        }
+    }
+    return closest;
 }
 
 std::string quoted_names(const std::vector<const PendingDeclaration*>& declarations) {
@@ -63,7 +103,33 @@ void warn_reserved_field(const Declaration& declaration, std::string_view field,
     } else if (contains(callbacks, field) && value.get_type() != sol::type::function) {
         log::warn("lua: {}: {} '{}' callback '{}' must be a function", source,
                   kind_name(declaration.kind), declaration.name, field);
+    } else if (value.get_type() == sol::type::function && !contains(callbacks, field)) {
+        if (const auto callback = misspelled_callback(field)) {
+            log::warn("lua: {}: {} '{}' function '{}' is never called by the engine; did you mean "
+                      "'{}'?",
+                      source, kind_name(declaration.kind), declaration.name, field, *callback);
+        }
     }
+}
+
+void warn_outside_tables(const PendingFile& file, const sol::table& environment) {
+    const std::string source = file.source.generic_string();
+    std::vector<const PendingDeclaration*> declarations;
+    declarations.reserve(file.declarations.size());
+    for (const PendingDeclaration& declaration : file.declarations) {
+        declarations.push_back(&declaration);
+    }
+    const std::string owners =
+        std::format("{} {}", declarations.size() == 1 ? "the table of" : "the tables of",
+                    quoted_names(declarations));
+    environment.for_each([&](const sol::object& key, const sol::object&) {
+        if (key.get_type() != sol::type::string) {
+            return;
+        }
+        log::warn("lua: {}: '{}' is defined outside {} and is ignored; move it into the table, or "
+                  "use the short form for a single declaration",
+                  source, key.as<std::string>(), owners);
+    });
 }
 
 } // namespace
@@ -121,6 +187,9 @@ std::optional<std::vector<Declaration>> resolve_declarations(const PendingFile& 
                    "declarations",
                    source, short_forms.front()->name);
         return std::nullopt;
+    }
+    if (short_forms.empty() && !file.declarations.empty()) {
+        warn_outside_tables(file, environment);
     }
     std::vector<Declaration> declarations;
     declarations.reserve(file.declarations.size());
