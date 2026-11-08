@@ -13,8 +13,12 @@
 namespace editor {
 
 /** @brief One person's editor preferences, read from `settings.json` at startup. */
+/** @brief The bounds of `ui.scale`. */
+inline constexpr float min_ui_scale = 0.5F;
+inline constexpr float max_ui_scale = 3.F;
+
 struct Settings {
-    /** Multiplies the screen's DPI scale; from 0.5 to 3. */
+    /** Multiplies the screen's DPI scale; from min_ui_scale to max_ui_scale. */
     float ui_scale = 1.F;
     /** Multiplies the distance one wheel notch scrolls; from 0.25 to 4. */
     float scroll_speed = 1.F;

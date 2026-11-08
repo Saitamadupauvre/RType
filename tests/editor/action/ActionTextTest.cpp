@@ -41,6 +41,7 @@ TEST(ActionText, CommandsShowTheirFields) {
         describe_action(command::SetOverlay{.overlay = editor::Overlay::names, .visible = true}),
         "command::SetOverlay overlay=names visible=true");
     EXPECT_EQ(describe_action(command::ReloadScripts{}), "command::ReloadScripts");
+    EXPECT_EQ(describe_action(command::SetUiScale{.scale = 1.5F}), "command::SetUiScale scale=1.5");
     EXPECT_EQ(describe_action(command::ShowTab{.tab = editor::BottomTab::assets}),
               "command::ShowTab tab=assets");
     EXPECT_EQ(describe_action(command::CreatePrefab{.name = "crate"}),

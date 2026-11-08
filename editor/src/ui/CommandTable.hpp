@@ -17,6 +17,9 @@ struct Shortcut {
     Key key = Key::s;
     bool primary_modifier = false;
     bool shift = false;
+    /** Matches with or without Shift, for keys whose shifted symbol is the same command (`=`, `+`).
+     */
+    bool any_shift = false;
 
     bool operator==(const Shortcut&) const = default;
 };

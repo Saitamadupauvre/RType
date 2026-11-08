@@ -167,6 +167,9 @@ std::string command_text(const Command& command) {
             [](const command::OpenSettings&) { return std::string("command::OpenSettings"); },
             [](const command::ReloadSettings&) { return std::string("command::ReloadSettings"); },
             [](const command::ReloadScripts&) { return std::string("command::ReloadScripts"); },
+            [](const command::SetUiScale& zoom) {
+                return std::format("command::SetUiScale scale={:g}", zoom.scale);
+            },
             [](const command::Play&) { return std::string("command::Play"); },
             [](const command::Pause&) { return std::string("command::Pause"); },
             [](const command::Stop&) { return std::string("command::Stop"); },

@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <variant>
 #include <vector>
 
 #include "FrameFixture.hpp"
@@ -193,4 +196,50 @@ TEST_F(ShortcutLog, NothingIsTracedAboveTheLevel) {
     press(Key::g);
 
     EXPECT_FALSE(traced("editor: key"));
+}
+
+TEST_F(CommandTable, ZoomStepsTheUiScaleByATenth) {
+    const auto table = command_table();
+    const auto entry = [&](std::string_view label) {
+        return *std::ranges::find(table, label, &editor::CommandEntry::label);
+    };
+    const auto scale_of = [](const std::optional<editor::Action>& action) {
+        const auto* zoom = std::get_if<command::SetUiScale>(&std::get<editor::Command>(*action));
+        return zoom == nullptr ? 0.F : zoom->scale;
+    };
+
+    EXPECT_FLOAT_EQ(scale_of(entry("Zoom in").make(_editor)), 1.1F);
+    EXPECT_FLOAT_EQ(scale_of(entry("Zoom out").make(_editor)), 0.9F);
+
+    _editor.handle(command::SetUiScale{.scale = 3.F});
+    EXPECT_FALSE(entry("Zoom in").make(_editor).has_value());
+    _editor.handle(command::SetUiScale{.scale = 0.5F});
+    EXPECT_FALSE(entry("Zoom out").make(_editor).has_value());
+}
+
+TEST_F(CommandTable, SetUiScaleRefusesOutOfRangeValues) {
+    _editor.handle(command::SetUiScale{.scale = 1.5F});
+    _editor.handle(command::SetUiScale{.scale = 9.F});
+    _editor.handle(command::SetUiScale{.scale = 0.1F});
+
+    EXPECT_FLOAT_EQ(_editor.state().ui_scale, 1.5F);
+    EXPECT_EQ(_editor.state().refusal.count, 2U);
+}
+
+TEST_F(CommandTable, CtrlPlusAndMinusZoomWithOrWithoutShift) {
+    const auto zoom_of = [](const std::vector<editor::Action>& actions) {
+        const auto* zoom = only<command::SetUiScale>(actions);
+        return zoom == nullptr ? 0.F : zoom->scale;
+    };
+
+    EXPECT_FLOAT_EQ(zoom_of(press(Key::plus, true)), 1.1F);
+    EXPECT_FLOAT_EQ(zoom_of(press(Key::plus, true, true)), 1.1F);
+    EXPECT_FLOAT_EQ(zoom_of(press(Key::minus, true)), 0.9F);
+    EXPECT_TRUE(press(Key::plus).empty());
+    EXPECT_TRUE(press(Key::minus).empty());
+}
+
+TEST(CommandTableEntries, ZoomShortcutsReadAsEqualsAndMinus) {
+    EXPECT_EQ(editor::shortcut_label({.key = Key::plus, .primary_modifier = true}).back(), '=');
+    EXPECT_EQ(editor::shortcut_label({.key = Key::minus, .primary_modifier = true}).back(), '-');
 }

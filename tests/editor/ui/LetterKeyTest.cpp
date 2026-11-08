@@ -12,6 +12,9 @@ TEST(LetterKey, MapsTheLettersTheEditorUses) {
     EXPECT_EQ(letter_key("z"), Key::z);
     EXPECT_EQ(letter_key("h"), Key::h);
     EXPECT_EQ(letter_key("d"), Key::d);
+    EXPECT_EQ(letter_key("="), Key::plus);
+    EXPECT_EQ(letter_key("+"), Key::plus);
+    EXPECT_EQ(letter_key("-"), Key::minus);
 }
 
 TEST(LetterKey, IgnoresCase) { EXPECT_EQ(letter_key("A"), Key::a); }

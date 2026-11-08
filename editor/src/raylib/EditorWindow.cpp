@@ -63,6 +63,7 @@ constexpr std::array named_keys{
     std::pair{KEY_LEFT, Key::left},     std::pair{KEY_RIGHT, Key::right},
     std::pair{KEY_UP, Key::up},         std::pair{KEY_DOWN, Key::down},
     std::pair{KEY_HOME, Key::home},     std::pair{KEY_END, Key::end},
+    std::pair{KEY_KP_ADD, Key::plus},   std::pair{KEY_KP_SUBTRACT, Key::minus},
 };
 
 #ifdef __APPLE__
@@ -86,6 +87,9 @@ std::vector<std::pair<int, Key>> layout_letters() {
         add_if_letter(letters, code);
     }
     for (const int code : punctuation_keys) {
+        add_if_letter(letters, code);
+    }
+    for (int code = KEY_ZERO; code <= KEY_NINE; ++code) {
         add_if_letter(letters, code);
     }
     return letters;
