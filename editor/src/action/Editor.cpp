@@ -44,9 +44,18 @@ void Editor::attach_launcher(std::unique_ptr<GameLauncher> launcher) {
 
 void Editor::attach_file_opener(FileOpener opener) { _open_file = std::move(opener); }
 
+void Editor::attach_clock(std::function<std::string()> clock) { _clock = std::move(clock); }
+
+void Editor::log(ConsoleLine line) {
+    if (_clock) {
+        line.time = _clock();
+    }
+    _state.console.push_back(std::move(line));
+}
+
 void Editor::update() {
     for (ConsoleLine& line : _play.update(_state.mode)) {
-        _state.console.push_back(std::move(line));
+        log(std::move(line));
     }
 }
 
@@ -88,11 +97,11 @@ void Editor::refresh_lists() {
 
 void Editor::report(const CommandResult& result) {
     if (!result.ok) {
-        _state.console.push_back({.severity = Severity::error, .text = result.message});
+        log({.severity = Severity::error, .text = result.message});
         return;
     }
     if (!result.message.empty()) {
-        _state.console.push_back({.severity = Severity::info, .text = result.message});
+        log({.severity = Severity::info, .text = result.message});
     }
 }
 

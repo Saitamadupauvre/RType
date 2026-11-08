@@ -57,13 +57,24 @@ void line(const Theme& theme, Clay_String content, Clay_Color tint) {
     }
 }
 
+void console_line(const Theme& theme, const ConsoleLine& entry) {
+    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
+                     .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)},
+                     .childGap = theme.px16(12.F)}}) {
+        if (!entry.time.empty()) {
+            text(theme, view_of(entry.time), size::small_text, color::text_dim, Face::regular);
+        }
+        text(theme, view_of(entry.text), size::small_text,
+             entry.severity == Severity::error ? color::error : color::text_soft);
+    }
+}
+
 void console(const Theme& theme, const std::vector<ConsoleLine>& lines) {
     if (lines.empty()) {
         empty_hint(theme, CLAY_STRING("Nothing to report"));
     }
     for (const ConsoleLine& entry : lines) {
-        line(theme, view_of(entry.text),
-             entry.severity == Severity::error ? color::error : color::text_soft);
+        console_line(theme, entry);
     }
 }
 

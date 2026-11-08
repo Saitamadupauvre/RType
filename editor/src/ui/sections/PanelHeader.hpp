@@ -6,6 +6,7 @@
 
 namespace editor {
 
-void panel_header(const Theme& theme, Clay_String title);
+/** @brief A panel title in capitals, with an optional count or note on the right. */
+void panel_header(const Theme& theme, Clay_String title, Clay_String detail = {});
 
 } // namespace editor

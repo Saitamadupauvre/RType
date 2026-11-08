@@ -3,7 +3,9 @@
 #include <clay.h>
 #include <raylib.h>
 
+#include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -15,7 +17,10 @@ namespace editor {
 
 class ViewportPainter {
 public:
-    explicit ViewportPainter(std::filesystem::path assets);
+    /** @brief Gives the editor font at a pixel size, so labels match the rest of the editor. */
+    using FontAt = std::function<const Font&(std::uint16_t size)>;
+
+    ViewportPainter(std::filesystem::path assets, FontAt font);
     ~ViewportPainter();
     ViewportPainter(const ViewportPainter&) = delete;
     ViewportPainter& operator=(const ViewportPainter&) = delete;
@@ -29,6 +34,7 @@ private:
     [[nodiscard]] const Texture2D* texture(std::string_view path);
 
     std::filesystem::path _assets;
+    FontAt _font;
     std::unordered_map<std::string, std::optional<Texture2D>> _textures;
 };
 

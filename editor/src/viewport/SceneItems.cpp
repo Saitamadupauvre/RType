@@ -47,6 +47,7 @@ SceneItem item_of(const EntityManager& world, Entity entity,
     item.id = entry.id;
     item.top_left = position;
     item.label = std::string(instance_label(entry.instance));
+    item.type = entry.instance.type;
     if (const auto* scale = world.find<engine::core::Scale>(entity)) {
         item.scale = scale->factor;
         item.scales = true;

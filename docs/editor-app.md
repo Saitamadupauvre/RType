@@ -20,11 +20,12 @@ project, and creating one, come with the launcher (#158).
 |---|---|---|
 | Menu bar | Open scene, `•` when unsaved | Play, Stop |
 | Toolbar | Tools, snap, grid size, overlays | Switch tool, toggle snap and overlays, Undo, Redo |
-| Sidebar | Prefabs, scenes (start scene marked), instances | Open a scene, select an instance |
-| Viewport | The scene, drawn like the game, the grid and the selection | Select, move, pan, zoom |
-| Inspector | Name, type, position and fields of the selection | Rename, move, edit and reset fields |
-| Bottom panel | Console, Problems | Switch tab |
-| Status bar | Mode, instance count, game folder, scene | |
+| Play band | While playing or paused: the mode and what is blocked | |
+| Sidebar | Prefabs, scenes (start scene marked), instances, each with its count | Open a scene, select or place an instance |
+| Viewport | The scene drawn like the game, the grid, the camera frame, the selection in blue with its `name · type` tag, the cursor's world point and the zoom | Select, move, scale, rotate, pan, zoom |
+| Inspector | The selection's name, prefab and script, then its fields by component | Rename, retype, move, edit and reset fields, open the script |
+| Bottom panel | Console (with the time of each line), Problems | Switch tab |
+| Status bar | Mode, instance count, selection, snap, unsaved changes, game folder, scene | |
 
 | Shortcut | Command |
 |---|---|
@@ -103,7 +104,11 @@ or the program given with `--runtime`. `PlaySession` owns the game;
 
 ## Inspector
 
-The inspector shows the selected instance. `Editor` caches what it shows in
+The inspector shows the selected instance, as in the design mock-ups: a
+header with its name and `instance of <prefab> · <script>`, a legend of the
+two colors, the instance rows, one shaded band per component (with how many
+of its fields are overridden), and at the bottom **Reset all to prefab** and
+**Open <script>**. `Editor` caches what it shows in
 `EditorState::inspector` (`inspect_selection`) and refreshes it after every
 action, so the UI never queries the session.
 

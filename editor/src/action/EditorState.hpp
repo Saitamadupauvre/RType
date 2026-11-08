@@ -29,6 +29,8 @@ enum class Severity : std::uint8_t { info, error };
 struct ConsoleLine {
     Severity severity = Severity::info;
     std::string text;
+    /** @brief When the line was written, as "HH:MM:SS"; empty when no clock is attached. */
+    std::string time{};
 
     bool operator==(const ConsoleLine&) const = default;
 };

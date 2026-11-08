@@ -76,22 +76,22 @@ protected:
 TEST_F(Inspector, ShowsTheInstanceAndItsFields) {
     select("ship");
 
-    EXPECT_TRUE(shows("INSPECTOR · hero"));
+    EXPECT_TRUE(shows("INSPECTOR"));
     EXPECT_TRUE(shows("hero"));
     EXPECT_TRUE(shows("ship"));
-    EXPECT_TRUE(shows("COMPONENTS"));
+    EXPECT_TRUE(shows("instance of ship · ship.lua"));
     EXPECT_TRUE(shows("Sprite"));
     EXPECT_TRUE(shows("color"));
     EXPECT_FALSE(shows("Sprite.color"));
     EXPECT_TRUE(shows("#0A141EFF"));
-    EXPECT_TRUE(shows("SCRIPT"));
+    EXPECT_TRUE(shows("Script fields"));
     EXPECT_TRUE(shows("health"));
     EXPECT_TRUE(shows("7"));
 }
 
 TEST_F(Inspector, ShowsNothingSelectedWithoutASelection) {
     EXPECT_TRUE(shows("Nothing selected"));
-    EXPECT_FALSE(shows("COMPONENTS"));
+    EXPECT_FALSE(shows("Script fields"));
 }
 
 TEST_F(Inspector, RenamingEmitsRename) {
@@ -316,7 +316,8 @@ TEST_F(Inspector, PickingAnotherTypeEmitsChangeType) {
 
 TEST_F(Inspector, ShowsTheScriptAndOpensIt) {
     select("rock");
-    EXPECT_TRUE(shows("rock.lua"));
+    EXPECT_TRUE(shows("instance of rock · rock.lua"));
+    EXPECT_TRUE(shows("Open rock.lua"));
 
     const auto actions = click(CLAY_ID("InspectorOpenScript"));
 
@@ -325,12 +326,24 @@ TEST_F(Inspector, ShowsTheScriptAndOpensIt) {
     EXPECT_EQ(open->file, _game.path() / "scripts" / "rock.lua");
 }
 
-TEST_F(Inspector, ScriptNameIsCenteredOnTheOpenButton) {
-    select("rock");
-    frame();
+TEST_F(Inspector, ComponentBandsCountTheirOverrides) {
+    select("ship");
+    _editor.handle(
+        edit::SetField{.id = id_of(_editor.session(), "ship"),
+                       .key = "Sprite.color",
+                       .value = FieldValue{engine::core::Rgba{.r = 1, .g = 2, .b = 3, .a = 255}}});
+
+    EXPECT_TRUE(shows("Sprite"));
+    EXPECT_TRUE(shows("1 overridden"));
+}
+
+TEST_F(Inspector, LongNamesAreShortenedInTheHeader) {
+    select("ship");
+    _editor.handle(
+        edit::Rename{.id = id_of(_editor.session(), "ship"), .name = std::string(60, 'n')});
     frame();
 
-    const Clay_BoundingBox name = box_of(CLAY_ID("InspectorScriptName"));
-    const Clay_BoundingBox open = box_of(CLAY_ID("InspectorOpenScript"));
-    EXPECT_FLOAT_EQ(name.y + (name.height / 2.F), open.y + (open.height / 2.F));
+    const auto texts = frame().texts;
+    EXPECT_EQ(std::ranges::count(texts, std::string(60, 'n')), 1);
+    EXPECT_LE(box_of(CLAY_ID("Inspector")).x + box_of(CLAY_ID("Inspector")).width, 1440.F);
 }

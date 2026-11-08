@@ -1,6 +1,8 @@
 #include "raylib/ViewportPainter.hpp"
 
 #include <cmath>
+#include <string>
+#include <format>
 #include <utility>
 
 #include "ui/Theme.hpp"
@@ -24,6 +26,12 @@ constexpr float label_size = 13.F;
 constexpr float label_gap = 3.F;
 constexpr float label_spacing = 1.F;
 constexpr unsigned char label_alpha = 200;
+constexpr float chip_padding = 6.F;
+constexpr float chip_roundness = 0.4F;
+constexpr int chip_segments = 6;
+constexpr float tag_gap = 4.F;
+constexpr float corner_gap = 12.F;
+constexpr float percent = 100.F;
 constexpr Color frame_color{.r = 110, .g = 170, .b = 255, .a = 200};
 constexpr Color hitbox_color{.r = 90, .g = 220, .b = 120, .a = 220};
 
@@ -104,22 +112,66 @@ void draw_handles(const ViewportFrame& frame, Clay_BoundingBox box) {
                               .y = at.y - handle_radius,
                               .width = handle_radius * 2.F,
                               .height = handle_radius * 2.F},
-                             to_raylib(color::accent));
+                             to_raylib(color::focus));
         }
         if (item.rotates) {
             const engine::core::Vec2 at = handle_position(item, Handle::rotate, frame.camera, box);
-            DrawCircleV({.x = at.x, .y = at.y}, handle_radius, to_raylib(color::accent));
+            DrawCircleV({.x = at.x, .y = at.y}, handle_radius, to_raylib(color::focus));
         }
     }
 }
 
-void draw_names(const ViewportFrame& frame, Clay_BoundingBox box) {
-    const Font font = GetFontDefault();
+void draw_names(const ViewportFrame& frame, Clay_BoundingBox box, const Font& font) {
     for (const SceneItem& item : frame.items) {
         const engine::core::Vec2 at = to_screen(frame.camera, box, item.top_left);
         DrawTextEx(font, item.label.c_str(), {.x = at.x, .y = at.y - label_size - label_gap},
                    label_size, label_spacing, faded(WHITE, label_alpha));
     }
+}
+
+void draw_chip(const Font& font, const std::string& label, Vector2 at, Color background,
+               Color foreground) {
+    const Vector2 size = MeasureTextEx(font, label.c_str(), label_size, label_spacing);
+    const Rectangle chip{.x = at.x,
+                         .y = at.y,
+                         .width = size.x + (2.F * chip_padding),
+                         .height = size.y + chip_padding};
+    DrawRectangleRounded(chip, chip_roundness, chip_segments, background);
+    DrawTextEx(font, label.c_str(), {.x = at.x + chip_padding, .y = at.y + (chip_padding / 2.F)},
+               label_size, label_spacing, foreground);
+}
+
+void draw_selection_tag(const ViewportFrame& frame, Clay_BoundingBox box, const Font& font) {
+    for (const SceneItem& item : frame.items) {
+        if (item.id != frame.selection) {
+            continue;
+        }
+        const engine::core::Vec2 at =
+            to_screen(frame.camera, box, {item.top_left.x, item.top_left.y + item.size.y});
+        const std::string label = item.label == item.type ? item.type
+                                                          : item.label + " · " + item.type;
+        draw_chip(font, label, {.x = at.x, .y = at.y + tag_gap}, to_raylib(color::focus),
+                  to_raylib(color::text_on_accent));
+    }
+}
+
+void draw_camera_label(const ViewportFrame& frame, Clay_BoundingBox box, const Font& font) {
+    const engine::core::Vec2 at = to_screen(frame.camera, box, frame.game_frame.top_left);
+    const std::string label =
+        std::format("camera start · {:g} × {:g}", frame.game_frame.size.x, frame.game_frame.size.y);
+    DrawTextEx(font, label.c_str(), {.x = at.x, .y = at.y - label_size - label_gap}, label_size,
+               label_spacing, frame_color);
+}
+
+void draw_cursor(const ViewportFrame& frame, Clay_BoundingBox box, const Font& font) {
+    const std::string label =
+        frame.cursor ? std::format("cursor {:.0f}, {:.0f}   {:.0f}%", frame.cursor->x,
+                                   frame.cursor->y, frame.camera.zoom * percent)
+                     : std::format("{:.0f}%", frame.camera.zoom * percent);
+    const Vector2 size = MeasureTextEx(font, label.c_str(), label_size, label_spacing);
+    const Vector2 at{.x = box.x + box.width - size.x - (2.F * chip_padding) - corner_gap,
+                     .y = box.y + box.height - size.y - chip_padding - corner_gap};
+    draw_chip(font, label, at, to_raylib(color::toolbar), to_raylib(color::text_muted));
 }
 
 Rectangle visible_world(const ViewportFrame& frame, Clay_BoundingBox box) {
@@ -133,7 +185,8 @@ Rectangle visible_world(const ViewportFrame& frame, Clay_BoundingBox box) {
 
 } // namespace
 
-ViewportPainter::ViewportPainter(std::filesystem::path assets) : _assets(std::move(assets)) {}
+ViewportPainter::ViewportPainter(std::filesystem::path assets, FontAt font)
+    : _assets(std::move(assets)), _font(std::move(font)) {}
 
 ViewportPainter::~ViewportPainter() {
     for (auto& [path, texture] : _textures) {
@@ -213,14 +266,18 @@ void ViewportPainter::paint(const Clay_RenderCommand& command) {
     for (const SceneItem& item : frame.items) {
         if (item.id == frame.selection) {
             DrawRectangleLinesEx(box_of(item), selection_pixels / frame.camera.zoom,
-                                 to_raylib(color::accent));
+                                 to_raylib(color::focus));
         }
     }
     EndMode2D();
+    const Font& font = _font(static_cast<std::uint16_t>(label_size));
+    draw_camera_label(frame, box, font);
     if (frame.show_names) {
-        draw_names(frame, box);
+        draw_names(frame, box, font);
     }
     draw_handles(frame, box);
+    draw_selection_tag(frame, box, font);
+    draw_cursor(frame, box, font);
     EndScissorMode();
 }
 

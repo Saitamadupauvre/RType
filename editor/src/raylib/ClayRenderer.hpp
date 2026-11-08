@@ -20,6 +20,9 @@ public:
 
     void set_custom_painter(CustomPainter painter);
 
+    /** @brief The editor font of `face` at `size` pixels, loaded on first use. */
+    [[nodiscard]] const Font& font(Face face, std::uint16_t size);
+
     [[nodiscard]] Clay_Dimensions measure(std::string_view text,
                                           const Clay_TextElementConfig& config);
     void render(Clay_RenderCommandArray commands);

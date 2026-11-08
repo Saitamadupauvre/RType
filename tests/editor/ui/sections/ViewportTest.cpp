@@ -271,3 +271,25 @@ TEST_F(Viewport, FrameCarriesTheOverlaysAndTheGameFrame) {
     EXPECT_FALSE(state().frame.show_names);
     EXPECT_EQ(state().frame.game_frame.size, editor::game_screen);
 }
+
+TEST_F(Viewport, FrameKnowsTheWorldPointUnderTheCursor) {
+    frame({.pointer = screen({100.F, 50.F})});
+    frame({.pointer = screen({100.F, 50.F})});
+
+    ASSERT_TRUE(state().frame.cursor.has_value());
+    EXPECT_EQ(state().frame.cursor.value_or(Vec2{}), Vec2(100.F, 50.F));
+
+    frame({.pointer = {.x = 1.F, .y = 1.F}});
+    EXPECT_FALSE(state().frame.cursor.has_value());
+}
+
+TEST_F(Viewport, ItemsCarryTheirTypeForTheSelectionTag) {
+    frame();
+    const auto& items = state().frame.items;
+    const auto ship =
+        std::ranges::find(items, id_of(_editor.session(), "ship"), &editor::SceneItem::id);
+
+    ASSERT_NE(ship, items.end());
+    EXPECT_EQ(ship->type, "ship");
+    EXPECT_EQ(ship->label, "hero");
+}

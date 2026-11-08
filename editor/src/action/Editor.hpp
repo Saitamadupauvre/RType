@@ -1,7 +1,9 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <memory>
+#include <string>
 
 #include "action/Action.hpp"
 #include "action/ApplyCommand.hpp"
@@ -36,6 +38,9 @@ public:
     /** @brief Lets Play start games; without a launcher Play is refused. */
     void attach_launcher(std::unique_ptr<GameLauncher> launcher);
 
+    /** @brief Stamps console lines, e.g. with the local time; without it lines have no time. */
+    void attach_clock(std::function<std::string()> clock);
+
     /** @brief Lets OpenScript open files; without it OpenScript is refused. */
     void attach_file_opener(FileOpener opener);
 
@@ -67,6 +72,9 @@ private:
     EditorState _state;
     PlaySession _play;
     FileOpener _open_file;
+    std::function<std::string()> _clock;
+
+    void log(ConsoleLine line);
 };
 
 } // namespace editor
