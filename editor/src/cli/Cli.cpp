@@ -70,18 +70,20 @@ CliResult parse_cli(const std::vector<std::string>& args) {
 
     auto& runtime =
         app.option<std::filesystem::path>("--runtime", "Program that plays the game; defaults to "
-                                                       "r-type_client next to the editor.")
+                                                       "engine-runtime next to the editor.")
             .default_value(std::filesystem::path{});
 
-    auto& log_level = app.option<std::string>("--log-level",
-                                              "Lowest level of the developer log on stderr: trace "
-                                              "shows every key and shortcut, debug every action.")
-                          .validator(clap::Choices(level_names()))
-                          .default_value("info");
+    auto& log_level =
+        app.option<std::string>("--log-level", "Lowest level of the developer log on stderr: trace "
+                                               "shows every key and shortcut, debug every action.")
+            .validator(clap::Choices(level_names()))
+            .default_value("info");
 
-    app.example(program + " game", "Edit the game in ./game and open its start scene.");
-    app.example(program + " game --runtime ./r-type_client", "Play with a given runtime.");
-    app.example(program + " game --log-level trace", "Log every key, shortcut and action.");
+    app.example(program + " examples/r-type", "Edit the R-Type example and open its start scene.");
+    app.example(program + " examples/r-type --runtime ./engine-runtime",
+                "Play with a given runtime.");
+    app.example(program + " examples/r-type --log-level trace",
+                "Log every key, shortcut and action.");
 
     const bool ok = app.parse(args);
 

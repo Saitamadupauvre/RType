@@ -34,7 +34,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path switch_game() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scenes" / "switch";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scenes" / "switch";
 }
 
 class SceneSwitchTest : public ::testing::Test {
@@ -215,7 +215,7 @@ TEST_F(SceneSwitchTest, PersistentMustBeABoolean) {
     ScriptRuntime runtime = ScriptRuntime::builder().with<ServerApi>().build();
 
     EXPECT_FALSE(
-        runtime.load_scripts(std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "persistent"));
+        runtime.load_scripts(std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "persistent"));
 
     EXPECT_TRUE(logged_error("entity 'anchor' field 'persistent' must be a boolean"));
     EXPECT_FALSE(runtime.find_declaration("anchor").has_value());

@@ -27,7 +27,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path transform_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "transform";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "transform";
 }
 
 class TransformFieldsTest : public ::testing::Test {

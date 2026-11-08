@@ -25,7 +25,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path shaders_fixture(const std::string& name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "shaders" / name;
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "shaders" / name;
 }
 
 class ShadersTest : public ::testing::Test {

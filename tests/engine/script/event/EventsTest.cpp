@@ -29,7 +29,7 @@ namespace {
 const std::vector<std::string> built_in_events{"scene_loaded"};
 
 std::filesystem::path events_fixture(const std::string& name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "events" / name;
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "events" / name;
 }
 
 class EventsTest : public ::testing::Test {

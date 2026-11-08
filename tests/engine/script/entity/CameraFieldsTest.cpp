@@ -27,7 +27,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path camera_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "camera";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "camera";
 }
 
 class CameraFieldsTest : public ::testing::Test {

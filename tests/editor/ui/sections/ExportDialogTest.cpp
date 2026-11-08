@@ -22,8 +22,7 @@ protected:
     }
 
     void attach_runtime() {
-        _game.write(".runtime/r-type_client", "client");
-        _game.write(".runtime/r-type_server", "server");
+        _game.write(".runtime/engine-runtime", "runtime");
         _game.write(".runtime/plugins/graphics-raylib.so", "graphics");
         _editor.attach_runtime(_game.path() / ".runtime");
     }
@@ -48,7 +47,7 @@ TEST_F(ExportDialog, ShowsTheSettings) {
 
     EXPECT_TRUE(shows("EXPORT GAME"));
     EXPECT_TRUE(shows("editor-test"));
-    EXPECT_TRUE(shows("Client + server"));
+    EXPECT_FALSE(shows("Client + server"));
 }
 
 TEST_F(ExportDialog, ExportIsDisabledWhileThePlanHasProblems) {
@@ -71,17 +70,6 @@ TEST_F(ExportDialog, CancelAndEscapeClose) {
     EXPECT_NE(only<command::CloseExport>(click(CLAY_ID("ExportCancel"))), nullptr);
     EXPECT_NE(only<command::CloseExport>(frame({.keys_pressed = {editor::Key::escape}}).actions),
               nullptr);
-}
-
-TEST_F(ExportDialog, ChoosingClientOnlyChangesTheSettings) {
-    open_dialog();
-
-    const auto actions = click(CLAY_ID("ExportClientOnly"));
-    const auto* change = only<command::SetExport>(actions);
-
-    ASSERT_NE(change, nullptr);
-    EXPECT_EQ(change->settings.binaries, editor::Binaries::client_only);
-    EXPECT_EQ(change->settings.name, "editor-test");
 }
 
 TEST_F(ExportDialog, ClicksDoNotReachTheWindowBehind) {

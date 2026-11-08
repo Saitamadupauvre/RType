@@ -37,9 +37,9 @@ namespace {
 
 constexpr Duration tick_step = std::chrono::nanoseconds(1'000'000'000 / 60);
 const std::filesystem::path players_game =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "players";
+    std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "server" / "players";
 const std::filesystem::path camera_game =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "camera";
+    std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "server" / "camera";
 
 std::vector<Entity> owned_by(ServerApp& app, std::uint32_t player_id) {
     std::vector<Entity> owned;
@@ -279,7 +279,7 @@ TEST(ServerApp, InputFromUnknownPlayerIsIgnored) {
 }
 
 TEST(ServerApp, MissingScriptsGiveAnEmptyGame) {
-    Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "missing");
+    Server server(std::filesystem::path(TEST_FIXTURES_DIR) / "missing");
     ServerApp& app = server.app;
 
     app.events().publish(PlayerJoined{.player_id = 1});
@@ -294,7 +294,7 @@ TEST(ServerApp, MissingScriptsGiveAnEmptyGame) {
 namespace {
 
 const std::filesystem::path audio_game =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "audio";
+    std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "server" / "audio";
 
 struct HeardAudio {
     std::vector<engine::network::SoundPlayed> sounds;
@@ -339,7 +339,7 @@ TEST(ServerApp, ScriptsWithoutAudioHaveNoAudioNames) {
 }
 
 TEST(ServerApp, StringTableListsDeclaredTexturesAndEntitySpritesInOrder) {
-    const Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "textures");
+    const Server server(std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "server" / "textures");
 
     EXPECT_EQ(server.app.strings().entries(StringCategory::texture),
               (std::vector<StringEntry>{
@@ -348,7 +348,7 @@ TEST(ServerApp, StringTableListsDeclaredTexturesAndEntitySpritesInOrder) {
 }
 
 TEST(ServerApp, StringTableListsDeclaredShadersAndEntityShadersInOrder) {
-    const Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "shaders");
+    const Server server(std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "server" / "shaders");
 
     EXPECT_EQ(server.app.strings().entries(StringCategory::shader),
               (std::vector<StringEntry>{
@@ -399,7 +399,7 @@ TEST(ServerApp, SoundPlayedByAnEntityCarriesItsIndex) {
 namespace {
 
 const std::filesystem::path events_game =
-    std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "events";
+    std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "server" / "events";
 
 std::vector<engine::network::NamedEvent> listen_events(ServerApp& app) {
     std::vector<engine::network::NamedEvent> heard;
@@ -453,7 +453,7 @@ TEST(ServerApp, TickPublishesEmittedEventsInOrder) {
 }
 
 TEST(ServerApp, TickSwitchesTheSceneAndPublishesSceneLoaded) {
-    Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "scenes");
+    Server server(std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "server" / "scenes");
     ServerApp& app = server.app;
     const auto before = app.script().spawn("marker", engine::core::Vec2{1.F, 2.F});
     ASSERT_TRUE(before.has_value());
@@ -471,7 +471,7 @@ TEST(ServerApp, TickSwitchesTheSceneAndPublishesSceneLoaded) {
 }
 
 TEST(ServerApp, TickDestroysEntitiesWhoseHitboxesOverlap) {
-    Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "collide");
+    Server server(std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "server" / "collide");
     ServerApp& app = server.app;
     const auto bullet = app.script().spawn("bullet", engine::core::Vec2{1000.F, 300.F});
     const auto target = app.script().spawn("target", engine::core::Vec2{1000.F, 290.F});
@@ -486,7 +486,7 @@ TEST(ServerApp, TickDestroysEntitiesWhoseHitboxesOverlap) {
 }
 
 TEST(ServerApp, TickMovesScriptEntitiesByTheirVelocity) {
-    Server server(std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "server" / "drift");
+    Server server(std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "server" / "drift");
     ServerApp& app = server.app;
     const auto drifter = app.script().spawn("drifter", engine::core::Vec2{100.F, 100.F});
     ASSERT_TRUE(drifter);

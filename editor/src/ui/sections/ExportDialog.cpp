@@ -27,7 +27,9 @@ constexpr Clay_Color backdrop{.r = 0, .g = 0, .b = 0, .a = 150};
 constexpr ButtonStyle primary{.background = color::accent, .foreground = color::text_on_accent};
 constexpr ButtonStyle secondary{.background = color::toolbar, .foreground = color::text};
 
-void change(Ui& ui, ExportSettings settings) { ui.emit(command::SetExport{.settings = std::move(settings)}); }
+void change(Ui& ui, ExportSettings settings) {
+    ui.emit(command::SetExport{.settings = std::move(settings)});
+}
 
 template <typename Field> void labelled(const Theme& theme, Clay_String label, Field field) {
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
@@ -63,25 +65,6 @@ void output_row(Ui& ui, const ExportSettings& settings) {
             ExportSettings changed = settings;
             changed.output = result.value;
             change(ui, std::move(changed));
-        }
-    });
-}
-
-void binaries_row(Ui& ui, const ExportSettings& settings) {
-    labelled(ui.theme(), CLAY_STRING("Binaries"), [&] {
-        CLAY({.layout = {.childGap = ui.theme().px16(6.F)}}) {
-            for (const auto [id, label, binaries] :
-                 {std::tuple{CLAY_ID("ExportClientAndServer"), CLAY_STRING("Client + server"),
-                             Binaries::client_and_server},
-                  std::tuple{CLAY_ID("ExportClientOnly"), CLAY_STRING("Client only"),
-                             Binaries::client_only}}) {
-                if (toggle(ui, id, label, settings.binaries == binaries) &&
-                    settings.binaries != binaries) {
-                    ExportSettings changed = settings;
-                    changed.binaries = binaries;
-                    change(ui, std::move(changed));
-                }
-            }
         }
     });
 }
@@ -157,7 +140,6 @@ void dialog_body(Ui& ui, const ExportDialog& dialog) {
                          .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
             name_row(ui, dialog.settings);
             output_row(ui, dialog.settings);
-            binaries_row(ui, dialog.settings);
             plan_summary(ui, dialog.plan);
             actions_row(ui, dialog.plan);
         }

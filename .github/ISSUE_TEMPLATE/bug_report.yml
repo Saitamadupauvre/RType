@@ -85,7 +85,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: RType version or commit
+      label: Version or commit
       placeholder: "v1.2.0, or the output of `git rev-parse --short HEAD`"
 
   - type: checkboxes

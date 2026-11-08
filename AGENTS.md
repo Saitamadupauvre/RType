@@ -66,7 +66,7 @@ docs/                       documentation (English, MkDocs sources; mkdocs.yml a
   Lua scripts with errors, duplicate or reserved names, missing plugin, missing
   symbol, wrong plugin API version.
 - Test data goes in `tests/fixtures/` and is reached through the
-  `RTYPE_FIXTURES_DIR` macro, never through the working directory.
+  `TEST_FIXTURES_DIR` macro, never through the working directory.
 - Tests must be deterministic: no real network, no sleeps, no display. Inject
   the clock and random seeds.
 

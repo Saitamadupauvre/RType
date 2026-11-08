@@ -5,9 +5,9 @@ function(engine_add_test module)
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE engine::${module} GTest::gtest_main)
     target_compile_definitions(${target} PRIVATE
-        RTYPE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+        TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
-    rtype_set_warnings(${target})
+    workspace_set_warnings(${target})
     set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "${module}.")
 endfunction()
@@ -156,7 +156,7 @@ function(engine_add_test_library name)
     add_library(${name} MODULE ${arg_SOURCES})
     target_link_libraries(${name} PRIVATE ${arg_LINKS})
     set_target_properties(${name} PROPERTIES PREFIX "")
-    rtype_set_warnings(${name})
+    workspace_set_warnings(${name})
 endfunction()
 
 function(engine_test_use_library test_target macro library)
@@ -193,18 +193,17 @@ engine_test_use_library(engine_audio_tests MISSING_CREATE_PLUGIN_PATH test-audio
 engine_test_use_library(engine_audio_tests NULL_BACKEND_PLUGIN_PATH test-audio-plugin-nullbackend)
 engine_test_use_library(engine_audio_tests RAYLIB_PLUGIN_PATH audio-raylib)
 
-function(game_add_test name)
+function(runtime_add_test name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
-    set(target game_${name}_tests)
+    set(target runtime_${name}_tests)
 
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
     target_compile_definitions(${target} PRIVATE
-        RTYPE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+        TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
-    rtype_set_warnings(${target})
-    set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
-    gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "game.${name}.")
+    workspace_set_warnings(${target})
+    gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "runtime.${name}.")
 endfunction()
 
 function(plugin_add_test name)
@@ -213,7 +212,7 @@ function(plugin_add_test name)
 
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
-    rtype_set_warnings(${target})
+    workspace_set_warnings(${target})
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "plugin.${name}.")
 endfunction()
 
@@ -241,7 +240,7 @@ function(editor_add_test name)
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
     target_compile_definitions(${target} PRIVATE
-        RTYPE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+        TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
     editor_set_warnings(${target})
     set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
@@ -293,26 +292,5 @@ editor_add_test(core
     LINKS editor-core
 )
 
-game_add_test(server SOURCES game/server/CliTest.cpp
-    game/server/ShipTest.cpp game/server/MissileTest.cpp game/server/BydoTest.cpp
-    game/server/BydoShotTest.cpp game/server/SpawnerTest.cpp game/server/CollisionTest.cpp
-    game/server/GameFlowTest.cpp
-    LINKS r-type_server_cli engine::app engine::physics)
-game_add_test(client SOURCES game/client/CliTest.cpp LINKS r-type_client_cli)
-
-function(game_add_runtime_data_test folder source)
-    add_test(NAME game.runtime_data.${folder}
-        COMMAND ${CMAKE_COMMAND}
-            -DSOURCE=${source}
-            -DCOPY=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${folder}
-            -P ${CMAKE_CURRENT_SOURCE_DIR}/game/RuntimeDataTest.cmake
-    )
-endfunction()
-
-game_add_runtime_data_test(scripts ${PROJECT_SOURCE_DIR}/game/scripts)
-game_add_runtime_data_test(scenes ${PROJECT_SOURCE_DIR}/game/scenes)
-game_add_runtime_data_test(assets ${PROJECT_SOURCE_DIR}/assets)
-add_test(NAME game.runtime_data.project
-    COMMAND ${CMAKE_COMMAND} -E compare_files
-        ${PROJECT_SOURCE_DIR}/game/game.json ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/game.json
-)
+runtime_add_test(cli SOURCES runtime/CliTest.cpp runtime/OptionsTest.cpp
+    LINKS engine-runtime-core)

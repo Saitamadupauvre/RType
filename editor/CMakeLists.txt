@@ -9,7 +9,7 @@ check_cxx_compiler_flag(-Wmissing-designated-field-initializers
     EDITOR_HAS_DESIGNATED_FIELD_WARNING)
 
 function(editor_set_warnings target)
-    rtype_set_warnings(${target})
+    workspace_set_warnings(${target})
     if(EDITOR_HAS_DESIGNATED_FIELD_WARNING)
         target_compile_options(${target} PRIVATE -Wno-missing-designated-field-initializers)
     endif()

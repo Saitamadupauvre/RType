@@ -28,7 +28,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path game_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scenes" / "game";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scenes" / "game";
 }
 
 std::vector<std::string> types_of(const std::vector<Instance>& instances) {

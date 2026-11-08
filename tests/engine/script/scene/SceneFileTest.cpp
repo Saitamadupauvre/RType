@@ -39,11 +39,11 @@ using engine::script::write_scene;
 namespace {
 
 std::filesystem::path scene_fixture(const std::string& name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scenes" / "files" / (name + ".json");
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scenes" / "files" / (name + ".json");
 }
 
 std::filesystem::path declarations_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "instances";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "instances";
 }
 
 std::vector<std::string> issue_fields(const std::vector<InstanceIssue>& issues) {

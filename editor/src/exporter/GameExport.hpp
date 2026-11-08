@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -10,15 +9,11 @@
 
 namespace editor {
 
-/** @brief Which runtime binaries an export ships. */
-enum class Binaries : std::uint8_t { client_and_server, client_only };
-
 /** @brief What the user chooses in the export dialog. */
 struct ExportSettings {
-    /** File name of the exported game binary; the server is `<name>-server`. */
+    /** File name of the exported game binary, which runs every mode. */
     std::string name;
     std::filesystem::path output;
-    Binaries binaries = Binaries::client_and_server;
 
     bool operator==(const ExportSettings&) const = default;
 };
@@ -59,8 +54,8 @@ struct ExportPlan {
 /**
  * @brief Lists what exporting @p game with @p settings copies, and why it cannot run.
  *
- * @param runtime Folder holding `r-type_client`, `r-type_server`, the `libengine-*` libraries
- * and `plugins/`; usually the editor's own folder.
+ * @param runtime Folder holding `engine-runtime`, the `libengine-*` libraries and `plugins/`;
+ * usually the editor's own folder.
  * @note Reads the disk but never writes to it.
  */
 [[nodiscard]] ExportPlan plan_export(const std::filesystem::path& game,

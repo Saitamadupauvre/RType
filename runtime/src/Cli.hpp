@@ -8,29 +8,30 @@
 
 #include "engine/app/Launch.hpp"
 
-namespace rtype::client {
+namespace runtime {
 
-inline constexpr std::size_t max_players = 4;
+inline constexpr std::size_t max_supported_players = 4;
 
-struct ClientConfig {
+struct RuntimeConfig {
     engine::app::Mode mode{engine::app::Mode::client};
-    std::string host;
+    std::string server_ip{};
     std::uint16_t port{0};
+    std::size_t max_players{max_supported_players};
     unsigned int music_volume{100};
     unsigned int effects_volume{100};
     bool muted{false};
     std::string game{};
     std::string scene_file{};
 
-    bool operator==(const ClientConfig&) const = default;
+    bool operator==(const RuntimeConfig&) const = default;
 };
 
 struct CliResult {
-    std::optional<ClientConfig> config;
+    std::optional<RuntimeConfig> config;
     int exit_code;
     std::string message;
 };
 
 CliResult parse_cli(const std::vector<std::string>& args);
 
-} // namespace rtype::client
+} // namespace runtime

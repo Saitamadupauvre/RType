@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(RType
+project(EngineWorkspace
     VERSION 0.1.0
     LANGUAGES CXX
 )
@@ -26,9 +26,11 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 add_subdirectory(engine)
 add_subdirectory(plugins)
 add_subdirectory(editor)
-add_subdirectory(game)
+add_subdirectory(runtime)
 
 # Added by project-bootstrap
 include(cmake/project_bootstrap/tests.cmake)
 include(cmake/project_bootstrap/format.cmake)
 include(cmake/project_bootstrap/docs.cmake)
+
+install(DIRECTORY examples/ DESTINATION examples)

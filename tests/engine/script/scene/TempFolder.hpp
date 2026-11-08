@@ -42,7 +42,7 @@ public:
 private:
     static std::string unique_name() {
         const auto* test = ::testing::UnitTest::GetInstance()->current_test_info();
-        return std::string("rtype_") + test->test_suite_name() + "_" + test->name();
+        return std::string("engine_test_") + test->test_suite_name() + "_" + test->name();
     }
 
     std::filesystem::path _path;

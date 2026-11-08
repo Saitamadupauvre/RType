@@ -18,7 +18,7 @@ constexpr int terminate_signal = 15;
 constexpr long max_polls = 100'000'000;
 
 std::filesystem::path fixture(const char* name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "editor" / name;
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "editor" / name;
 }
 
 PlayRequest request() { return {.game = "/games/demo", .scene_file = "/tmp/played.json"}; }

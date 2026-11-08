@@ -39,7 +39,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path instances_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "instances";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "instances";
 }
 
 struct Scene {

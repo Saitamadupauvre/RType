@@ -220,8 +220,7 @@ protected:
 
     ApplyExport() {
         _runtime = _game.path() / ".runtime";
-        _game.write(".runtime/r-type_client", "client");
-        _game.write(".runtime/r-type_server", "server");
+        _game.write(".runtime/engine-runtime", "runtime");
         _game.write(".runtime/plugins/graphics-raylib.so", "graphics");
     }
 
@@ -297,7 +296,7 @@ TEST_F(ApplyExport, ExportWritesTheGameAndClosesTheDialog) {
 
     EXPECT_FALSE(_state.export_dialog.has_value());
     EXPECT_TRUE(std::filesystem::exists(_output / "editor-test"));
-    EXPECT_TRUE(std::filesystem::exists(_output / "editor-test-server"));
+    EXPECT_FALSE(std::filesystem::exists(_output / "editor-test-server"));
     EXPECT_TRUE(std::filesystem::exists(_output / "scenes" / "level1.json"));
     EXPECT_TRUE(std::filesystem::exists(_output / "README.txt"));
 }

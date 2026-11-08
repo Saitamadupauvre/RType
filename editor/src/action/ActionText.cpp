@@ -38,10 +38,6 @@ std::string_view overlay_name(Overlay overlay) {
     return overlay == Overlay::hitboxes ? "hitboxes" : "names";
 }
 
-std::string_view binaries_name(Binaries binaries) {
-    return binaries == Binaries::client_and_server ? "client+server" : "client";
-}
-
 std::string edit_text(const Edit& edit) {
     return std::visit(
         Overloaded{
@@ -60,8 +56,8 @@ std::string edit_text(const Edit& edit) {
                 return std::format("edit::Rename id={} name={}", id_text(rename.id), rename.name);
             },
             [](const edit::SetField& set) {
-                return std::format("edit::SetField id={} key={} value={}", id_text(set.id),
-                                   set.key, describe(set.value));
+                return std::format("edit::SetField id={} key={} value={}", id_text(set.id), set.key,
+                                   describe(set.value));
             },
             [](const edit::ResetField& reset) {
                 return std::format("edit::ResetField id={} key={}", id_text(reset.id), reset.key);
@@ -149,9 +145,8 @@ std::string command_text(const Command& command) {
             [](const command::Stop&) { return std::string("command::Stop"); },
             [](const command::OpenExport&) { return std::string("command::OpenExport"); },
             [](const command::SetExport& change) {
-                return std::format("command::SetExport name={} output={} binaries={}",
-                                   change.settings.name, change.settings.output.generic_string(),
-                                   binaries_name(change.settings.binaries));
+                return std::format("command::SetExport name={} output={}", change.settings.name,
+                                   change.settings.output.generic_string());
             },
             [](const command::CloseExport&) { return std::string("command::CloseExport"); },
             [](const command::RunExport&) { return std::string("command::RunExport"); },

@@ -16,7 +16,7 @@ protected:
     TempFolder _game;
 
     GameFixture() {
-        std::filesystem::copy(std::filesystem::path(RTYPE_FIXTURES_DIR) / "editor" / "game",
+        std::filesystem::copy(std::filesystem::path(TEST_FIXTURES_DIR) / "editor" / "game",
                               _game.path(), std::filesystem::copy_options::recursive);
     }
 

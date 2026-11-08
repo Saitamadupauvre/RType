@@ -14,8 +14,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-constexpr std::string_view client_binary = "r-type_client";
-constexpr std::string_view server_binary = "r-type_server";
+constexpr std::string_view runtime_binary = "engine-runtime";
 constexpr std::string_view library_prefix = "libengine-";
 constexpr std::string_view fallback_name = "game";
 constexpr std::string_view readme_file = "README.txt";
@@ -89,15 +88,12 @@ void check_output(ExportPlan& plan, const fs::path& game, const ExportSettings& 
 }
 
 std::string readme(const ExportSettings& settings) {
-    std::string text = std::format("{0}\n\n"
-                                   "Play alone:             ./{0} --solo\n"
-                                   "Host and play:          ./{0} --host 4242\n"
-                                   "Join a game:            ./{0} <server-ip> 4242\n",
-                                   settings.name);
-    if (settings.binaries == Binaries::client_and_server) {
-        text += std::format("Dedicated server:       ./{}-server 4242\n", settings.name);
-    }
-    return text;
+    return std::format("{0}\n\n"
+                       "Play alone:             ./{0} --solo\n"
+                       "Host and play:          ./{0} --host 4242\n"
+                       "Join a game:            ./{0} <server-ip> 4242\n"
+                       "Dedicated server:       ./{0} --server 4242\n",
+                       settings.name);
 }
 
 } // namespace
@@ -130,15 +126,13 @@ ExportSettings default_export(const fs::path& game) {
 
 ExportPlan plan_export(const fs::path& game, const fs::path& runtime,
                        const ExportSettings& settings) {
-    ExportPlan plan{.output = settings.output, .steps = {}, .problems = {}, .readme = readme(settings)};
+    ExportPlan plan{
+        .output = settings.output, .steps = {}, .problems = {}, .readme = readme(settings)};
     if (!engine::script::is_scene_name(settings.name)) {
         plan.problems.emplace_back("the name takes 1 to 63 letters, digits, '_' or '-'");
     }
     check_output(plan, game, settings);
-    add_binary(plan, runtime, client_binary, settings.name);
-    if (settings.binaries == Binaries::client_and_server) {
-        add_binary(plan, runtime, server_binary, settings.name + "-server");
-    }
+    add_binary(plan, runtime, runtime_binary, settings.name);
     add_libraries(plan, runtime);
     add_entry(plan, runtime / "plugins", true);
     add_entry(plan, game / "game.json", true);
@@ -161,7 +155,8 @@ engine::editor::CommandResult run_export(const ExportPlan& plan) {
                 std::format("export failed: cannot write {}", readme_file));
         }
     } catch (const fs::filesystem_error& error) {
-        return engine::editor::CommandResult::refused(std::format("export failed: {}", error.what()));
+        return engine::editor::CommandResult::refused(
+            std::format("export failed: {}", error.what()));
     }
     return engine::editor::CommandResult::done(
         std::format("exported to {} ({} items)", plan.output.generic_string(), plan.steps.size()));
