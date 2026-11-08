@@ -58,6 +58,8 @@ enum class Face : std::uint8_t { regular, bold };
 
 struct Theme {
     float scale = 1.F;
+    /** Multiplies the distance one wheel notch scrolls. */
+    float scroll_speed = 1.F;
 
     [[nodiscard]] float px(float design) const;
     [[nodiscard]] std::uint16_t px16(float design) const;

@@ -1,6 +1,7 @@
 #include "action/Editor.hpp"
 
 #include <filesystem>
+#include <format>
 #include <system_error>
 #include <utility>
 #include <variant>
@@ -57,6 +58,22 @@ void Editor::log(ConsoleLine line) {
 
 void Editor::attach_runtime(std::filesystem::path folder) { _runtime = std::move(folder); }
 
+void Editor::apply_settings(const LoadedSettings& loaded) {
+    namespace logging = engine::core::log;
+    _state.view = loaded.settings.view;
+    _state.ui_scale = loaded.settings.ui_scale;
+    _state.scroll_speed = loaded.settings.scroll_speed;
+    _state.settings_file = loaded.file;
+    for (const ConsoleLine& problem : loaded.problems) {
+        if (problem.severity == Severity::error) {
+            logging::error("editor: {}", problem.text);
+        } else {
+            logging::warn("editor: {}", problem.text);
+        }
+        log(problem);
+    }
+}
+
 void Editor::update() {
     for (ConsoleLine& line : _play.update(_state.mode)) {
         log(std::move(line));
@@ -95,9 +112,21 @@ CommandResult Editor::apply(const Command& command) {
     if (_state.mode != Mode::editing && !allowed_while_running(command)) {
         return stop_first();
     }
+    if (std::holds_alternative<command::ReloadSettings>(command)) {
+        return reload_settings();
+    }
     CommandResult result = apply_command(_session, _state, {.play = _play, .open_file = _open_file, .runtime = _runtime}, command);
     refresh_lists();
     return result;
+}
+
+CommandResult Editor::reload_settings() {
+    if (_state.settings_file.empty()) {
+        return CommandResult::refused("No settings folder: neither XDG_CONFIG_HOME nor HOME is set.");
+    }
+    apply_settings(load_settings(_state.settings_file));
+    return CommandResult::done(
+        std::format("settings reloaded from {}", _state.settings_file.generic_string()));
 }
 
 void Editor::refresh_inspector() { _state.inspector = inspect_selection(_session); }

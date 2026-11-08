@@ -1,6 +1,7 @@
 find_package(raylib CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(clap 1.0 CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 find_path(CLAY_INCLUDE_DIR clay.h REQUIRED)
 
 include(CheckCXXCompilerFlag)
@@ -32,6 +33,7 @@ add_library(editor-core STATIC
     src/play/ProcessLauncher.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
+    src/settings/Settings.cpp
     src/text/CaretScroll.cpp
     src/text/FitText.cpp
     src/text/FuzzyMatch.cpp
@@ -74,7 +76,7 @@ add_library(editor-core STATIC
     src/ui/widgets/Toggle.cpp
 )
 target_include_directories(editor-core PUBLIC src)
-target_link_libraries(editor-core PUBLIC editor-clay engine::editor PRIVATE clap::clap)
+target_link_libraries(editor-core PUBLIC editor-clay engine::editor PRIVATE clap::clap nlohmann_json::nlohmann_json)
 editor_set_warnings(editor-core)
 
 set(EDITOR_ASSETS_DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/editor-assets)
@@ -90,6 +92,7 @@ add_executable(editor
     src/raylib/ClayRenderer.cpp
     src/raylib/EditorWindow.cpp
     src/raylib/FontCache.cpp
+    src/raylib/RaylibLog.cpp
     src/raylib/ViewportPainter.cpp
 )
 target_link_libraries(editor PRIVATE editor-core raylib glfw)

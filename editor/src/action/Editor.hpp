@@ -12,6 +12,7 @@
 #include "engine/editor/EditorSession.hpp"
 #include "play/GameLauncher.hpp"
 #include "play/PlaySession.hpp"
+#include "settings/Settings.hpp"
 
 
 
@@ -43,6 +44,11 @@ public:
 
     /** @brief Lets OpenScript open files; without it OpenScript is refused. */
     void attach_file_opener(FileOpener opener);
+    /**
+     * @brief Starts the view with the settings' defaults and writes each settings problem to the
+     * console and the log.
+     */
+    void apply_settings(const LoadedSettings& loaded);
     /** @brief Sets the folder of the runtime binaries an export copies. */
     void attach_runtime(std::filesystem::path folder);
 
@@ -66,6 +72,7 @@ public:
 private:
     [[nodiscard]] engine::editor::CommandResult apply(const Edit& edit);
     [[nodiscard]] engine::editor::CommandResult apply(const Command& command);
+    [[nodiscard]] engine::editor::CommandResult reload_settings();
     void refresh_lists();
     void refresh_inspector();
     void report(const engine::editor::CommandResult& result);

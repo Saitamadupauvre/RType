@@ -14,6 +14,51 @@ The argument is required and must be a folder that contains a `game.json`
 (see [Game folder and scenes](game-folder.md)). Opening the editor without a
 project, and creating one, come with the launcher (#158).
 
+### Settings
+
+Personal preferences live in a `settings.json` that the editor reads once, at
+startup. File > Open settings, also in the command palette, opens it with the
+system's program for JSON files; when it does not exist yet, it is created
+holding `{}` first. That is the only time the editor writes it. File > Reload
+settings, also in the palette, reads it again and applies it at once: the scale
+and scroll speed change on the next frame, the `view.*` keys reset the toolbar
+to the file's values, and problems go to the console as at startup.
+
+| System | File |
+|---|---|
+| Linux | `$XDG_CONFIG_HOME/engine-editor/settings.json`, or `~/.config/engine-editor/settings.json` |
+| macOS | `~/Library/Application Support/engine-editor/settings.json` |
+
+```json
+{
+    "ui.scale": 1.25,
+    "ui.scroll_speed": 1,
+    "view.snap": true,
+    "view.grid_size": 16,
+    "view.show_hitboxes": false,
+    "view.show_names": true
+}
+```
+
+| Key | Type | Range | Default | Effect |
+|---|---|---|---|---|
+| `ui.scale` | number | 0.5 to 3 | 1 | Multiplies the screen's DPI scale: every panel, font and row |
+| `ui.scroll_speed` | number | 0.25 to 4 | 1 | Multiplies the 40 px one wheel notch scrolls |
+| `view.snap` | bool | | true | Snap to the grid when the editor starts |
+| `view.grid_size` | number | 1 to 512 | 16 | Grid size, in pixels, when the editor starts |
+| `view.show_hitboxes` | bool | | false | Show hitboxes when the editor starts |
+| `view.show_names` | bool | | true | Show names when the editor starts |
+
+- The `view.*` keys are where the toolbar starts, and where Reload settings
+  puts it back; toggling it changes the session only and never writes the
+  file.
+- A bad file never stops the editor. A missing file means the defaults.
+  Invalid JSON, or JSON that is not an object, gives one error in the console
+  and the defaults. An unknown key, a wrong type or a value out of range gives
+  a warning naming the key, and that key keeps its default.
+- Settings are about the tool, for one person. What belongs to the game (its
+  window, scenes, controls) lives in the game folder.
+
 ### Developer logs
 
 The in-app console is for users. What the editor does goes to the engine log
@@ -23,7 +68,7 @@ on stderr, at the level given by `--log-level` (`trace`, `debug`, `info`,
 | Level | Logged |
 |---|---|
 | `info` | The game folder and the start scene at startup; every refused action with its reason (`editor: refused command::Undo: ...`) |
-| `debug` | Every handled action with its fields (`editor: edit::Move id=3 position=(9, 9)`), each font loaded |
+| `debug` | Every handled action with its fields (`editor: edit::Move id=3 position=(9, 9)`), each font loaded, and raylib's own messages (`raylib: ...`) |
 | `trace` | Every key pressed with its modifiers, and the shortcut it ran, skipped because it is disabled, or ignored because a field or dialog has the keyboard |
 
 ```sh
@@ -31,7 +76,9 @@ editor game --log-level trace    # see every key, shortcut and action
 ```
 
 `action/ActionText` names each action and its fields. A font that cannot be
-loaded is a warning at any level.
+loaded is a warning at any level, and so are raylib's warnings and errors.
+Programs the editor opens, such as the text editor for scripts, may still
+print to the same terminal.
 
 ## Window
 

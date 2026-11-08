@@ -126,6 +126,15 @@ TEST_F(SmoothScroll, StepFollowsTheUiScale) {
     EXPECT_FLOAT_EQ(position(_console), -2.F * editor::SmoothScroll::step);
 }
 
+TEST_F(SmoothScroll, StepFollowsTheScrollSpeed) {
+    const editor::Theme theme{.scale = 1.F, .scroll_speed = 0.5F};
+    const editor::UiInput input = over(_console, theme);
+    scroll(input, -1.F, theme);
+    settle(input, theme);
+
+    EXPECT_FLOAT_EQ(position(_console), -0.5F * editor::SmoothScroll::step);
+}
+
 TEST_F(SmoothScroll, ScrollsTheClayDebugView) {
     Clay_SetDebugModeEnabled(true);
     const Clay_ElementId pane = CLAY_ID("Clay__DebugViewOuterScrollPane");

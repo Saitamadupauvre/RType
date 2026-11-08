@@ -23,6 +23,7 @@
 #include "ui/Layout.hpp"
 #include "ui/LetterKey.hpp"
 #include "ui/Platform.hpp"
+#include "raylib/RaylibLog.hpp"
 #include "ui/Theme.hpp"
 #include "ui/Ui.hpp"
 #include "ui/UiInput.hpp"
@@ -180,7 +181,8 @@ void run_frames(Editor& editor) {
         if (IsKeyPressed(KEY_F11)) {
             toggle_debug_view();
         }
-        Ui ui(Theme{.scale = GetWindowScaleDPI().x}, read_input(clicks), widgets, platform);
+        const Theme theme = theme_for(editor.state(), GetWindowScaleDPI().x);
+        Ui ui(theme, read_input(clicks), widgets, platform);
         const Clay_RenderCommandArray commands = build_frame(ui, editor, window_size());
         BeginDrawing();
         ClearBackground(BLACK);
@@ -201,6 +203,7 @@ bool run_editor_window(Editor& editor) {
         OpenURL(file.string().c_str());
         return true;
     });
+    route_raylib_log();
     SetConfigFlags(window_flags);
     InitWindow(initial_width, initial_height, "Editor");
     if (!IsWindowReady()) {

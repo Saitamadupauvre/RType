@@ -25,7 +25,8 @@ void feed_input(Ui& ui) {
     if (Clay_IsDebugModeEnabled()) {
         scroll.add(CLAY_ID("Clay__DebugViewOuterScrollPane"));
     }
-    scroll.update(input.wheel.y, ui.theme().px(SmoothScroll::step), input.delta_time);
+    scroll.update(input.wheel.y, ui.theme().px(SmoothScroll::step) * ui.theme().scroll_speed,
+                  input.delta_time);
 }
 
 void play_banner(Ui& ui, const Editor& editor) {
@@ -52,6 +53,10 @@ void play_banner(Ui& ui, const Editor& editor) {
 }
 
 } // namespace
+
+Theme theme_for(const EditorState& state, float dpi_scale) {
+    return {.scale = dpi_scale * state.ui_scale, .scroll_speed = state.scroll_speed};
+}
 
 Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimensions window) {
     Clay_SetLayoutDimensions(window);

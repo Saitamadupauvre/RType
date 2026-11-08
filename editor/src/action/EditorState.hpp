@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -24,7 +25,7 @@ struct ViewSettings {
     bool operator==(const ViewSettings&) const = default;
 };
 
-enum class Severity : std::uint8_t { info, error };
+enum class Severity : std::uint8_t { info, warning, error };
 
 /** @brief A line of the editor console, usually the message of a refused command. */
 struct ConsoleLine {
@@ -62,6 +63,12 @@ struct EditorState {
     std::string prefab_filter;
     std::optional<InspectorModel> inspector;
     std::optional<ExportDialog> export_dialog;
+    /** The user's settings file; empty when no config folder was found. */
+    std::filesystem::path settings_file;
+    /** `ui.scale` of the settings: multiplies the screen's DPI scale. */
+    float ui_scale = 1.F;
+    /** `ui.scroll_speed` of the settings: multiplies the wheel step. */
+    float scroll_speed = 1.F;
 };
 
 } // namespace editor

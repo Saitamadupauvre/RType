@@ -261,6 +261,7 @@ editor_add_test(core
         editor/exporter/GameExportTest.cpp
         editor/render/GeometryTest.cpp
         editor/render/ScissorStackTest.cpp
+        editor/settings/SettingsTest.cpp
         editor/play/PlaySessionTest.cpp
         editor/play/ProcessLauncherTest.cpp
         editor/text/CaretScrollTest.cpp

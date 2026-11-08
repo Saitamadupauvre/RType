@@ -57,6 +57,20 @@ std::optional<Action> open_script(const Editor& editor) {
     return command::OpenScript{.file = inspector->script};
 }
 
+std::optional<Action> open_settings(const Editor& editor) {
+    if (editor.state().settings_file.empty()) {
+        return std::nullopt;
+    }
+    return command::OpenSettings{};
+}
+
+std::optional<Action> reload_settings(const Editor& editor) {
+    if (editor.state().settings_file.empty()) {
+        return std::nullopt;
+    }
+    return command::ReloadSettings{};
+}
+
 std::optional<Action> open_export(const Editor& editor) {
     if (!editing(editor) || editor.state().export_dialog) {
         return std::nullopt;
@@ -116,6 +130,14 @@ constexpr std::array table{
     CommandEntry{.label = "Save scene", .menu = Menu::file, .shortcut = primary(Key::s), .make = save},
     CommandEntry{.label = "Discard changes", .menu = Menu::file, .shortcut = std::nullopt, .make = discard},
     CommandEntry{.label = "Open script", .menu = Menu::file, .shortcut = std::nullopt, .make = open_script},
+    CommandEntry{.label = "Open settings",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = open_settings},
+    CommandEntry{.label = "Reload settings",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = reload_settings},
     CommandEntry{.label = "Export game...",
                  .menu = Menu::file,
                  .shortcut = std::nullopt,

@@ -177,3 +177,51 @@ TEST_F(EditorLog, RefusedActionsAreLoggedAtInfoWithTheReason) {
     EXPECT_TRUE(logged(logging::Level::Debug, "editor: command::Undo"));
     EXPECT_TRUE(logged(logging::Level::Info, "editor: refused command::Undo: "));
 }
+
+TEST_F(EditorLog, SettingsSetTheViewAndReportProblems) {
+    editor::LoadedSettings loaded;
+    loaded.settings.view = {.snap = false, .grid_size = 8.F, .show_hitboxes = true};
+    loaded.problems.push_back(
+        {.severity = Severity::warning, .text = "settings.json: unknown key"});
+
+    _editor.apply_settings(loaded);
+
+    EXPECT_EQ(_editor.state().view, loaded.settings.view);
+    ASSERT_FALSE(_editor.state().console.empty());
+    EXPECT_EQ(_editor.state().console.back().severity, Severity::warning);
+    EXPECT_TRUE(logged(logging::Level::Warn, "editor: settings.json: unknown key"));
+}
+
+TEST_F(EditorLog, ReloadSettingsAppliesTheFileNow) {
+    _game.write("settings.json", R"({"ui.scale": 1.5})");
+    _editor.apply_settings(editor::load_settings(_game.path() / "settings.json"));
+    _game.write("settings.json",
+                R"({"ui.scale": 2, "ui.scroll_speed": 0.5, "view.snap": false, "nope": 1})");
+
+    _editor.handle(command::ReloadSettings{});
+
+    EXPECT_EQ(_editor.state().ui_scale, 2.F);
+    EXPECT_EQ(_editor.state().scroll_speed, 0.5F);
+    EXPECT_FALSE(_editor.state().view.snap);
+    EXPECT_TRUE(logged(logging::Level::Warn, "unknown key 'nope'"));
+    ASSERT_FALSE(_editor.state().console.empty());
+    EXPECT_NE(_editor.state().console.back().text.find("settings reloaded"), std::string::npos);
+}
+
+TEST_F(EditorLog, ReloadSettingsWorksWhilePlaying) {
+    _game.write("settings.json", R"({"ui.scale": 1.25})");
+    _editor.apply_settings(editor::load_settings(_game.path() / "settings.json"));
+    _editor.handle(command::Play{});
+    _game.write("settings.json", R"({"ui.scale": 2})");
+
+    _editor.handle(command::ReloadSettings{});
+
+    EXPECT_EQ(_editor.state().ui_scale, 2.F);
+}
+
+TEST_F(EditorLog, ReloadSettingsWithoutAFileIsRefused) {
+    _editor.handle(command::ReloadSettings{});
+
+    EXPECT_TRUE(logged(logging::Level::Info, "refused command::ReloadSettings"));
+    EXPECT_EQ(_editor.state().ui_scale, 1.F);
+}
