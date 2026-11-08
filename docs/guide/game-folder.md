@@ -31,8 +31,10 @@ which is how an exported game finds its files.
 |---|---|---|
 | `name` | string | Name of the game: the runtime's window title, and the name the editor's export gives the binary. |
 | `start_scene` | scene name | Scene spawned when the server starts, before `on_start()`. Optional. |
+| `modes` | array of mode names | Modes the runtime accepts for this game: `"solo"`, `"host"`, `"client"` (joining a server) and `"dedicated"`. Optional: without it, every mode. The editor's export writes it from the modes chosen in its dialog. |
 
-Other keys are ignored. The file itself is optional: a game folder without
+`modes` must be a non-empty array of those four names, otherwise the file is
+invalid; a repeated name counts once. Other keys are ignored. The file itself is optional: a game folder without
 `game.json`, or whose `game.json` has no `start_scene`, starts with only what
 `on_start()` spawns, as before scenes existed.
 

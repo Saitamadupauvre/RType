@@ -16,7 +16,7 @@ changes. What the editor does for its users is described in
 | Viewport | `viewport/` (`ViewCamera`, `Snap`, `Handles`, `SceneItems`), `raylib/ViewportPainter` | The camera, the drag and the pan live in `WidgetState::viewport()`; the renderer paints the frame's `ViewportFrame`, passed through the Clay element's custom data |
 | Inspector | `action/InspectorModel`, `ui/sections/Inspector*` | `Editor` caches what it shows in `EditorState::inspector` (`inspect_selection`) and refreshes it after every action, so the UI never queries the session |
 | Play | `play/PlaySession`, `play/ProcessLauncher` | `PlaySession` owns the game process and the played scene file; `ProcessLauncher` is the POSIX launcher (`posix_spawn` with the output piped to the console, `SIGSTOP`, `SIGTERM`), tests give a fake `GameLauncher` |
-| Export | `exporter/GameExport` | `plan_export()` only reads the disk, `run_export()` writes it; the runtime folder is attached with `Editor::attach_runtime()` |
+| Export | `exporter/GameExport` | `plan_export()` only reads the disk, `run_export()` writes it: the copies, the chosen `modes` into the exported `game.json` (`engine::script::write_modes`), the `<name>-server` launcher and `README.txt`; the runtime folder is attached with `Editor::attach_runtime()` |
 | Command palette | `ui/sections/CommandPalette`, `text/FuzzyMatch` | Reads the command table |
 
 ## One-way flow

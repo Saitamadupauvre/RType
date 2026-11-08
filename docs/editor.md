@@ -221,7 +221,9 @@ runtime:
 | `is_scene_name(name)` | Whether `name` is a valid scene name. |
 | `scene_file(game, name)` | `<game>/scenes/<name>.json`. |
 | `scripts_folder(game)` | `<game>/scripts`. |
-| `read_project(game)` | Reads `game.json` into `GameProject{start_scene}`; `std::nullopt` when it is invalid. |
+| `read_project(game)` | Reads `game.json` into `GameProject{name, start_scene, modes}`; `std::nullopt` when it is invalid. |
+| `is_mode_name(name)` | Whether `name` is `solo`, `host`, `client` or `dedicated`. |
+| `write_modes(game, modes)` | Sets (or, with `std::nullopt`, removes) `modes` in `game.json`, keeping its other keys. |
 | `write_start_scene(game, name)` | Sets (or, with `std::nullopt`, removes) `start_scene` in `game.json`, keeping its other keys; creates the file if needed. |
 | `list_scenes(game)` | Names of the scene files of `scenes/`, sorted. |
 

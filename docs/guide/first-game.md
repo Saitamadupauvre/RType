@@ -311,17 +311,21 @@ In the editor, click **Export**. The dialog proposes:
 |---|---|
 | Name | `coin-chase`, from the `name` of `game.json` |
 | Output folder | `coin-chase-export`, next to the game folder |
+| Modes | Solo, Host, Join and Server, all on |
 
-The dialog lists what will be copied, or what blocks the export. Click
-**Export**, then:
+Turn **Server** off if players should only play alone or host from their own
+machine: the export then ships no dedicated server and the game refuses
+`--server`. The dialog lists what will be copied, or what blocks the export.
+Click **Export**, then:
 
 ```sh
 cd coin-chase-export
 ./coin-chase --solo
 ```
 
-The folder holds the runtime renamed `coin-chase`, the engine libraries, the
-plugins and the game's files. Zip it and share it: it runs on a machine with
+The folder holds the runtime renamed `coin-chase` (and the `coin-chase-server`
+launcher when Server is on), the engine libraries, the plugins and the game's
+files. Zip it and share it: it runs on a machine with
 neither the editor nor the engine sources.
 
 ## Where next

@@ -45,7 +45,9 @@ Epitech *Advanced C++* project (B-CPP-500).
 - **Play** runs the open scene in the real game, unsaved changes included,
   with the game's output and Lua errors in the editor's console.
 - **Export** writes a self-contained folder: the runtime renamed after the
-  game, the engine libraries, the plugins and the game's files.
+  game, the engine libraries, the plugins and the game's files, offering only
+  the modes you choose (solo, host, join, dedicated server, which ships a
+  `<name>-server` launcher).
 - Menu bar, command palette (`Ctrl+Shift+P`), personal `settings.json`.
 
 **Runtime and engine**

@@ -48,14 +48,22 @@ engine-runtime [options] --solo
 | `--mute` | Start with every sound muted |
 | `-h`, `--help` | Print the usage and exit with `0` |
 
-Exactly one mode must be given. The window title is the `name` of
-`game.json`, or the folder's name.
+Exactly one mode must be given. When `game.json` lists `modes`, any other
+mode is refused with exit code `84`, naming the modes the game offers:
+
+```
+$ ./space-game --server 4242
+Space Game does not offer the dedicated mode; it offers: solo, host, client
+```
+
+The window title is the `name` of `game.json`, or the folder's name.
 
 ## Exit codes and errors
 
 | Situation | Behaviour |
 |---|---|
 | Missing or invalid argument, or several modes | Prints the error and the usage, exits with `84` |
+| A mode the game's `modes` does not list | Prints the modes it offers, exits with `84` |
 | The server cannot listen on the port (already in use...) | Exits with `84` |
 | `plugins/graphics-raylib` cannot be loaded or the window cannot open | Exits with `84` |
 | `plugins/audio-raylib` cannot be loaded, or no audio device | Warning; plays without sound |
@@ -83,33 +91,50 @@ started from any directory. Move the whole folder, never the program alone.
 |---|---|
 | Name | `name` of `game.json` as a file name (`Space Game` gives `space-game`), or the folder name |
 | Output folder | `<name>-export` next to the game folder |
+| Modes | **Solo**, **Host**, **Join** and **Server** toggles: the `modes` of `game.json`, or all four |
+
+The modes decide what players can do with the exported game:
+
+| Mode | Lets players | Exported as |
+|---|---|---|
+| Solo | Play alone | `./<name> --solo` |
+| Host | Host a game and play on it | `./<name> --host <port>` |
+| Join | Join a server | `./<name> <server-ip> <port>` |
+| Server | Run a dedicated server | `./<name>-server <port>`, a launcher for `./<name> --server <port>` |
+
+A client-only export is Server off: no `<name>-server`, and the runtime refuses
+`--server`. A solo game is only Solo on. The chosen modes are written into the
+exported `game.json` (never into your game folder), and `README.txt` only
+lists them.
 
 The export copies, without building anything:
 
 ```
 <name>-export/
 ├── <name>                 engine-runtime, renamed
+├── <name>-server          dedicated server launcher, with Server on
 ├── libengine-*.so         engine libraries
 ├── plugins/               graphics and audio backends
-├── game.json
+├── game.json              with the chosen modes
 ├── scripts/
 ├── scenes/                when the game has some
 ├── assets/                when the game has some
-└── README.txt             how to run every mode
+└── README.txt             how to run each offered mode
 ```
 
-The exported program runs every mode with its own folder as the game folder:
+The exported programs use their own folder as the game folder:
 
 ```sh
 ./space-game --solo
 ./space-game --host 4242
 ./space-game 192.168.1.10 4242
-./space-game --server 4242
+./space-game-server 4242 --max-players 2
 ```
 
 The dialog lists what it will copy, or each problem that blocks the export:
 
 - a name that is not 1 to 63 letters, digits, `_` or `-`;
+- no mode chosen;
 - no output folder, an output folder inside the game folder, or one that
   exists and is not empty;
 - a missing `engine-runtime`, `plugins/` or `scripts/`.
@@ -123,4 +148,10 @@ system the editor was built for (Linux or macOS).
 Exporting is only copying, so it can be scripted: copy `engine-runtime`
 (renamed), the `libengine-*` libraries and `plugins/` from the build's `bin/`
 folder, then `game.json`, `scripts/`, `scenes/` and `assets/` from the game
-folder, all into one folder.
+folder, all into one folder. Add `"modes"` to the copied `game.json` to limit
+what it offers, and, for a dedicated server launcher, a `<name>-server` script:
+
+```sh
+#!/bin/sh
+exec "$(dirname "$0")/<name>" --server "$@"
+```

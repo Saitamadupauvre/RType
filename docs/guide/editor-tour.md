@@ -172,7 +172,8 @@ change the project."). Closing the game window ends Play too. More in
 ## Export
 
 **Export** (or File > Export game...) writes a folder that runs the game
-without the editor. See [Run and export](run-and-export.md#exporting-from-the-editor).
+without the editor, offering the modes you choose: solo, host, join and
+dedicated server. See [Run and export](run-and-export.md#exporting-from-the-editor).
 
 ## Menus, shortcuts and command palette
 
