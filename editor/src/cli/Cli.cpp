@@ -34,7 +34,13 @@ CliResult parse_cli(const std::vector<std::string>& args) {
                      .validator(clap::DirExists)
                      .validator(GameFolderFn{});
 
+    auto& runtime =
+        app.option<std::filesystem::path>("--runtime", "Program that plays the game; defaults to "
+                                                       "r-type_client next to the editor.")
+            .default_value(std::filesystem::path{});
+
     app.example(program + " game", "Edit the game in ./game and open its start scene.");
+    app.example(program + " game --runtime ./r-type_client", "Play with a given runtime.");
 
     const bool ok = app.parse(args);
 
@@ -43,7 +49,9 @@ CliResult parse_cli(const std::vector<std::string>& args) {
                 .exit_code = help ? 0 : error_exit_code,
                 .message = help ? app.help() : app.error()};
     }
-    return {.config = EditorConfig{.game = game.get()}, .exit_code = 0, .message = ""};
+    return {.config = EditorConfig{.game = game.get(), .runtime = runtime.get()},
+            .exit_code = 0,
+            .message = ""};
 }
 
 } // namespace editor

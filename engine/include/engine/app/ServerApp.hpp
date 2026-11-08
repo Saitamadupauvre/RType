@@ -31,6 +31,8 @@ struct ServerAppOptions {
      * script::ScriptRuntime::load_game(). Empty runs no script.
      */
     std::filesystem::path game;
+    /** @brief Scene file spawned instead of `game.json`'s `start_scene`; empty keeps it. */
+    std::filesystem::path start_scene_file{};
     /** @brief Maximum number of players connected at once. */
     std::size_t max_players{4};
 };

@@ -1,7 +1,10 @@
+#include <filesystem>
 #include <iostream>
+#include <memory>
 
 #include "action/OpenEditor.hpp"
 #include "cli/Cli.hpp"
+#include "play/ProcessLauncher.hpp"
 #include "raylib/EditorWindow.hpp"
 
 int main(int argc, char** argv) {
@@ -15,5 +18,10 @@ int main(int argc, char** argv) {
         std::cerr << "editor: cannot open " << result.config->game.string() << "\n";
         return 84;
     }
+    const std::filesystem::path runtime =
+        result.config->runtime.empty()
+            ? std::filesystem::path(argv[0]).parent_path() / "r-type_client"
+            : result.config->runtime;
+    editor->attach_launcher(std::make_unique<editor::ProcessLauncher>(runtime));
     return editor::run_editor_window(*editor) ? 0 : 84;
 }

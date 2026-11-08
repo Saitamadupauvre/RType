@@ -39,12 +39,23 @@ CliResult parse_cli(const std::vector<std::string>& args) {
             .range(0, 100)
             .default_value(100);
     auto& muted = app.flag("--mute", "Start with every sound muted (toggle in game with M).");
+    auto& game = app.option<std::string>("--game", "Game folder to play instead of the one next "
+                                                   "to this program.")
+                     .validator(clap::NonEmpty)
+                     .default_value("");
+    auto& scene_file =
+        app.option<std::string>("--scene-file", "Scene file to start from instead of the game's "
+                                                "start scene, such as one an editor plays.")
+            .validator(clap::NonEmpty)
+            .default_value("");
 
     app.example(program + " 127.0.0.1 4242", "Connect to a local server on port 4242.");
     app.example(program + " 127.0.0.1 4242 --music-volume 30",
                 "Connect with the music at 30% volume.");
     app.example(program + " --host 4242", "Host a game on port 4242 and play on it.");
     app.example(program + " --solo", "Play alone.");
+    app.example(program + " --solo --game ../my-game --scene-file /tmp/level.json",
+                "Play another game folder from a given scene.");
 
     const bool ok = app.parse(args);
 
@@ -68,7 +79,9 @@ CliResult parse_cli(const std::vector<std::string>& args) {
                         .port = port.get(),
                         .music_volume = music_volume.get(),
                         .effects_volume = effects_volume.get(),
-                        .muted = muted};
+                        .muted = muted,
+                        .game = game.get(),
+                        .scene_file = scene_file.get()};
     if (hosted.is_set()) {
         config.mode = Mode::host;
         config.port = hosted.get();

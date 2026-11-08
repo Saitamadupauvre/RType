@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "../GameFixture.hpp"
+#include "../play/FakeLauncher.hpp"
 #include "FixedMeasure.hpp"
 #include "action/Action.hpp"
 #include "action/Editor.hpp"
@@ -37,7 +38,8 @@ class FrameFixture : public GameFixture {
 protected:
     static constexpr Clay_Dimensions window{.width = 1440, .height = 900};
 
-    editor::Editor _editor{open_level()};
+    editor::Editor _editor{
+        with_fake_launcher(editor::Editor{open_level(), _game.path() / ".scratch"})};
     editor::ClayContext _clay{window, fixed_measure};
     editor::WidgetState _widgets;
     std::string _clipboard;
@@ -46,6 +48,11 @@ protected:
         .read_clipboard = [this] { return _clipboard; },
         .write_clipboard = [this](std::string_view text) { _clipboard = std::string(text); },
         .texture_size = {}};
+
+    static editor::Editor with_fake_launcher(editor::Editor editor) {
+        editor.attach_launcher(std::make_unique<FakeLauncher>(std::make_shared<FakeGame>()));
+        return editor;
+    }
 
     Frame frame(editor::UiInput input = {}, editor::Theme theme = {},
                 Clay_Dimensions size = window) {

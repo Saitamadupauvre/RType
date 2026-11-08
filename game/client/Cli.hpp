@@ -19,6 +19,8 @@ struct ClientConfig {
     unsigned int music_volume{100};
     unsigned int effects_volume{100};
     bool muted{false};
+    std::string game{};
+    std::string scene_file{};
 
     bool operator==(const ClientConfig&) const = default;
 };

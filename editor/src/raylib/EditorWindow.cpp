@@ -176,6 +176,7 @@ void run_frames(Editor& editor) {
         for (const Action& action : ui.take_actions()) {
             editor.handle(action);
         }
+        editor.update();
     }
 }
 

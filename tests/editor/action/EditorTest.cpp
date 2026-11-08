@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "../GameFixture.hpp"
+#include "../play/FakeLauncher.hpp"
 #include "action/Editor.hpp"
 #include "action/EditorState.hpp"
 #include "engine/core/math/Vec2.hpp"
@@ -23,8 +24,12 @@ namespace {
 
 class EditorTest : public GameFixture {
 protected:
-    Editor _editor{open_level()};
+    Editor _editor{open_level(), _game.path() / ".scratch"};
     InstanceId _rock = id_of(_editor.session(), "rock");
+
+    void SetUp() override {
+        _editor.attach_launcher(std::make_unique<FakeLauncher>(std::make_shared<FakeGame>()));
+    }
 
     [[nodiscard]] Vec2 rock_position() const { return instance(_editor.session(), _rock).position; }
 };

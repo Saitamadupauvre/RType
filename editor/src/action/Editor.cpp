@@ -1,5 +1,7 @@
 #include "action/Editor.hpp"
 
+#include <filesystem>
+#include <system_error>
 #include <utility>
 #include <variant>
 
@@ -24,9 +26,26 @@ CommandResult stop_first() {
 
 } // namespace
 
-Editor::Editor(EditorSession session) : _session(std::move(session)) {
+Editor::Editor(EditorSession session, std::filesystem::path scratch)
+    : _session(std::move(session)), _play(std::move(scratch)) {
     refresh_lists();
     refresh_inspector();
+}
+
+std::filesystem::path Editor::default_scratch() {
+    std::error_code error;
+    const std::filesystem::path temporary = std::filesystem::temp_directory_path(error);
+    return (error ? std::filesystem::path(".") : temporary) / "engine-editor";
+}
+
+void Editor::attach_launcher(std::unique_ptr<GameLauncher> launcher) {
+    _play.attach(std::move(launcher));
+}
+
+void Editor::update() {
+    for (ConsoleLine& line : _play.update(_state.mode)) {
+        _state.console.push_back(std::move(line));
+    }
 }
 
 void Editor::handle(const Action& action) {
@@ -53,7 +72,7 @@ CommandResult Editor::apply(const Command& command) {
     if (_state.mode != Mode::editing && !allowed_while_running(command)) {
         return stop_first();
     }
-    CommandResult result = apply_command(_session, _state, command);
+    CommandResult result = apply_command(_session, _state, _play, command);
     refresh_lists();
     return result;
 }

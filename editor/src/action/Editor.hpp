@@ -1,9 +1,16 @@
 #pragma once
 
+#include <filesystem>
+#include <memory>
+
 #include "action/Action.hpp"
 #include "action/EditorState.hpp"
 #include "engine/editor/CommandResult.hpp"
 #include "engine/editor/EditorSession.hpp"
+#include "play/GameLauncher.hpp"
+#include "play/PlaySession.hpp"
+
+
 
 namespace editor {
 
@@ -15,7 +22,24 @@ namespace editor {
  */
 class Editor {
 public:
-    explicit Editor(engine::editor::EditorSession session);
+    /**
+     * @param scratch Folder for the scene file Play writes; the default is in the system's
+     * temporary folder.
+     */
+    explicit Editor(engine::editor::EditorSession session,
+                    std::filesystem::path scratch = default_scratch());
+
+    /** @brief The folder Play writes to when none is given. */
+    [[nodiscard]] static std::filesystem::path default_scratch();
+
+    /** @brief Lets Play start games; without a launcher Play is refused. */
+    void attach_launcher(std::unique_ptr<GameLauncher> launcher);
+
+    /**
+     * @brief Follows the played game: its output goes to the console, and its end brings the
+     * editor back to Mode::editing. Called once per frame by the loop.
+     */
+    void update();
 
     /**
      * @brief Applies one action. A refused action changes nothing and adds an error line to the
@@ -37,6 +61,7 @@ private:
 
     engine::editor::EditorSession _session;
     EditorState _state;
+    PlaySession _play;
 };
 
 } // namespace editor

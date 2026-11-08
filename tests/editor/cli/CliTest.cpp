@@ -67,3 +67,17 @@ TEST_F(EditorCli, RejectsExtraArguments) {
     expect_rejected(args({_game.path().string(), "other"}));
     expect_rejected(args({_game.path().string(), "--unknown"}));
 }
+
+TEST_F(EditorCli, RuntimeDefaultsToEmpty) {
+    const auto result = parse_cli(args({_game.path().string()}));
+
+    ASSERT_TRUE(result.config.has_value());
+    EXPECT_TRUE(result.config->runtime.empty());
+}
+
+TEST_F(EditorCli, AcceptsARuntime) {
+    const auto result = parse_cli(args({_game.path().string(), "--runtime", "/opt/game/runtime"}));
+
+    ASSERT_TRUE(result.config.has_value());
+    EXPECT_EQ(result.config->runtime, std::filesystem::path("/opt/game/runtime"));
+}
