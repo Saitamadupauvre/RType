@@ -47,7 +47,34 @@ TEST_F(ExportDialog, ShowsTheSettings) {
 
     EXPECT_TRUE(shows("EXPORT GAME"));
     EXPECT_TRUE(shows("editor-test"));
-    EXPECT_FALSE(shows("Client + server"));
+    EXPECT_TRUE(shows("Modes"));
+    EXPECT_TRUE(shows("Server"));
+}
+
+TEST_F(ExportDialog, TurningOffTheServerModeChangesOnlyThatMode) {
+    open_dialog();
+
+    const auto actions = click(CLAY_ID("ExportModeDedicated"));
+    const auto* change = only<command::SetExport>(actions);
+
+    ASSERT_NE(change, nullptr);
+    EXPECT_EQ(
+        change->settings.modes,
+        (editor::ExportModes{.solo = true, .host = true, .client = true, .dedicated = false}));
+    EXPECT_EQ(change->settings.name, "editor-test");
+}
+
+TEST_F(ExportDialog, TurningAModeBackOnOffersItAgain) {
+    open_dialog();
+    auto settings = _editor.state().export_dialog->settings;
+    settings.modes.solo = false;
+    _editor.handle(command::SetExport{.settings = settings});
+    frame();
+
+    const auto* change = only<command::SetExport>(click(CLAY_ID("ExportModeSolo")));
+
+    ASSERT_NE(change, nullptr);
+    EXPECT_TRUE(change->settings.modes.solo);
 }
 
 TEST_F(ExportDialog, ExportIsDisabledWhileThePlanHasProblems) {

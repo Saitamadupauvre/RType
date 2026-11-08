@@ -5,7 +5,9 @@
 #include "Options.hpp"
 
 using engine::app::Mode;
+using runtime::game_folder;
 using runtime::launch_options;
+using runtime::refused_mode;
 using runtime::RuntimeConfig;
 using runtime::window_title;
 
@@ -75,4 +77,35 @@ TEST(RuntimeOptions, VolumesBecomeLevels) {
     EXPECT_FLOAT_EQ(options.audio.music_volume, 0.3F);
     EXPECT_FLOAT_EQ(options.audio.effects_volume, 0.F);
     EXPECT_TRUE(options.audio.muted);
+}
+
+TEST(RuntimeOptions, GameFolderIsTheOptionOrTheExecutableFolder) {
+    EXPECT_EQ(game_folder(RuntimeConfig{.mode = Mode::solo}, "/opt/game"), fs::path("/opt/game"));
+    EXPECT_EQ(game_folder(RuntimeConfig{.mode = Mode::solo, .game = "mine"}, "/opt"),
+              fs::path("mine"));
+}
+
+TEST(RuntimeOptions, GamesWithoutModesOfferEveryMode) {
+    for (const Mode mode : {Mode::solo, Mode::host, Mode::client, Mode::dedicated}) {
+        EXPECT_FALSE(refused_mode(RuntimeConfig{.mode = mode}, fixtures / "named").has_value());
+    }
+}
+
+TEST(RuntimeOptions, ListedModesAreAccepted) {
+    EXPECT_FALSE(refused_mode(RuntimeConfig{.mode = Mode::solo}, fixtures / "solo-only"));
+    EXPECT_FALSE(refused_mode(RuntimeConfig{.mode = Mode::host}, fixtures / "solo-only"));
+}
+
+TEST(RuntimeOptions, ModesTheGameDoesNotListAreRefused) {
+    const auto refused =
+        refused_mode(RuntimeConfig{.mode = Mode::dedicated}, fixtures / "solo-only");
+
+    ASSERT_TRUE(refused.has_value());
+    EXPECT_NE(refused->find("Solo Game does not offer the dedicated mode"), std::string::npos);
+    EXPECT_NE(refused->find("solo, host"), std::string::npos);
+    EXPECT_TRUE(refused_mode(RuntimeConfig{.mode = Mode::client}, fixtures / "solo-only"));
+}
+
+TEST(RuntimeOptions, MissingProjectRefusesNothing) {
+    EXPECT_FALSE(refused_mode(RuntimeConfig{.mode = Mode::dedicated}, fixtures / "missing"));
 }

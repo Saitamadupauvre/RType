@@ -296,7 +296,7 @@ TEST_F(ApplyExport, ExportWritesTheGameAndClosesTheDialog) {
 
     EXPECT_FALSE(_state.export_dialog.has_value());
     EXPECT_TRUE(std::filesystem::exists(_output / "editor-test"));
-    EXPECT_FALSE(std::filesystem::exists(_output / "editor-test-server"));
+    EXPECT_TRUE(std::filesystem::exists(_output / "editor-test-server"));
     EXPECT_TRUE(std::filesystem::exists(_output / "scenes" / "level1.json"));
     EXPECT_TRUE(std::filesystem::exists(_output / "README.txt"));
 }

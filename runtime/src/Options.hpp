@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 
 #include "Cli.hpp"
@@ -14,6 +15,12 @@ struct PluginFiles {
 };
 
 std::string window_title(const std::filesystem::path& game);
+
+std::filesystem::path game_folder(const RuntimeConfig& config,
+                                  const std::filesystem::path& executable_dir);
+
+std::optional<std::string> refused_mode(const RuntimeConfig& config,
+                                        const std::filesystem::path& game);
 
 engine::app::LaunchOptions launch_options(const RuntimeConfig& config,
                                           const std::filesystem::path& executable_dir,

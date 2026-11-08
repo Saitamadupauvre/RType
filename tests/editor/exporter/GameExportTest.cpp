@@ -6,8 +6,10 @@
 #include <vector>
 
 #include "../../engine/script/scene/TempFolder.hpp"
+#include "engine/script/GameFolder.hpp"
 #include "exporter/GameExport.hpp"
 
+using editor::ExportModes;
 using editor::ExportPlan;
 using editor::ExportSettings;
 using editor::ExportStep;
@@ -101,9 +103,55 @@ TEST_F(GameExport, ReadmeTellsHowToRunEveryMode) {
     const std::string readme = plan(settings()).readme;
 
     for (const std::string_view mode :
-         {"./space --solo", "./space --host", "./space <server-ip>", "./space --server"}) {
+         {"./space --solo", "./space --host", "./space <server-ip>", "./space-server 4242"}) {
         EXPECT_NE(readme.find(mode), std::string::npos) << mode;
     }
+}
+
+TEST_F(GameExport, EveryModeIsOfferedByDefault) {
+    const ExportPlan planned = plan(settings());
+
+    EXPECT_EQ(planned.modes, (std::vector<std::string>{"solo", "host", "client", "dedicated"}));
+    ASSERT_TRUE(planned.server_launcher.has_value());
+    EXPECT_EQ(planned.server_launcher->to, _output / "space-server");
+    EXPECT_NE(planned.server_launcher->text.find("/space\" --server \"$@\""), std::string::npos);
+}
+
+TEST_F(GameExport, DefaultsOfferTheModesTheProjectLists) {
+    _root.write("game/game.json", R"({"name": "Space Game", "modes": ["solo", "client"]})");
+
+    EXPECT_EQ(editor::default_export(_game).modes,
+              (ExportModes{.solo = true, .host = false, .client = true, .dedicated = false}));
+}
+
+TEST_F(GameExport, ClientOnlyLeavesTheServerOut) {
+    ExportSettings chosen = settings();
+    chosen.modes.dedicated = false;
+
+    const ExportPlan planned = plan(chosen);
+
+    EXPECT_TRUE(planned.problems.empty());
+    EXPECT_EQ(planned.modes, (std::vector<std::string>{"solo", "host", "client"}));
+    EXPECT_FALSE(planned.server_launcher.has_value());
+    EXPECT_EQ(planned.readme.find("space-server"), std::string::npos);
+}
+
+TEST_F(GameExport, ReadmeOnlyListsTheOfferedModes) {
+    ExportSettings chosen = settings();
+    chosen.modes = {.solo = true, .host = false, .client = false, .dedicated = false};
+
+    const std::string readme = plan(chosen).readme;
+
+    EXPECT_NE(readme.find("./space --solo"), std::string::npos);
+    EXPECT_EQ(readme.find("--host"), std::string::npos);
+    EXPECT_EQ(readme.find("<server-ip>"), std::string::npos);
+}
+
+TEST_F(GameExport, NoModeIsAProblem) {
+    ExportSettings chosen = settings();
+    chosen.modes = {.solo = false, .host = false, .client = false, .dedicated = false};
+
+    EXPECT_TRUE(mentions(plan(chosen), "at least one mode"));
 }
 
 TEST_F(GameExport, OptionalGameFoldersMayBeMissing) {
@@ -191,6 +239,36 @@ TEST_F(GameExport, RunWritesEveryFileAndTheReadme) {
     EXPECT_FALSE(fs::exists(_output / "libother.so"));
     EXPECT_FALSE(fs::exists(_output / "editor"));
     EXPECT_NE(fs::status(_output / "space").permissions() & fs::perms::owner_exec, fs::perms::none);
+}
+
+TEST_F(GameExport, RunWritesTheModesAndTheServerLauncher) {
+    ExportSettings chosen = settings();
+    chosen.modes.host = false;
+
+    const auto result = editor::run_export(plan(chosen));
+
+    ASSERT_TRUE(result.ok) << result.message;
+    const auto project = engine::script::read_project(_output);
+    ASSERT_TRUE(project.has_value());
+    EXPECT_EQ(project->name, "Space Game");
+    EXPECT_EQ(project->start_scene, "level1");
+    EXPECT_EQ(project->modes, (std::vector<std::string>{"solo", "client", "dedicated"}));
+    EXPECT_NE(_root.read("out/space-server").find("--server"), std::string::npos);
+    EXPECT_NE(fs::status(_output / "space-server").permissions() & fs::perms::owner_exec,
+              fs::perms::none);
+    EXPECT_EQ(_root.read("game/game.json").find("modes"), std::string::npos);
+}
+
+TEST_F(GameExport, RunWithoutTheServerModeWritesNoLauncher) {
+    ExportSettings chosen = settings();
+    chosen.modes.dedicated = false;
+
+    ASSERT_TRUE(editor::run_export(plan(chosen)).ok);
+
+    EXPECT_FALSE(fs::exists(_output / "space-server"));
+    const auto project = engine::script::read_project(_output);
+    ASSERT_TRUE(project.has_value());
+    EXPECT_EQ(project->modes, (std::vector<std::string>{"solo", "host", "client"}));
 }
 
 TEST_F(GameExport, RunReportsACopyThatFails) {

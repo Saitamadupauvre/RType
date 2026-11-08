@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "TempFolder.hpp"
@@ -209,6 +210,66 @@ TEST_F(GameFolderTest, ProjectNameThatIsNotAStringIsIgnored) {
     const auto project = engine::script::read_project(_game.path());
     ASSERT_TRUE(project.has_value());
     EXPECT_FALSE(project->name.has_value());
+}
+
+TEST_F(GameFolderTest, ProjectWithoutModesAllowsEveryMode) {
+    _game.write("game.json", R"({ "name": "Space Game" })");
+
+    const auto project = engine::script::read_project(_game.path());
+    ASSERT_TRUE(project.has_value());
+    EXPECT_FALSE(project->modes.has_value());
+}
+
+TEST_F(GameFolderTest, ProjectModesAreReadInOrderWithoutDuplicates) {
+    _game.write("game.json", R"({ "modes": ["host", "solo", "host"] })");
+
+    const auto project = engine::script::read_project(_game.path());
+    ASSERT_TRUE(project.has_value());
+    EXPECT_EQ(project->modes, (std::vector<std::string>{"host", "solo"}));
+}
+
+TEST_F(GameFolderTest, InvalidProjectModesAreRejected) {
+    for (const std::string modes : {R"("solo")", "[]", R"(["solo", "lan"])", R"([1])", "{}"}) {
+        _game.write("game.json", R"({ "modes": )" + modes + " }");
+
+        EXPECT_FALSE(engine::script::read_project(_game.path()).has_value()) << modes;
+    }
+}
+
+TEST_F(GameFolderTest, ModeNamesAreTheFourModes) {
+    for (const std::string_view mode : {"solo", "host", "client", "dedicated"}) {
+        EXPECT_TRUE(engine::script::is_mode_name(mode)) << mode;
+    }
+    for (const std::string_view mode : {"", "Solo", "server", "join"}) {
+        EXPECT_FALSE(engine::script::is_mode_name(mode)) << mode;
+    }
+}
+
+TEST_F(GameFolderTest, WriteModesKeepsTheOtherKeysAndRemovesTheKey) {
+    _game.write("game.json", R"({ "name": "kept", "start_scene": "stage1" })");
+
+    ASSERT_TRUE(engine::script::write_modes(_game.path(), std::vector<std::string>{"solo"}));
+    auto project = engine::script::read_project(_game.path());
+    ASSERT_TRUE(project.has_value());
+    EXPECT_EQ(project->name, "kept");
+    EXPECT_EQ(project->start_scene, "stage1");
+    EXPECT_EQ(project->modes, (std::vector<std::string>{"solo"}));
+
+    ASSERT_TRUE(engine::script::write_modes(_game.path(), std::nullopt));
+    project = engine::script::read_project(_game.path());
+    ASSERT_TRUE(project.has_value());
+    EXPECT_FALSE(project->modes.has_value());
+}
+
+TEST_F(GameFolderTest, WriteModesRejectsBadModesAndBadProjects) {
+    _game.write("game.json", R"({ "name": "kept" })");
+
+    EXPECT_FALSE(engine::script::write_modes(_game.path(), std::vector<std::string>{}));
+    EXPECT_FALSE(engine::script::write_modes(_game.path(), std::vector<std::string>{"lan"}));
+    EXPECT_EQ(_game.read("game.json"), R"({ "name": "kept" })");
+
+    _game.write("game.json", R"(["not", "an", "object"])");
+    EXPECT_FALSE(engine::script::write_modes(_game.path(), std::vector<std::string>{"solo"}));
 }
 
 TEST_F(GameFolderTest, WriteStartSceneCreatesTheProjectAndRemovesTheKey) {

@@ -38,6 +38,14 @@ std::string_view overlay_name(Overlay overlay) {
     return overlay == Overlay::hitboxes ? "hitboxes" : "names";
 }
 
+std::string joined_modes(const ExportModes& modes) {
+    std::string text;
+    for (const std::string& name : mode_names(modes)) {
+        text += text.empty() ? name : "," + name;
+    }
+    return text.empty() ? std::string("none") : text;
+}
+
 std::string edit_text(const Edit& edit) {
     return std::visit(
         Overloaded{
@@ -145,8 +153,9 @@ std::string command_text(const Command& command) {
             [](const command::Stop&) { return std::string("command::Stop"); },
             [](const command::OpenExport&) { return std::string("command::OpenExport"); },
             [](const command::SetExport& change) {
-                return std::format("command::SetExport name={} output={}", change.settings.name,
-                                   change.settings.output.generic_string());
+                return std::format("command::SetExport name={} output={} modes={}",
+                                   change.settings.name, change.settings.output.generic_string(),
+                                   joined_modes(change.settings.modes));
             },
             [](const command::CloseExport&) { return std::string("command::CloseExport"); },
             [](const command::RunExport&) { return std::string("command::RunExport"); },

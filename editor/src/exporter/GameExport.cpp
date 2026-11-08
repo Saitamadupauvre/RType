@@ -4,7 +4,10 @@
 #include <cctype>
 #include <format>
 #include <fstream>
+#include <optional>
+#include <stdexcept>
 #include <system_error>
+#include <utility>
 
 #include "engine/script/GameFolder.hpp"
 
@@ -88,15 +91,71 @@ void check_output(ExportPlan& plan, const fs::path& game, const ExportSettings& 
 }
 
 std::string readme(const ExportSettings& settings) {
-    return std::format("{0}\n\n"
-                       "Play alone:             ./{0} --solo\n"
-                       "Host and play:          ./{0} --host 4242\n"
-                       "Join a game:            ./{0} <server-ip> 4242\n"
-                       "Dedicated server:       ./{0} --server 4242\n",
-                       settings.name);
+    const ExportModes& modes = settings.modes;
+    std::string text = std::format("{}\n\n", settings.name);
+    if (modes.solo) {
+        text += std::format("Play alone:             ./{} --solo\n", settings.name);
+    }
+    if (modes.host) {
+        text += std::format("Host and play:          ./{} --host 4242\n", settings.name);
+    }
+    if (modes.client) {
+        text += std::format("Join a game:            ./{} <server-ip> 4242\n", settings.name);
+    }
+    if (modes.dedicated) {
+        text += std::format("Dedicated server:       ./{}-server 4242\n", settings.name);
+    }
+    return text;
+}
+
+std::optional<ExportLauncher> server_launcher(const ExportSettings& settings) {
+    if (!settings.modes.dedicated) {
+        return std::nullopt;
+    }
+    return ExportLauncher{
+        .to = settings.output / (settings.name + "-server"),
+        .text = std::format("#!/bin/sh\nexec \"$(dirname \"$0\")/{}\" --server \"$@\"\n",
+                            settings.name)};
+}
+
+ExportModes modes_of(const std::optional<std::vector<std::string>>& names) {
+    if (!names) {
+        return {};
+    }
+    const auto offers = [&](std::string_view mode) {
+        return std::ranges::find(*names, mode) != names->end();
+    };
+    return {.solo = offers("solo"),
+            .host = offers("host"),
+            .client = offers("client"),
+            .dedicated = offers("dedicated")};
+}
+
+void write_launcher(const ExportLauncher& launcher) {
+    std::ofstream out(launcher.to);
+    out << launcher.text;
+    out.close();
+    if (!out) {
+        throw std::runtime_error(std::format("cannot write {}", launcher.to.filename().string()));
+    }
+    fs::permissions(launcher.to,
+                    fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
+                    fs::perm_options::add);
 }
 
 } // namespace
+
+std::vector<std::string> mode_names(const ExportModes& modes) {
+    std::vector<std::string> names;
+    for (const auto [offered, name] :
+         {std::pair{modes.solo, "solo"}, std::pair{modes.host, "host"},
+          std::pair{modes.client, "client"}, std::pair{modes.dedicated, "dedicated"}}) {
+        if (offered) {
+            names.emplace_back(name);
+        }
+    }
+    return names;
+}
 
 std::string export_name(std::string_view game_name) {
     std::string name;
@@ -121,15 +180,24 @@ ExportSettings default_export(const fs::path& game) {
         project && project->name ? *project->name : folder.filename().string();
     std::string name = export_name(game_name);
     fs::path output = folder.parent_path() / (name + "-export");
-    return {.name = std::move(name), .output = std::move(output)};
+    return {.name = std::move(name),
+            .output = std::move(output),
+            .modes = modes_of(project ? project->modes : std::nullopt)};
 }
 
 ExportPlan plan_export(const fs::path& game, const fs::path& runtime,
                        const ExportSettings& settings) {
-    ExportPlan plan{
-        .output = settings.output, .steps = {}, .problems = {}, .readme = readme(settings)};
+    ExportPlan plan{.output = settings.output,
+                    .steps = {},
+                    .problems = {},
+                    .readme = readme(settings),
+                    .modes = mode_names(settings.modes),
+                    .server_launcher = server_launcher(settings)};
     if (!engine::script::is_scene_name(settings.name)) {
         plan.problems.emplace_back("the name takes 1 to 63 letters, digits, '_' or '-'");
+    }
+    if (plan.modes.empty()) {
+        plan.problems.emplace_back("choose at least one mode");
     }
     check_output(plan, game, settings);
     add_binary(plan, runtime, runtime_binary, settings.name);
@@ -148,13 +216,20 @@ engine::editor::CommandResult run_export(const ExportPlan& plan) {
         for (const ExportStep& step : plan.steps) {
             fs::copy(step.from, step.to, fs::copy_options::recursive);
         }
+        if (!engine::script::write_modes(plan.output, plan.modes)) {
+            return engine::editor::CommandResult::refused(
+                "export failed: cannot write the modes into game.json");
+        }
+        if (plan.server_launcher) {
+            write_launcher(*plan.server_launcher);
+        }
         std::ofstream readme_out(plan.output / readme_file);
         readme_out << plan.readme;
         if (!readme_out) {
             return engine::editor::CommandResult::refused(
                 std::format("export failed: cannot write {}", readme_file));
         }
-    } catch (const fs::filesystem_error& error) {
+    } catch (const std::exception& error) {
         return engine::editor::CommandResult::refused(
             std::format("export failed: {}", error.what()));
     }
