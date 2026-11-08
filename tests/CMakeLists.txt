@@ -259,6 +259,7 @@ editor_add_test(core
         editor/cli/CliTest.cpp
         editor/render/GeometryTest.cpp
         editor/render/ScissorStackTest.cpp
+        editor/text/FitTextTest.cpp
         editor/text/TextEditTest.cpp
         editor/ui/ClickCounterTest.cpp
         editor/ui/CommandTableTest.cpp
@@ -274,6 +275,7 @@ editor_add_test(core
         editor/ui/widgets/DropdownTest.cpp
         editor/ui/widgets/NumberFieldTest.cpp
         editor/ui/widgets/TextFieldTest.cpp
+        editor/viewport/HandlesTest.cpp
         editor/viewport/SceneItemsTest.cpp
         editor/viewport/SnapTest.cpp
         editor/viewport/ViewCameraTest.cpp

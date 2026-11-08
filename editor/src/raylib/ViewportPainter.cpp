@@ -4,7 +4,9 @@
 #include <utility>
 
 #include "ui/Theme.hpp"
+#include "viewport/Handles.hpp"
 #include "viewport/SceneItems.hpp"
+#include "viewport/ViewCamera.hpp"
 #include "viewport/ViewportState.hpp"
 
 namespace editor {
@@ -16,6 +18,14 @@ constexpr float selection_pixels = 2.F;
 constexpr unsigned char grid_alpha = 28;
 constexpr unsigned char axis_alpha = 70;
 constexpr unsigned char marker_alpha = 120;
+constexpr unsigned char ghost_alpha = 70;
+constexpr float frame_pixels = 2.F;
+constexpr float label_size = 13.F;
+constexpr float label_gap = 3.F;
+constexpr float label_spacing = 1.F;
+constexpr unsigned char label_alpha = 200;
+constexpr Color frame_color{.r = 110, .g = 170, .b = 255, .a = 200};
+constexpr Color hitbox_color{.r = 90, .g = 220, .b = 120, .a = 220};
 
 Color to_raylib(Clay_Color color) {
     return {.r = static_cast<unsigned char>(std::lround(color.r)),
@@ -55,6 +65,60 @@ void draw_grid(const ViewportFrame& frame, Rectangle world) {
     for (const float y : frame.grid.ys) {
         DrawLineEx({.x = world.x, .y = y}, {.x = world.x + world.width, .y = y}, thickness,
                    y == 0.F ? axis : line);
+    }
+}
+
+Rectangle rectangle_of(const WorldBox& box) {
+    return {.x = box.top_left.x, .y = box.top_left.y, .width = box.size.x, .height = box.size.y};
+}
+
+void draw_marker(const SceneItem& item, float zoom) {
+    const Rectangle box = box_of(item);
+    const Color color = faded(WHITE, marker_alpha);
+    DrawRectangleLinesEx(box, outline_pixels / zoom, color);
+    DrawLineEx({.x = box.x, .y = box.y}, {.x = box.x + box.width, .y = box.y + box.height},
+               outline_pixels / zoom, color);
+    DrawLineEx({.x = box.x + box.width, .y = box.y}, {.x = box.x, .y = box.y + box.height},
+               outline_pixels / zoom, color);
+}
+
+void draw_hitboxes(const SceneItem& item, float zoom) {
+    if (item.box_collider) {
+        DrawRectangleLinesEx(rectangle_of(*item.box_collider), outline_pixels / zoom,
+                             hitbox_color);
+    }
+    if (item.circle_collider) {
+        DrawCircleLinesV({.x = item.circle_collider->center.x, .y = item.circle_collider->center.y},
+                         item.circle_collider->radius, hitbox_color);
+    }
+}
+
+void draw_handles(const ViewportFrame& frame, Clay_BoundingBox box) {
+    for (const SceneItem& item : frame.items) {
+        if (item.id != frame.selection) {
+            continue;
+        }
+        if (item.scales) {
+            const engine::core::Vec2 at = handle_position(item, Handle::scale, frame.camera, box);
+            DrawRectangleRec({.x = at.x - handle_radius,
+                              .y = at.y - handle_radius,
+                              .width = handle_radius * 2.F,
+                              .height = handle_radius * 2.F},
+                             to_raylib(color::accent));
+        }
+        if (item.rotates) {
+            const engine::core::Vec2 at = handle_position(item, Handle::rotate, frame.camera, box);
+            DrawCircleV({.x = at.x, .y = at.y}, handle_radius, to_raylib(color::accent));
+        }
+    }
+}
+
+void draw_names(const ViewportFrame& frame, Clay_BoundingBox box) {
+    const Font font = GetFontDefault();
+    for (const SceneItem& item : frame.items) {
+        const engine::core::Vec2 at = to_screen(frame.camera, box, item.top_left);
+        DrawTextEx(font, item.label.c_str(), {.x = at.x, .y = at.y - label_size - label_gap},
+                   label_size, label_spacing, faded(WHITE, label_alpha));
     }
 }
 
@@ -121,8 +185,7 @@ void ViewportPainter::paint(const Clay_RenderCommand& command) {
         const Rectangle dest = centered(item);
         const Vector2 origin{.x = item.size.x / 2.F, .y = item.size.y / 2.F};
         if (!item.visible) {
-            DrawRectangleLinesEx(box_of(item), outline_pixels / frame.camera.zoom,
-                                 faded(WHITE, marker_alpha));
+            draw_marker(item, frame.camera.zoom);
             continue;
         }
         if (const Texture2D* loaded = item.texture.empty() ? nullptr : texture(item.texture)) {
@@ -137,6 +200,16 @@ void ViewportPainter::paint(const Clay_RenderCommand& command) {
             DrawRectanglePro(dest, origin, item.rotation, to_raylib(item.tint));
         }
     }
+    if (frame.show_hitboxes) {
+        for (const SceneItem& item : frame.items) {
+            draw_hitboxes(item, frame.camera.zoom);
+        }
+    }
+    DrawRectangleLinesEx(rectangle_of(frame.game_frame), frame_pixels / frame.camera.zoom,
+                         frame_color);
+    if (frame.ghost) {
+        DrawRectangleRec(rectangle_of(*frame.ghost), faded(to_raylib(color::accent), ghost_alpha));
+    }
     for (const SceneItem& item : frame.items) {
         if (item.id == frame.selection) {
             DrawRectangleLinesEx(box_of(item), selection_pixels / frame.camera.zoom,
@@ -144,6 +217,10 @@ void ViewportPainter::paint(const Clay_RenderCommand& command) {
         }
     }
     EndMode2D();
+    if (frame.show_names) {
+        draw_names(frame, box);
+    }
+    draw_handles(frame, box);
     EndScissorMode();
 }
 

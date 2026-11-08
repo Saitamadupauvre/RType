@@ -181,3 +181,93 @@ TEST_F(Viewport, FrameHoldsTheSceneAndTheSelection) {
     EXPECT_EQ(state().frame.selection, id_of(_editor.session(), "ship"));
     EXPECT_FALSE(state().frame.grid.xs.empty());
 }
+
+TEST_F(Viewport, DraggingAPrefabIntoTheViewportPlacesIt) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame({.pointer = screen({100.F, 100.F}), .primary_down = true});
+    frame({.pointer = screen({100.F, 100.F}), .primary_down = true});
+    ASSERT_TRUE(state().frame.ghost.has_value());
+    const auto actions = frame({.pointer = screen({100.F, 100.F})}).actions;
+
+    const auto* place = only_edit<edit::Place>(actions);
+    ASSERT_NE(place, nullptr);
+    EXPECT_EQ(place->type, "rock");
+    EXPECT_EQ(place->position, Vec2(64.F, 64.F));
+}
+
+TEST_F(Viewport, ClickingAPrefabArmsIt) {
+    const auto row = CLAY_IDI("PrefabRow", 0);
+    click(row);
+    const Clay_BoundingBox box = box_of(row);
+    const auto actions = frame({.pointer = {.x = box.x + 2.F, .y = box.y + 2.F}}).actions;
+
+    EXPECT_TRUE(actions.empty());
+    ASSERT_TRUE(state().placing.has_value());
+    EXPECT_TRUE(state().placing.value_or(editor::Placing{}).armed);
+}
+
+TEST_F(Viewport, ArmedPrefabIsPlacedByAClickInTheViewport) {
+    const auto row = CLAY_IDI("PrefabRow", 1);
+    click(row);
+    frame();
+    frame({.pointer = screen({100.F, 100.F})});
+    ASSERT_TRUE(state().frame.ghost.has_value());
+    const auto actions =
+        frame({.pointer = screen({100.F, 100.F}), .primary_down = true, .primary_pressed = true})
+            .actions;
+
+    const auto* place = only_edit<edit::Place>(actions);
+    ASSERT_NE(place, nullptr);
+    EXPECT_EQ(place->type, "ship");
+    EXPECT_EQ(place->position, Vec2(64.F, 64.F));
+    EXPECT_FALSE(state().placing.has_value());
+}
+
+TEST_F(Viewport, EscapeDisarmsThePrefab) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame();
+    frame({.keys_pressed = {editor::Key::escape}});
+
+    EXPECT_FALSE(state().placing.has_value());
+}
+
+TEST_F(Viewport, ClickingElsewhereDisarmsThePrefab) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame();
+    const auto actions = click(CLAY_ID("PlayButton"));
+
+    EXPECT_FALSE(state().placing.has_value());
+    for (const auto& action : actions) {
+        EXPECT_EQ(std::get_if<editor::Edit>(&action), nullptr);
+    }
+}
+
+TEST_F(Viewport, ArmedPrefabIsTheClickedOne) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame();
+
+    EXPECT_EQ(state().placing.value_or(editor::Placing{}).type, "rock");
+}
+
+TEST_F(Viewport, RotateHandleEmitsTheRotation) {
+    const auto rock = id_of(_editor.session(), "rock");
+    _editor.handle(edit::Move{.id = rock, .position = Vec2(100.F, 100.F)});
+    _editor.handle(command::Select{.id = rock});
+    frame();
+    const auto actions = drag({132.F, 76.F}, {300.F, 132.F});
+
+    const auto* set = only_edit<edit::SetField>(actions);
+    ASSERT_NE(set, nullptr);
+    EXPECT_EQ(set->key, "Rotation.degrees");
+    EXPECT_EQ(set->value, engine::core::FieldValue{90.F});
+}
+
+TEST_F(Viewport, FrameCarriesTheOverlaysAndTheGameFrame) {
+    _editor.handle(command::SetOverlay{.overlay = editor::Overlay::hitboxes, .visible = true});
+    _editor.handle(command::SetOverlay{.overlay = editor::Overlay::names, .visible = false});
+    frame();
+
+    EXPECT_TRUE(state().frame.show_hitboxes);
+    EXPECT_FALSE(state().frame.show_names);
+    EXPECT_EQ(state().frame.game_frame.size, editor::game_screen);
+}

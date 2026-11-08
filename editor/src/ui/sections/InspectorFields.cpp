@@ -135,9 +135,10 @@ void value(Ui& ui, const FieldRow& row) {
 
 void label(Ui& ui, const FieldRow& row) {
     const Theme& theme = ui.theme();
-    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_FIXED(theme.px(label_width))}}}) {
-        text(theme, view_of(row.label), size::small_text,
-             row.field.overridden ? color::accent : color::text_muted);
+    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_FIXED(theme.px(label_width))}},
+          .clip = {.horizontal = true}}) {
+        wrapped_text(theme, view_of(row.label), size::small_text,
+                     row.field.overridden ? color::accent : color::text_muted);
     }
 }
 
@@ -157,7 +158,10 @@ void field_row(Ui& ui, const FieldRow& row) {
     const Theme& theme = ui.theme();
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(),
                                 .height = CLAY_SIZING_FIT(theme.px(size::row), 0)},
-                     .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)},
+                     .padding = {.left = theme.px16(size::gutter),
+                                 .right = theme.px16(size::gutter),
+                                 .top = theme.px16(row_padding),
+                                 .bottom = theme.px16(row_padding)},
                      .childGap = theme.px16(6.F),
                      .childAlignment = {.y = CLAY_ALIGN_Y_CENTER}}}) {
         label(ui, row);

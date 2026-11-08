@@ -20,6 +20,25 @@ namespace editor {
 /** @brief Size of an entity drawn without a texture, in world units, as the game draws it. */
 inline constexpr float square_size = 64.F;
 
+/** @brief Size of the game's drawing space in virtual units, as the graphics plugin sets it. */
+inline constexpr engine::core::Vec2 game_screen{1920.F, 1080.F};
+
+/** @brief An axis-aligned box in world units. */
+struct WorldBox {
+    engine::core::Vec2 top_left;
+    engine::core::Vec2 size;
+
+    bool operator==(const WorldBox&) const = default;
+};
+
+/** @brief A circle in world units. */
+struct WorldCircle {
+    engine::core::Vec2 center;
+    float radius = 0.F;
+
+    bool operator==(const WorldCircle&) const = default;
+};
+
 /** @brief Size of a texture in pixels, or std::nullopt when it cannot be loaded. */
 using TextureSize = std::function<std::optional<engine::core::Vec2>(std::string_view path)>;
 
@@ -38,6 +57,14 @@ struct SceneItem {
     /** @brief false for an entity without a Sprite, which the game does not draw. */
     bool visible = true;
     std::int32_t z_index = 0;
+    /** @brief The instance name, or its type when it has none. */
+    std::string label;
+    /** @brief Whether the entity has a Rotation or a Scale the handles can edit. */
+    bool rotates = false;
+    bool scales = false;
+    /** @brief As the physics reads it: Position plus the offset is the center of the box. */
+    std::optional<WorldBox> box_collider;
+    std::optional<WorldCircle> circle_collider;
 
     bool operator==(const SceneItem&) const = default;
 };
@@ -53,6 +80,12 @@ struct SceneItem {
 /** @brief The topmost item whose box holds `world`, ignoring rotation. */
 [[nodiscard]] std::optional<engine::editor::InstanceId>
 item_at(const std::vector<SceneItem>& items, engine::core::Vec2 world);
+
+/**
+ * @brief The world area the game shows when the scene starts: the view of the first instance
+ * with a Camera, or the default view of the game screen without one.
+ */
+[[nodiscard]] WorldBox game_frame(const engine::editor::EditorSession& session);
 
 /** @brief World coordinates of the grid lines visible in the viewport. */
 struct GridLines {

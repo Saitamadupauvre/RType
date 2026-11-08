@@ -2,6 +2,7 @@
 
 #include <clay.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <format>
 #include <string>
@@ -87,11 +88,18 @@ void problems(Ui& ui, const engine::editor::EditorSession& session) {
 
 } // namespace
 
-void bottom_panel(Ui& ui, const Editor& editor) {
+float bottom_panel_height(const Theme& theme, float window_height) {
+    const float others = theme.px(size::menu_bar + size::toolbar + size::status_bar +
+                                  size::workspace_min);
+    return std::clamp(window_height - others, theme.px(size::bottom_panel_min),
+                      theme.px(size::bottom_panel));
+}
+
+void bottom_panel(Ui& ui, const Editor& editor, float height) {
     const Theme& theme = ui.theme();
     CLAY({.id = CLAY_ID("BottomPanel"),
           .layout = {.sizing = {.width = CLAY_SIZING_GROW(),
-                                .height = CLAY_SIZING_FIXED(theme.px(size::bottom_panel))},
+                                .height = CLAY_SIZING_FIXED(height)},
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::toolbar,
           .border = {.color = color::border, .width = {.top = theme.px16(1.F)}}}) {

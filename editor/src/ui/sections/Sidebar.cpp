@@ -57,10 +57,16 @@ void prefabs(Ui& ui, const EditorState& state) {
         return;
     }
     bool any = false;
-    for (const std::string& type : state.prefabs) {
-        if (matches_filter(type, state.prefab_filter)) {
-            list_item(theme, {.label = view_of(type)});
-            any = true;
+    for (std::uint32_t index = 0; index < state.prefabs.size(); ++index) {
+        const std::string& type = state.prefabs[index];
+        if (!matches_filter(type, state.prefab_filter)) {
+            continue;
+        }
+        any = true;
+        auto& placing = ui.widgets().viewport().placing;
+        const bool picked = placing && placing->type == type;
+        if (list_row(ui, CLAY_IDI("PrefabRow", index), {.label = view_of(type), .selected = picked})) {
+            placing = Placing{.type = type};
         }
     }
     if (!any) {
@@ -114,7 +120,7 @@ void instances(Ui& ui, const engine::editor::EditorSession& session) {
 void sidebar(Ui& ui, const Editor& editor) {
     const Theme& theme = ui.theme();
     CLAY({.id = CLAY_ID("Sidebar"),
-          .layout = {.sizing = {.width = CLAY_SIZING_FIXED(theme.px(size::sidebar)),
+          .layout = {.sizing = {.width = CLAY_SIZING_GROW(theme.px(size::sidebar_min), theme.px(size::sidebar)),
                                 .height = CLAY_SIZING_GROW()},
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::panel,

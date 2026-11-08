@@ -8,6 +8,7 @@
 #include <string_view>
 #include <utility>
 
+#include "text/FitText.hpp"
 #include "text/TextEdit.hpp"
 #include "ui/Text.hpp"
 #include "ui/widgets/FieldKeys.hpp"
@@ -137,18 +138,48 @@ void draft_content(const Theme& theme, const TextEdit& draft, Face face) {
     piece(theme, all.substr(last), face);
 }
 
-void shown_content(Ui& ui, std::string_view shown, const TextFieldOptions& options) {
+Clay_String fitted(Ui& ui, std::optional<float> field_width, std::string_view shown, Face face) {
+    if (!field_width) {
+        return view_of(shown);
+    }
+    const float width = *field_width - (2.F * ui.theme().px(padding));
+    const Clay_TextElementConfig font = font_of(ui.theme(), face);
+    return ui.keep(fit_text(shown, width, [&ui, &font](std::string_view prefix) {
+        return ui.platform().measure(prefix, font).width;
+    }));
+}
+
+void shown_text(Ui& ui, std::optional<float> field_width, std::string_view shown,
+                const TextFieldOptions& options) {
     if (shown.empty()) {
         text(ui.theme(), view_of(options.placeholder), size::text, color::text_dim, options.face);
         return;
     }
     const Clay_Color color = options.read_only ? color::text_muted : color::text;
-    text(ui.theme(), view_of(shown), size::text, color, options.face);
+    text(ui.theme(), fitted(ui, field_width, shown, options.face), size::text, color,
+         options.face);
+}
+
+void shown_content(Ui& ui, std::optional<float> field_width, std::string_view shown,
+                   const TextFieldOptions& options) {
+    CLAY({.floating = {.offset = {.x = ui.theme().px(padding), .y = 0.F},
+                       .attachPoints = {.element = CLAY_ATTACH_POINT_LEFT_CENTER,
+                                        .parent = CLAY_ATTACH_POINT_LEFT_CENTER},
+                       .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
+                       .attachTo = CLAY_ATTACH_TO_PARENT,
+                       .clipTo = CLAY_CLIP_TO_ATTACHED_PARENT}}) {
+        shown_text(ui, field_width, shown, options);
+    }
 }
 
 void draw(Ui& ui, Clay_ElementId id, std::string_view shown, const TextFieldOptions& options) {
     const Theme& theme = ui.theme();
     const bool focused = ui.widgets().is_focused(id);
+    const Clay_ElementData previous = Clay_GetElementData(id);
+    const std::optional<float> field_width =
+        previous.found && previous.boundingBox.width > 0.F
+            ? std::optional<float>(previous.boundingBox.width)
+            : std::nullopt;
     CLAY({.id = id,
           .layout = {.sizing = {.width = CLAY_SIZING_GROW(),
                                 .height = CLAY_SIZING_FIXED(theme.px(size::row))},
@@ -156,13 +187,13 @@ void draw(Ui& ui, Clay_ElementId id, std::string_view shown, const TextFieldOpti
                      .childAlignment = {.y = CLAY_ALIGN_Y_CENTER}},
           .backgroundColor = color::field,
           .cornerRadius = CLAY_CORNER_RADIUS(theme.px(size::radius)),
-          .clip = {.horizontal = true},
+          .clip = {.horizontal = focused},
           .border = {.color = focused ? color::focus : color::border,
                      .width = CLAY_BORDER_OUTSIDE(theme.px16(1.F))}}) {
         if (focused) {
             draft_content(theme, ui.widgets().draft(), options.face);
         } else {
-            shown_content(ui, shown, options);
+            shown_content(ui, field_width, shown, options);
         }
     }
 }

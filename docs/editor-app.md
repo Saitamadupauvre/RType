@@ -43,7 +43,7 @@ game camera. Instances are laid out like the game's renderer: Position is the
 top-left corner, a sprite takes its texture size times Scale, an entity
 without a texture is a 64 px square tinted by its color, and Layer `z_index`
 orders the drawing. Entities without a Sprite, which the game does not draw,
-show as a thin outline so they can still be selected. Textures load from
+show as a crossed outline so they can still be selected. Textures load from
 `<game>/assets/`; a missing one is drawn as the tinted square.
 
 | Input | Effect |
@@ -54,7 +54,20 @@ show as a thin outline so they can still be selected. Textures load from
 | Alt while dragging | Drop without snapping |
 | Middle drag, or drag with the Pan tool (H) | Pan |
 | Wheel | Zoom around the cursor (0.1x to 10x) |
+| Drag a prefab from PREFABS into the viewport | Place it under the cursor, snapped (`Place`) |
+| Click a prefab, then click in the viewport | Same; the prefab stays highlighted until placed, Esc or a click elsewhere cancels |
+| Drag the square handle of the selection | Scale it (`SetField` on `Scale.x`, `Scale.y`) |
+| Drag the round handle of the selection | Rotate it, by 15° steps with snap on (`SetField` on `Rotation.degrees`) |
 | Delete | Delete the selection |
+
+Handles only appear when the entity has the component they edit (`Scale`,
+`Rotation`). Alt skips snapping for handles too.
+
+| Overlay | Shows |
+|---|---|
+| Camera frame (always) | What the game shows at start: the view of the first instance with a `Camera`, or the 1920x1080 game screen from the origin |
+| Names (toolbar) | Each instance's name, or its type, above it |
+| Hitboxes (toolbar) | `AABBCollider` and `CircleCollider` outlines, where the physics puts them: Position plus the offset is the center of the box or circle |
 
 With snap on, a dragged instance's top-left corner lands on the grid. Grid
 lines are drawn unless they would be closer than 6 px on screen; the world
@@ -71,7 +84,8 @@ action, so the UI never queries the session.
 - **Name** and **Position** edit the instance (`Rename`, `Move`). Type is read
   only.
 - **Components** lists the registry fields of the components the prefab's
-  entity owns, in registration order. `Position.pos` is left out: it is the
+  entity owns, in registration order, under one sub-header per component.
+  Labels show the field name as words (`resolve collisions`) and wrap. `Position.pos` is left out: it is the
   position above.
 - **Script** lists the fields the prefab script declares.
 - Each field shows its override, or the prefab value when there is none. An
@@ -233,6 +247,24 @@ notch times the UI scale, and keeps it inside the content. Clay still tracks
 the containers but gets a zero wheel delta. The F11 debug view scrolls the
 same way. Content that must stay visible, such as the prefab filter, goes
 above the container, not inside it.
+
+Clay tracks at most 10 clip containers (`scrollContainerDatas`, fixed when
+Clay starts); one more corrupts its memory. The editor stays under it:
+
+- only the leaf lists scroll: prefabs, scenes, instances, console and the
+  inspector body; panels and bars never clip;
+- an unfocused text field shortens its text with `...` (`fit_text`) and
+  draws it as a floating child, which does not widen the field; only the
+  focused field clips;
+- `Layout.SelectionAndDebugViewStayWithinClayLimits` fails if a change goes
+  over.
+
+In a small window the sidebar and the inspector shrink to 180 and 240 px and
+the console to 60 px, so the console and the status bar stay visible down to
+about 290 px of height. The console height comes from the window height only
+(`bottom_panel_height`): a growing console would trade space with the
+workspace, and Clay weighs that trade by content, so selecting an instance
+with many fields would move every panel.
 
 ## Code layout
 

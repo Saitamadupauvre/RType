@@ -23,7 +23,9 @@ protected:
                                                          "color = { r = 200, g = 100, b = 50 }\n"
                                                          "scale = { x = 2, y = -1 }\n"
                                                          "z_index = -5\n"
-                                                         "rotation = 30\n";
+                                                         "rotation = 30\n"
+                                                         "hitbox = { w = 32, h = 16 }\n";
+        std::ofstream(game / "scripts" / "eye.lua") << "entity \"eye\"\nzoom = 2\n";
         return true;
     }
 
@@ -131,4 +133,44 @@ TEST(GridLines, NoneWhenTooDenseOnScreen) {
     const editor::ViewCamera camera{.center = {0.F, 0.F}, .zoom = 0.1F};
 
     EXPECT_TRUE(editor::grid_lines(camera, viewport, 16.F).xs.empty());
+}
+
+TEST_F(SceneItems, ItemsCarryTheInstanceLabel) {
+    EXPECT_EQ(item_of("ship").label, "hero");
+    EXPECT_EQ(item_of("rock").label, "rock");
+}
+
+TEST_F(SceneItems, HandlesFollowTheTransformComponents) {
+    place_crate({100.F, 100.F});
+
+    EXPECT_TRUE(item_of("crate").scales);
+    EXPECT_TRUE(item_of("crate").rotates);
+    EXPECT_FALSE(item_of("ship").scales);
+    EXPECT_TRUE(item_of("rock").rotates);
+}
+
+TEST_F(SceneItems, BoxColliderIsCenteredOnPositionPlusOffsetLikeThePhysics) {
+    place_crate({100.F, 100.F});
+    const SceneItem crate = item_of("crate");
+
+    ASSERT_TRUE(crate.box_collider.has_value());
+    const editor::WorldBox box = crate.box_collider.value_or(editor::WorldBox{});
+    EXPECT_EQ(box.size, Vec2(32.F, 16.F));
+    EXPECT_EQ(box.top_left, Vec2(100.F, 100.F));
+    EXPECT_FALSE(item_of("ship").box_collider.has_value());
+}
+
+TEST_F(SceneItems, GameFrameIsTheGameScreenWithoutACamera) {
+    const editor::WorldBox frame = editor::game_frame(_session);
+
+    EXPECT_EQ(frame.top_left, Vec2(0.F, 0.F));
+    EXPECT_EQ(frame.size, editor::game_screen);
+}
+
+TEST_F(SceneItems, GameFrameFollowsACameraInstance) {
+    ASSERT_TRUE(_session.place("eye", {1000.F, 500.F}).ok);
+    const editor::WorldBox frame = editor::game_frame(_session);
+
+    EXPECT_EQ(frame.size, editor::game_screen / 2.F);
+    EXPECT_EQ(frame.top_left + (frame.size / 2.F), Vec2(1000.F, 500.F));
 }

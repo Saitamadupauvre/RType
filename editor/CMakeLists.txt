@@ -28,6 +28,7 @@ add_library(editor-core STATIC
     src/cli/Cli.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
+    src/text/FitText.cpp
     src/text/TextEdit.cpp
     src/text/Utf8.cpp
     src/ui/ClickCounter.cpp
@@ -51,6 +52,7 @@ add_library(editor-core STATIC
     src/ui/sections/StatusBar.cpp
     src/ui/sections/Toolbar.cpp
     src/ui/sections/Viewport.cpp
+    src/viewport/Handles.cpp
     src/viewport/SceneItems.cpp
     src/viewport/Snap.cpp
     src/viewport/ViewCamera.cpp
