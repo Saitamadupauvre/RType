@@ -11,6 +11,8 @@ namespace editor {
 
 struct EditorConfig {
     std::filesystem::path game;
+    /** @brief Create a new game in `game` before opening it (`--new`). */
+    bool create = false;
     /** @brief Program that plays the game; empty for the default next to the editor. */
     std::filesystem::path runtime{};
     /** @brief Lowest level the developer log writes to stderr. */
