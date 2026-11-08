@@ -38,7 +38,8 @@ void tab(Ui& ui, Clay_ElementId id, Clay_String label, BottomTab tab, BottomTab 
 void tabs(Ui& ui, const Editor& editor) {
     const Theme& theme = ui.theme();
     const BottomTab current = editor.state().bottom_tab;
-    const auto problems = editor.session().problems().size();
+    const auto problems =
+        editor.session().problems().size() + editor.session().script_messages().size();
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(),
                                 .height = CLAY_SIZING_FIXED(theme.px(size::tabs))},
                      .padding = {.left = theme.px16(8.F), .right = theme.px16(8.F)}},
@@ -109,8 +110,11 @@ std::string describe(const engine::editor::Problem& problem,
 }
 
 void problems(Ui& ui, const engine::editor::EditorSession& session) {
-    if (session.problems().empty()) {
+    if (session.problems().empty() && session.script_messages().empty()) {
         empty_hint(ui.theme(), CLAY_STRING("No problems"));
+    }
+    for (const auto& message : session.script_messages()) {
+        line(ui.theme(), view_of(message.text), message.error ? color::error : color::accent);
     }
     for (const auto& problem : session.problems()) {
         line(ui.theme(), ui.keep(describe(problem, session)), color::error);
