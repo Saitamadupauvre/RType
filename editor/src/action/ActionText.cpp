@@ -77,6 +77,10 @@ std::string edit_text(const Edit& edit) {
                 return std::format("edit::ChangeType id={} type={}", id_text(change.id),
                                    change.type);
             },
+            [](const edit::Duplicate& duplicate) {
+                return std::format("edit::Duplicate id={} offset={}", id_text(duplicate.id),
+                                   point_text(duplicate.offset));
+            },
         },
         edit);
 }

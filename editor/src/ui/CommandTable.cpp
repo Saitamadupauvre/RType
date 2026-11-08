@@ -42,6 +42,15 @@ std::optional<Action> delete_selection(const Editor& editor) {
     return edit::Remove{.id = *selection};
 }
 
+std::optional<Action> duplicate_selection(const Editor& editor) {
+    const auto selection = editor.session().selection();
+    if (!editing(editor) || !selection) {
+        return std::nullopt;
+    }
+    const float step = editor.state().view.grid_size;
+    return edit::Duplicate{.id = *selection, .offset = {step, step}};
+}
+
 std::optional<Action> discard(const Editor& editor) {
     if (!editing(editor) || !editor.session().unsaved()) {
         return std::nullopt;
@@ -147,6 +156,10 @@ constexpr std::array table{
                  .make = open_export},
     CommandEntry{.label = "Undo", .menu = Menu::edit, .shortcut = primary(Key::z), .make = undo},
     CommandEntry{.label = "Redo", .menu = Menu::edit, .shortcut = primary(Key::y), .make = redo},
+    CommandEntry{.label = "Duplicate selection",
+                 .menu = Menu::edit,
+                 .shortcut = primary(Key::d),
+                 .make = duplicate_selection},
     CommandEntry{.label = "Delete selection",
                  .menu = Menu::edit,
                  .shortcut = plain(Key::del),
@@ -214,6 +227,8 @@ std::string_view key_name(Key key) {
         return "H";
     case Key::p:
         return "P";
+    case Key::d:
+        return "D";
     case Key::del:
         return "Del";
     case Key::backspace:

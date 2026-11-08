@@ -95,6 +95,24 @@ TEST_F(CommandTable, DeleteRemovesTheSelection) {
     EXPECT_EQ(remove->id, rock);
 }
 
+TEST_F(CommandTable, CtrlDDuplicatesTheSelectionOneGridCellAway) {
+    EXPECT_TRUE(press(Key::d, true).empty());
+
+    const auto rock = id_of(_editor.session(), "rock");
+    _editor.handle(command::Select{.id = rock});
+    _editor.handle(command::SetGridSize{.size = 32.F});
+    const auto actions = press(Key::d, true);
+
+    ASSERT_EQ(actions.size(), 1U);
+    const auto* edit = std::get_if<editor::Edit>(&actions.front());
+    ASSERT_NE(edit, nullptr);
+    const auto* duplicate = std::get_if<edit::Duplicate>(edit);
+    ASSERT_NE(duplicate, nullptr);
+    EXPECT_EQ(duplicate->id, rock);
+    EXPECT_EQ(duplicate->offset, (engine::core::Vec2{32, 32}));
+    EXPECT_TRUE(press(Key::d).empty());
+}
+
 TEST_F(CommandTable, ToolKeysSwitchTools) {
     for (const auto [key, tool] : {std::pair{Key::v, Tool::select}, std::pair{Key::g, Tool::move},
                                    std::pair{Key::h, Tool::pan}}) {

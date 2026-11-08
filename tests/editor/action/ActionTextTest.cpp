@@ -14,6 +14,8 @@ TEST(ActionText, EditsShowTheirFields) {
               "edit::Move id=3 position=(9, 9.5)");
     EXPECT_EQ(describe_action(edit::Place{.type = "rock", .position = {0, 16}}),
               "edit::Place type=rock position=(0, 16)");
+    EXPECT_EQ(describe_action(edit::Duplicate{.id = InstanceId{4}, .offset = {16, 16}}),
+              "edit::Duplicate id=4 offset=(16, 16)");
     EXPECT_EQ(describe_action(edit::ResetField{.id = InstanceId{2}, .key = "Scale.x"}),
               "edit::ResetField id=2 key=Scale.x");
 }

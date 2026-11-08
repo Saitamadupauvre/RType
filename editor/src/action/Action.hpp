@@ -64,6 +64,12 @@ struct ChangeType {
     std::string type;
 };
 
+/** @brief Adds a copy of an instance at its position plus `offset` and selects the copy. */
+struct Duplicate {
+    InstanceId id;
+    engine::core::Vec2 offset;
+};
+
 } // namespace edit
 
 /**
@@ -71,7 +77,7 @@ struct ChangeType {
  * Mode::editing.
  */
 using Edit = std::variant<edit::Place, edit::Move, edit::Remove, edit::Rename, edit::SetField,
-                          edit::ResetField, edit::ResetAll, edit::ChangeType>;
+                          edit::ResetField, edit::ResetAll, edit::ChangeType, edit::Duplicate>;
 
 enum class Overlay : std::uint8_t { hitboxes, names };
 enum class Tool : std::uint8_t { select, move, pan };

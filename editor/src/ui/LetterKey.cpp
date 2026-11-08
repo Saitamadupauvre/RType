@@ -11,7 +11,7 @@ namespace {
 constexpr std::array letters{
     std::pair{'a', Key::a}, std::pair{'c', Key::c}, std::pair{'s', Key::s}, std::pair{'v', Key::v},
     std::pair{'x', Key::x}, std::pair{'y', Key::y}, std::pair{'z', Key::z}, std::pair{'g', Key::g},
-    std::pair{'h', Key::h}, std::pair{'p', Key::p},
+    std::pair{'h', Key::h}, std::pair{'p', Key::p}, std::pair{'d', Key::d},
 };
 
 } // namespace
