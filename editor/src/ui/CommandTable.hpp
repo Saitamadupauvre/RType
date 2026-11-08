@@ -47,7 +47,7 @@ struct CommandEntry {
 
 /**
  * @brief Emits the action of each enabled command whose shortcut was pressed this frame.
- * @note Emits nothing while a field has the keyboard.
+ * @note Emits nothing while a field has the keyboard or the export dialog is open.
  */
 void emit_shortcuts(Ui& ui, const Editor& editor);
 

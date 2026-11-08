@@ -2,6 +2,7 @@
 
 #include <clay.h>
 
+#include <cstdint>
 #include <string_view>
 
 #include "ui/Theme.hpp"
@@ -14,6 +15,8 @@ struct TextFieldOptions {
     std::string_view placeholder{};
     bool read_only = false;
     Face face = Face::regular;
+    /** Z-index of the shown text; a field inside a floating element passes a layer above it. */
+    std::int16_t layer = 0;
 };
 
 /**

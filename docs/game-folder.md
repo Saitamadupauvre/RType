@@ -28,7 +28,7 @@ the folder of the executable is the game folder.
 
 | Key | Type | Meaning |
 |---|---|---|
-| `name` | string | Name of the game, shown by tools. The runtime does not read it. |
+| `name` | string | Name of the game, shown by tools; the editor's export names the binaries after it. The runtime does not read it. |
 | `start_scene` | scene name | Scene spawned when the server starts, before `on_start()`. Optional. |
 
 Other keys are ignored. The file itself is optional: a game folder without

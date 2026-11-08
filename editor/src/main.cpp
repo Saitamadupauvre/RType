@@ -22,6 +22,7 @@ int main(int argc, char** argv) {
         result.config->runtime.empty()
             ? std::filesystem::path(argv[0]).parent_path() / "r-type_client"
             : result.config->runtime;
+    editor->attach_runtime(runtime.parent_path());
     editor->attach_launcher(std::make_unique<editor::ProcessLauncher>(runtime));
     return editor::run_editor_window(*editor) ? 0 : 84;
 }

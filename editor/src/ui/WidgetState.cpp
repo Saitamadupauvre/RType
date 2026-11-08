@@ -26,7 +26,10 @@ void WidgetState::focus(Clay_ElementId id, std::string_view value) {
     _focused = id.id;
     _draft = TextEdit(std::string(value));
     _original = std::string(value);
+    _text_offset = 0.F;
 }
+
+float& WidgetState::text_offset() noexcept { return _text_offset; }
 
 void WidgetState::blur() noexcept {
     _focused.reset();

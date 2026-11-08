@@ -53,6 +53,8 @@ void Editor::log(ConsoleLine line) {
     _state.console.push_back(std::move(line));
 }
 
+void Editor::attach_runtime(std::filesystem::path folder) { _runtime = std::move(folder); }
+
 void Editor::update() {
     for (ConsoleLine& line : _play.update(_state.mode)) {
         log(std::move(line));
@@ -83,7 +85,7 @@ CommandResult Editor::apply(const Command& command) {
     if (_state.mode != Mode::editing && !allowed_while_running(command)) {
         return stop_first();
     }
-    CommandResult result = apply_command(_session, _state, {.play = _play, .open_file = _open_file}, command);
+    CommandResult result = apply_command(_session, _state, {.play = _play, .open_file = _open_file, .runtime = _runtime}, command);
     refresh_lists();
     return result;
 }

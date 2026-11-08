@@ -9,6 +9,7 @@
 #include "engine/core/ecs/FieldRegistry.hpp"
 #include "engine/core/math/Vec2.hpp"
 #include "engine/editor/SceneDocument.hpp"
+#include "exporter/GameExport.hpp"
 
 namespace editor {
 
@@ -203,6 +204,27 @@ struct Stop {
     static constexpr bool while_running = true;
 };
 
+/** @brief Opens the export dialog with the game's default settings. */
+struct OpenExport {
+    static constexpr bool while_running = false;
+};
+
+/** @brief Changes the settings of the open export dialog and plans the export again. */
+struct SetExport {
+    static constexpr bool while_running = false;
+    ExportSettings settings;
+};
+
+/** @brief Closes the export dialog without exporting. */
+struct CloseExport {
+    static constexpr bool while_running = true;
+};
+
+/** @brief Runs the planned export and closes the dialog; refused while the plan has problems. */
+struct RunExport {
+    static constexpr bool while_running = false;
+};
+
 } // namespace command
 
 using Command = std::variant<command::Select, command::Undo, command::Redo, command::Save,
@@ -211,7 +233,9 @@ using Command = std::variant<command::Select, command::Undo, command::Redo, comm
                              command::SetStartScene, command::SetSnap, command::SetGridSize,
                              command::SetOverlay, command::SetTool, command::ShowTab,
                              command::ReportInvalidInput, command::SetPrefabFilter,
-                             command::OpenScript, command::Play, command::Pause, command::Stop>;
+                             command::OpenScript, command::Play, command::Pause, command::Stop,
+                             command::OpenExport, command::SetExport, command::CloseExport,
+                             command::RunExport>;
 
 /** @brief What the UI emits; applied after the frame by Editor::handle(). */
 using Action = std::variant<Edit, Command>;

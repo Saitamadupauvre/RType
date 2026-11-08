@@ -43,6 +43,8 @@ public:
 
     /** @brief Lets OpenScript open files; without it OpenScript is refused. */
     void attach_file_opener(FileOpener opener);
+    /** @brief Sets the folder of the runtime binaries an export copies. */
+    void attach_runtime(std::filesystem::path folder);
 
     /**
      * @brief Follows the played game: its output goes to the console, and its end brings the
@@ -72,6 +74,7 @@ private:
     EditorState _state;
     PlaySession _play;
     FileOpener _open_file;
+    std::filesystem::path _runtime;
     std::function<std::string()> _clock;
 
     void log(ConsoleLine line);

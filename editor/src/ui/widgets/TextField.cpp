@@ -8,6 +8,7 @@
 #include <string_view>
 #include <utility>
 
+#include "text/CaretScroll.hpp"
 #include "text/FitText.hpp"
 #include "text/TextEdit.hpp"
 #include "ui/Text.hpp"
@@ -29,7 +30,8 @@ Clay_TextElementConfig font_of(const Theme& theme, Face face) {
 
 void place_caret_at(Ui& ui, Clay_ElementId id, float pointer_x, Face face, bool extend) {
     const Clay_ElementData box = Clay_GetElementData(id);
-    const float x = pointer_x - box.boundingBox.x - ui.theme().px(padding);
+    const float x =
+        pointer_x - box.boundingBox.x - ui.theme().px(padding) + ui.widgets().text_offset();
     const Clay_TextElementConfig font = font_of(ui.theme(), face);
     TextEdit& draft = ui.widgets().draft();
     const auto width = [&ui, &font](std::string_view prefix) {
@@ -163,6 +165,7 @@ void shown_text(Ui& ui, std::optional<float> field_width, std::string_view shown
 void shown_content(Ui& ui, std::optional<float> field_width, std::string_view shown,
                    const TextFieldOptions& options) {
     CLAY({.floating = {.offset = {.x = ui.theme().px(padding), .y = 0.F},
+                       .zIndex = options.layer,
                        .attachPoints = {.element = CLAY_ATTACH_POINT_LEFT_CENTER,
                                         .parent = CLAY_ATTACH_POINT_LEFT_CENTER},
                        .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
@@ -170,6 +173,23 @@ void shown_content(Ui& ui, std::optional<float> field_width, std::string_view sh
                        .clipTo = CLAY_CLIP_TO_ATTACHED_PARENT}}) {
         shown_text(ui, field_width, shown, options);
     }
+}
+
+float scrolled(Ui& ui, std::optional<float> field_width, Face face) {
+    float& offset = ui.widgets().text_offset();
+    if (!field_width) {
+        return offset;
+    }
+    const TextEdit& draft = ui.widgets().draft();
+    const Clay_TextElementConfig font = font_of(ui.theme(), face);
+    const auto width = [&ui, &font](std::string_view prefix) {
+        return ui.platform().measure(prefix, font).width;
+    };
+    const std::string_view all = draft.text();
+    const float visible =
+        *field_width - (2.F * ui.theme().px(padding)) - ui.theme().px(caret_width);
+    offset = scroll_to_caret(offset, width(all.substr(0, draft.caret())), width(all), visible);
+    return offset;
 }
 
 void draw(Ui& ui, Clay_ElementId id, std::string_view shown, const TextFieldOptions& options) {
@@ -187,7 +207,9 @@ void draw(Ui& ui, Clay_ElementId id, std::string_view shown, const TextFieldOpti
                      .childAlignment = {.y = CLAY_ALIGN_Y_CENTER}},
           .backgroundColor = color::field,
           .cornerRadius = CLAY_CORNER_RADIUS(theme.px(size::radius)),
-          .clip = {.horizontal = focused},
+          .clip = {.horizontal = focused,
+                   .childOffset = {.x = focused ? -scrolled(ui, field_width, options.face) : 0.F,
+                                   .y = 0.F}},
           .border = {.color = focused ? color::focus : color::border,
                      .width = CLAY_BORDER_OUTSIDE(theme.px16(1.F))}}) {
         if (focused) {

@@ -26,10 +26,12 @@ add_library(editor-core STATIC
     src/action/OpenEditor.cpp
     src/clay/ClayContext.cpp
     src/cli/Cli.cpp
+    src/exporter/GameExport.cpp
     src/play/PlaySession.cpp
     src/play/ProcessLauncher.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
+    src/text/CaretScroll.cpp
     src/text/FitText.cpp
     src/text/TextEdit.cpp
     src/text/Utf8.cpp
@@ -46,6 +48,7 @@ add_library(editor-core STATIC
     src/ui/SmoothScroll.cpp
     src/ui/WidgetState.cpp
     src/ui/sections/BottomPanel.cpp
+    src/ui/sections/ExportDialog.cpp
     src/ui/sections/Inspector.cpp
     src/ui/sections/InspectorFields.cpp
     src/ui/sections/MenuBar.cpp

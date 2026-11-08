@@ -44,6 +44,21 @@ CommandResult open_script(const FileOpener& open_file, const std::filesystem::pa
     return CommandResult::done();
 }
 
+CommandResult export_game(EditorState& state) {
+    if (!state.export_dialog) {
+        return CommandResult::refused("the export dialog is not open");
+    }
+    const ExportPlan& plan = state.export_dialog->plan;
+    if (!plan.problems.empty()) {
+        return CommandResult::refused(std::format("cannot export: {}", plan.problems.front()));
+    }
+    CommandResult result = run_export(plan);
+    if (result.ok) {
+        state.export_dialog.reset();
+    }
+    return result;
+}
+
 } // namespace
 
 CommandResult apply_command(EditorSession& session, EditorState& state, EditorServices services,
@@ -95,6 +110,27 @@ CommandResult apply_command(EditorSession& session, EditorState& state, EditorSe
             [&](const command::Play&) { return play.play(session, state.mode); },
             [&](const command::Pause&) { return play.pause(state.mode); },
             [&](const command::Stop&) { return play.stop(state.mode); },
+            [&](const command::OpenExport&) {
+                const ExportSettings settings = default_export(session.game());
+                state.export_dialog = ExportDialog{
+                    .settings = settings,
+                    .plan = plan_export(session.game(), services.runtime, settings)};
+                return CommandResult::done();
+            },
+            [&](const command::SetExport& change) {
+                if (!state.export_dialog) {
+                    return CommandResult::refused("the export dialog is not open");
+                }
+                state.export_dialog->settings = change.settings;
+                state.export_dialog->plan =
+                    plan_export(session.game(), services.runtime, change.settings);
+                return CommandResult::done();
+            },
+            [&](const command::CloseExport&) {
+                state.export_dialog.reset();
+                return CommandResult::done();
+            },
+            [&](const command::RunExport&) { return export_game(state); },
         },
         command);
 }

@@ -4,6 +4,7 @@
 #include "ui/SmoothScroll.hpp"
 #include "ui/Text.hpp"
 #include "ui/sections/BottomPanel.hpp"
+#include "ui/sections/ExportDialog.hpp"
 #include "ui/sections/Inspector.hpp"
 #include "ui/sections/MenuBar.hpp"
 #include "ui/sections/Sidebar.hpp"
@@ -70,6 +71,7 @@ Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimension
         }
         bottom_panel(ui, editor, bottom_panel_height(ui.theme(), window.height));
         status_bar(ui, editor);
+        export_dialog(ui, editor, window);
     }
     const Clay_RenderCommandArray commands = Clay_EndLayout();
     ui.widgets().end_frame();

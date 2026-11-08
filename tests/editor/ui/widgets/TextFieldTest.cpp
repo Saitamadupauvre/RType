@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 
 #include "WidgetFixture.hpp"
@@ -282,4 +283,48 @@ TEST_F(TextField, MovingWithTheButtonUpDoesNotSelect) {
     step();
     step({.pointer = click_at(first_id(), padding + (2 * byte_width)).pointer});
     EXPECT_FALSE(_widgets.draft().has_selection());
+}
+
+TEST_F(TextField, LongTextScrollsToKeepTheCaretVisible) {
+    _first = std::string(200, 'a');
+    focus_first();
+    step(press(Key::end));
+    step();
+
+    const float visible = window.width - (2 * padding) - 1.F;
+    EXPECT_FLOAT_EQ(_widgets.text_offset(), (200 * byte_width) - visible);
+}
+
+TEST_F(TextField, HomeScrollsBackToTheStart) {
+    _first = std::string(200, 'a');
+    focus_first();
+    step(press(Key::end));
+    step(press(Key::home));
+    step();
+
+    EXPECT_FLOAT_EQ(_widgets.text_offset(), 0.F);
+}
+
+TEST_F(TextField, ClickInAScrolledFieldPlacesTheCaretUnderThePointer) {
+    _first = std::string(200, 'a');
+    focus_first();
+    step(press(Key::end));
+    step();
+    const float offset = _widgets.text_offset();
+
+    step(click_at(first_id(), padding + (4 * byte_width)));
+    step(type("X"));
+
+    const auto expected = static_cast<std::size_t>((offset / byte_width) + 4.5F);
+    EXPECT_EQ(_first_result.value.find('X'), expected);
+}
+
+TEST_F(TextField, FocusStartsUnscrolled) {
+    _first = std::string(200, 'a');
+    focus_first();
+    step(press(Key::end));
+    step(press(Key::enter));
+    focus_first();
+
+    EXPECT_FLOAT_EQ(_widgets.text_offset(), 0.F);
 }

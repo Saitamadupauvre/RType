@@ -18,6 +18,8 @@ using FileOpener = std::function<bool(const std::filesystem::path& file)>;
 struct EditorServices {
     PlaySession& play;
     const FileOpener& open_file;
+    /** Folder holding the runtime binaries an export copies; empty when unknown. */
+    const std::filesystem::path& runtime;
 };
 
 /**

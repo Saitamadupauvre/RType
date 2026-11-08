@@ -5,6 +5,7 @@
 #include <format>
 #include <stdexcept>
 #include <system_error>
+#include <utility>
 
 #include "JsonFile.hpp"
 #include "engine/core/log/Log.hpp"
@@ -38,6 +39,14 @@ std::optional<std::string> start_scene_of(const Json& project, const fs::path& f
         throw std::runtime_error(std::format(
             "{}: start_scene must be a scene name of 1 to {} letters, digits, '_' or '-'",
             file.generic_string(), max_scene_name_length));
+    }
+    return found->get<std::string>();
+}
+
+std::optional<std::string> name_of(const Json& project) {
+    const auto found = project.find("name");
+    if (found == project.end() || !found->is_string()) {
+        return std::nullopt;
     }
     return found->get<std::string>();
 }
@@ -87,7 +96,9 @@ std::optional<GameProject> read_project(const fs::path& game) {
         return GameProject{};
     }
     try {
-        return GameProject{.start_scene = start_scene_of(read_json_file(file), file)};
+        const Json project = read_json_file(file);
+        std::optional<std::string> start_scene = start_scene_of(project, file);
+        return GameProject{.name = name_of(project), .start_scene = std::move(start_scene)};
     } catch (const std::runtime_error& invalid) {
         log::error("game: {}", invalid.what());
     }
