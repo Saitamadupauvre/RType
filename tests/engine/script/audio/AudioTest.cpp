@@ -24,7 +24,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path audio_fixture(const std::string& name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "audio" / name;
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "audio" / name;
 }
 
 AudioCommand sound(const std::string& name) {

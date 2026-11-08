@@ -83,7 +83,7 @@ std::vector<std::uint8_t> raw_accept(const std::vector<RawEntry>& entries) {
 
 engine::network::StringTable sample_strings() {
     return strings_of({{.category = StringCategory::type, .id = 1, .name = "player"},
-                       {.category = StringCategory::type, .id = 2, .name = "bydo"},
+                       {.category = StringCategory::type, .id = 2, .name = "enemy"},
                        {.category = StringCategory::sound, .id = 1, .name = "shot.wav"},
                        {.category = StringCategory::music, .id = 7, .name = "stage1.ogg"},
                        {.category = StringCategory::field, .id = 1, .name = "Position.pos"}});
@@ -534,8 +534,8 @@ TEST(ConnectAcceptPayload, DecoderRejectsDuplicateIdInACategory) {
 }
 
 TEST(ConnectAcceptPayload, DecoderRejectsDuplicateNameInACategory) {
-    const std::vector<RawEntry> entries{{.category = 0, .id = 1, .name = "bydo"},
-                                        {.category = 0, .id = 2, .name = "bydo"}};
+    const std::vector<RawEntry> entries{{.category = 0, .id = 1, .name = "enemy"},
+                                        {.category = 0, .id = 2, .name = "enemy"}};
 
     EXPECT_FALSE(decode_connect_accept(raw_accept(entries)).has_value());
 }
@@ -558,21 +558,21 @@ TEST(ConnectAcceptPayload, DecoderRejectsTruncatedPayloads) {
 }
 
 TEST(ConnectAcceptPayload, DecoderRejectsNameRunningPastTheEnd) {
-    auto bytes = raw_accept({{.category = 0, .id = 1, .name = "bydo"}});
+    auto bytes = raw_accept({{.category = 0, .id = 1, .name = "enemy"}});
     bytes.resize(bytes.size() - no_current_music.size() - 1);
 
     EXPECT_FALSE(decode_connect_accept(bytes).has_value());
 }
 
 TEST(ConnectAcceptPayload, DecoderRejectsCountLargerThanEntries) {
-    const auto bytes = raw_accept(2, {{.category = 0, .id = 1, .name = "bydo"}});
+    const auto bytes = raw_accept(2, {{.category = 0, .id = 1, .name = "enemy"}});
 
     EXPECT_FALSE(decode_connect_accept(bytes).has_value());
 }
 
 TEST(ConnectAcceptPayload, DecoderRejectsHugeCountInShortPayload) {
     EXPECT_FALSE(
-        decode_connect_accept(raw_accept(0xFFFF, {{.category = 0, .id = 1, .name = "bydo"}}))
+        decode_connect_accept(raw_accept(0xFFFF, {{.category = 0, .id = 1, .name = "enemy"}}))
             .has_value());
 }
 
@@ -592,7 +592,7 @@ TEST(ConnectAcceptPayload, DecoderRejectsACurrentMusicMissingFromTheTable) {
 }
 
 TEST(ConnectAcceptPayload, DecoderRejectsTrailingBytes) {
-    auto bytes = raw_accept({{.category = 0, .id = 1, .name = "bydo"}});
+    auto bytes = raw_accept({{.category = 0, .id = 1, .name = "enemy"}});
     bytes.push_back(0x00);
 
     EXPECT_FALSE(decode_connect_accept(bytes).has_value());

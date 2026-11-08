@@ -56,7 +56,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "RTYPE_WARNINGS_AS_ERRORS": "ON",
+        "WORKSPACE_WARNINGS_AS_ERRORS": "ON",
         "ENGINE_WARNINGS_AS_ERRORS": "ON"
       }
     },

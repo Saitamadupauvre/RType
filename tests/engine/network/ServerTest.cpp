@@ -274,7 +274,7 @@ TEST_F(NetworkServerTest, SendsMusicChangesToPlayers) {
 
 TEST_F(NetworkServerTest, SendsItsStringTableAndPublishedEventsToPlayers) {
     const auto strings = payload_samples::strings_of(
-        {{.category = StringCategory::type, .id = 3, .name = "bydo"},
+        {{.category = StringCategory::type, .id = 3, .name = "enemy"},
          {.category = StringCategory::event, .id = 2, .name = "boom"},
          {.category = StringCategory::event_key, .id = 5, .name = "at"}});
     LoopbackServer typed(clock, bus, no_fields,

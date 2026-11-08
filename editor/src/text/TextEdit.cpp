@@ -8,7 +8,8 @@
 
 namespace editor {
 
-TextEdit::TextEdit(std::string text) : _text(std::move(text)), _caret(_text.size()), _anchor(_caret) {}
+TextEdit::TextEdit(std::string text)
+    : _text(std::move(text)), _caret(_text.size()), _anchor(_caret) {}
 
 const std::string& TextEdit::text() const noexcept { return _text; }
 

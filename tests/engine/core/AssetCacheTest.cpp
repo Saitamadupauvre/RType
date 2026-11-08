@@ -67,7 +67,7 @@ TEST(AssetCache, GivesDistinctNamesDistinctHandles) {
     FakeBackend backend;
     auto cache = cache_over(backend);
 
-    EXPECT_NE(cache.get("ship.png"), cache.get("bydo.png"));
+    EXPECT_NE(cache.get("ship.png"), cache.get("enemy.png"));
     EXPECT_EQ(cache.size(), 2U);
 }
 
@@ -110,13 +110,13 @@ TEST(AssetCache, UnloadsEveryLoadedAssetOnClear) {
     FakeBackend backend;
     auto cache = cache_over(backend);
     const TestId ship = cache.get("ship.png");
-    const TestId bydo = cache.get("bydo.png");
+    const TestId enemy = cache.get("enemy.png");
 
     cache.clear();
 
     EXPECT_EQ(backend.unloaded.size(), 2U);
     EXPECT_NE(std::ranges::find(backend.unloaded, ship.value), backend.unloaded.end());
-    EXPECT_NE(std::ranges::find(backend.unloaded, bydo.value), backend.unloaded.end());
+    EXPECT_NE(std::ranges::find(backend.unloaded, enemy.value), backend.unloaded.end());
     EXPECT_EQ(cache.size(), 0U);
 }
 
@@ -136,7 +136,7 @@ TEST(AssetCache, UnloadsEveryLoadedAssetOnDestruction) {
     {
         auto cache = cache_over(backend);
         static_cast<void>(cache.get("ship.png"));
-        static_cast<void>(cache.get("bydo.png"));
+        static_cast<void>(cache.get("enemy.png"));
     }
 
     EXPECT_EQ(backend.unloaded.size(), 2U);
@@ -156,7 +156,7 @@ TEST(AssetCache, NeverUnloadsThePlaceholder) {
 TEST(AssetName, AcceptsPlainAndNestedRelativePaths) {
     EXPECT_TRUE(is_valid_asset_name("laser_shoot.wav"));
     EXPECT_TRUE(is_valid_asset_name("bit-space.mp3"));
-    EXPECT_TRUE(is_valid_asset_name("sprites/enemies/bydo.png"));
+    EXPECT_TRUE(is_valid_asset_name("sprites/enemies/enemy.png"));
 }
 
 TEST(AssetName, RejectsEmptyName) { EXPECT_FALSE(is_valid_asset_name("")); }

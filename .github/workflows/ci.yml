@@ -112,7 +112,7 @@ jobs:
       # Same files as the `format-check` target.
       - name: clang-format
         run: >
-          git ls-files -- {engine,plugins,game,tests}/'*'.{cpp,hpp}
+          git ls-files -- {engine,plugins,editor,runtime,tests}/'*'.{cpp,hpp}
           | xargs -r clang-format --dry-run --Werror
 
   # Every job above passed on a push to main: the tested commit goes to the mirror.

@@ -1,6 +1,7 @@
 #include "engine/script/GameFolder.hpp"
 
 #include <algorithm>
+#include <array>
 #include <exception>
 #include <format>
 #include <stdexcept>
@@ -19,6 +20,7 @@ namespace log = engine::core::log;
 
 constexpr std::string_view project_file = "game.json";
 constexpr std::size_t max_scene_name_length = 63;
+constexpr std::array<std::string_view, 4> mode_names{"solo", "host", "client", "dedicated"};
 
 bool is_scene_name_character(char character) noexcept {
     const bool lower = character >= 'a' && character <= 'z';
@@ -49,6 +51,37 @@ std::optional<std::string> name_of(const Json& project) {
         return std::nullopt;
     }
     return found->get<std::string>();
+}
+
+std::vector<std::string> checked_modes(const Json& modes, const fs::path& file) {
+    const auto invalid = [&] {
+        return std::runtime_error(
+            std::format("{}: modes must be a non-empty array of \"solo\", \"host\", \"client\" or "
+                        "\"dedicated\"",
+                        file.generic_string()));
+    };
+    if (!modes.is_array() || modes.empty()) {
+        throw invalid();
+    }
+    std::vector<std::string> names;
+    for (const Json& mode : modes) {
+        if (!mode.is_string() || !is_mode_name(mode.get<std::string>())) {
+            throw invalid();
+        }
+        std::string name = mode.get<std::string>();
+        if (std::ranges::find(names, name) == names.end()) {
+            names.push_back(std::move(name));
+        }
+    }
+    return names;
+}
+
+std::optional<std::vector<std::string>> modes_of(const Json& project, const fs::path& file) {
+    const auto found = project.find("modes");
+    if (found == project.end()) {
+        return std::nullopt;
+    }
+    return checked_modes(*found, file);
 }
 
 Json project_or_empty(const fs::path& file) {
@@ -83,6 +116,10 @@ bool is_scene_name(std::string_view name) noexcept {
            std::ranges::all_of(name, is_scene_name_character);
 }
 
+bool is_mode_name(std::string_view name) noexcept {
+    return std::ranges::find(mode_names, name) != mode_names.end();
+}
+
 fs::path scene_file(const fs::path& game, std::string_view name) {
     return game / "scenes" / (std::string(name) + ".json");
 }
@@ -98,7 +135,9 @@ std::optional<GameProject> read_project(const fs::path& game) {
     try {
         const Json project = read_json_file(file);
         std::optional<std::string> start_scene = start_scene_of(project, file);
-        return GameProject{.name = name_of(project), .start_scene = std::move(start_scene)};
+        return GameProject{.name = name_of(project),
+                           .start_scene = std::move(start_scene),
+                           .modes = modes_of(project, file)};
     } catch (const std::runtime_error& invalid) {
         log::error("game: {}", invalid.what());
     }
@@ -117,6 +156,23 @@ bool write_start_scene(const fs::path& game,
             project["start_scene"] = *start_scene;
         } else {
             project.erase("start_scene");
+        }
+        return write_json_file(file, project);
+    } catch (const std::exception& error) {
+        log::error("game: cannot write {}: {}", file.generic_string(), error.what());
+    }
+    return false;
+}
+
+bool write_modes(const fs::path& game,
+                 const std::optional<std::vector<std::string>>& modes) noexcept {
+    const fs::path file = game / project_file;
+    try {
+        Json project = project_or_empty(file);
+        if (modes) {
+            project["modes"] = checked_modes(Json(*modes), file);
+        } else {
+            project.erase("modes");
         }
         return write_json_file(file, project);
     } catch (const std::exception& error) {

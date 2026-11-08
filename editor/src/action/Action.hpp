@@ -243,15 +243,14 @@ struct RunExport {
 
 } // namespace command
 
-using Command = std::variant<command::Select, command::Undo, command::Redo, command::Save,
-                             command::DiscardChanges, command::CreateScene, command::OpenScene,
-                             command::DuplicateScene, command::RenameScene, command::DeleteScene,
-                             command::SetStartScene, command::SetSnap, command::SetGridSize,
-                             command::SetOverlay, command::SetTool, command::ShowTab,
-                             command::ReportInvalidInput, command::SetPrefabFilter,
-                             command::OpenScript, command::OpenSettings, command::ReloadSettings, command::Play, command::Pause, command::Stop,
-                             command::OpenExport, command::SetExport, command::CloseExport,
-                             command::RunExport>;
+using Command = std::variant<
+    command::Select, command::Undo, command::Redo, command::Save, command::DiscardChanges,
+    command::CreateScene, command::OpenScene, command::DuplicateScene, command::RenameScene,
+    command::DeleteScene, command::SetStartScene, command::SetSnap, command::SetGridSize,
+    command::SetOverlay, command::SetTool, command::ShowTab, command::ReportInvalidInput,
+    command::SetPrefabFilter, command::OpenScript, command::OpenSettings, command::ReloadSettings,
+    command::Play, command::Pause, command::Stop, command::OpenExport, command::SetExport,
+    command::CloseExport, command::RunExport>;
 
 /** @brief What the UI emits; applied after the frame by Editor::handle(). */
 using Action = std::variant<Edit, Command>;

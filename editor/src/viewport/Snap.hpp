@@ -4,7 +4,8 @@
 
 namespace editor {
 
-/** @brief Rounds each coordinate to the nearest multiple of `grid`; a grid of 0 or less keeps it. */
+/** @brief Rounds each coordinate to the nearest multiple of `grid`; a grid of 0 or less keeps it.
+ */
 [[nodiscard]] engine::core::Vec2 snap_to_grid(engine::core::Vec2 point, float grid);
 
 /**

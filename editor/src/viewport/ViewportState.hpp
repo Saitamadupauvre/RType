@@ -12,7 +12,8 @@
 
 namespace editor {
 
-/** @brief An instance being dragged: where it was grabbed, where it started and where it is shown. */
+/** @brief An instance being dragged: where it was grabbed, where it started and where it is shown.
+ */
 struct ViewDrag {
     engine::editor::InstanceId id;
     engine::core::Vec2 grab;

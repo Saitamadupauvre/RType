@@ -26,7 +26,7 @@ using engine::script::ScriptRuntime;
 namespace {
 
 std::filesystem::path client_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "api_sets" / "client";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "api_sets" / "client";
 }
 
 EventCommand hit(float x, float y, int damage) {

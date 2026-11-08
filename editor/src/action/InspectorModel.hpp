@@ -11,7 +11,8 @@
 
 namespace editor {
 
-/** @brief One field of the selected instance, as the scene gives it: an override or the prefab's value. */
+/** @brief One field of the selected instance, as the scene gives it: an override or the prefab's
+ * value. */
 struct InspectorField {
     /** "Component.field" or "Script.<name>", as SetField expects it. */
     std::string key;
@@ -39,6 +40,7 @@ struct InspectorModel {
  * it is the instance position, changed with Move.
  * @return std::nullopt without a selection.
  */
-[[nodiscard]] std::optional<InspectorModel> inspect_selection(engine::editor::EditorSession& session);
+[[nodiscard]] std::optional<InspectorModel>
+inspect_selection(engine::editor::EditorSession& session);
 
 } // namespace editor

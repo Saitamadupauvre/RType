@@ -24,7 +24,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path api_sets_fixture(const std::string& name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "api_sets" / name;
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "api_sets" / name;
 }
 
 constexpr const char* core_globals =

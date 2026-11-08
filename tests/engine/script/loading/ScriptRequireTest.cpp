@@ -18,7 +18,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path modules_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "declarations" / "modules";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "declarations" / "modules";
 }
 
 class ScriptRequireTest : public ::testing::Test {

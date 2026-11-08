@@ -112,10 +112,10 @@ TEST_F(InspectorFields, AssetFieldEditsItsPath) {
     click(CLAY_IDI("InspectorValue", 0));
     step();
     step(press(Key::a, true));
-    step(type("bydo.png"));
+    step(type("enemy.png"));
     _actions.clear();
     step(press(Key::enter));
 
     ASSERT_NE(set_value(), nullptr);
-    EXPECT_EQ(*set_value(), FieldValue{AssetName{.path = "bydo.png"}});
+    EXPECT_EQ(*set_value(), FieldValue{AssetName{.path = "enemy.png"}});
 }

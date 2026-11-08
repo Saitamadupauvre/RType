@@ -132,7 +132,7 @@ Part 1. Acknowledgement of events is planned (issue #86).
 **Decision:** Lua 5.4 through sol2. Lua is designed to be embedded, can be
 sandboxed (we open only `base`, `math`, `string`, `table`, `coroutine` and
 reject bytecode), and lets a designer add an enemy without touching C++. The
-whole R-Type game is Lua; the engine has no game rule. LuaJIT is faster but
+whole R-Type example is Lua; the engine has no game rule. LuaJIT is faster but
 stuck on Lua 5.1 semantics and less maintained; our scripts are far from
 being a bottleneck.
 

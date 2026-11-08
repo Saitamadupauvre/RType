@@ -23,30 +23,28 @@ Defined in `CMakePresets.json`. The build folder is always `build/<preset>/`.
 ```sh
 cmake --preset ninja-debug                       # configure
 cmake --build --preset ninja-debug               # build everything
-cmake --build --preset ninja-debug --target r-type_server   # one target
+cmake --build --preset ninja-debug --target editor   # one target
 ```
 
-Useful targets: `r-type_server`, `r-type_client`, `r-type_sandbox`,
-`graphics-raylib`, `audio-raylib`, `engine-<module>`, `engine_<module>_tests`, `docs`
+Useful targets: `editor`, `engine-runtime`, `graphics-raylib`, `audio-raylib`, `engine-<module>`, `engine_<module>_tests`, `docs`
 (Doxygen, if installed), `format`, `format-check`.
 
 CMake options:
 
 | Option | Default | Effect |
 |---|---|---|
-| `RTYPE_BUILD_SANDBOX` | `ON` | Build `r-type_sandbox` |
-| `RTYPE_WARNINGS_AS_ERRORS` | `OFF` (`ON` in `ci`) | Warnings fail the build in game code |
+| `WORKSPACE_BUILD_TESTS` | `ON` at the top level | Build the GoogleTest suites |
+| `WORKSPACE_WARNINGS_AS_ERRORS` | `OFF` (`ON` in `ci`) | Warnings fail the build in the editor, the runtime and the tests |
 | `ENGINE_WARNINGS_AS_ERRORS` | `OFF` (`ON` in `ci`) | Same for engine code |
 
 ## Run
 
 ```sh
-./build/ninja-debug/bin/r-type_server 4242
-./build/ninja-debug/bin/r-type_client 127.0.0.1 4242
-./build/ninja-debug/bin/r-type_client 127.0.0.1 4242 --music-volume 30 --mute
-./build/ninja-debug/bin/r-type_client --host 4242   # server thread + client
-./build/ninja-debug/bin/r-type_client --solo        # no socket
-./build/ninja-debug/bin/r-type_sandbox           # tries the graphics plugin alone
+./build/ninja-debug/bin/editor examples/r-type                               # the editor
+./build/ninja-debug/bin/engine-runtime --game examples/r-type --solo         # no socket
+./build/ninja-debug/bin/engine-runtime --game examples/r-type --host 4242    # server thread + client
+./build/ninja-debug/bin/engine-runtime --game examples/r-type 127.0.0.1 4242 --music-volume 30 --mute
+./build/ninja-debug/bin/engine-runtime --game examples/r-type --server 4242  # dedicated server
 ```
 
 ## Install
@@ -66,7 +64,8 @@ ctest --preset ninja-debug --output-on-failure
 ```
 
 There is one test executable per engine module (`engine_<module>_tests`), per
-game target and per plugin.
+plugin (`plugin_<name>_tests`), one for the editor (`editor_core_tests`) and
+one for the runtime (`runtime_cli_tests`).
 
 ## Workflows
 
@@ -91,16 +90,18 @@ cmake --build --preset ninja-debug --target format-check   # fail if not formatt
 
 ## `fred.sh`
 
-A shortcut script at the repository root:
+A shortcut script in `scripts/`:
 
 | Command | Does |
 |---|---|
-| `./fred.sh run` | Configure and build `release` |
-| `./fred.sh debug` | Configure and build `debug` |
-| `./fred.sh tests` | Build `debug` and run the tests |
-| `./fred.sh tidy` | clang-tidy workflow |
-| `./fred.sh format` | Format the sources in place |
-| `./fred.sh all` | Format check, debug build, tests and clang-tidy: run it before pushing |
+| `scripts/fred.sh run` | Configure and build `release` |
+| `scripts/fred.sh editor [folder]` | Build `release` and open the editor on `folder` (`examples/r-type` by default) |
+| `scripts/fred.sh play <mode>` | Build `release` and run `examples/r-type` with the runtime: `play --solo`, `play --host 4242`, `play 127.0.0.1 4242`, `play --server 4242` |
+| `scripts/fred.sh debug` | Configure and build `debug` |
+| `scripts/fred.sh tests` | Build `debug` and run the tests |
+| `scripts/fred.sh tidy` | clang-tidy workflow |
+| `scripts/fred.sh format` | Format the sources in place |
+| `scripts/fred.sh all` | Format check, debug build, tests and clang-tidy: run it before pushing |
 
 ## Documentation
 
@@ -118,5 +119,5 @@ cmake --build --preset release --target docs     # Doxygen API reference in buil
 | After pulling | `cmake --build --preset ninja-debug && ctest --preset ninja-debug` |
 | After changing `vcpkg.json` | `cmake --preset ninja-debug` (vcpkg installs the new port) |
 | Strange build errors | `rm -rf build/ninja-debug`, configure and build again |
-| Before pushing | `./fred.sh all` |
-| After editing a Lua script | Rebuild (scripts are copied next to the executables), re-sync the test fixture (see [Writing the game](writing-the-game.md#tests)) |
+| Before pushing | `scripts/fred.sh all` |
+| After editing a game's Lua script | Nothing to build: press Play in the editor, or restart the runtime |

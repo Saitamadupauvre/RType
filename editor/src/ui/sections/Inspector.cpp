@@ -2,16 +2,16 @@
 
 #include <clay.h>
 
-#include <cstdint>
-#include <format>
-#include <utility>
-#include <string>
 #include <algorithm>
 #include <cstddef>
-#include <vector>
+#include <cstdint>
 #include <filesystem>
+#include <format>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "text/FitText.hpp"
 #include "ui/FieldText.hpp"
@@ -139,12 +139,12 @@ void identity(Ui& ui, const Editor& editor, const engine::script::Instance& inst
                      .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
         text(theme, fitted_name(ui, instance_label(instance)), size::text, color::text, Face::bold);
         const std::string subtitle =
-            model.script.empty()
-                ? std::format("instance of {}", instance.type)
-                : std::format("instance of {} · {}", instance.type,
-                              shown_script(editor, model.script).generic_string());
+            model.script.empty() ? std::format("instance of {}", instance.type)
+                                 : std::format("instance of {} · {}", instance.type,
+                                               shown_script(editor, model.script).generic_string());
         wrapped_text(theme, ui.keep(subtitle), size::small_text, color::text_muted);
-        wrapped_text(theme, CLAY_STRING("orange = overridden, saved in the scene · grey = prefab value"),
+        wrapped_text(theme,
+                     CLAY_STRING("orange = overridden, saved in the scene · grey = prefab value"),
                      size::small_text, color::text_dim);
     }
 }
@@ -152,9 +152,11 @@ void identity(Ui& ui, const Editor& editor, const engine::script::Instance& inst
 bool wide_button(Ui& ui, Clay_ElementId id, Clay_String label) {
     const Theme& theme = ui.theme();
     bool clicked = false;
-    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
-                     .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)}}}) {
-        clicked = button(ui, id, label, {.background = color::field, .foreground = color::text_soft});
+    CLAY({.layout = {
+              .sizing = {.width = CLAY_SIZING_GROW()},
+              .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)}}}) {
+        clicked =
+            button(ui, id, label, {.background = color::field, .foreground = color::text_soft});
     }
     return clicked;
 }
@@ -199,7 +201,8 @@ void band(Ui& ui, Clay_String name, std::size_t overridden) {
     const Theme& theme = ui.theme();
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(),
                                 .height = CLAY_SIZING_FIXED(theme.px(size::band))},
-                     .padding = {.left = theme.px16(size::gutter), .right = theme.px16(size::gutter)},
+                     .padding = {.left = theme.px16(size::gutter),
+                                 .right = theme.px16(size::gutter)},
                      .childAlignment = {.y = CLAY_ALIGN_Y_CENTER}},
           .backgroundColor = color::band,
           .border = {.color = color::border, .width = {.top = theme.px16(1.F)}}}) {
@@ -249,7 +252,7 @@ void inspector(Ui& ui, const Editor& editor) {
     const auto* selected = model ? editor.session().document().find(model->id) : nullptr;
     CLAY({.id = CLAY_ID("Inspector"),
           .layout = {.sizing = {.width = CLAY_SIZING_GROW(theme.px(size::inspector_min),
-                                                  theme.px(size::inspector)),
+                                                          theme.px(size::inspector)),
                                 .height = CLAY_SIZING_GROW()},
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::panel,

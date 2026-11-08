@@ -104,8 +104,7 @@ std::vector<SceneItem> scene_items(const engine::editor::EditorSession& session,
     return items;
 }
 
-std::optional<engine::editor::InstanceId> item_at(const std::vector<SceneItem>& items,
-                                                  Vec2 world) {
+std::optional<engine::editor::InstanceId> item_at(const std::vector<SceneItem>& items, Vec2 world) {
     for (const SceneItem& item : std::views::reverse(items)) {
         if (holds(item, world)) {
             return item.id;

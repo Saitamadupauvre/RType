@@ -1,15 +1,15 @@
 #include "raylib/EditorWindow.hpp"
 
-#include <clay.h>
 #include <GLFW/glfw3.h>
+#include <clay.h>
 #include <raylib.h>
 
 #include <array>
-#include <format>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -18,12 +18,12 @@
 
 #include "clay/ClayContext.hpp"
 #include "raylib/ClayRenderer.hpp"
+#include "raylib/RaylibLog.hpp"
 #include "raylib/ViewportPainter.hpp"
 #include "ui/ClickCounter.hpp"
 #include "ui/Layout.hpp"
 #include "ui/LetterKey.hpp"
 #include "ui/Platform.hpp"
-#include "raylib/RaylibLog.hpp"
 #include "ui/Theme.hpp"
 #include "ui/Ui.hpp"
 #include "ui/UiInput.hpp"
@@ -55,18 +55,12 @@ constexpr std::array punctuation_keys{
 };
 
 constexpr std::array named_keys{
-    std::pair{KEY_DELETE, Key::del},
-    std::pair{KEY_BACKSPACE, Key::backspace},
-    std::pair{KEY_ENTER, Key::enter},
-    std::pair{KEY_KP_ENTER, Key::enter},
-    std::pair{KEY_ESCAPE, Key::escape},
-    std::pair{KEY_TAB, Key::tab},
-    std::pair{KEY_LEFT, Key::left},
-    std::pair{KEY_RIGHT, Key::right},
-    std::pair{KEY_UP, Key::up},
-    std::pair{KEY_DOWN, Key::down},
-    std::pair{KEY_HOME, Key::home},
-    std::pair{KEY_END, Key::end},
+    std::pair{KEY_DELETE, Key::del},    std::pair{KEY_BACKSPACE, Key::backspace},
+    std::pair{KEY_ENTER, Key::enter},   std::pair{KEY_KP_ENTER, Key::enter},
+    std::pair{KEY_ESCAPE, Key::escape}, std::pair{KEY_TAB, Key::tab},
+    std::pair{KEY_LEFT, Key::left},     std::pair{KEY_RIGHT, Key::right},
+    std::pair{KEY_UP, Key::up},         std::pair{KEY_DOWN, Key::down},
+    std::pair{KEY_HOME, Key::home},     std::pair{KEY_END, Key::end},
 };
 
 #ifdef __APPLE__
@@ -164,16 +158,17 @@ void run_frames(Editor& editor) {
         return renderer.measure(text, config);
     };
     const ClayContext clay(window_size(), measure);
-    ViewportPainter painter(editor.session().game() / "assets", [&renderer](std::uint16_t size) -> const Font& {
-        return renderer.font(Face::regular, size);
-    });
-    renderer.set_custom_painter([&painter](const Clay_RenderCommand& command) { painter.paint(command); });
-    const Platform platform{.measure = measure,
-                            .read_clipboard = read_clipboard,
-                            .write_clipboard = write_clipboard,
-                            .texture_size = [&painter](std::string_view path) {
-                                return painter.texture_size(path);
-                            }};
+    ViewportPainter painter(editor.session().game() / "assets",
+                            [&renderer](std::uint16_t size) -> const Font& {
+                                return renderer.font(Face::regular, size);
+                            });
+    renderer.set_custom_painter(
+        [&painter](const Clay_RenderCommand& command) { painter.paint(command); });
+    const Platform platform{
+        .measure = measure,
+        .read_clipboard = read_clipboard,
+        .write_clipboard = write_clipboard,
+        .texture_size = [&painter](std::string_view path) { return painter.texture_size(path); }};
     WidgetState widgets;
     ClickCounter clicks;
 

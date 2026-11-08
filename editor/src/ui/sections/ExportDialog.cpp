@@ -27,7 +27,9 @@ constexpr Clay_Color backdrop{.r = 0, .g = 0, .b = 0, .a = 150};
 constexpr ButtonStyle primary{.background = color::accent, .foreground = color::text_on_accent};
 constexpr ButtonStyle secondary{.background = color::toolbar, .foreground = color::text};
 
-void change(Ui& ui, ExportSettings settings) { ui.emit(command::SetExport{.settings = std::move(settings)}); }
+void change(Ui& ui, ExportSettings settings) {
+    ui.emit(command::SetExport{.settings = std::move(settings)});
+}
 
 template <typename Field> void labelled(const Theme& theme, Clay_String label, Field field) {
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
@@ -67,18 +69,20 @@ void output_row(Ui& ui, const ExportSettings& settings) {
     });
 }
 
-void binaries_row(Ui& ui, const ExportSettings& settings) {
-    labelled(ui.theme(), CLAY_STRING("Binaries"), [&] {
+void modes_row(Ui& ui, const ExportSettings& settings) {
+    labelled(ui.theme(), CLAY_STRING("Modes"), [&] {
         CLAY({.layout = {.childGap = ui.theme().px16(6.F)}}) {
-            for (const auto [id, label, binaries] :
-                 {std::tuple{CLAY_ID("ExportClientAndServer"), CLAY_STRING("Client + server"),
-                             Binaries::client_and_server},
-                  std::tuple{CLAY_ID("ExportClientOnly"), CLAY_STRING("Client only"),
-                             Binaries::client_only}}) {
-                if (toggle(ui, id, label, settings.binaries == binaries) &&
-                    settings.binaries != binaries) {
+            for (const auto [id, label, mode] :
+                 {std::tuple{CLAY_ID("ExportModeSolo"), CLAY_STRING("Solo"), &ExportModes::solo},
+                  std::tuple{CLAY_ID("ExportModeHost"), CLAY_STRING("Host"), &ExportModes::host},
+                  std::tuple{CLAY_ID("ExportModeClient"), CLAY_STRING("Join"),
+                             &ExportModes::client},
+                  std::tuple{CLAY_ID("ExportModeDedicated"), CLAY_STRING("Server"),
+                             &ExportModes::dedicated}}) {
+                const bool offered = settings.modes.*mode;
+                if (toggle(ui, id, label, offered)) {
                     ExportSettings changed = settings;
-                    changed.binaries = binaries;
+                    changed.modes.*mode = !offered;
                     change(ui, std::move(changed));
                 }
             }
@@ -157,7 +161,7 @@ void dialog_body(Ui& ui, const ExportDialog& dialog) {
                          .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
             name_row(ui, dialog.settings);
             output_row(ui, dialog.settings);
-            binaries_row(ui, dialog.settings);
+            modes_row(ui, dialog.settings);
             plan_summary(ui, dialog.plan);
             actions_row(ui, dialog.plan);
         }

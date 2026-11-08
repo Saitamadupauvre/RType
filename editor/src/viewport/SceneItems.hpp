@@ -80,8 +80,8 @@ struct SceneItem {
                                                  const TextureSize& texture_size);
 
 /** @brief The topmost item whose box holds `world`, ignoring rotation. */
-[[nodiscard]] std::optional<engine::editor::InstanceId>
-item_at(const std::vector<SceneItem>& items, engine::core::Vec2 world);
+[[nodiscard]] std::optional<engine::editor::InstanceId> item_at(const std::vector<SceneItem>& items,
+                                                                engine::core::Vec2 world);
 
 /**
  * @brief The world area the game shows when the scene starts: the view of the first instance

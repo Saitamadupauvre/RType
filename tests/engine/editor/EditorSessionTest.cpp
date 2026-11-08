@@ -55,7 +55,7 @@ const FieldValue health_seven{std::int64_t{7}};
 } // namespace
 
 TEST(EditorSession, MissingGameFolderIsRefused) {
-    EXPECT_FALSE(EditorSession::open(RTYPE_FIXTURES_DIR "/editor/missing").has_value());
+    EXPECT_FALSE(EditorSession::open(TEST_FIXTURES_DIR "/editor/missing").has_value());
 }
 
 TEST(EditorSession, FolderWithoutScriptsStillOpens) {

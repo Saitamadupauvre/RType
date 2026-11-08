@@ -32,7 +32,7 @@ protected:
 
     void SetUp() override {
         _runtime.attach_world(_world);
-        ASSERT_TRUE(_runtime.load_scripts(std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" /
+        ASSERT_TRUE(_runtime.load_scripts(std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" /
                                           "local_entities"));
     }
 
@@ -107,7 +107,7 @@ TEST(LocalEntities, SpawnLocalWithoutAWorldReturnsNilAndIsLogged) {
     auto sink = std::make_shared<logger::MemorySink>();
     const logger::ScopedSink scope{sink, logger::Level::Trace};
     ScriptRuntime runtime = ScriptRuntime::builder().with<ClientApi>().build();
-    ASSERT_TRUE(runtime.load_scripts(std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" /
+    ASSERT_TRUE(runtime.load_scripts(std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" /
                                      "local_entities"));
 
     EXPECT_TRUE(runtime.run_string("assert(spawn_local('spark') == nil)", "client"));

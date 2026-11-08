@@ -41,7 +41,7 @@ using engine::network::LoopbackNetwork;
 
 namespace {
 
-const std::filesystem::path game = std::filesystem::path(RTYPE_FIXTURES_DIR) / "app" / "game";
+const std::filesystem::path game = std::filesystem::path(TEST_FIXTURES_DIR) / "app" / "game";
 constexpr int session_frames = 10;
 
 class FakeRenderer final : public fixture::NullRenderer {

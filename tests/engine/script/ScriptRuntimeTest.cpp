@@ -15,7 +15,7 @@ using engine::script::ScriptRuntime;
 namespace {
 
 std::filesystem::path script_fixture(const std::string& name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / name;
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / name;
 }
 
 class ScriptRuntimeTest : public ::testing::Test {
@@ -88,11 +88,11 @@ TEST_F(ScriptRuntimeTest, CallingIoFailsWithoutCrashing) {
 }
 
 TEST_F(ScriptRuntimeTest, RuntimeErrorInStringIsLoggedWithChunkAndLine) {
-    EXPECT_FALSE(_runtime.run_string("local a = 1\nerror('boom')", "bydo"));
+    EXPECT_FALSE(_runtime.run_string("local a = 1\nerror('boom')", "enemy"));
 
     const auto logged = errors();
     ASSERT_EQ(logged.size(), 1U);
-    EXPECT_NE(logged.front().message.find("bydo:2:"), std::string::npos);
+    EXPECT_NE(logged.front().message.find("enemy:2:"), std::string::npos);
     EXPECT_NE(logged.front().message.find("boom"), std::string::npos);
 }
 

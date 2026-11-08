@@ -27,7 +27,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path players_fixture(const std::string& name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "players" / name;
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "players" / name;
 }
 
 class PlayersTest : public ::testing::Test {

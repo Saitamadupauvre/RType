@@ -31,7 +31,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path entities_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "entities";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "entities";
 }
 
 class EntityFieldsTest : public ::testing::Test {

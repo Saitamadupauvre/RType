@@ -83,13 +83,12 @@ void Editor::update() {
 void Editor::handle(const Action& action) {
     namespace logging = engine::core::log;
     logging::debug("editor: {}", describe_action(action));
-    const CommandResult result = std::visit(Overloaded{
-                                                [&](const Edit& edit) { return apply(edit); },
-                                                [&](const Command& command) {
-                                                    return apply(command);
-                                                },
-                                            },
-                                            action);
+    const CommandResult result =
+        std::visit(Overloaded{
+                       [&](const Edit& edit) { return apply(edit); },
+                       [&](const Command& command) { return apply(command); },
+                   },
+                   action);
     if (!result.ok) {
         logging::info("editor: refused {}: {}", describe_action(action), result.message);
     }
@@ -115,14 +114,16 @@ CommandResult Editor::apply(const Command& command) {
     if (std::holds_alternative<command::ReloadSettings>(command)) {
         return reload_settings();
     }
-    CommandResult result = apply_command(_session, _state, {.play = _play, .open_file = _open_file, .runtime = _runtime}, command);
+    CommandResult result = apply_command(
+        _session, _state, {.play = _play, .open_file = _open_file, .runtime = _runtime}, command);
     refresh_lists();
     return result;
 }
 
 CommandResult Editor::reload_settings() {
     if (_state.settings_file.empty()) {
-        return CommandResult::refused("No settings folder: neither XDG_CONFIG_HOME nor HOME is set.");
+        return CommandResult::refused(
+            "No settings folder: neither XDG_CONFIG_HOME nor HOME is set.");
     }
     apply_settings(load_settings(_state.settings_file));
     return CommandResult::done(

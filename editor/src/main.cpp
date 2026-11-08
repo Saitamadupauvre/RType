@@ -7,8 +7,8 @@
 #include <string_view>
 
 #include "action/OpenEditor.hpp"
-#include "engine/core/log/Log.hpp"
 #include "cli/Cli.hpp"
+#include "engine/core/log/Log.hpp"
 #include "play/ProcessLauncher.hpp"
 #include "raylib/EditorWindow.hpp"
 #include "settings/Settings.hpp"
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
     }
     const std::filesystem::path runtime =
         result.config->runtime.empty()
-            ? std::filesystem::path(argv[0]).parent_path() / "r-type_client"
+            ? std::filesystem::path(argv[0]).parent_path() / "engine-runtime"
             : result.config->runtime;
     const auto settings_file = editor::settings_path([](std::string_view name) {
         const std::string key(name);

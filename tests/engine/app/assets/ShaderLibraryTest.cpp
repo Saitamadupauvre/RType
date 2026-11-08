@@ -26,7 +26,7 @@ using engine::graphics::ShaderId;
 
 namespace {
 
-const std::filesystem::path assets = std::filesystem::path(RTYPE_FIXTURES_DIR) / "app";
+const std::filesystem::path assets = std::filesystem::path(TEST_FIXTURES_DIR) / "app";
 
 class ShaderRenderer final : public fixture::NullRenderer {
 public:

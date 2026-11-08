@@ -33,7 +33,7 @@ protected:
     void SetUp() override {
         _runtime.attach_world(_world);
         ASSERT_TRUE(
-            _runtime.load_scripts(std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "layer"));
+            _runtime.load_scripts(std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "layer"));
         ASSERT_TRUE(_runtime.run_string("backdrop = spawn('backdrop')", "setup"));
     }
 

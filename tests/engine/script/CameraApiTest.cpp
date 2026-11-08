@@ -23,7 +23,7 @@ namespace {
 constexpr Vec2 viewport{1920.F, 1080.F};
 
 std::filesystem::path client_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "api_sets" / "client";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "api_sets" / "client";
 }
 
 class CameraApiTest : public ::testing::Test {

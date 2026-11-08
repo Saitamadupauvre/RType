@@ -220,8 +220,7 @@ protected:
 
     ApplyExport() {
         _runtime = _game.path() / ".runtime";
-        _game.write(".runtime/r-type_client", "client");
-        _game.write(".runtime/r-type_server", "server");
+        _game.write(".runtime/engine-runtime", "runtime");
         _game.write(".runtime/plugins/graphics-raylib.so", "graphics");
     }
 

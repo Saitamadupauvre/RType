@@ -37,7 +37,7 @@ protected:
 
     void SetUp() override {
         ASSERT_TRUE(
-            _runtime.load_scripts(std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "hud"));
+            _runtime.load_scripts(std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "hud"));
     }
 
     std::vector<HudCommand> draw(const std::string& body) {

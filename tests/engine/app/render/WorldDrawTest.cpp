@@ -308,7 +308,7 @@ public:
     std::vector<std::string> calls;
 };
 
-const std::filesystem::path shader_assets = std::filesystem::path(RTYPE_FIXTURES_DIR) / "app";
+const std::filesystem::path shader_assets = std::filesystem::path(TEST_FIXTURES_DIR) / "app";
 
 EntityManager world_with_shaders() {
     EntityManager world;

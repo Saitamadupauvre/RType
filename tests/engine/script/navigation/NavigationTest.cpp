@@ -56,7 +56,7 @@ constexpr std::string_view path_helpers = R"(
 )";
 
 std::filesystem::path navigation_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "navigation";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "navigation";
 }
 
 class ScriptNavigationTest : public ::testing::Test {

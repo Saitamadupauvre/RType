@@ -22,7 +22,7 @@ protected:
     std::optional<engine::editor::EditorSession> _session;
 
     void SetUp() override {
-        std::filesystem::copy(std::filesystem::path(RTYPE_FIXTURES_DIR) / "editor" / "game",
+        std::filesystem::copy(std::filesystem::path(TEST_FIXTURES_DIR) / "editor" / "game",
                               _game.path(), std::filesystem::copy_options::recursive);
         _session = engine::editor::EditorSession::open(_game.path());
         ASSERT_TRUE(_session.has_value());

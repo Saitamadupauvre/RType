@@ -44,11 +44,11 @@ using engine::script::write_scene;
 namespace {
 
 std::filesystem::path scripts_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "script_fields";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "script_fields";
 }
 
 std::filesystem::path scene_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scenes" / "files" / "script_fields.json";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scenes" / "files" / "script_fields.json";
 }
 
 struct World {

@@ -127,9 +127,12 @@ constexpr Shortcut primary(Key key) { return {.key = key, .primary_modifier = tr
 constexpr Shortcut plain(Key key) { return {.key = key}; }
 
 constexpr std::array table{
-    CommandEntry{.label = "Save scene", .menu = Menu::file, .shortcut = primary(Key::s), .make = save},
-    CommandEntry{.label = "Discard changes", .menu = Menu::file, .shortcut = std::nullopt, .make = discard},
-    CommandEntry{.label = "Open script", .menu = Menu::file, .shortcut = std::nullopt, .make = open_script},
+    CommandEntry{
+        .label = "Save scene", .menu = Menu::file, .shortcut = primary(Key::s), .make = save},
+    CommandEntry{
+        .label = "Discard changes", .menu = Menu::file, .shortcut = std::nullopt, .make = discard},
+    CommandEntry{
+        .label = "Open script", .menu = Menu::file, .shortcut = std::nullopt, .make = open_script},
     CommandEntry{.label = "Open settings",
                  .menu = Menu::file,
                  .shortcut = std::nullopt,
@@ -163,8 +166,11 @@ constexpr std::array table{
                  .shortcut = plain(Key::h),
                  .make = use_tool<Tool::pan>,
                  .checked = uses_tool<Tool::pan>},
-    CommandEntry{
-        .label = "Snap to grid", .menu = Menu::view, .shortcut = std::nullopt, .make = toggle_snap, .checked = snaps},
+    CommandEntry{.label = "Snap to grid",
+                 .menu = Menu::view,
+                 .shortcut = std::nullopt,
+                 .make = toggle_snap,
+                 .checked = snaps},
     CommandEntry{.label = "Show hitboxes",
                  .menu = Menu::view,
                  .shortcut = std::nullopt,
@@ -256,10 +262,10 @@ std::string shortcut_label(const Shortcut& shortcut) {
 
 void trace_keys(const UiInput& input) {
     for (const Key key : input.keys_pressed) {
-        engine::core::log::trace("editor: key {}", shortcut_label({.key = key,
-                                                                    .primary_modifier =
-                                                                        input.primary_modifier,
-                                                                    .shift = input.shift}));
+        engine::core::log::trace(
+            "editor: key {}",
+            shortcut_label(
+                {.key = key, .primary_modifier = input.primary_modifier, .shift = input.shift}));
     }
 }
 

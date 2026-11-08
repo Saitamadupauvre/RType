@@ -56,7 +56,7 @@ GridFixture parse_grid(std::string_view text) {
 }
 
 GridFixture load_grid(const std::string& name) {
-    std::ifstream file(std::string(RTYPE_FIXTURES_DIR) + "/navigation/" + name);
+    std::ifstream file(std::string(TEST_FIXTURES_DIR) + "/navigation/" + name);
     if (!file) {
         throw std::runtime_error("missing grid fixture " + name);
     }

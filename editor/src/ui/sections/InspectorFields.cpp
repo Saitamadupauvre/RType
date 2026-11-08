@@ -51,8 +51,7 @@ void number(Ui& ui, const ValueSlot& slot, Clay_ElementId id, Number value, auto
 }
 
 void vec2(Ui& ui, const ValueSlot& slot, engine::core::Vec2 value) {
-    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
-                     .childGap = ui.theme().px16(4.F)}}) {
+    CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()}, .childGap = ui.theme().px16(4.F)}}) {
         number(ui, slot, slot.id, value.x,
                [&](float x) { return FieldValue{engine::core::Vec2{x, value.y}}; });
         number(ui, slot, slot.second_id, value.y,
@@ -194,12 +193,11 @@ void list_item(Ui& ui, const FieldRow& row, const FieldList& list, std::size_t i
         changed.items[item] = narrow(value);
         set(ui, row, FieldValue{std::move(changed)});
     };
-    const ValueSlot slot{.id = CLAY_IDI("InspectorItem", at),
-                         .second_id = CLAY_IDI("InspectorItemY", at),
-                         .commit = replace,
-                         .reject = [&ui, &row](std::string_view expected) {
-                             reject(ui, row, expected);
-                         }};
+    const ValueSlot slot{
+        .id = CLAY_IDI("InspectorItem", at),
+        .second_id = CLAY_IDI("InspectorItemY", at),
+        .commit = replace,
+        .reject = [&ui, &row](std::string_view expected) { reject(ui, row, expected); }};
     CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW()},
                      .childGap = ui.theme().px16(4.F),
                      .childAlignment = {.y = CLAY_ALIGN_Y_CENTER}}}) {

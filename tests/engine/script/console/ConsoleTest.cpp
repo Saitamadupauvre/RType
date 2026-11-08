@@ -21,7 +21,7 @@ using engine::script::ScriptRuntime;
 namespace {
 
 std::filesystem::path console_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "console";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "console";
 }
 
 class ScriptConsoleTest : public ::testing::Test {

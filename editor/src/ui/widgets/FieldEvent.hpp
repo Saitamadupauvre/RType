@@ -19,8 +19,7 @@ enum class FieldEvent : std::uint8_t {
 };
 
 /** @brief Result of a field: the event and the value it carries. */
-template <typename Value>
-struct FieldResult {
+template <typename Value> struct FieldResult {
     FieldEvent event = FieldEvent::none;
     Value value{};
 };

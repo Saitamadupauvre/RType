@@ -153,14 +153,16 @@ GameLauncher::Launch ProcessLauncher::launch(const PlayRequest& request) {
     }
     Pipe output;
     if (::pipe(output.ends.data()) != 0) {
-        return {.run = nullptr, .error = std::format("cannot start the game: {}", std::strerror(errno))};
+        return {.run = nullptr,
+                .error = std::format("cannot start the game: {}", std::strerror(errno))};
     }
     make_non_blocking(output.ends[0]);
     ::fcntl(output.ends[0], F_SETFD, FD_CLOEXEC);
     ::fcntl(output.ends[1], F_SETFD, FD_CLOEXEC);
 
-    std::vector<std::string> arguments{_program.string(), "--solo", "--game", request.game.string(),
-                                       "--scene-file", request.scene_file.string()};
+    std::vector<std::string> arguments{_program.string(), "--solo",
+                                       "--game",          request.game.string(),
+                                       "--scene-file",    request.scene_file.string()};
     std::vector<char*> argv;
     argv.reserve(arguments.size() + 1);
     for (std::string& argument : arguments) {
@@ -176,7 +178,8 @@ GameLauncher::Launch ProcessLauncher::launch(const PlayRequest& request) {
     const int failed = posix_spawn(&pid, argv[0], &actions, nullptr, argv.data(), environment());
     posix_spawn_file_actions_destroy(&actions);
     if (failed != 0) {
-        return {.run = nullptr, .error = std::format("cannot start the game: {}", std::strerror(failed))};
+        return {.run = nullptr,
+                .error = std::format("cannot start the game: {}", std::strerror(failed))};
     }
     return {.run = std::make_unique<ProcessRun>(pid, output.release_read()), .error = {}};
 }

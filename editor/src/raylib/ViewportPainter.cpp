@@ -1,8 +1,8 @@
 #include "raylib/ViewportPainter.hpp"
 
 #include <cmath>
-#include <string>
 #include <format>
+#include <string>
 #include <utility>
 
 #include "ui/Theme.hpp"
@@ -52,7 +52,8 @@ Color faded(Color color, unsigned char alpha) {
 }
 
 Rectangle box_of(const SceneItem& item) {
-    return {.x = item.top_left.x, .y = item.top_left.y, .width = item.size.x, .height = item.size.y};
+    return {
+        .x = item.top_left.x, .y = item.top_left.y, .width = item.size.x, .height = item.size.y};
 }
 
 Rectangle centered(const SceneItem& item) {
@@ -92,8 +93,7 @@ void draw_marker(const SceneItem& item, float zoom) {
 
 void draw_hitboxes(const SceneItem& item, float zoom) {
     if (item.box_collider) {
-        DrawRectangleLinesEx(rectangle_of(*item.box_collider), outline_pixels / zoom,
-                             hitbox_color);
+        DrawRectangleLinesEx(rectangle_of(*item.box_collider), outline_pixels / zoom, hitbox_color);
     }
     if (item.circle_collider) {
         DrawCircleLinesV({.x = item.circle_collider->center.x, .y = item.circle_collider->center.y},
@@ -148,8 +148,8 @@ void draw_selection_tag(const ViewportFrame& frame, Clay_BoundingBox box, const 
         }
         const engine::core::Vec2 at =
             to_screen(frame.camera, box, {item.top_left.x, item.top_left.y + item.size.y});
-        const std::string label = item.label == item.type ? item.type
-                                                          : item.label + " · " + item.type;
+        const std::string label =
+            item.label == item.type ? item.type : item.label + " · " + item.type;
         draw_chip(font, label, {.x = at.x, .y = at.y + tag_gap}, to_raylib(color::focus),
                   to_raylib(color::text_on_accent));
     }
@@ -164,10 +164,10 @@ void draw_camera_label(const ViewportFrame& frame, Clay_BoundingBox box, const F
 }
 
 void draw_cursor(const ViewportFrame& frame, Clay_BoundingBox box, const Font& font) {
-    const std::string label =
-        frame.cursor ? std::format("cursor {:.0f}, {:.0f}   {:.0f}%", frame.cursor->x,
-                                   frame.cursor->y, frame.camera.zoom * percent)
-                     : std::format("{:.0f}%", frame.camera.zoom * percent);
+    const std::string label = frame.cursor
+                                  ? std::format("cursor {:.0f}, {:.0f}   {:.0f}%", frame.cursor->x,
+                                                frame.cursor->y, frame.camera.zoom * percent)
+                                  : std::format("{:.0f}%", frame.camera.zoom * percent);
     const Vector2 size = MeasureTextEx(font, label.c_str(), label_size, label_spacing);
     const Vector2 at{.x = box.x + box.width - size.x - (2.F * chip_padding) - corner_gap,
                      .y = box.y + box.height - size.y - chip_padding - corner_gap};
@@ -226,12 +226,13 @@ void ViewportPainter::paint(const Clay_RenderCommand& command) {
     const Clay_BoundingBox box = command.boundingBox;
     DrawRectangleRec({.x = box.x, .y = box.y, .width = box.width, .height = box.height},
                      to_raylib(command.renderData.custom.backgroundColor));
-    BeginScissorMode(static_cast<int>(box.x), static_cast<int>(box.y),
-                     static_cast<int>(box.width), static_cast<int>(box.height));
-    const Camera2D camera{.offset = {.x = box.x + (box.width / 2.F), .y = box.y + (box.height / 2.F)},
-                          .target = {.x = frame.camera.center.x, .y = frame.camera.center.y},
-                          .rotation = 0.F,
-                          .zoom = frame.camera.zoom};
+    BeginScissorMode(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.width),
+                     static_cast<int>(box.height));
+    const Camera2D camera{
+        .offset = {.x = box.x + (box.width / 2.F), .y = box.y + (box.height / 2.F)},
+        .target = {.x = frame.camera.center.x, .y = frame.camera.center.y},
+        .rotation = 0.F,
+        .zoom = frame.camera.zoom};
     BeginMode2D(camera);
     draw_grid(frame, visible_world(frame, box));
     for (const SceneItem& item : frame.items) {
@@ -242,12 +243,11 @@ void ViewportPainter::paint(const Clay_RenderCommand& command) {
             continue;
         }
         if (const Texture2D* loaded = item.texture.empty() ? nullptr : texture(item.texture)) {
-            const Rectangle source{.x = 0.F,
-                                   .y = 0.F,
-                                   .width = static_cast<float>(loaded->width) *
-                                            (item.scale.x < 0.F ? -1.F : 1.F),
-                                   .height = static_cast<float>(loaded->height) *
-                                             (item.scale.y < 0.F ? -1.F : 1.F)};
+            const Rectangle source{
+                .x = 0.F,
+                .y = 0.F,
+                .width = static_cast<float>(loaded->width) * (item.scale.x < 0.F ? -1.F : 1.F),
+                .height = static_cast<float>(loaded->height) * (item.scale.y < 0.F ? -1.F : 1.F)};
             DrawTexturePro(*loaded, source, dest, origin, item.rotation, to_raylib(item.tint));
         } else {
             DrawRectanglePro(dest, origin, item.rotation, to_raylib(item.tint));
