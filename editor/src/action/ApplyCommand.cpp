@@ -125,6 +125,7 @@ CommandResult apply_command(EditorSession& session, EditorState& state, EditorSe
             [&](const command::ReloadSettings&) {
                 return CommandResult::refused("Reloading settings needs the editor.");
             },
+            [&](const command::ReloadScripts&) { return session.reload_scripts(); },
             [&](const command::Play&) { return play.play(session, state.mode); },
             [&](const command::Pause&) { return play.pause(state.mode); },
             [&](const command::Stop&) { return play.stop(state.mode); },

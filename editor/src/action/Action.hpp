@@ -216,6 +216,14 @@ struct ReloadSettings {
     static constexpr bool while_running = true;
 };
 
+/**
+ * @brief Loads the game's scripts again, so new, changed and deleted prefabs show without
+ * restarting the editor; the open scene and its history are kept.
+ */
+struct ReloadScripts {
+    static constexpr bool while_running = true;
+};
+
 /** @brief Pauses a playing game; refused otherwise. */
 struct Pause {
     static constexpr bool while_running = true;
@@ -255,8 +263,8 @@ using Command = std::variant<
     command::DeleteScene, command::SetStartScene, command::SetSnap, command::SetGridSize,
     command::SetOverlay, command::SetTool, command::ShowTab, command::ReportInvalidInput,
     command::SetPrefabFilter, command::OpenScript, command::OpenSettings, command::ReloadSettings,
-    command::Play, command::Pause, command::Stop, command::OpenExport, command::SetExport,
-    command::CloseExport, command::RunExport>;
+    command::ReloadScripts, command::Play, command::Pause, command::Stop, command::OpenExport,
+    command::SetExport, command::CloseExport, command::RunExport>;
 
 /** @brief What the UI emits; applied after the frame by Editor::handle(). */
 using Action = std::variant<Edit, Command>;

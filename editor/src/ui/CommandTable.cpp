@@ -80,6 +80,8 @@ std::optional<Action> reload_settings(const Editor& editor) {
     return command::ReloadSettings{};
 }
 
+std::optional<Action> reload_scripts(const Editor&) { return command::ReloadScripts{}; }
+
 std::optional<Action> open_export(const Editor& editor) {
     if (!editing(editor) || editor.state().export_dialog) {
         return std::nullopt;
@@ -150,6 +152,10 @@ constexpr std::array table{
                  .menu = Menu::file,
                  .shortcut = std::nullopt,
                  .make = reload_settings},
+    CommandEntry{.label = "Reload scripts",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = reload_scripts},
     CommandEntry{.label = "Export game...",
                  .menu = Menu::file,
                  .shortcut = std::nullopt,

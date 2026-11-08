@@ -40,6 +40,7 @@ TEST(ActionText, CommandsShowTheirFields) {
     EXPECT_EQ(
         describe_action(command::SetOverlay{.overlay = editor::Overlay::names, .visible = true}),
         "command::SetOverlay overlay=names visible=true");
+    EXPECT_EQ(describe_action(command::ReloadScripts{}), "command::ReloadScripts");
     EXPECT_EQ(describe_action(command::DuplicateScene{.from = "a", .to = "b"}),
               "command::DuplicateScene from=a to=b");
 }
