@@ -18,6 +18,9 @@ changes. What the editor does for its users is described in
 | Play | `play/PlaySession`, `play/ProcessLauncher` | `PlaySession` owns the game process and the played scene file; `ProcessLauncher` is the POSIX launcher (`posix_spawn` with the output piped to the console, `SIGSTOP`, `SIGTERM`), tests give a fake `GameLauncher` |
 | Export | `exporter/GameExport` | `plan_export()` only reads the disk, `run_export()` writes it: the copies, the chosen `modes` into the exported `game.json` (`engine::script::write_modes`), the `<name>-server` launcher and `README.txt`; the runtime folder is attached with `Editor::attach_runtime()` |
 | Command palette | `ui/sections/CommandPalette`, `text/FuzzyMatch` | Reads the command table |
+| New game, new prefab | `project/ProjectFiles` | `create_project()` (for `--new`) and `create_prefab()` write files without a display; `main` creates the game before opening it |
+| Name dialog | `ui/sections/NameDialog` | `EditorState::name_dialog` holds what it creates and the name typed; `CreatePrefab` and `CreateScene` close it only when they succeed |
+| Clickable console lines | `text/ScriptLocation` | `Editor::log()` stores in `ConsoleLine::script` the existing script a line names (`player.lua:12:`), so drawing never touches the disk |
 
 ## One-way flow
 
@@ -217,12 +220,13 @@ editor/
   src/action/     Action, Editor, EditorState: no Clay, no raylib
   src/cli/        command line (clap)
   src/clay/       Clay context
-  src/text/       TextEdit: UTF-8 caret, selection and editing, no UI
+  src/text/       TextEdit, fuzzy matching, script locations in console lines: no UI
   src/ui/         layout, sections, widgets, widget state, command table
   src/viewport/   editor camera, snapping, scene layout and hit testing
   src/play/       Play: the played scene file and the game process
   src/exporter/   Export: plan and copy the runtime and the game folder
   src/settings/   settings.json: path, parsing, validation
+  src/project/    new game folders and prefab scripts
   src/render/     geometry and scissor helpers for the renderer
   src/raylib/     window, input, Clay renderer, font cache: the only raylib code
 ```

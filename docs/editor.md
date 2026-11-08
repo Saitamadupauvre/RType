@@ -43,6 +43,13 @@ afterwards.
 | `runtime()` | The `script::ScriptRuntime`, for `script_fields(type)`, `fields()` and `find_declaration(name)`. |
 | `default_value(type, key)` | What an instance of `type` has for `key` without an override. |
 
+`reload_scripts()` loads `scripts/` and `game.json` again into a fresh
+runtime, so new, changed and deleted scripts are seen without reopening. The
+open scene, its unsaved changes, its history and the selection are kept; the
+edit world is rebuilt, and instances of a type that no longer exists become
+problems. It always succeeds; its message gives the prefab count, or says that
+a script failed to load.
+
 ## Commands and `CommandResult`
 
 Every command returns a `CommandResult`:
@@ -101,6 +108,7 @@ for (const Problem& problem : session->problems()) {
 | Command | Does | Refused when |
 |---|---|---|
 | `place(type, position)` | Adds an instance and **selects** it. | No scene is open, `type` is not a declared entity, the position is not finite. |
+| `duplicate(id, offset)` | Adds a copy (name, type, overrides) at its position plus `offset`, right after it, and **selects** it. | Unknown id, offset not finite. |
 | `move(id, position)` | Moves an instance. | Unknown id, position not finite. |
 | `remove(id)` | Removes an instance; it leaves the selection. | Unknown id. |
 | `rename(id, name)` | Sets the label; `""` removes it. | Unknown id. |
