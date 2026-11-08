@@ -38,6 +38,7 @@ add_library(editor-core STATIC
     src/text/CaretScroll.cpp
     src/text/FitText.cpp
     src/text/FuzzyMatch.cpp
+    src/text/ScriptLocation.cpp
     src/text/TextEdit.cpp
     src/text/Utf8.cpp
     src/ui/ClickCounter.cpp

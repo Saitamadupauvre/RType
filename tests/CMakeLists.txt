@@ -268,6 +268,7 @@ editor_add_test(core
         editor/text/CaretScrollTest.cpp
         editor/text/FitTextTest.cpp
         editor/text/FuzzyMatchTest.cpp
+        editor/text/ScriptLocationTest.cpp
         editor/text/TextEditTest.cpp
         editor/ui/ClickCounterTest.cpp
         editor/ui/CommandTableTest.cpp
