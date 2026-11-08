@@ -264,6 +264,7 @@ editor_add_test(core
         editor/settings/SettingsTest.cpp
         editor/play/PlaySessionTest.cpp
         editor/play/ProcessLauncherTest.cpp
+        editor/project/ProjectFilesTest.cpp
         editor/text/CaretScrollTest.cpp
         editor/text/FitTextTest.cpp
         editor/text/FuzzyMatchTest.cpp

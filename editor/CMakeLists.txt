@@ -30,6 +30,7 @@ add_library(editor-core STATIC
     src/cli/Cli.cpp
     src/exporter/GameExport.cpp
     src/play/PlaySession.cpp
+    src/project/ProjectFiles.cpp
     src/play/ProcessLauncher.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
