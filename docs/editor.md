@@ -43,6 +43,11 @@ afterwards.
 | `runtime()` | The `script::ScriptRuntime`, for `script_fields(type)`, `fields()` and `find_declaration(name)`. |
 | `default_value(type, key)` | What an instance of `type` has for `key` without an override. |
 
+`script_messages()` lists what the last load of the scripts logged as a
+warning or an error (a broken file, a name outside a table form, a misspelled
+callback), without the `lua: ` prefix. The session reads them from the log
+while it loads, so messages below the log level are not seen.
+
 `reload_scripts()` loads `scripts/` and `game.json` again into a fresh
 runtime, so new, changed and deleted scripts are seen without reopening. The
 open scene, its unsaved changes, its history and the selection are kept; the
