@@ -41,7 +41,8 @@ struct Problem {
  * `on_destroy` and no system. What must be visible in the editor therefore belongs in the
  * declaration, not in `on_spawn`.
  *
- * **Edits** (place(), move(), remove(), rename(), set_field(), reset_field(), reset_all()) change
+ * **Edits** (place(), duplicate(), move(), remove(), rename(), set_field(), reset_field(),
+ * reset_all(), change_type()) change
  * the document and can be undone. An edit that changes nothing succeeds without being recorded.
  * Up to @ref history_limit edits are kept. The scene is unsaved while the document differs from
  * the last saved or opened one, so undoing back to it clears the flag.
@@ -96,6 +97,17 @@ public:
      */
     [[nodiscard]] std::optional<core::FieldValue> default_value(std::string_view type,
                                                                 std::string_view key);
+    /**
+     * @brief Loads the declarations of `scripts/` and `game.json` again, so new, changed and
+     * deleted scripts are seen without reopening the game folder.
+     *
+     * The open scene, its unsaved changes, its history and the selection are kept; the edit world
+     * is rebuilt with the new declarations, and instances of a type that no longer exists become
+     * problems.
+     * @return Done; its message says how many prefabs there are, or that a script failed to load
+     * (scripts_loaded() is then false and what did load is used).
+     */
+    CommandResult reload_scripts();
     ///@}
 
     /** @name Scene commands */
@@ -186,6 +198,12 @@ public:
      * a note naming the dropped overrides, if any. The same type changes nothing.
      */
     CommandResult change_type(InstanceId id, std::string_view type);
+    /**
+     * @brief Adds a copy of an instance, with its name and overrides, at its position plus
+     * @p offset, right after it in the document, and selects the copy.
+     * Refused for an unknown id or a non-finite offset.
+     */
+    CommandResult duplicate(InstanceId id, core::Vec2 offset);
     /** @brief Goes back one edit. Refused when there is none. */
     CommandResult undo();
     /** @brief Applies again the last undone edit. Refused when there is none. */

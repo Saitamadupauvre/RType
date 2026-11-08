@@ -39,6 +39,7 @@ struct EditorSession::Impl {
     [[nodiscard]] bool scene_exists(std::string_view name) const;
     [[nodiscard]] std::optional<CommandResult> refuse_unsaved() const;
 
+    void load_scripts();
     void rebuild();
     void forget_missing_selection() noexcept;
     void show(std::optional<std::string> name, SceneDocument opened);

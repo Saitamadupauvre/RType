@@ -61,11 +61,23 @@ void write_override(std::vector<script::FieldOverride>& overrides, std::string_v
     }
 }
 
+script::ScriptRuntime editor_runtime() {
+    return script::ScriptRuntime::builder().with<script::EditorApi>().build();
+}
+
+bool finite(core::Vec2 point) { return std::isfinite(point.x) && std::isfinite(point.y); }
+
 } // namespace
 
-EditorSession::Impl::Impl(fs::path folder)
-    : game(std::move(folder)),
-      runtime(script::ScriptRuntime::builder().with<script::EditorApi>().build()) {}
+EditorSession::Impl::Impl(fs::path folder) : game(std::move(folder)), runtime(editor_runtime()) {}
+
+void EditorSession::Impl::load_scripts() {
+    script::ScriptRuntime fresh = editor_runtime();
+    scripts_loaded = fresh.load_declarations(script::scripts_folder(game));
+    runtime = std::move(fresh);
+    const auto project = script::read_project(game);
+    start_scene = project ? project->start_scene : std::nullopt;
+}
 
 void EditorSession::Impl::rebuild() {
     world = std::make_unique<core::EntityManager>();
@@ -116,9 +128,7 @@ std::optional<EditorSession> EditorSession::open(const fs::path& game) noexcept 
             return std::nullopt;
         }
         auto impl = std::make_unique<Impl>(game);
-        impl->scripts_loaded = impl->runtime.load_declarations(script::scripts_folder(game));
-        const auto project = script::read_project(game);
-        impl->start_scene = project ? project->start_scene : std::nullopt;
+        impl->load_scripts();
         impl->rebuild();
         return EditorSession(std::move(impl));
     } catch (const std::exception& exception) {
@@ -154,6 +164,15 @@ const std::optional<std::string>& EditorSession::start_scene() const noexcept {
 }
 
 const script::ScriptRuntime& EditorSession::runtime() const noexcept { return _impl->runtime; }
+
+CommandResult EditorSession::reload_scripts() {
+    _impl->load_scripts();
+    _impl->rebuild();
+    if (!_impl->scripts_loaded) {
+        return CommandResult::done("a script failed to load, see the log; what did load is used");
+    }
+    return CommandResult::done(std::format("scripts reloaded: {} prefabs", prefabs().size()));
+}
 
 std::optional<core::FieldValue> EditorSession::default_value(std::string_view type,
                                                              std::string_view key) {
@@ -316,6 +335,27 @@ CommandResult EditorSession::change_type(InstanceId id, std::string_view type) {
         }
         return CommandResult::done(std::format("dropped what '{}' does not have: {}", type, names));
     }
+    return result;
+}
+
+CommandResult EditorSession::duplicate(InstanceId id, core::Vec2 offset) {
+    if (!finite(offset)) {
+        return CommandResult::refused("the offset must be finite");
+    }
+    const auto& instances = _impl->document.instances;
+    const auto found = std::ranges::find(instances, id, &DocumentInstance::id);
+    if (found == instances.end()) {
+        return unknown_instance(id);
+    }
+    DocumentInstance copy = *found;
+    copy.id = _impl->new_id();
+    copy.instance.position += offset;
+    const InstanceId copy_id = copy.id;
+    SceneDocument next = _impl->document;
+    next.instances.insert(next.instances.begin() + (found - instances.begin()) + 1,
+                          std::move(copy));
+    CommandResult result = _impl->commit(std::move(next));
+    _impl->selection = copy_id;
     return result;
 }
 
