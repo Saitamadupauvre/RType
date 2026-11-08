@@ -1,245 +1,23 @@
-# Editor app
+# Editor internals
 
 `editor` is the window in front of the [editor backend](editor.md): it shows
 the open game folder and turns clicks and keys into **actions**. All the
 editing logic lives in `engine-editor`; the app only displays it and asks for
-changes.
+changes. What the editor does for its users is described in
+[The editor](guide/editor-tour.md); this page is about its code.
 
-```sh
-editor game          # edit ./game and open its start scene
-editor --help
-```
+## Where each feature lives
 
-The argument is required and must be a folder that contains a `game.json`
-(see [Game folder and scenes](game-folder.md)). Opening the editor without a
-project, and creating one, come with the launcher (#158).
-
-### Settings
-
-Personal preferences live in a `settings.json` that the editor reads once, at
-startup. File > Open settings, also in the command palette, opens it with the
-system's program for JSON files; when it does not exist yet, it is created
-holding `{}` first. That is the only time the editor writes it. File > Reload
-settings, also in the palette, reads it again and applies it at once: the scale
-and scroll speed change on the next frame, the `view.*` keys reset the toolbar
-to the file's values, and problems go to the console as at startup.
-
-| System | File |
-|---|---|
-| Linux | `$XDG_CONFIG_HOME/engine-editor/settings.json`, or `~/.config/engine-editor/settings.json` |
-| macOS | `~/Library/Application Support/engine-editor/settings.json` |
-
-```json
-{
-    "ui.scale": 1.25,
-    "ui.scroll_speed": 1,
-    "view.snap": true,
-    "view.grid_size": 16,
-    "view.show_hitboxes": false,
-    "view.show_names": true
-}
-```
-
-| Key | Type | Range | Default | Effect |
-|---|---|---|---|---|
-| `ui.scale` | number | 0.5 to 3 | 1 | Multiplies the screen's DPI scale: every panel, font and row |
-| `ui.scroll_speed` | number | 0.25 to 4 | 1 | Multiplies the 40 px one wheel notch scrolls |
-| `view.snap` | bool | | true | Snap to the grid when the editor starts |
-| `view.grid_size` | number | 1 to 512 | 16 | Grid size, in pixels, when the editor starts |
-| `view.show_hitboxes` | bool | | false | Show hitboxes when the editor starts |
-| `view.show_names` | bool | | true | Show names when the editor starts |
-
-- The `view.*` keys are where the toolbar starts, and where Reload settings
-  puts it back; toggling it changes the session only and never writes the
-  file.
-- A bad file never stops the editor. A missing file means the defaults.
-  Invalid JSON, or JSON that is not an object, gives one error in the console
-  and the defaults. An unknown key, a wrong type or a value out of range gives
-  a warning naming the key, and that key keeps its default.
-- Settings are about the tool, for one person. What belongs to the game (its
-  window, scenes, controls) lives in the game folder.
-
-### Developer logs
-
-The in-app console is for users. What the editor does goes to the engine log
-on stderr, at the level given by `--log-level` (`trace`, `debug`, `info`,
-`warn`, `error` or `off`; `info` by default):
-
-| Level | Logged |
-|---|---|
-| `info` | The game folder and the start scene at startup; every refused action with its reason (`editor: refused command::Undo: ...`) |
-| `debug` | Every handled action with its fields (`editor: edit::Move id=3 position=(9, 9)`), each font loaded, and raylib's own messages (`raylib: ...`) |
-| `trace` | Every key pressed with its modifiers, and the shortcut it ran, skipped because it is disabled, or ignored because a field or dialog has the keyboard |
-
-```sh
-editor game --log-level trace    # see every key, shortcut and action
-```
-
-`action/ActionText` names each action and its fields. A font that cannot be
-loaded is a warning at any level, and so are raylib's warnings and errors.
-Programs the editor opens, such as the text editor for scripts, may still
-print to the same terminal.
-
-## Window
-
-| Area | Shows | Does |
+| Feature | Code | Notes |
 |---|---|---|
-| Menu bar | File, Edit, View, Scene and Help menus; open scene, `•` when unsaved | Every command of the command table, Play, Stop, Export |
-| Toolbar | Tools, snap, grid size, overlays | Switch tool, toggle snap and overlays, Undo, Redo |
-| Play band | While playing or paused: the mode and what is blocked | |
-| Sidebar | Prefabs, scenes (start scene marked), instances, each with its count | Open a scene, select or place an instance |
-| Viewport | The scene drawn like the game, the grid, the camera frame, the selection in blue with its `name · type` tag, the cursor's world point and the zoom | Select, move, scale, rotate, pan, zoom |
-| Inspector | The selection's name, prefab and script, then its fields by component | Rename, retype, move, edit and reset fields, open the script |
-| Bottom panel | Console (with the time of each line), Problems | Switch tab |
-| Status bar | Mode, instance count, selection, snap, unsaved changes, game folder, scene | |
-
-| Shortcut | Command |
-|---|---|
-| Ctrl+S | Save scene |
-| Ctrl+Z / Ctrl+Y | Undo / Redo |
-| Delete | Delete the selection |
-| V / G / H | Select, move, pan tool |
-| F11 | Clay debug view |
-
-On macOS, Cmd replaces Ctrl.
-
-## Viewport
-
-The viewport draws the open scene through an editor camera, separate from the
-game camera. Instances are laid out like the game's renderer: Position is the
-top-left corner, a sprite takes its texture size times Scale, an entity
-without a texture is a 64 px square tinted by its color, and Layer `z_index`
-orders the drawing. Entities without a Sprite, which the game does not draw,
-show as a crossed outline so they can still be selected. Textures load from
-`<game>/assets/`; a missing one is drawn as the tinted square.
-
-| Input | Effect |
-|---|---|
-| Click an instance | Select it (the topmost one when they overlap) |
-| Click empty space | Clear the selection |
-| Drag with the Move tool (G) | Move the instance; one `Move` on release, undoable |
-| Alt while dragging | Drop without snapping |
-| Middle drag, or drag with the Pan tool (H) | Pan |
-| Wheel | Zoom around the cursor (0.1x to 10x) |
-| Drag a prefab from PREFABS into the viewport | Place it under the cursor, snapped (`Place`) |
-| Click a prefab, then click in the viewport | Same; the prefab stays highlighted until placed, Esc or a click elsewhere cancels |
-| Drag the square handle of the selection | Scale it (`SetField` on `Scale.x`, `Scale.y`) |
-| Drag the round handle of the selection | Rotate it, by 15° steps with snap on (`SetField` on `Rotation.degrees`) |
-| Delete | Delete the selection |
-
-Handles only appear when the entity has the component they edit (`Scale`,
-`Rotation`). Alt skips snapping for handles too.
-
-| Overlay | Shows |
-|---|---|
-| Camera frame (always) | What the game shows at start: the view of the first instance with a `Camera`, or the 1920x1080 game screen from the origin |
-| Names (toolbar) | Each instance's name, or its type, above it |
-| Hitboxes (toolbar) | `AABBCollider` and `CircleCollider` outlines, where the physics puts them: Position plus the offset is the center of the box or circle |
-
-With snap on, a dragged instance's top-left corner lands on the grid. Grid
-lines are drawn unless they would be closer than 6 px on screen; the world
-axes are brighter. The camera, the drag and the pan live in
-`WidgetState::viewport()`; the renderer paints the frame's `ViewportFrame`,
-passed through the Clay element's custom data.
-
-## Play
-
-Play runs the open scene in the game itself, in its own window, without
-leaving the editor:
-
-1. The scene document, unsaved changes included, is written to
-   `<temp>/engine-editor/played-scene.json`. The scene files of the game are
-   never touched, and the document is never changed by playing.
-2. The runtime starts as `<runtime> --solo --game <game folder> --scene-file
-   <that file>`: server and client in one process over loopback, starting
-   from the played scene instead of the `start_scene` of `game.json`.
-3. Everything the game prints, errors included, goes to the console. A Lua
-   error in the game shows there and never closes the editor.
-
-| Command | Effect |
-|---|---|
-| Play | Start the open scene; on a paused game, continue it |
-| Pause | Freeze the game process (`SIGSTOP`) |
-| Stop | Ask the game to quit (`SIGTERM`), kill it after one second, delete the played file |
-
-While the game runs, edits and project commands are refused ("Stop the game
-to change the project."). Closing the game window ends Play too, with its
-exit code in the console. The runtime is `r-type_client` next to the editor,
-or the program given with `--runtime`. `PlaySession` owns the game;
-`ProcessLauncher` is the POSIX launcher and tests give a fake one.
-
-## Export
-
-**Export...** in the menu bar (or File > Export game...) opens a dialog that
-writes a folder holding the game and everything it needs to run without the
-editor:
-
-| Setting | Default |
-|---|---|
-| Name | `name` of `game.json` as a file name (`Space Game` gives `space-game`), or the folder name |
-| Output folder | `<name>-export` next to the game folder |
-| Binaries | Client + server, or client only |
-
-The export copies:
-
-- the runtime, renamed: `r-type_client` becomes `<name>`, `r-type_server`
-  becomes `<name>-server`;
-- the `libengine-*` libraries and `plugins/` from the editor's folder;
-- `game.json`, `scripts/`, and `assets/` and `scenes/` when they exist;
-- a `README.txt` telling how to run every mode: `--solo`, `--host <port>`,
-  `<server-ip> <port>`, and the dedicated server.
-
-The dialog lists what it will copy, or each problem that blocks the export: a
-name that is not 1 to 63 letters, digits, `_` or `-`; no output folder; an
-output inside the game folder; an output that exists and is not empty; a
-missing runtime binary, `plugins/` or `scripts/`. Export stays disabled until
-there are none. It never overwrites anything. The binaries find their
-libraries, plugins and game next to themselves, so the folder can be moved or
-zipped as it is.
-
-`exporter/GameExport` plans and runs the export without a display:
-`plan_export()` only reads the disk, `run_export()` writes it. While the dialog
-is open, it takes the mouse and the keyboard shortcuts.
-
-## Inspector
-
-The inspector shows the selected instance, as in the design mock-ups: a
-header with its name and `instance of <prefab> · <script>`, a legend of the
-two colors, the instance rows, one shaded band per component (with how many
-of its fields are overridden), and at the bottom **Reset all to prefab** and
-**Open <script>**. `Editor` caches what it shows in
-`EditorState::inspector` (`inspect_selection`) and refreshes it after every
-action, so the UI never queries the session.
-
-- **Name** and **Position** edit the instance (`Rename`, `Move`).
-- **Type** is a dropdown of the prefabs: picking one emits `ChangeType`, which
-  keeps the name, the position and the overrides the new prefab accepts; the
-  console names the dropped ones. Undo brings everything back.
-- **Script** names the file declaring the prefab; **Open** opens it with the
-  system's program for `.lua` files (`OpenScript`). The editor never edits
-  code: behavior, controls and spawning live in the scripts.
-- **Components** lists the registry fields of the components the prefab's
-  entity owns, in registration order, under one sub-header per component.
-  Labels show the field name as words (`resolve collisions`) and wrap. `Position.pos` is left out: it is the
-  position above.
-- **Script** lists the fields the prefab script declares.
-- Each field shows its override, or the prefab value when there is none. An
-  overridden field has an accent label and a Reset button (`ResetField`).
-  **Reset all** (`ResetAll`) appears when the instance has overrides.
-
-| Kind | Edited with |
-|---|---|
-| float, int | number field |
-| bool | checkbox |
-| string | text field |
-| vec2 | two number fields, x and y |
-| color | swatch and a hex text field: `#RRGGBB` or `#RRGGBBAA` |
-| asset | text field holding the path, relative to `assets/` |
-| list | one row per item with its kind's widget and `x` to remove it, then `+ Add` (the default of the item kind) |
-
-Committing a value emits `SetField` only when it differs from the shown one.
-Invalid input emits `ReportInvalidInput`, which logs
-`<field>: expected ...` in the console and changes nothing.
+| Command line | `cli/Cli` | clap; `--runtime` defaults to `engine-runtime` next to the editor |
+| Settings | `settings/Settings` | `settings_path()` per system, `load_settings()` never throws; the file is written only by Open settings when missing |
+| Developer logs | `action/ActionText` | Names each action and its fields for the `debug` log level |
+| Viewport | `viewport/` (`ViewCamera`, `Snap`, `Handles`, `SceneItems`), `raylib/ViewportPainter` | The camera, the drag and the pan live in `WidgetState::viewport()`; the renderer paints the frame's `ViewportFrame`, passed through the Clay element's custom data |
+| Inspector | `action/InspectorModel`, `ui/sections/Inspector*` | `Editor` caches what it shows in `EditorState::inspector` (`inspect_selection`) and refreshes it after every action, so the UI never queries the session |
+| Play | `play/PlaySession`, `play/ProcessLauncher` | `PlaySession` owns the game process and the played scene file; `ProcessLauncher` is the POSIX launcher (`posix_spawn` with the output piped to the console, `SIGSTOP`, `SIGTERM`), tests give a fake `GameLauncher` |
+| Export | `exporter/GameExport` | `plan_export()` only reads the disk, `run_export()` writes it; the runtime folder is attached with `Editor::attach_runtime()` |
+| Command palette | `ui/sections/CommandPalette`, `text/FuzzyMatch` | Reads the command table |
 
 ## One-way flow
 
@@ -443,6 +221,8 @@ editor/
   src/ui/         layout, sections, widgets, widget state, command table
   src/viewport/   editor camera, snapping, scene layout and hit testing
   src/play/       Play: the played scene file and the game process
+  src/exporter/   Export: plan and copy the runtime and the game folder
+  src/settings/   settings.json: path, parsing, validation
   src/render/     geometry and scissor helpers for the renderer
   src/raylib/     window, input, Clay renderer, font cache: the only raylib code
 ```

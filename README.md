@@ -1,15 +1,19 @@
-# R-Type
+# Engine
 
-A networked multiplayer remake of the classic horizontal shoot'em up **R-Type**,
-built on our own C++20 game engine. Up to four players connect to an
-authoritative server over UDP and fight waves of Bydos together. The gameplay
-is written in Lua; the engine knows nothing about R-Type.
+A 2D multiplayer game engine written in C++20, with an **editor** to make
+games and a **runtime** to play and ship them. A game is a folder of Lua
+scripts, JSON scenes and assets: you lay out its levels in the editor, press
+Play to try it, and export it as a standalone folder. Every game is networked
+from the start, with up to four players on an authoritative UDP server.
+
+The repository ships one example game, **R-Type**, a cooperative shoot'em up
+in [`examples/r-type/`](examples/r-type/) made only of Lua, scenes and assets.
 
 Epitech *Advanced C++* project (B-CPP-500).
 
 - **Full documentation:** [`docs/`](docs/index.md), published online with
   MkDocs (see [Documentation](#documentation)).
-- **Protocol specification:** [`docs/protocol.md`](docs/protocol.md).
+- **Make your first game:** [docs/guide/first-game.md](docs/guide/first-game.md).
 
 ## Contents
 
@@ -17,8 +21,8 @@ Epitech *Advanced C++* project (B-CPP-500).
 - [Supported platforms](#supported-platforms)
 - [Requirements](#requirements)
 - [Build](#build)
-- [Launch the game](#launch-the-game)
-- [How to play](#how-to-play)
+- [Open the editor](#open-the-editor)
+- [Run a game](#run-a-game)
 - [Install](#install)
 - [Tests and checks](#tests-and-checks)
 - [Repository layout](#repository-layout)
@@ -29,35 +33,50 @@ Epitech *Advanced C++* project (B-CPP-500).
 
 ## Features
 
-- Authoritative, multithreaded server (receive thread, game thread, send
-  thread) running the game at a fixed 60 ticks per second.
-- Custom binary protocol over UDP, validated before every read, documented
-  RFC-style.
-- Up to 4 players, each with their own colour.
-- Dedicated server, hosted game (`--host`: play and let others join) or solo
-  game (`--solo`: no network at all).
-- Bydos spawning at random heights on the
-  right and shooting back, missiles, collisions detected by the engine's
-  physics module, game over and automatic restart.
-- Looping music, shot and explosion sounds, with separate music and effects
-  volumes and a mute key.
-- A crashed or disconnected client is dropped after 5 seconds and the other
-  players are notified; malformed packets are dropped and logged.
-- Engine split into shared libraries (`core`, `script`, `network`,
-  `physics`, `graphics`, `audio`), with the Raylib graphics and audio backends
-  loaded at runtime as plugins.
-- Gameplay written in sandboxed Lua 5.4 scripts.
+**Editor**
+
+- Opens a game folder and lists its prefabs (the entity types its scripts
+  declare), its scenes and the instances of the open scene.
+- Viewport drawn like the game: place prefabs by drag and drop, select, move,
+  scale and rotate with grid snapping, pan and zoom, hitbox and name overlays.
+- Inspector built from the engine's field registry and the scripts' fields:
+  every placed entity can override any field of its prefab, with reset.
+- Undo and redo, unsaved-change tracking, stable scene files that diff well.
+- **Play** runs the open scene in the real game, unsaved changes included,
+  with the game's output and Lua errors in the editor's console.
+- **Export** writes a self-contained folder: the runtime renamed after the
+  game, the engine libraries, the plugins and the game's files.
+- Menu bar, command palette (`Ctrl+Shift+P`), personal `settings.json`.
+
+**Runtime and engine**
+
+- `engine-runtime` runs any game folder: solo (no network), host (play and let
+  others join), join, or dedicated server.
+- Authoritative multithreaded server (receive, game and send threads) at a
+  fixed 60 ticks per second; custom binary UDP protocol, validated before every
+  read and documented RFC-style.
+- Gameplay in sandboxed Lua 5.4: entities, collisions, input, sound, music,
+  game events, client HUD and local effects, cameras, pathfinding, scenes,
+  console variables.
+- A crashed or disconnected client is dropped after 5 seconds and the others
+  are notified; malformed packets are dropped and logged; a Lua error disables
+  only the faulty entity.
+- Engine split into shared libraries (`core`, `script`, `network`, `physics`,
+  `navigation`, `graphics`, `audio`, `app`, `editor`), with the Raylib
+  graphics and audio backends loaded at runtime as plugins.
+- In-game metrics overlay (`F3`) and developer console running Lua on the
+  client or the server.
 
 ## Supported platforms
 
-| Platform | Server | Client | Tested in CI |
+| Platform | Editor | Runtime | Tested in CI |
 |---|---|---|---|
 | Linux (GCC, Clang) | Yes | Yes | Yes |
 | macOS (Apple Clang) | Yes | Yes | Yes |
 | Windows | No | No | No |
 
 Windows support is postponed: the network module only has a POSIX socket
-implementation for now. See the
+implementation and Play uses POSIX processes. See the
 [comparative study](docs/comparative-study.md#cross-platform-support).
 
 ## Requirements
@@ -70,11 +89,12 @@ implementation for now. See the
 | Git | any | Needed by vcpkg |
 | [vcpkg](https://github.com/microsoft/vcpkg) | any recent | Builds every third-party library |
 
-Every third-party library (Raylib, Lua, sol2, GoogleTest, and
-[`clap`](https://github.com/lucaspujol/clap), our command-line parser served
-from the overlay port in `ports/`) comes from [`vcpkg.json`](vcpkg.json) and is built automatically the first
-time you configure. Nothing has to be installed system-wide except the
-compiler toolchain and, on Linux, the X11/OpenGL headers Raylib needs.
+Every third-party library (Raylib, Lua, sol2, Clay, nlohmann-json, GoogleTest,
+and [`clap`](https://github.com/lucaspujol/clap), our command-line parser
+served from the overlay port in `ports/`) comes from [`vcpkg.json`](vcpkg.json)
+and is built automatically the first time you configure. Nothing has to be
+installed system-wide except the compiler toolchain and, on Linux, the
+X11/OpenGL headers Raylib needs.
 
 ### 1. Install vcpkg
 
@@ -108,122 +128,83 @@ On macOS, the Xcode Command Line Tools (`xcode-select --install`) plus
 ## Build
 
 ```sh
-git clone https://github.com/Saitamadupauvre/RType.git r-type
-cd r-type
+git clone https://github.com/Saitamadupauvre/RType.git engine
+cd engine
 cmake --preset release            # first run builds the dependencies: a few minutes
 cmake --build --preset release
 ```
 
-Both executables end up in `build/release/bin/`, next to the engine libraries,
-the `plugins/` folder, the Lua `scripts/` and the `assets/`.
+`build/release/bin/` then holds `editor`, `engine-runtime`, the engine
+libraries and the `plugins/` folder. This is the only compilation: games are
+never compiled, the runtime reads their scripts and assets when it starts.
 
 | Preset | Generator | Use |
 |---|---|---|
-| `release` / `debug` | Default generator | Playing / debugging |
+| `release` / `debug` | Default generator | Using / debugging |
 | `ninja-release` / `ninja-debug` | Ninja | Faster builds |
 | `asan`, `tsan`, `tidy`, `ci` | Default generator | Checks, see [Tests and checks](#tests-and-checks) |
 
-The output folder is always `build/<preset>/`. The rest of this README uses
-`release`; replace it with the preset you built.
+The output folder is always `build/<preset>/`.
 
-## Launch the game
-
-A game is **one server** and **one to four clients**. Start the server first,
-then one client per player, each in its own terminal.
-
-### On one machine
+## Open the editor
 
 ```sh
-# terminal 1: the server, listening on UDP port 4242
-./build/release/bin/r-type_server 4242
-
-# terminals 2 and 3: two players
-./build/release/bin/r-type_client 127.0.0.1 4242
-./build/release/bin/r-type_client 127.0.0.1 4242
+./build/release/bin/editor examples/r-type
 ```
 
-The game starts as soon as the first player connects. Players who join later
-get a ship immediately.
+The editor opens the R-Type example on its start scene. Drag prefabs from the
+sidebar into the viewport, select one to edit its fields in the inspector,
+save with `Ctrl+S`, and press **Play** to run the scene in a game window.
 
-Without a separate server:
+| Argument | Meaning |
+|---|---|
+| `game` | Game folder to edit; it must contain a `game.json` |
+| `--runtime <program>` | Program Play starts; defaults to `engine-runtime` next to the editor |
+| `--log-level <level>` | Developer log on stderr: `trace`, `debug`, `info` (default), `warn`, `error`, `off` |
+
+To make your own game, follow [Your first game](docs/guide/first-game.md).
+
+## Run a game
 
 ```sh
-./build/release/bin/r-type_client --host 4242   # host on UDP 4242 and play; others join with <your-ip> 4242
-./build/release/bin/r-type_client --solo        # play alone, no socket
+./build/release/bin/engine-runtime --game examples/r-type --solo            # play alone, no socket
+./build/release/bin/engine-runtime --game examples/r-type --host 4242       # host and play; others join
+./build/release/bin/engine-runtime --game examples/r-type 127.0.0.1 4242    # join a server
+./build/release/bin/engine-runtime --game examples/r-type --server 4242     # dedicated server, no window
 ```
 
-### Over a local network
-
-1. On the server machine, find its IPv4 address (`ip addr` on Linux,
-   `ipconfig getifaddr en0` on macOS) and start the server:
-   `./build/release/bin/r-type_server 4242`.
-2. Allow incoming **UDP** traffic on that port in its firewall.
-3. On each player's machine: `./build/release/bin/r-type_client <server-ip> 4242`.
-
-### Command line
-
-```
-r-type_server [-h] [-p <1..4>] <port>
-r-type_client [-h] [--music-volume <0..100>] [--effects-volume <0..100>] [--mute] <server-ip> <port>
-r-type_client [-h] [options] --host <port>
-r-type_client [-h] [options] --solo
-```
-
-| Executable | Argument | Meaning |
-|---|---|---|
-| `r-type_server` | `port` | UDP port to listen on, `1`–`65535` |
-| `r-type_server` | `-p`, `--max-players` | Maximum connected players, `1`–`4`, default `4` |
-| `r-type_client` | `server-ip` | IPv4 address of the server, e.g. `127.0.0.1` |
-| `r-type_client` | `port` | UDP port of the server, `1`–`65535` |
-| `r-type_client` | `--music-volume` | Music volume, `0`–`100`, default `100` |
-| `r-type_client` | `--effects-volume` | Sound effects volume, `0`–`100`, default `100` |
-| `r-type_client` | `--mute` | Start muted (`M` toggles it in game) |
-| both | `-h`, `--help` | Print the usage and exit with code `0` |
-
-### Exit codes and errors
-
-| Situation | Behaviour |
+| Option | Meaning |
 |---|---|
-| Missing or invalid argument | Prints the error and the usage, exits with `84` |
-| Server cannot listen on the port (already in use...) | Exits with `84` |
-| Client cannot load `plugins/graphics-raylib` or open the window | Exits with `84` |
-| Client cannot load `plugins/audio-raylib` or finds no audio device | Prints a warning and plays without sound |
-| Server full (`--max-players` reached) | The client is refused and stays on an empty screen; close it |
-| Server stops or stops answering | The client stops receiving updates after 5 seconds; close it |
-| `Ctrl+C` / SIGTERM on the server | Notifies every client, exits with `0` |
+| `server-ip` `port` | Join that server |
+| `--host <port>` | Host a game on this UDP port and play on it |
+| `--server <port>` | Dedicated server on this UDP port |
+| `--solo` | Play alone, without network |
+| `--game <folder>` | Game folder; defaults to the program's own folder (exported games) |
+| `--scene-file <file>` | Start from this scene instead of the game's start scene |
+| `-p`, `--max-players <1..4>` | Maximum players when hosting or serving, default `4` |
+| `--music-volume`, `--effects-volume <0..100>` | Volumes, default `100` |
+| `--mute` | Start muted |
+| `-h`, `--help` | Print the usage and exit with code `0` |
 
-The executables find their libraries, plugin, scripts and assets **relative to
-their own location**, so they can be started from any directory. Do not move
-a single executable out of `bin/`: move the whole folder.
+Invalid arguments, a port already in use or a missing graphics plugin exit
+with code `84`. A missing audio device only disables sound. Over a local
+network, open the UDP port in the host's firewall and join with its IPv4
+address. Everything is in [Run and export](docs/guide/run-and-export.md).
 
-## How to play
-
-| Action | Keys |
-|---|---|
-| Move | Arrow keys, or `Z` `Q` `S` `D` |
-| Fire | `Space` (hold to keep firing) |
-| Mute / unmute | `M` |
-| Quit | Close the window |
-
-- Shoot the Bydos coming from the right. A Bydo touching your ship destroys
-  it.
-- Each player has their own colour (blue, red, green, yellow, by join order).
-- When every ship is destroyed, the game is over and restarts after 3
-  seconds with a ship for every connected player.
-
-More in [docs/how-to-play.md](docs/how-to-play.md).
+In R-Type, move with the arrow keys or `ZQSD`, fire with `Space`, mute with
+`M`; see the [R-Type example](docs/examples/r-type.md).
 
 ## Install
 
-To get a self-contained folder you can copy or zip:
-
 ```sh
 cmake --install build/release --prefix dist
-./dist/bin/r-type_server 4242
 ```
 
-`dist/bin/` contains the executables, the engine libraries, `plugins/`,
-`scripts/` and `assets/`.
+`dist/bin/` contains the editor, the runtime, the engine libraries and
+`plugins/`; `dist/examples/` contains the example games. Executables find
+their libraries and plugins relative to their own location, so the folder can
+be moved as a whole. Games themselves are shipped with the editor's
+**Export**.
 
 ## Tests and checks
 
@@ -239,44 +220,44 @@ cmake --workflow --preset tidy          # clang-tidy, warnings as errors
 cmake --build --preset ninja-debug --target format   # clang-format 23.1.1
 ```
 
-`./fred.sh all` runs the format check, the debug build, the tests and
-clang-tidy in one go. Every command is described in
+`scripts/fred.sh all` runs the format check, the debug build, the tests and
+clang-tidy in one go; `scripts/fred.sh editor` and `scripts/fred.sh play --solo`
+build and open the example. Every command is described in
 [docs/commands.md](docs/commands.md).
 
 ## Repository layout
 
 ```
-engine/          C++ engine: one shared library per module (core, script, network, physics, graphics, audio, app)
+engine/          C++ engine: one shared library per module (core, script, network, physics, navigation, graphics, audio, app, editor)
 plugins/         runtime plugins (graphics-raylib: window, rendering, input; audio-raylib: sound and music)
-game/server/     r-type_server entry point
-game/client/     r-type_client entry point
-game/scripts/    the game itself, in Lua (main.lua is the entry point)
-assets/          sprites, sounds, music (credits in assets/CREDITS.md)
-tests/           GoogleTest suites, mirroring engine/, game/ and plugins/
+editor/          the editor app (Clay layout, raylib only in editor/src/raylib/)
+runtime/         engine-runtime: runs any game folder in every mode
+examples/r-type/ example game: game.json, scripts/, scenes/, assets/ (credits in assets/CREDITS.md)
+tests/           GoogleTest suites, mirroring engine/, plugins/, editor/ and runtime/
 docs/            documentation (MkDocs sources)
 ```
 
 ## Documentation
 
 Everything lives in [`docs/`](docs/index.md) as Markdown and is published as a
-searchable website with MkDocs on every push to `main`
-(GitHub Pages, with the Doxygen API reference under `/api/`).
+searchable website with MkDocs on every push to `main` (GitHub Pages, with the
+Doxygen API reference under `/api/`).
 
 | Page | Content |
 |---|---|
-| [Getting started](docs/getting-started.md) | Detailed build, run and troubleshooting |
-| [How to play](docs/how-to-play.md) | Controls and rules |
+| [Getting started](docs/getting-started.md) | Build, open the example, troubleshooting |
+| [Making games](docs/guide/index.md) | The editor, your first game, game folders and scenes, scripting, play and debug, run and export |
+| [Lua API reference](docs/reference/lua-api.md) | Every function scripts can call |
+| [R-Type example](docs/examples/r-type.md) | How to play it, how it is built, how to extend it |
 | [Architecture](docs/architecture.md) | Layers, subsystems, data flow, diagrams |
 | [Engine modules](docs/engine.md) | What each module does and how to add one |
-| [Networking internals](docs/networking.md) | Threads, queues, sessions, failure handling |
-| [Protocol](docs/protocol.md) | RFC-style specification of the UDP protocol |
+| [Networking internals](docs/networking.md) / [Protocol](docs/protocol.md) | Threads, sessions, failure handling; RFC-style UDP protocol |
 | [Plugins](docs/plugins.md) | Runtime plugin contract |
-| [Game](docs/game.md) / [Writing the game](docs/writing-the-game.md) | The Lua game and how to extend it |
-| [Project overview](docs/PROJECT.md) | Vision, Lua API reference, roadmap |
+| [Editor backend](docs/editor.md) / [Editor internals](docs/editor-app.md) | Editing model; editor app code |
+| [Project overview](docs/PROJECT.md) | Vision, architecture decisions, roadmap |
 | [Comparative study](docs/comparative-study.md) | Technology choices, algorithms, storage, security |
-| [Accessibility](docs/accessibility.md) | What we provide for players with disabilities |
-| [Commands](docs/commands.md) | Build, test and quality commands |
-| [Contributing](docs/contributing.md) | Workflow and conventions |
+| [Accessibility](docs/accessibility.md) | What we provide for people with disabilities |
+| [Commands](docs/commands.md) / [Contributing](docs/contributing.md) | Build, test, quality commands; workflow and conventions |
 
 Preview the website locally:
 
@@ -302,6 +283,6 @@ a green CI.
 ## License
 
 Released under the [MIT License](LICENSE). R-Type is a trademark of its
-respective owners; the sprites are used for educational purposes only.
-The music is by Beam Theory (OGA-BY 3.0); every asset is credited in
-[assets/CREDITS.md](assets/CREDITS.md).
+respective owners; the example's sprites are used for educational purposes
+only. The example's music is by Beam Theory (OGA-BY 3.0); every asset is
+credited in [examples/r-type/assets/CREDITS.md](examples/r-type/assets/CREDITS.md).

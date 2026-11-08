@@ -155,7 +155,7 @@ its instance disappears (removed, undone, scene closed).
 | `save()` | Writes the document to the open scene's file. | No scene open, write failed. |
 | `discard_changes()` | Back to the last saved or opened document; clears history. | No scene open. |
 
-Scene names follow the rules of [Game folder and scenes](game-folder.md):
+Scene names follow the rules of [Game folders and scenes](guide/game-folder.md):
 1 to 63 letters, digits, `_` or `-`.
 
 `unsaved()` is true while the document differs from the last saved or opened
@@ -177,10 +177,60 @@ written back by `save()`. Instances that are malformed in the file (no type,
 bad position...) are skipped when opening, counted in the message and logged,
 and are not written back.
 
-## Not covered yet
+## Game folder C++ API
 
-- Changing the type of an instance (#156).
-- Play and stop from the editor (#157).
+Everything is in `engine/script/Scene.hpp` and `ScriptRuntime`:
+
+```cpp
+auto runtime = engine::script::ScriptRuntime::builder()
+                   .with<engine::script::ServerApi>()
+                   .build();
+runtime.attach_world(world);
+runtime.load_game(game);
+
+const engine::script::SceneLoad load = runtime.read_scene(game / "scenes" / "stage1.json");
+if (!load.ok()) {
+    show_error(load.error);
+}
+for (const engine::script::InstanceIssue& issue : load.issues) {
+    show_problem(issue.instance, issue.field, issue.message);
+}
+
+const engine::script::Scene saved{.instances = runtime.capture_instances(),
+                                  .unknown_instances = load.scene.unknown_instances};
+engine::script::write_scene(game / "scenes" / "stage1.json", saved);
+```
+
+| Call | Does |
+|---|---|
+| `ScriptRuntime::load_game(game)` | Loads `scripts/`, spawns the start scene, calls `on_start()`. Returns `false` if the scripts, `game.json` or the start scene failed. |
+| `ScriptRuntime::read_scene(file)` | Reads a scene against the loaded declarations: `SceneLoad{scene, issues, error}`. `ok()` is `false` when the file was rejected. Call it after loading the scripts, otherwise every type is unknown. |
+| `ScriptRuntime::spawn_instances(instances)` | Spawns instances into the attached world, see [Engine modules](engine.md#instances). |
+| `ScriptRuntime::capture_instances()` | Turns the world back into instances. |
+| `ScriptRuntime::flush_scene()` | Applies a pending Lua `load_scene`; returns the scene name, or `std::nullopt` when none was requested. The server calls it every tick after `flush_destroyed()`. |
+| `write_scene(file, scene)` | Saves a scene. It needs no runtime. |
+| `ScriptRuntime::load_declarations(scripts)` | Loads the declarations of a scripts folder without starting the game: no `on_start()`, no start scene. Used by the editor. |
+| `ScriptRuntime::preview_instances(world, instances)` | Builds each instance into `world` as `spawn_instances()` would, from the prototype only: no `on_spawn`, no Lua. Returns `Preview{entities, issues}`, `entities[i]` being the entity of instance `i` or `std::nullopt`. Issues are not logged. |
+| `ScriptRuntime::default_value(type, key)` | Value an instance of `type` has for `key` (`"Component.field"` or `"Script.<name>"`) without an override; `std::nullopt` for an unknown type or key. |
+
+`engine/script/GameFolder.hpp` holds the game folder helpers, which need no
+runtime:
+
+| Call | Does |
+|---|---|
+| `is_scene_name(name)` | Whether `name` is a valid scene name. |
+| `scene_file(game, name)` | `<game>/scenes/<name>.json`. |
+| `scripts_folder(game)` | `<game>/scripts`. |
+| `read_project(game)` | Reads `game.json` into `GameProject{start_scene}`; `std::nullopt` when it is invalid. |
+| `write_start_scene(game, name)` | Sets (or, with `std::nullopt`, removes) `start_scene` in `game.json`, keeping its other keys; creates the file if needed. |
+| `list_scenes(game)` | Names of the scene files of `scenes/`, sorted. |
+
+The editor backend builds on these calls.
+
+`InstanceIssue::instance` is the index in the file's `instances` array for
+`read_scene()`, and the index in the given list for `spawn_instances()`.
+
+Every function is `noexcept` and runs on the thread that owns the runtime.
 
 ## Threading
 

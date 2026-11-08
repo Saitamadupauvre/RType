@@ -3,13 +3,13 @@
 This page gives the big picture: the layers, the subsystems, how data flows
 during a tick and a frame, and where each piece lives in the code. Details of
 each part are in [Engine modules](engine.md),
-[Networking internals](networking.md), [Plugins](plugins.md) and
-[Game](game.md).
+[Networking internals](networking.md), [Plugins](plugins.md),
+[Editor backend](editor.md) and [Editor internals](editor-app.md).
 
 ## Principles
 
-1. **The engine never knows the game.** Nothing under `engine/` names R-Type,
-   its entities or its scripts. A feature goes into the engine only if it
+1. **The engine never knows the game.** Nothing under `engine/`, `editor/` or
+   `runtime/` names a game, its entities or its scripts. A feature goes into the engine only if it
    would make sense in another game (a platformer, a Breakout).
 2. **The server is authoritative.** Clients send inputs, never positions. The
    server runs every game rule and replicates the result.
@@ -25,10 +25,12 @@ each part are in [Engine modules](engine.md),
 
 ```mermaid
 flowchart TB
-    subgraph Game["Game layer (game/)"]
-        LUA["Lua scripts<br/>game/scripts"]
-        SRV["r-type_server<br/>dedicated"]
-        CLI["r-type_client<br/>client, host, solo"]
+    subgraph Games["Game folders (examples/r-type, your game)"]
+        LUA["game.json, scripts/,<br/>scenes/, assets/"]
+    end
+    subgraph Tools["Executables"]
+        ED["editor<br/>scenes, inspector, Play, Export"]
+        RT["engine-runtime<br/>solo, host, client, dedicated"]
     end
     subgraph Engine["Engine layer (engine/), shared libraries"]
         APP["engine-app<br/>ServerApp, ClientApp,<br/>launch modes"]
@@ -46,8 +48,9 @@ flowchart TB
         RAU["audio-raylib<br/>sound effects, music"]
     end
     LUA -. loaded by .-> SCRIPT
-    SRV --> APP
-    CLI --> APP
+    ED --> EDIT
+    ED -. Play: starts .-> RT
+    RT --> APP
     APP --> SCRIPT
     APP --> NET
     APP --> PHYS
@@ -67,12 +70,13 @@ flowchart TB
 
 | Layer | Knows about | Never knows about |
 |---|---|---|
-| Game | Public engine headers (`engine/include/`) | Engine internals, Raylib, sockets, Lua C API |
+| Game folders | The Lua API | C++ of any kind |
+| Editor, runtime | Public engine headers (`engine/include/`); the editor also Clay and raylib, privately | Engine internals, sockets, Lua C API, any game |
 | Engine | Its own modules, third-party libraries privately | The game, the plugins' backend libraries |
-| Plugins | Engine interfaces and types | The game |
+| Plugins | Engine interfaces and types | Any game |
 
 Third-party headers stay private: `raylib.h` appears only in
-`plugins/graphics-raylib/`, POSIX socket headers only in
+`plugins/graphics-raylib/` and `editor/src/raylib/`, POSIX socket headers only in
 `engine/src/network/socket/`, Lua, sol2 and nlohmann-json only in
 `engine/src/script/`.
 
@@ -327,12 +331,12 @@ classDiagram
 
 ```mermaid
 flowchart LR
-    subgraph Server["r-type_server process"]
+    subgraph Server["engine-runtime --server (or --host)"]
         direction TB
         RX["receive thread"] -- inbox --> GT["game thread<br/>ServerApp::tick"]
         GT -- outbox --> TX["send thread"]
     end
-    subgraph Client["r-type_client process"]
+    subgraph Client["engine-runtime joining a server"]
         direction TB
         CRX["receive thread"] -- inbox --> MT["main thread<br/>render loop"]
         MT -- outbox --> CTX["send thread"]
@@ -341,7 +345,9 @@ flowchart LR
     CTX -- "UDP: inputs, heartbeats" --> RX
 ```
 
-Both processes use the same `NetworkIo` core: one thread reads the socket, one
+In `--host` mode the server runs on a background thread of the playing
+process; in `--solo` mode both run on one thread over a `LoopbackNetwork`,
+without any socket. Both processes use the same `NetworkIo` core: one thread reads the socket, one
 thread writes to it, and the game or render thread only touches two queues.
 See [Networking internals](networking.md).
 
@@ -383,7 +389,7 @@ sequenceDiagram
 2. Until every asset is loaded: once connected, preload the next 4 textures,
    sounds and musics of the string table (`AssetPreloader`), apply the audio
    levels and draw the loading screen (`draw_loading_screen`) instead of
-   steps 3 to 6. See [PROJECT §9.5](PROJECT.md#95-asset-cache).
+   steps 3 to 6. See [asset cache](PROJECT.md#95-asset-cache).
 3. Capture every key and mouse button held, and the mouse position, through
    `IInput` (`engine::graphics::capture_input`).
 4. In fixed 1/60 s steps: hand the input to Lua (`input`), run the
@@ -396,7 +402,8 @@ sequenceDiagram
    components that world does not register (such as `PhysicsBody`).
 
 The client never runs game rules: it draws what the server sent, and its Lua
-only handles local concerns such as hotkeys and audio levels.
+only handles local concerns such as hotkeys, audio levels, local effects and
+the HUD.
 
 ## Data ownership
 
@@ -418,12 +425,15 @@ only handles local concerns such as hotkeys and audio levels.
 | CMake helpers (`engine_add_module`, `engine_add_plugin`) | `engine/cmake/EngineModule.cmake` |
 | Raylib backends | `plugins/graphics-raylib/src/`, `plugins/audio-raylib/src/` |
 | Generic apps and modes | `engine/src/app/` (`ServerApp`, `ClientApp`, `Launch` at the root; `assets/`, `render/`, `simulation/` subfolders) |
-| Entry points | `game/server/`, `game/client/` (`main.cpp`, `Cli`) |
-| Game rules | `game/scripts/` |
-| Tests | `tests/engine/<module>/`, `tests/game/<target>/`, `tests/plugins/<name>/` |
+| Editing model (scene document, commands, undo/redo) | `engine/src/editor/` |
+| Editor app | `editor/src/` (raylib only in `editor/src/raylib/`) |
+| Runtime entry point | `runtime/src/` (`main.cpp`, `Cli`, `Options`) |
+| Example game | `examples/r-type/` |
+| Tests | `tests/engine/<module>/`, `tests/plugins/<name>/`, `tests/editor/`, `tests/runtime/` |
 
 ## Where this is going (Part 2)
 
-The engine moves to its own repository consumed through vcpkg, a launcher runs
-any game folder, and a second game written only in Lua proves it is generic. See the
+The engine moves to its own repository consumed through vcpkg, the editor gets
+a launcher to create and open games, and a second game written only in Lua
+proves the engine is generic. See the
 [roadmap](PROJECT.md#15-roadmap).

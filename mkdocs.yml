@@ -1,5 +1,5 @@
-site_name: R-Type
-site_description: Networked R-Type remake on a reusable C++ game engine scripted in Lua
+site_name: Engine
+site_description: A 2D multiplayer game engine with an editor; games are written in Lua
 docs_dir: docs
 site_dir: site
 repo_url: https://github.com/Saitamadupauvre/RType
@@ -56,23 +56,29 @@ exclude_docs: |
 
 nav:
   - Home: index.md
-  - Players:
-      - Getting started: getting-started.md
-      - How to play: how-to-play.md
-      - Accessibility: accessibility.md
-  - Developers:
+  - Getting started: getting-started.md
+  - Making games:
+      - guide/index.md
+      - The editor: guide/editor-tour.md
+      - Your first game: guide/first-game.md
+      - Game folders and scenes: guide/game-folder.md
+      - Scripting a game: guide/scripting.md
+      - Play and debug: guide/play-and-debug.md
+      - Run and export: guide/run-and-export.md
+  - Lua API reference: reference/lua-api.md
+  - Examples:
+      - R-Type: examples/r-type.md
+  - Engine internals:
       - Architecture: architecture.md
       - Engine modules: engine.md
       - Networking internals: networking.md
-      - Plugins: plugins.md
-      - Game: game.md
-      - Game folder and scenes: game-folder.md
-      - Editor backend: editor.md
-      - Editor app: editor-app.md
-      - Writing the game: writing-the-game.md
-      - Commands: commands.md
-      - Contributing: contributing.md
-  - Reference:
-      - Project overview and Lua API: PROJECT.md
       - Protocol (RFC): protocol.md
+      - Plugins: plugins.md
+      - Editor backend: editor.md
+      - Editor internals: editor-app.md
+  - Project:
+      - Overview and roadmap: PROJECT.md
+      - Contributing: contributing.md
+      - Commands: commands.md
       - Comparative study: comparative-study.md
+      - Accessibility: accessibility.md

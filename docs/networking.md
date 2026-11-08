@@ -5,15 +5,15 @@ what happens when something goes wrong. The wire format itself is specified
 in the [protocol](protocol.md).
 
 Everything here is generic: the module knows players, entities with a type
-id, inputs made of the keys and mouse buttons held and a pointer, but nothing about R-Type.
+id, inputs made of the keys and mouse buttons held and a pointer, but nothing about any game.
 
 ## Public API
 
 | Header | Type | Used by |
 |---|---|---|
-| `engine/network/Server.hpp` | `NetworkServer`, `ServerOptions`, `PlayerInput` | `r-type_server` |
-| `engine/network/Client.hpp` | `NetworkClient`, `EntitySnapshot`, `ReplicatedValue`, `ConnectionState` | `r-type_client` |
-| `engine/network/Transport.hpp` | `ServerTransport`, `ClientTransport`, `UdpServerTransport`, `UdpClientTransport`, `LoopbackNetwork` | Both executables, tests, later self-hosted and solo modes |
+| `engine/network/Server.hpp` | `NetworkServer`, `ServerOptions`, `PlayerInput` | `ServerApp` (`engine-runtime --server`, `--host`) |
+| `engine/network/Client.hpp` | `NetworkClient`, `EntitySnapshot`, `ReplicatedValue`, `ConnectionState` | `ClientApp` (`engine-runtime` joining or hosting) |
+| `engine/network/Transport.hpp` | `ServerTransport`, `ClientTransport`, `UdpServerTransport`, `UdpClientTransport`, `LoopbackNetwork` | `engine-app` in every mode (`LoopbackNetwork` for `--solo`), tests |
 | `engine/network/Replicated.hpp` | `Replicated { type_id, owner }` | Marks the entities sent in snapshots |
 | `engine/network/Fields.hpp` | `register_network_fields` | Registers `Replicated.owner` in a `FieldRegistry` |
 | `engine/network/Events.hpp` | `PlayerJoined`, `PlayerLeft`, `Disconnected`, `NamedEvent`... | Published on the `EventBus` |
@@ -173,7 +173,7 @@ publishes it back with names.
 
 `ServerApp` decides what is replicated: every scripted entity with a sprite or
 a colour gets `Replicated { type_id, owner }`. Its field registry comes from
-`rtype::common::game_fields()` (core, physics and network fields), which the
+`engine/src/app/Fields.cpp` (core, physics and network fields), which the
 client uses too, so both sides know the same names. One `StringTable` holds the
 names sent in `connect_accept`: entity types from the Lua declarations (category
 `type`), sounds and musics from `sounds { ... }` / `musics { ... }` (`sound`,

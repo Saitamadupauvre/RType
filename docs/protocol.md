@@ -1,4 +1,4 @@
-# R-Type UDP Protocol
+# Engine UDP Protocol
 
 | | |
 |---|---|
@@ -9,8 +9,8 @@
 
 ## Abstract
 
-This document specifies the binary protocol spoken between an R-Type server
-and its clients. A client connects, sends its inputs, and receives the
+This document specifies the binary protocol spoken between a game server
+run by the engine and its clients. A client connects, sends its inputs, and receives the
 authoritative world state (snapshots) and game events. The protocol is
 generic: entity types, sounds and musics are names exchanged at connection
 time, so the same protocol serves any game built on the engine.
@@ -25,7 +25,8 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT** and **MAY**
 are to be interpreted as described in
 [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 
-- "Server" is the authoritative `r-type_server`; "client" is any program
+- "Server" is the authoritative game server (`engine-runtime --server` or
+  `--host`, or an exported game in those modes); "client" is any program
   connecting to it.
 - Byte offsets start at 0. Sizes are in bytes.
 - All integers are unsigned unless marked signed. Signed integers use two's
@@ -98,7 +99,7 @@ The server sends this message to the endpoint that sent the matching request. It
 | 6 | `event_key` | argument keys of `named` events, shared by every event |
 | 7 | `texture` | textures of `asset` values (every `asset` event argument, and the fields that name textures, e.g. `Sprite.path`), paths relative to the assets folder (e.g. `sprites/ship.png`) |
 
-Sound and music names are file names (for R-Type, files under the client's `assets/sounds/` and `assets/music/` folders). Texture names are the textures the scripts declare, plus the sprite of every declared entity; shader names likewise are the shaders the scripts declare, plus the shader of every declared entity. An `asset` value is a 16-bit id of the category its field names (`texture` or `shader`), so the receiver reads it through the field's descriptor and no extra byte is sent. Then comes the music the server is playing, so that a player joining mid-game hears it.
+Sound and music names are file names (for the engine's client, files under the game's `assets/sounds/` and `assets/music/` folders). Texture names are the textures the scripts declare, plus the sprite of every declared entity; shader names likewise are the shaders the scripts declare, plus the shader of every declared entity. An `asset` value is a 16-bit id of the category its field names (`texture` or `shader`), so the receiver reads it through the field's descriptor and no extra byte is sent. Then comes the music the server is playing, so that a player joining mid-game hears it.
 
 | Offset | Size | Field | Encoding |
 |---|---:|---|---|
@@ -123,14 +124,14 @@ The receiver rejects an unknown category; within one category, duplicate IDs or 
 
 The server fills the `field` category itself with every field its field registry flags `replicated`. A client resolves each `field` name in its own field registry. When one is unknown, it ends the connection: it sends `disconnect` with reason `protocol_error` and reports the connection as rejected.
 
-A client MUST NOT use a sound, music or texture name as a path without checking it: R-Type only loads relative paths whose `/`-separated segments are made of letters, digits, `_`, `-` and `.` and do not start with `.`, and ignores the others.
+A client MUST NOT use a sound, music or texture name as a path without checking it: the engine's client only loads relative paths whose `/`-separated segments are made of letters, digits, `_`, `-` and `.` and do not start with `.`, and ignores the others.
 
 ### Connection Flow
 
 1. The client sends `connect_request` with a fresh `client_nonce`. Without an answer it resends the request after a retry interval, and gives up after a bounded number of attempts.
 2. The server answers with one of:
    - `connect_accept` carrying the same nonce, the player ID, the string table and the current music;
-   - `disconnect` with reason `server_full` when every player slot is taken. The number of slots is set by the game (`r-type_server --max-players`, 1 to 4, default 4). No session is created.
+   - `disconnect` with reason `server_full` when every player slot is taken. The number of slots is set by the game (`--max-players` of the runtime, 1 to 4, default 4). No session is created.
 3. A repeated `connect_request` from an endpoint that already has a session is answered with `connect_accept` again, with the same player ID. It does not create a second session.
 4. Once connected, the client sends `heartbeat` at a fixed interval and the server answers each one with `heartbeat`. Any valid packet from the client refreshes its session.
 5. A session ends when the client sends `disconnect`, or when the server receives nothing from it for longer than the session timeout. On timeout the server sends `disconnect` with reason `timeout` to that client. In both cases every remaining client receives a `player_left` event and the player ID becomes free.
@@ -195,7 +196,7 @@ Each field has the following layout:
 
 Lists (kind 7 in the engine field registry) are not replicated: a server with a replicated list field refuses to start.
 
-The server replicates every entity that has the engine's `Replicated` component. Its record carries `Replicated::type_id` and, in registration order, every field flagged `replicated` that the entity owns; a field of a component the entity lacks is left out, and the client keeps its default value (opaque white for a missing `Sprite.color`). A string longer than 255 bytes, a non-finite float or an asset missing from the `texture` category is left out and logged. `entity_id` is the entity index. Vec2 components (positions, velocities) are rounded to the nearest integer and clamped to the signed 16-bit range; ints are clamped to the signed 32-bit range. With the R-Type fields, an entity sends `Position.pos`, `Sprite.path`, `Sprite.color`, `PhysicsBody.velocity` (when it has a body) and `Replicated.owner`; a client compares `owner` with the `player_entity_id` of its `connect_accept` to find its own entities.
+The server replicates every entity that has the engine's `Replicated` component. Its record carries `Replicated::type_id` and, in registration order, every field flagged `replicated` that the entity owns; a field of a component the entity lacks is left out, and the client keeps its default value (opaque white for a missing `Sprite.color`). A string longer than 255 bytes, a non-finite float or an asset missing from the `texture` category is left out and logged. `entity_id` is the entity index. Vec2 components (positions, velocities) are rounded to the nearest integer and clamped to the signed 16-bit range; ints are clamped to the signed 32-bit range. With the engine's fields, an entity sends `Position.pos`, `Sprite.path`, `Sprite.color`, `PhysicsBody.velocity` (when it has a body) and `Replicated.owner`; a client compares `owner` with the `player_entity_id` of its `connect_accept` to find its own entities.
 
 A snapshot packet carries as many entities as fit in the maximum payload size: their records take at most 1181 bytes. A larger world is sent as several snapshot packets with the same `server_tick`. The format of each packet does not change. A server whose replicated fields, all present with the longest strings, would not fit one entity in a packet refuses to start, as does one with more than 255 replicated fields or a field name longer than 63 bytes.
 

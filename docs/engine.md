@@ -97,7 +97,7 @@ whole instance was skipped) and a message.
 - **Script fields** are the Lua free fields of a declaration (`health = 3`)
   whose default has a supported kind. `script_fields(type)` lists them with
   their kind and default, inferred once at load (rules in
-  [Game folder and scenes](game-folder.md#script-fields)). Spawning writes a
+  [Game folders and scenes](guide/game-folder.md#script-fields)). Spawning writes a
   `"Script.name"` override into the entity's Lua table after `on_spawn`, so
   `self.health` reads it. A value of the wrong kind is skipped at spawn and
   left out (with a warning) at capture.
@@ -112,7 +112,7 @@ whole instance was skipped) and a message.
   requests a switch that `flush_scene()` applies at the end of the server tick,
   keeping entities declared `persistent = true`. The format, the switch, the
   reported problems and the API are in
-  [Game folder and scenes](game-folder.md). The JSON code (`scene/`, built on
+  [Game folders and scenes](guide/game-folder.md). The JSON code (`scene/`, built on
   `nlohmann-json`) stays private to the module.
 
 The runtime only holds this core API. Everything that belongs to one side is an
@@ -141,7 +141,7 @@ reads (`server = { ... }`, `client = { ... }`). Adding a set twice, or both
 split: public-API implementations at the root of `engine/src/script/`,
 internals in `lua/`, `loading/`, `entity/`, `audio/`, `event/` and `player/`.
 
-The Lua API is specified in [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
+The Lua API is specified in [Lua API reference](reference/lua-api.md).
 
 ### network
 
@@ -155,7 +155,7 @@ statistics behind two classes, `NetworkServer` and `NetworkClient`. See
 a `PhysicsBody` (static or dynamic, mass, gravity, collision layer and mask),
 detects overlaps between `AABBCollider` and `CircleCollider` shapes, resolves
 them and publishes collision events on the event bus once every pair has
-been checked, so handlers may spawn or destroy entities. The R-Type server
+been checked, so handlers may spawn or destroy entities. `ServerApp`
 runs it every tick and forwards each `CollisionEvent` to the script runtime;
 scripted entities only use it for detection (`resolve_collisions = false`).
 
@@ -194,7 +194,7 @@ Scripts reach it through `engine-script`, which links it privately: `navgrid`
 builds a `NavGrid` from the hitboxes of entities carrying obstacle tags (rebuilt
 at most once per tick), `find_path` returns waypoints and `self:navigate_to`
 steers an entity along them through its physics velocity. See
-[the Lua API](PROJECT.md#106-global-functions).
+[the Lua API](reference/lua-api.md#global-functions).
 
 ### graphics
 
@@ -214,7 +214,7 @@ backend) and `load_audio_plugin()`, which loads a backend at runtime. See
 
 The composition root: the only module that depends on most of the others. It
 runs any game folder (`game.json`, `scripts/`, `scenes/` and `assets/`, see
-[Game folder and scenes](game-folder.md)) without knowing the game.
+[Game folders and scenes](guide/game-folder.md)) without knowing the game.
 
 | Header | What it gives |
 |---|---|
@@ -469,4 +469,4 @@ fails on Linux as well.
    `engine_add_test(<name> SOURCES ...)` in `tests/CMakeLists.txt`.
 4. Add any new third-party library to `vcpkg.json` and link it with
    `PRIVATE_DEPENDS`.
-5. Link `engine::<name>` from `game/CMakeLists.txt` where needed.
+5. Link `engine::<name>` from `runtime/CMakeLists.txt` or `editor/CMakeLists.txt` where needed.

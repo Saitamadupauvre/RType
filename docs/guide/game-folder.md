@@ -1,21 +1,22 @@
-# Game folder and scene files
+# Game folders and scenes
 
 A **game folder** holds everything that makes a game, apart from the engine:
-its project file, its scripts, its scenes and its assets. The server runs any
-game folder, and the editor opens one. The engine finds every file relative to
-the game folder, never relative to the working directory.
+its project file, its scripts, its scenes and its assets. The editor opens a
+game folder and the runtime runs one. Every file is found relative to the game
+folder, never relative to the working directory.
 
 ```
 <game>/
 ├── game.json      project file: the game's name and its start scene
-├── scripts/       Lua code: main.lua and the declarations (PROJECT.md §10)
+├── scripts/       Lua code: main.lua and the declarations (see the Lua API)
 ├── scenes/        one JSON file per scene
 └── assets/        sprites, sounds, music, shaders
 ```
 
-For R-Type the game folder is `game/` in the repository. The build copies
-`game.json`, `scripts/`, `scenes/` and `assets/` next to the executables, so
-the folder of the executable is the game folder.
+`examples/r-type/` in the repository is a game folder. Only `scripts/` is
+required by the export; `scenes/` and `assets/` are optional. The runtime takes
+the folder with `--game <folder>`, or uses its own folder when there is none,
+which is how an exported game finds its files.
 
 ## `game.json`
 
@@ -28,7 +29,7 @@ the folder of the executable is the game folder.
 
 | Key | Type | Meaning |
 |---|---|---|
-| `name` | string | Name of the game, shown by tools; the editor's export names the binaries after it. The runtime does not read it. |
+| `name` | string | Name of the game: the runtime's window title, and the name the editor's export gives the binary. |
 | `start_scene` | scene name | Scene spawned when the server starts, before `on_start()`. Optional. |
 
 Other keys are ignored. The file itself is optional: a game folder without
@@ -164,7 +165,7 @@ type has no such script field or its value is of another kind (`"Script.health":
 
 On start, the server runs `ScriptRuntime::load_game()` on its game folder:
 
-1. Every script of `scripts/` is loaded (PROJECT.md §10.2).
+1. Every script of `scripts/` is loaded ([Lua API: loading order](../reference/lua-api.md#loading-order)).
 2. If `game.json` names a `start_scene`, its file is read and each instance is
    spawned at its position: `on_spawn` runs, then the overrides are applied, so
    they win over what `on_spawn` set.
@@ -210,7 +211,7 @@ client = {
 
 A persistent entity placed in a scene file is spawned again every time that
 scene loads; persistent entities are usually spawned by scripts. Full rules:
-PROJECT.md §10.6.
+the [Lua API](../reference/lua-api.md#global-functions).
 
 ## What is reported
 
@@ -244,57 +245,4 @@ is spawned, and the scripts and `on_start()` still run.
 The text first goes to `<file>.tmp`, which then replaces the scene, so a
 failed save never leaves a truncated file. Missing folders are created.
 
-## C++ API
-
-Everything is in `engine/script/Scene.hpp` and `ScriptRuntime`:
-
-```cpp
-auto runtime = engine::script::ScriptRuntime::builder()
-                   .with<engine::script::ServerApi>()
-                   .build();
-runtime.attach_world(world);
-runtime.load_game(game);
-
-const engine::script::SceneLoad load = runtime.read_scene(game / "scenes" / "stage1.json");
-if (!load.ok()) {
-    show_error(load.error);
-}
-for (const engine::script::InstanceIssue& issue : load.issues) {
-    show_problem(issue.instance, issue.field, issue.message);
-}
-
-const engine::script::Scene saved{.instances = runtime.capture_instances(),
-                                  .unknown_instances = load.scene.unknown_instances};
-engine::script::write_scene(game / "scenes" / "stage1.json", saved);
-```
-
-| Call | Does |
-|---|---|
-| `ScriptRuntime::load_game(game)` | Loads `scripts/`, spawns the start scene, calls `on_start()`. Returns `false` if the scripts, `game.json` or the start scene failed. |
-| `ScriptRuntime::read_scene(file)` | Reads a scene against the loaded declarations: `SceneLoad{scene, issues, error}`. `ok()` is `false` when the file was rejected. Call it after loading the scripts, otherwise every type is unknown. |
-| `ScriptRuntime::spawn_instances(instances)` | Spawns instances into the attached world, see [Engine modules](engine.md#instances). |
-| `ScriptRuntime::capture_instances()` | Turns the world back into instances. |
-| `ScriptRuntime::flush_scene()` | Applies a pending Lua `load_scene`; returns the scene name, or `std::nullopt` when none was requested. The server calls it every tick after `flush_destroyed()`. |
-| `write_scene(file, scene)` | Saves a scene. It needs no runtime. |
-| `ScriptRuntime::load_declarations(scripts)` | Loads the declarations of a scripts folder without starting the game: no `on_start()`, no start scene. Used by the editor. |
-| `ScriptRuntime::preview_instances(world, instances)` | Builds each instance into `world` as `spawn_instances()` would, from the prototype only: no `on_spawn`, no Lua. Returns `Preview{entities, issues}`, `entities[i]` being the entity of instance `i` or `std::nullopt`. Issues are not logged. |
-| `ScriptRuntime::default_value(type, key)` | Value an instance of `type` has for `key` (`"Component.field"` or `"Script.<name>"`) without an override; `std::nullopt` for an unknown type or key. |
-
-`engine/script/GameFolder.hpp` holds the game folder helpers, which need no
-runtime:
-
-| Call | Does |
-|---|---|
-| `is_scene_name(name)` | Whether `name` is a valid scene name. |
-| `scene_file(game, name)` | `<game>/scenes/<name>.json`. |
-| `scripts_folder(game)` | `<game>/scripts`. |
-| `read_project(game)` | Reads `game.json` into `GameProject{start_scene}`; `std::nullopt` when it is invalid. |
-| `write_start_scene(game, name)` | Sets (or, with `std::nullopt`, removes) `start_scene` in `game.json`, keeping its other keys; creates the file if needed. |
-| `list_scenes(game)` | Names of the scene files of `scenes/`, sorted. |
-
-The [editor backend](editor.md) builds on these calls.
-
-`InstanceIssue::instance` is the index in the file's `instances` array for
-`read_scene()`, and the index in the given list for `spawn_instances()`.
-
-Every function is `noexcept` and runs on the thread that owns the runtime.
+The C++ calls behind this page are listed in [Editor backend](../editor.md#game-folder-c-api).

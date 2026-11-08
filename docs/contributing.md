@@ -29,10 +29,11 @@ flowchart LR
 
 1. **Every feature and every bug fix comes with GoogleTest tests.** A bug fix
    starts with a test that reproduces it.
-2. **The engine never knows about the game.** Nothing under `engine/`
-   includes, links or names anything from `game/`.
+2. **The engine never knows about a game.** Nothing under `engine/`,
+   `editor/` or `runtime/` includes, links or names anything from
+   `examples/`. Games are folders of Lua, scenes and assets; they have no C++.
 3. **The engine stays extractable.** It uses only its own CMake helpers; the
-   game links only `engine::*` targets.
+   editor and the runtime link only `engine::*` targets.
 4. **Dependencies only through vcpkg.** No copied sources, no `FetchContent`,
    no submodules.
 5. **CI must be green** before merging.
@@ -44,7 +45,8 @@ flowchart LR
 - `snake_case` functions and variables, `PascalCase` types and files,
   namespaces `engine::<module>`, private members prefixed with `_`.
 - **No comments** in code, CMake or CI files. The only exception is Doxygen
-  on the public API (`engine/include/`) and plugin interfaces: `/** @brief ...
+  on the public API (`engine/include/`), plugin interfaces and the editor's
+  contract headers: `/** @brief ...
   */` documenting the contract.
 - Third-party headers never appear in public engine headers.
 
@@ -52,7 +54,10 @@ flowchart LR
 
 - Tests mirror the code: `engine/src/<module>/Foo.cpp` →
   `tests/engine/<module>/FooTest.cpp`, registered with
-  `engine_add_test(<module> SOURCES ...)`.
+  `engine_add_test(<module> SOURCES ...)`; the editor in `tests/editor/`
+  (`editor_add_test`), the runtime in `tests/runtime/` (`runtime_add_test`).
+- Tests never use an example game: their games are small fixtures in
+  `tests/fixtures/`.
 - Names: `TEST(Feature, ExpectedBehaviour)`.
 - Test the failure paths: truncated packets, Lua errors, missing plugin...
 - Deterministic: no real network beyond loopback, no sleeps, no display.
@@ -62,7 +67,7 @@ flowchart LR
 
 - Documentation is in English, in `docs/`, and is updated in the same pull
   request as the code it describes.
-- Changes to the Lua API update [PROJECT.md §10](PROJECT.md#10-lua-scripting-api).
+- Changes to the Lua API update the [Lua API reference](reference/lua-api.md).
 - Changes to the protocol update [protocol.md](protocol.md) and the protocol
   version.
 - New pages are added to the `nav` of `mkdocs.yml`; check them with
@@ -81,7 +86,7 @@ disable the check project-wide in `.clang-tidy` and document why here.
 ## Before pushing
 
 ```sh
-./fred.sh all
+scripts/fred.sh all
 ```
 
 Runs the format check, the debug build, the tests and clang-tidy. See
