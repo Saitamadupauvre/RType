@@ -71,7 +71,8 @@ TEST_F(ExportDialog, TurningAModeBackOnOffersItAgain) {
     _editor.handle(command::SetExport{.settings = settings});
     frame();
 
-    const auto* change = only<command::SetExport>(click(CLAY_ID("ExportModeSolo")));
+    const auto actions = click(CLAY_ID("ExportModeSolo"));
+    const auto* change = only<command::SetExport>(actions);
 
     ASSERT_NE(change, nullptr);
     EXPECT_TRUE(change->settings.modes.solo);
