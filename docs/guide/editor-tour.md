@@ -48,7 +48,7 @@ Opening the editor without any folder is not there yet.
 │ INSTANCES  │                                           │  script      │
 │  space     │                                           │              │
 ├────────────┴───────────────────────────────────────────┴──────────────┤
-│ CONSOLE | PROBLEMS                                                     │  bottom panel
+│ CONSOLE | PROBLEMS | ASSETS                                            │  bottom panel
 ├───────────────────────────────────────────────────────────────────────┤
 │ EDIT · 12 instances · enemy_1 · snap 16 · unsaved · game · stage1      │  status bar
 └───────────────────────────────────────────────────────────────────────┘
@@ -62,8 +62,18 @@ Opening the editor without any folder is not there yet.
 | Sidebar | **Prefabs** (every entity type the scripts declare, with a filter), **scenes** (the start scene is marked), **instances** of the open scene | Place a prefab, open a scene, select an instance |
 | Viewport | The scene drawn like the game, the grid, the camera frame, the selection | Select, move, scale, rotate, pan, zoom |
 | Inspector | The selected instance: name, prefab, script, fields by component | Rename, change type, edit and reset fields, open the script |
-| Bottom panel | **Console** (timestamped messages, game output during Play) and **Problems** | Switch tab; click a console line that names a script (`player.lua:12: ...`) to open that script |
+| Bottom panel | **Console** (timestamped messages, game output during Play, its last 500 lines), **Problems** and **Assets** | Switch tab; click a console line that names a script (`player.lua:12: ...`) to open that script; drag an asset onto an instance; drag the panel's top edge to resize it |
 | Status bar | Mode, instance count, selection, snap, unsaved changes, game folder, scene | |
+
+The window cannot be made smaller than 1000 × 600. Drag the top edge of the
+bottom panel (the cursor turns into a vertical arrow) to make it from half to
+twice its usual 150 px; a double-click on that edge resets it. The panel never
+grows so tall that the viewport disappears, and its height is not kept between
+runs.
+
+A refused action, such as opening a scene while the open one has unsaved
+changes, also shows in red at the bottom of the viewport for 3 seconds, so you
+see it even when the console is hidden.
 
 ## Words
 
@@ -106,6 +116,29 @@ outline so they can still be selected. Textures load from the game's
 With snap on, a dragged instance's top-left corner lands on the grid. The
 world is 1920 × 1080 virtual units with the origin at the top-left and Y
 pointing down, the same units scripts use.
+
+## Assets
+
+The **Assets** tab of the bottom panel lists every file of the game's
+`assets/` folder, with its kind and, for images, a thumbnail.
+
+| Kind | Files | Dropped on an instance |
+|---|---|---|
+| sprite | `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tga`, `.gif`, `.qoi` | Sets its sprite |
+| shader | `.fs`, `.vs`, `.glsl`, `.frag`, `.vert` | Sets its shader, by name without the extension (`shaders/space`) |
+| music | Audio under `assets/music/` | Nothing |
+| sound | Other audio (`.wav`, `.ogg`, `.mp3`, `.flac`, `.qoa`) | Nothing |
+| file | Anything else | Nothing |
+
+- Drag a sprite or a shader from the list onto an instance in the viewport. A
+  chip with its name follows the pointer, and the instance under it is
+  outlined. Releasing there sets the field, undoable like any edit; releasing
+  elsewhere, or `Esc`, cancels.
+- Double-click a file to open it with your system's program.
+- Files starting with `.` are skipped. New files show after the next action.
+- A sprite or shader set this way needs no `textures { ... }` or
+  `shaders { ... }` in the scripts: loading the game declares what the scenes
+  use ([Game folders](game-folder.md#loading)).
 
 ## Inspector
 
@@ -220,7 +253,7 @@ dedicated server. See [Run and export](run-and-export.md#exporting-from-the-edit
 |---|---|
 | File | New prefab..., New scene..., Save scene, Discard changes, Open script, Reveal game folder, Open settings, Reload settings, Reload scripts, Export game... |
 | Edit | Undo, Redo, Duplicate selection, Delete selection |
-| View | Select tool, Move tool, Pan tool, Snap to grid, Show hitboxes, Show names |
+| View | Select tool, Move tool, Pan tool, Snap to grid, Show hitboxes, Show names, Zoom in, Zoom out |
 | Scene | Play, Pause, Stop |
 | Help | The viewport controls that have no menu entry |
 
@@ -232,10 +265,12 @@ dedicated server. See [Run and export](run-and-export.md#exporting-from-the-edit
 | `Delete` | Delete the selection |
 | `V` / `G` / `H` | Select / Move / Pan tool |
 | `Ctrl+Shift+P` | Command palette |
+| `Ctrl+=` / `Ctrl+-` | Zoom the whole editor in / out |
 | `F11` | Layout debug view |
 
-On macOS, `Cmd` replaces `Ctrl`. Letter shortcuts follow the keyboard layout:
-`Ctrl+Z` is the key printed Z, on AZERTY as on QWERTY. Shortcuts are ignored
+On macOS, `Cmd` replaces `Ctrl`. Shortcuts follow the keyboard layout:
+`Ctrl+Z` is the key printed Z, and `Ctrl+-` the key printed `-` (the `6` key on
+AZERTY). Zoom also takes `Ctrl++`, with or without `Shift`, and the keypad. Shortcuts are ignored
 while a text field has the keyboard.
 
 The **command palette** (`Ctrl+Shift+P`) lists every command with a filter.
@@ -267,7 +302,7 @@ applies it at once.
 
 | Key | Type | Range | Default | Effect |
 |---|---|---|---|---|
-| `ui.scale` | number | 0.5 to 3 | 1 | Multiplies the screen's DPI scale: every panel, font and row |
+| `ui.scale` | number | 0.5 to 3 | 1 | Multiplies the screen's DPI scale: every panel, font and row. Zoom in / out change it by 0.1 for the session; Reload settings goes back to the file |
 | `ui.scroll_speed` | number | 0.25 to 4 | 1 | Multiplies the 40 px one wheel notch scrolls |
 | `view.snap` | bool | | true | Snap to the grid when the editor starts |
 | `view.grid_size` | number | 1 to 512 | 16 | Grid size, in pixels, when the editor starts |

@@ -167,11 +167,15 @@ type has no such script field or its value is of another kind (`"Script.health":
 
 On start, the server runs `ScriptRuntime::load_game()` on its game folder:
 
-1. Every script of `scripts/` is loaded ([Lua API: loading order](../reference/lua-api.md#loading-order)).
-2. If `game.json` names a `start_scene`, its file is read and each instance is
+1. Every `Sprite.path` and `Shader.path` that a scene file of `scenes/` (or
+   the played scene file) overrides is declared, as if listed in
+   `textures { ... }` or `shaders { ... }`, so clients can receive it. A sprite
+   or shader set in the editor therefore needs no declaration in the scripts.
+2. Every script of `scripts/` is loaded ([Lua API: loading order](../reference/lua-api.md#loading-order)).
+3. If `game.json` names a `start_scene`, its file is read and each instance is
    spawned at its position: `on_spawn` runs, then the overrides are applied, so
    they win over what `on_spawn` set.
-3. `on_start()` of `main.lua` runs and already sees the scene's entities.
+4. `on_start()` of `main.lua` runs and already sees the scene's entities.
 
 Clients never spawn scenes: they receive the server's entities through
 replication.
