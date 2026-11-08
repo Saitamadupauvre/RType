@@ -153,6 +153,9 @@ std::string command_text(const Command& command) {
             [](const command::OpenScript& open) {
                 return std::format("command::OpenScript file={}", open.file.generic_string());
             },
+            [](const command::RevealGameFolder&) {
+                return std::string("command::RevealGameFolder");
+            },
             [](const command::OpenSettings&) { return std::string("command::OpenSettings"); },
             [](const command::ReloadSettings&) { return std::string("command::ReloadSettings"); },
             [](const command::ReloadScripts&) { return std::string("command::ReloadScripts"); },

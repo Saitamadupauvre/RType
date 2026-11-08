@@ -48,6 +48,7 @@ TEST(ActionText, CommandsShowTheirFields) {
     EXPECT_EQ(describe_action(command::SetNameDialogText{.name = "boss"}),
               "command::SetNameDialogText name=boss");
     EXPECT_EQ(describe_action(command::CloseNameDialog{}), "command::CloseNameDialog");
+    EXPECT_EQ(describe_action(command::RevealGameFolder{}), "command::RevealGameFolder");
     EXPECT_EQ(describe_action(command::DuplicateScene{.from = "a", .to = "b"}),
               "command::DuplicateScene from=a to=b");
 }

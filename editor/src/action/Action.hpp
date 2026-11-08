@@ -228,6 +228,11 @@ struct OpenScript {
     std::filesystem::path file;
 };
 
+/** @brief Shows the game folder in the system's file manager. */
+struct RevealGameFolder {
+    static constexpr bool while_running = true;
+};
+
 /**
  * @brief Opens the user's settings file with the program the system uses for it, creating an
  * empty one first when it does not exist.
@@ -293,9 +298,9 @@ using Command =
                  command::DeleteScene, command::SetStartScene, command::SetSnap,
                  command::SetGridSize, command::SetOverlay, command::SetTool, command::ShowTab,
                  command::ReportInvalidInput, command::SetPrefabFilter, command::OpenScript,
-                 command::OpenSettings, command::ReloadSettings, command::ReloadScripts,
-                 command::Play, command::Pause, command::Stop, command::OpenExport,
-                 command::SetExport, command::CloseExport, command::RunExport>;
+                 command::RevealGameFolder, command::OpenSettings, command::ReloadSettings,
+                 command::ReloadScripts, command::Play, command::Pause, command::Stop,
+                 command::OpenExport, command::SetExport, command::CloseExport, command::RunExport>;
 
 /** @brief What the UI emits; applied after the frame by Editor::handle(). */
 using Action = std::variant<Edit, Command>;

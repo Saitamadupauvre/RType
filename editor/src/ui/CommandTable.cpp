@@ -82,6 +82,8 @@ std::optional<Action> reload_settings(const Editor& editor) {
 
 std::optional<Action> reload_scripts(const Editor&) { return command::ReloadScripts{}; }
 
+std::optional<Action> reveal_game_folder(const Editor&) { return command::RevealGameFolder{}; }
+
 bool dialog_open(const Editor& editor) {
     return editor.state().export_dialog || editor.state().name_dialog;
 }
@@ -163,6 +165,10 @@ constexpr std::array table{
         .label = "Discard changes", .menu = Menu::file, .shortcut = std::nullopt, .make = discard},
     CommandEntry{
         .label = "Open script", .menu = Menu::file, .shortcut = std::nullopt, .make = open_script},
+    CommandEntry{.label = "Reveal game folder",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = reveal_game_folder},
     CommandEntry{.label = "Open settings",
                  .menu = Menu::file,
                  .shortcut = std::nullopt,

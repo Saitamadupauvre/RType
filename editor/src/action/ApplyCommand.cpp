@@ -171,6 +171,9 @@ CommandResult apply_command(EditorSession& session, EditorState& state, EditorSe
             [&](const command::OpenScript& open) {
                 return open_script(services.open_file, open.file);
             },
+            [&](const command::RevealGameFolder&) {
+                return open_script(services.open_file, session.game());
+            },
             [&](const command::OpenSettings&) {
                 return open_settings(services.open_file, state.settings_file);
             },

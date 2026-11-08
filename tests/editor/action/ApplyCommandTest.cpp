@@ -376,3 +376,9 @@ TEST_F(ApplyCommand, NameDialogOpensChangesAndCloses) {
     ASSERT_TRUE(run(command::CloseNameDialog{}));
     EXPECT_FALSE(_state.name_dialog.has_value());
 }
+
+TEST_F(ApplyCommand, RevealGameFolderOpensTheGameFolder) {
+    ASSERT_TRUE(run(command::RevealGameFolder{}));
+
+    EXPECT_EQ(_opened, (std::vector<std::filesystem::path>{_session.game()}));
+}
