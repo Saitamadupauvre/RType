@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -7,6 +9,8 @@
 #include "../play/FakeLauncher.hpp"
 #include "action/Editor.hpp"
 #include "action/EditorState.hpp"
+#include "engine/core/log/Log.hpp"
+#include "engine/core/log/MemorySink.hpp"
 #include "engine/core/math/Vec2.hpp"
 #include "engine/editor/SceneDocument.hpp"
 
@@ -140,4 +144,36 @@ TEST_F(EditorTest, ViewAndSaveStillWorkWhileRunning) {
     EXPECT_EQ(_editor.state().tool, editor::Tool::pan);
     EXPECT_EQ(_editor.state().mode, Mode::paused);
     EXPECT_TRUE(_editor.state().console.empty());
+}
+
+namespace {
+
+namespace logging = engine::core::log;
+
+class EditorLog : public EditorTest {
+protected:
+    std::shared_ptr<logging::MemorySink> _sink = std::make_shared<logging::MemorySink>();
+    logging::ScopedSink _scope{_sink, logging::Level::Trace};
+
+    [[nodiscard]] bool logged(logging::Level level, const std::string& part) const {
+        return std::ranges::any_of(_sink->records(), [&](const auto& record) {
+            return record.level == level && record.message.find(part) != std::string::npos;
+        });
+    }
+};
+
+} // namespace
+
+TEST_F(EditorLog, HandledActionsAreLoggedAtDebug) {
+    _editor.handle(edit::Move{.id = _rock, .position = {9, 9}});
+
+    EXPECT_TRUE(logged(logging::Level::Debug, "editor: edit::Move id="));
+    EXPECT_FALSE(logged(logging::Level::Info, "refused"));
+}
+
+TEST_F(EditorLog, RefusedActionsAreLoggedAtInfoWithTheReason) {
+    _editor.handle(command::Undo{});
+
+    EXPECT_TRUE(logged(logging::Level::Debug, "editor: command::Undo"));
+    EXPECT_TRUE(logged(logging::Level::Info, "editor: refused command::Undo: "));
 }

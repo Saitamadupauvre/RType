@@ -250,6 +250,7 @@ endfunction()
 
 editor_add_test(core
     SOURCES
+        editor/action/ActionTextTest.cpp
         editor/action/ApplyCommandTest.cpp
         editor/action/ApplyEditTest.cpp
         editor/action/EditorTest.cpp

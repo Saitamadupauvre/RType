@@ -1,10 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "FrameFixture.hpp"
 #include "action/Action.hpp"
+#include "engine/core/log/Log.hpp"
+#include "engine/core/log/MemorySink.hpp"
 #include "ui/CommandTable.hpp"
 #include "ui/UiInput.hpp"
 
@@ -123,4 +127,52 @@ TEST(CommandTableEntries, ShortcutLabelsNameTheModifierAndTheKey) {
 #endif
     EXPECT_EQ(editor::shortcut_label({.key = Key::del}), "Del");
     EXPECT_EQ(editor::shortcut_label({.key = Key::z, .shift = true}), "Shift+Z");
+}
+
+namespace {
+
+namespace logging = engine::core::log;
+
+class ShortcutLog : public CommandTable {
+protected:
+    std::shared_ptr<logging::MemorySink> _sink = std::make_shared<logging::MemorySink>();
+    logging::ScopedSink _scope{_sink, logging::Level::Trace};
+
+    [[nodiscard]] bool traced(const std::string& part) const {
+        return std::ranges::any_of(_sink->records(), [&](const auto& record) {
+            return record.level == logging::Level::Trace &&
+                   record.message.find(part) != std::string::npos;
+        });
+    }
+};
+
+} // namespace
+
+TEST_F(ShortcutLog, KeysAndTheShortcutTheyRunAreTraced) {
+    press(Key::g);
+
+    EXPECT_TRUE(traced("editor: key G"));
+    EXPECT_TRUE(traced("editor: shortcut G runs Move tool"));
+}
+
+TEST_F(ShortcutLog, DisabledShortcutsAreTraced) {
+    press(Key::z, true);
+
+    EXPECT_TRUE(traced("editor: shortcut " +
+                       editor::shortcut_label({.key = Key::z, .primary_modifier = true}) +
+                       " skipped, Undo is disabled"));
+}
+
+TEST_F(ShortcutLog, IgnoredShortcutsAreTraced) {
+    _widgets.focus(CLAY_ID("SomeField"), "text");
+    press(Key::v);
+
+    EXPECT_TRUE(traced("shortcuts ignored"));
+}
+
+TEST_F(ShortcutLog, NothingIsTracedAboveTheLevel) {
+    logging::set_level(logging::Level::Debug);
+    press(Key::g);
+
+    EXPECT_FALSE(traced("editor: key"));
 }

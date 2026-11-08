@@ -2,6 +2,7 @@
 
 #include <initializer_list>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "../GameFixture.hpp"
@@ -80,4 +81,29 @@ TEST_F(EditorCli, AcceptsARuntime) {
 
     ASSERT_TRUE(result.config.has_value());
     EXPECT_EQ(result.config->runtime, std::filesystem::path("/opt/game/runtime"));
+}
+
+TEST_F(EditorCli, LogLevelDefaultsToInfo) {
+    const auto result = parse_cli(args({_game.path().string()}));
+
+    ASSERT_TRUE(result.config.has_value());
+    EXPECT_EQ(result.config->log_level, engine::core::log::Level::Info);
+}
+
+TEST_F(EditorCli, AcceptsEveryLogLevel) {
+    using engine::core::log::Level;
+    for (const auto& [name, level] :
+         {std::pair{"trace", Level::Trace}, std::pair{"debug", Level::Debug},
+          std::pair{"info", Level::Info}, std::pair{"warn", Level::Warn},
+          std::pair{"error", Level::Error}, std::pair{"off", Level::Off}}) {
+        const auto result = parse_cli(args({_game.path().string(), "--log-level", name}));
+
+        ASSERT_TRUE(result.config.has_value()) << name;
+        EXPECT_EQ(result.config->log_level, level) << name;
+    }
+}
+
+TEST_F(EditorCli, RejectsAnUnknownLogLevel) {
+    expect_rejected(args({_game.path().string(), "--log-level", "loud"}));
+    expect_rejected(args({_game.path().string(), "--log-level"}));
 }

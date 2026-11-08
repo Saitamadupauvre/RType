@@ -5,9 +5,11 @@
 #include <utility>
 #include <variant>
 
+#include "action/ActionText.hpp"
 #include "action/ApplyCommand.hpp"
 #include "action/ApplyEdit.hpp"
 #include "action/Overloaded.hpp"
+#include "engine/core/log/Log.hpp"
 
 namespace editor {
 
@@ -62,11 +64,19 @@ void Editor::update() {
 }
 
 void Editor::handle(const Action& action) {
-    report(std::visit(Overloaded{
-                          [&](const Edit& edit) { return apply(edit); },
-                          [&](const Command& command) { return apply(command); },
-                      },
-                      action));
+    namespace logging = engine::core::log;
+    logging::debug("editor: {}", describe_action(action));
+    const CommandResult result = std::visit(Overloaded{
+                                                [&](const Edit& edit) { return apply(edit); },
+                                                [&](const Command& command) {
+                                                    return apply(command);
+                                                },
+                                            },
+                                            action);
+    if (!result.ok) {
+        logging::info("editor: refused {}: {}", describe_action(action), result.message);
+    }
+    report(result);
     refresh_inspector();
 }
 

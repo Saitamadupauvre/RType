@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "action/OpenEditor.hpp"
+#include "engine/core/log/Log.hpp"
 #include "cli/Cli.hpp"
 #include "play/ProcessLauncher.hpp"
 #include "raylib/EditorWindow.hpp"
@@ -13,6 +14,7 @@ int main(int argc, char** argv) {
         (result.exit_code == 0 ? std::cout : std::cerr) << result.message;
         return result.exit_code;
     }
+    engine::core::log::set_level(result.config->log_level);
     auto editor = editor::open_editor(result.config->game);
     if (!editor) {
         std::cerr << "editor: cannot open " << result.config->game.string() << "\n";
