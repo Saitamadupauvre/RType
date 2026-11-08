@@ -1,2 +1,2 @@
-entity "bydo" {}
+entity "enemy" {}
 entity "other" {}

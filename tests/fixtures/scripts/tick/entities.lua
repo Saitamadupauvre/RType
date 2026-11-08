@@ -73,7 +73,7 @@ entity "ship" {
 
     retag = function(self)
         self.tags = { "enemy" }
-        self.sprite = "bydo.png"
+        self.sprite = "enemy.png"
     end,
 
     break_input = function(self)

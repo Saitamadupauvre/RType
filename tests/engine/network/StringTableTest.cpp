@@ -16,8 +16,8 @@ TEST(StringTable, AddGivesIdsFromOneInOrder) {
     StringTable table;
 
     EXPECT_EQ(table.add(StringCategory::type, "player"), 1U);
-    EXPECT_EQ(table.add(StringCategory::type, "bydo"), 2U);
-    EXPECT_EQ(table.id_of(StringCategory::type, "bydo"), 2U);
+    EXPECT_EQ(table.add(StringCategory::type, "enemy"), 2U);
+    EXPECT_EQ(table.id_of(StringCategory::type, "enemy"), 2U);
     ASSERT_NE(table.name_of(StringCategory::type, 1), nullptr);
     EXPECT_EQ(*table.name_of(StringCategory::type, 1), "player");
 }
@@ -25,10 +25,10 @@ TEST(StringTable, AddGivesIdsFromOneInOrder) {
 TEST(StringTable, CategoriesHaveTheirOwnIds) {
     StringTable table;
 
-    EXPECT_EQ(table.add(StringCategory::type, "bydo"), 1U);
-    EXPECT_EQ(table.add(StringCategory::sound, "bydo"), 1U);
+    EXPECT_EQ(table.add(StringCategory::type, "enemy"), 1U);
+    EXPECT_EQ(table.add(StringCategory::sound, "enemy"), 1U);
     EXPECT_EQ(table.add(StringCategory::sound, "laser.wav"), 2U);
-    EXPECT_EQ(table.id_of(StringCategory::music, "bydo"), std::nullopt);
+    EXPECT_EQ(table.id_of(StringCategory::music, "enemy"), std::nullopt);
     EXPECT_EQ(table.entries().size(), 3U);
 }
 
@@ -69,11 +69,11 @@ TEST(StringTable, AddFailsOnceTheCategoryHasNoIdLeft) {
 
 TEST(StringTable, InsertRejectsDuplicatesWithinACategory) {
     StringTable table;
-    ASSERT_TRUE(table.insert({.category = StringCategory::type, .id = 3, .name = "bydo"}));
+    ASSERT_TRUE(table.insert({.category = StringCategory::type, .id = 3, .name = "enemy"}));
 
     EXPECT_FALSE(table.insert({.category = StringCategory::type, .id = 3, .name = "boss"}));
-    EXPECT_FALSE(table.insert({.category = StringCategory::type, .id = 4, .name = "bydo"}));
-    EXPECT_TRUE(table.insert({.category = StringCategory::field, .id = 3, .name = "bydo"}));
+    EXPECT_FALSE(table.insert({.category = StringCategory::type, .id = 4, .name = "enemy"}));
+    EXPECT_TRUE(table.insert({.category = StringCategory::field, .id = 3, .name = "enemy"}));
     EXPECT_EQ(table.entries().size(), 2U);
 }
 
@@ -91,7 +91,7 @@ TEST(StringTable, InsertRejectsReservedIdAndInvalidNames) {
 
 TEST(StringTable, UnknownLookupsFindNothing) {
     StringTable table;
-    table.add(StringCategory::type, "bydo");
+    table.add(StringCategory::type, "enemy");
 
     EXPECT_EQ(table.name_of(StringCategory::type, 2), nullptr);
     EXPECT_EQ(table.name_of(StringCategory::sound, 1), nullptr);
@@ -101,7 +101,7 @@ TEST(StringTable, UnknownLookupsFindNothing) {
 TEST(StringTable, EntriesOfACategoryKeepInsertionOrder) {
     StringTable table;
     table.add(StringCategory::sound, "b.wav");
-    table.add(StringCategory::type, "bydo");
+    table.add(StringCategory::type, "enemy");
     table.add(StringCategory::sound, "a.wav");
 
     EXPECT_EQ(

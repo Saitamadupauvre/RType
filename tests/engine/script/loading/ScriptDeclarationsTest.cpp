@@ -20,7 +20,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path declarations_fixture(const std::string& name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "declarations" / name;
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "declarations" / name;
 }
 
 class ScriptDeclarationsTest : public ::testing::Test {
@@ -54,8 +54,8 @@ protected:
 TEST_F(ScriptDeclarationsTest, RegistersShortFormEntity) {
     EXPECT_TRUE(_runtime.load_scripts(declarations_fixture("short_form")));
 
-    EXPECT_EQ(_runtime.find_declaration("bydo"),
-              (DeclarationInfo{DeclarationKind::Entity, "stage1/bydo.lua"}));
+    EXPECT_EQ(_runtime.find_declaration("enemy"),
+              (DeclarationInfo{DeclarationKind::Entity, "stage1/enemy.lua"}));
     EXPECT_TRUE(messages(logger::Level::Error).empty());
 }
 
@@ -108,10 +108,10 @@ TEST_F(ScriptDeclarationsTest, RejectsShortFormMixedWithTableForm) {
 TEST_F(ScriptDeclarationsTest, RejectsDuplicateNameAcrossFilesShowingBothPaths) {
     EXPECT_FALSE(_runtime.load_scripts(declarations_fixture("duplicate")));
 
-    EXPECT_EQ(_runtime.find_declaration("bydo"),
+    EXPECT_EQ(_runtime.find_declaration("enemy"),
               (DeclarationInfo{DeclarationKind::Entity, "a/first.lua"}));
     EXPECT_TRUE(logged(logger::Level::Error,
-                       {"duplicate declaration 'bydo'", "b/second.lua", "a/first.lua"}));
+                       {"duplicate declaration 'enemy'", "b/second.lua", "a/first.lua"}));
 }
 
 TEST_F(ScriptDeclarationsTest, RejectedDuplicateFileRegistersNothing) {
@@ -218,7 +218,7 @@ TEST_F(ScriptDeclarationsTest, RefusesToLoadTwice) {
     ASSERT_TRUE(_runtime.load_scripts(declarations_fixture("table_form")));
 
     EXPECT_FALSE(_runtime.load_scripts(declarations_fixture("short_form")));
-    EXPECT_FALSE(_runtime.find_declaration("bydo"));
+    EXPECT_FALSE(_runtime.find_declaration("enemy"));
     EXPECT_TRUE(logged(logger::Level::Error, {"already loaded"}));
 }
 

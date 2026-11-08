@@ -1,1 +1,1 @@
-entity "bydo"
+entity "enemy"

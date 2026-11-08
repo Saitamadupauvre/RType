@@ -35,7 +35,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path tick_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "tick";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "tick";
 }
 
 class TickTest : public ::testing::Test {
@@ -194,7 +194,7 @@ TEST_F(TickTest, TagsReadBackAsLuaArray) {
 TEST_F(TickTest, WritingSpriteAndTagsUpdatesComponents) {
     const Entity ship = spawn("ship");
     ASSERT_TRUE(_runtime.call(ship, "retag"));
-    EXPECT_EQ(_world.get<Sprite>(ship).path, "bydo.png");
+    EXPECT_EQ(_world.get<Sprite>(ship).path, "enemy.png");
     EXPECT_EQ(_world.get<Tags>(ship).labels(), (std::vector<std::string>{"enemy"}));
 }
 

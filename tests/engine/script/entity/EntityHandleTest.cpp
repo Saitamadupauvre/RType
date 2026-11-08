@@ -29,7 +29,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path entities_fixture() {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "entities";
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "entities";
 }
 
 class EntityHandleTest : public ::testing::Test {
@@ -77,37 +77,37 @@ protected:
 } // namespace
 
 TEST_F(EntityHandleTest, SpawnInitialisesComponentsFromPrefab) {
-    const Entity bydo = spawn_or_throw("bydo");
+    const Entity enemy = spawn_or_throw("enemy");
 
-    EXPECT_EQ(_world.get<Position>(bydo).pos, (Vec2{800.0F, 0.0F}));
-    EXPECT_EQ(_world.get<PhysicsBody>(bydo).velocity, (Vec2{-150.0F, 0.0F}));
+    EXPECT_EQ(_world.get<Position>(enemy).pos, (Vec2{800.0F, 0.0F}));
+    EXPECT_EQ(_world.get<PhysicsBody>(enemy).velocity, (Vec2{-150.0F, 0.0F}));
 }
 
 TEST_F(EntityHandleTest, SpawnPositionOverridesPrefab) {
-    const Entity bydo = spawn_or_throw("bydo", Vec2{10.0F, 20.0F});
+    const Entity enemy = spawn_or_throw("enemy", Vec2{10.0F, 20.0F});
 
-    EXPECT_EQ(_world.get<Position>(bydo).pos, (Vec2{10.0F, 20.0F}));
+    EXPECT_EQ(_world.get<Position>(enemy).pos, (Vec2{10.0F, 20.0F}));
 }
 
 TEST_F(EntityHandleTest, ReadingNativeFieldReturnsComponent) {
     EXPECT_TRUE(_runtime.run_string(R"(
-        local bydo = spawn("bydo")
-        assert(bydo.x == 800 and bydo.y == 0 and bydo.vx == -150 and bydo.vy == 0)
+        local enemy = spawn("enemy")
+        assert(enemy.x == 800 and enemy.y == 0 and enemy.vx == -150 and enemy.vy == 0)
     )",
                                     "test"));
 }
 
 TEST_F(EntityHandleTest, WritingNativeFieldUpdatesComponent) {
     ASSERT_TRUE(_runtime.run_string(R"(
-        local bydo = spawn("bydo")
-        bydo.x = 42
-        bydo.vy = 7
+        local enemy = spawn("enemy")
+        enemy.x = 42
+        enemy.vy = 7
     )",
                                     "test"));
 
-    const Entity bydo = only_entity();
-    EXPECT_EQ(_world.get<Position>(bydo).pos, (Vec2{42.0F, 0.0F}));
-    EXPECT_EQ(_world.get<PhysicsBody>(bydo).velocity, (Vec2{-150.0F, 7.0F}));
+    const Entity enemy = only_entity();
+    EXPECT_EQ(_world.get<Position>(enemy).pos, (Vec2{42.0F, 0.0F}));
+    EXPECT_EQ(_world.get<PhysicsBody>(enemy).velocity, (Vec2{-150.0F, 7.0F}));
 }
 
 TEST_F(EntityHandleTest, SettingVelocityGivesTheEntityAScriptBody) {
@@ -142,18 +142,18 @@ TEST_F(EntityHandleTest, VelocityOfAnEntityWithoutBodyIsNil) {
 
 TEST_F(EntityHandleTest, ReadOnlyFieldsDescribeTheEntity) {
     EXPECT_TRUE(_runtime.run_string(R"(
-        local bydo = spawn("bydo")
-        assert(bydo.type == "bydo")
-        assert(math.type(bydo.id) == "integer")
-        assert(bydo.id ~= spawn("bydo").id)
+        local enemy = spawn("enemy")
+        assert(enemy.type == "enemy")
+        assert(math.type(enemy.id) == "integer")
+        assert(enemy.id ~= spawn("enemy").id)
     )",
                                     "test"));
 }
 
 TEST_F(EntityHandleTest, CustomFieldsArePerEntity) {
     EXPECT_TRUE(_runtime.run_string(R"(
-        local first = spawn("bydo")
-        local second = spawn("bydo")
+        local first = spawn("enemy")
+        local second = spawn("enemy")
         first.health = 10
         first.target = "player"
         assert(first.health == 10 and second.health == 2)
@@ -164,27 +164,27 @@ TEST_F(EntityHandleTest, CustomFieldsArePerEntity) {
 
 TEST_F(EntityHandleTest, PrefabMethodsReachableThroughHandle) {
     EXPECT_TRUE(_runtime.run_string(R"(
-        local bydo = spawn("bydo")
-        bydo:damage(1)
-        assert(bydo.health == 1)
-        assert(spawn("bydo").health == 2)
+        local enemy = spawn("enemy")
+        enemy:damage(1)
+        assert(enemy.health == 1)
+        assert(spawn("enemy").health == 2)
     )",
                                     "test"));
 }
 
 TEST_F(EntityHandleTest, SameEntityGivesSameHandle) {
     EXPECT_TRUE(_runtime.run_string(R"(
-        local bydo = spawn("bydo")
-        bydo.self_ref = bydo
-        assert(rawequal(bydo.self_ref, bydo))
+        local enemy = spawn("enemy")
+        enemy.self_ref = enemy
+        assert(rawequal(enemy.self_ref, enemy))
     )",
                                     "test"));
 }
 
 TEST_F(EntityHandleTest, LuaSpawnAppliesOverrides) {
     ASSERT_TRUE(_runtime.run_string(R"(
-        local bydo = spawn("bydo", { y = 5, health = 9 })
-        assert(bydo.health == 9)
+        local enemy = spawn("enemy", { y = 5, health = 9 })
+        assert(enemy.health == 9)
     )",
                                     "test"));
 
@@ -192,28 +192,28 @@ TEST_F(EntityHandleTest, LuaSpawnAppliesOverrides) {
 }
 
 TEST_F(EntityHandleTest, CallRunsPrefabMethodWithHandle) {
-    ASSERT_TRUE(_runtime.run_string("kept = spawn('bydo')", "test"));
+    ASSERT_TRUE(_runtime.run_string("kept = spawn('enemy')", "test"));
 
     EXPECT_TRUE(_runtime.call(only_entity(), "heal"));
     EXPECT_TRUE(_runtime.run_string("assert(kept.health == 3)", "test"));
 }
 
 TEST_F(EntityHandleTest, CallReportsMissingMethodWithoutLogging) {
-    const Entity bydo = spawn_or_throw("bydo");
+    const Entity enemy = spawn_or_throw("enemy");
 
-    EXPECT_FALSE(_runtime.call(bydo, "on_spawn"));
+    EXPECT_FALSE(_runtime.call(enemy, "on_spawn"));
     EXPECT_FALSE(logged_error("on_spawn"));
 }
 
 TEST_F(EntityHandleTest, CallLogsErrorRaisedByMethod) {
-    const Entity bydo = spawn_or_throw("bydo");
+    const Entity enemy = spawn_or_throw("enemy");
 
-    EXPECT_FALSE(_runtime.call(bydo, "explode"));
-    EXPECT_TRUE(logged_error("bydo.lua:12: bydo exploded"));
+    EXPECT_FALSE(_runtime.call(enemy, "explode"));
+    EXPECT_TRUE(logged_error("enemy.lua:12: enemy exploded"));
 }
 
 TEST_F(EntityHandleTest, StaleHandleAfterKillLogsErrorAndDoesNotCrash) {
-    ASSERT_TRUE(_runtime.run_string("kept = spawn('bydo')", "test"));
+    ASSERT_TRUE(_runtime.run_string("kept = spawn('enemy')", "test"));
     _world.kill(only_entity());
 
     EXPECT_FALSE(_runtime.run_string("kept.x = 1", "stale"));
@@ -222,40 +222,40 @@ TEST_F(EntityHandleTest, StaleHandleAfterKillLogsErrorAndDoesNotCrash) {
 }
 
 TEST_F(EntityHandleTest, StaleHandleAfterReleaseLogsError) {
-    ASSERT_TRUE(_runtime.run_string("kept = spawn('bydo')", "test"));
-    const Entity bydo = only_entity();
-    _runtime.release(bydo);
+    ASSERT_TRUE(_runtime.run_string("kept = spawn('enemy')", "test"));
+    const Entity enemy = only_entity();
+    _runtime.release(enemy);
 
     EXPECT_FALSE(_runtime.run_string("return kept.x", "stale"));
     EXPECT_TRUE(logged_error("attempt to use a destroyed entity"));
-    EXPECT_FALSE(_runtime.call(bydo, "heal"));
+    EXPECT_FALSE(_runtime.call(enemy, "heal"));
 }
 
 TEST_F(EntityHandleTest, RecycledSlotDoesNotRevivePreviousHandle) {
-    ASSERT_TRUE(_runtime.run_string("kept = spawn('bydo')", "test"));
+    ASSERT_TRUE(_runtime.run_string("kept = spawn('enemy')", "test"));
     const Entity old = only_entity();
     _world.kill(old);
     _runtime.release(old);
-    ASSERT_TRUE(_runtime.spawn("bydo"));
+    ASSERT_TRUE(_runtime.spawn("enemy"));
 
     EXPECT_FALSE(_runtime.run_string("return kept.x", "stale"));
 }
 
 TEST_F(EntityHandleTest, RejectsReadOnlyFieldWrite) {
-    EXPECT_FALSE(_runtime.run_string("spawn('bydo').id = 3", "test"));
+    EXPECT_FALSE(_runtime.run_string("spawn('enemy').id = 3", "test"));
     EXPECT_TRUE(logged_error("entity field 'id' is read-only"));
-    EXPECT_FALSE(_runtime.run_string("spawn('bydo').type = 'boss'", "test"));
+    EXPECT_FALSE(_runtime.run_string("spawn('enemy').type = 'boss'", "test"));
     EXPECT_TRUE(logged_error("entity field 'type' is read-only"));
 }
 
 TEST_F(EntityHandleTest, RejectsWrongTypeForComponentField) {
-    EXPECT_FALSE(_runtime.run_string("spawn('bydo').x = 'left'", "test"));
+    EXPECT_FALSE(_runtime.run_string("spawn('enemy').x = 'left'", "test"));
     EXPECT_TRUE(logged_error("test:1: entity field 'x' cannot be set to a string"));
-    EXPECT_FALSE(_runtime.run_string("spawn('bydo').vx = nil", "test"));
+    EXPECT_FALSE(_runtime.run_string("spawn('enemy').vx = nil", "test"));
 }
 
 TEST_F(EntityHandleTest, LuaSpawnWithBadOverrideLeavesNoEntity) {
-    EXPECT_FALSE(_runtime.run_string("spawn('bydo', { id = 1 })", "test"));
+    EXPECT_FALSE(_runtime.run_string("spawn('enemy', { id = 1 })", "test"));
     EXPECT_TRUE(living_entities().empty());
 }
 
@@ -286,8 +286,8 @@ TEST(EntityHandle, SpawnFailsWithoutWorld) {
     ScriptRuntime runtime = ScriptRuntime::builder().with<ServerApi>().build();
     ASSERT_TRUE(runtime.load_scripts(entities_fixture()));
 
-    EXPECT_FALSE(runtime.spawn("bydo"));
-    EXPECT_TRUE(runtime.run_string("assert(spawn('bydo') == nil)", "test"));
+    EXPECT_FALSE(runtime.spawn("enemy"));
+    EXPECT_TRUE(runtime.run_string("assert(spawn('enemy') == nil)", "test"));
 }
 
 TEST_F(EntityHandleTest, PrefabTableDefaultsAreNotSharedBetweenEntities) {

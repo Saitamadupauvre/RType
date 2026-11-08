@@ -22,7 +22,7 @@ using engine::script::ServerApi;
 namespace {
 
 std::filesystem::path sections_fixture(const std::string& name) {
-    return std::filesystem::path(RTYPE_FIXTURES_DIR) / "scripts" / "sections" / name;
+    return std::filesystem::path(TEST_FIXTURES_DIR) / "scripts" / "sections" / name;
 }
 
 class SectionsTest : public ::testing::Test {
@@ -54,7 +54,7 @@ TEST_F(SectionsTest, ServerRuntimeReadsOnlyServerSection) {
     ASSERT_TRUE(runtime.load_scripts(sections_fixture("split")));
 
     EXPECT_TRUE(check(runtime, "ship", "check_server"));
-    EXPECT_TRUE(check(runtime, "bydo", "check_server"));
+    EXPECT_TRUE(check(runtime, "enemy", "check_server"));
 }
 
 TEST_F(SectionsTest, ClientRuntimeReadsOnlyClientSection) {
@@ -62,7 +62,7 @@ TEST_F(SectionsTest, ClientRuntimeReadsOnlyClientSection) {
     ASSERT_TRUE(runtime.load_scripts(sections_fixture("split")));
 
     EXPECT_TRUE(check(runtime, "ship", "check_client"));
-    EXPECT_TRUE(check(runtime, "bydo", "check_client"));
+    EXPECT_TRUE(check(runtime, "enemy", "check_client"));
 }
 
 TEST_F(SectionsTest, CoreRuntimeReadsNoSection) {
