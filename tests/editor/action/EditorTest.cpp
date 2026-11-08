@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -224,4 +225,35 @@ TEST_F(EditorLog, ReloadSettingsWithoutAFileIsRefused) {
 
     EXPECT_TRUE(logged(logging::Level::Info, "refused command::ReloadSettings"));
     EXPECT_EQ(_editor.state().ui_scale, 1.F);
+}
+
+TEST_F(EditorTest, ReloadScriptsShowsANewPrefab) {
+    std::ofstream(_game.path() / "scripts" / "crate.lua") << "entity \"crate\"\n";
+
+    _editor.handle(command::ReloadScripts{});
+
+    EXPECT_EQ(_editor.state().prefabs, (std::vector<std::string>{"crate", "rock", "ship"}));
+    ASSERT_EQ(_editor.state().console.size(), 1U);
+    EXPECT_EQ(_editor.state().console.front().severity, Severity::info);
+}
+
+TEST_F(EditorTest, ReloadScriptsWorksWhilePlaying) {
+    _editor.handle(command::Play{});
+    std::ofstream(_game.path() / "scripts" / "crate.lua") << "entity \"crate\"\n";
+
+    _editor.handle(command::ReloadScripts{});
+
+    EXPECT_EQ(_editor.state().prefabs, (std::vector<std::string>{"crate", "rock", "ship"}));
+}
+
+TEST_F(EditorTest, ConsoleLinesNamingAScriptPointAtIt) {
+    _editor.handle(command::ReportInvalidInput{.message = "lua: update: rock.lua:2: boom"});
+    _editor.handle(command::ReportInvalidInput{.message = "lua: update: gone.lua:2: boom"});
+    _editor.handle(command::ReportInvalidInput{.message = "not a number"});
+
+    const auto& console = _editor.state().console;
+    ASSERT_EQ(console.size(), 3U);
+    EXPECT_EQ(console[0].script, _game.path() / "scripts" / "rock.lua");
+    EXPECT_TRUE(console[1].script.empty());
+    EXPECT_TRUE(console[2].script.empty());
 }

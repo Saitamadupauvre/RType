@@ -14,6 +14,8 @@ TEST(ActionText, EditsShowTheirFields) {
               "edit::Move id=3 position=(9, 9.5)");
     EXPECT_EQ(describe_action(edit::Place{.type = "rock", .position = {0, 16}}),
               "edit::Place type=rock position=(0, 16)");
+    EXPECT_EQ(describe_action(edit::Duplicate{.id = InstanceId{4}, .offset = {16, 16}}),
+              "edit::Duplicate id=4 offset=(16, 16)");
     EXPECT_EQ(describe_action(edit::ResetField{.id = InstanceId{2}, .key = "Scale.x"}),
               "edit::ResetField id=2 key=Scale.x");
 }
@@ -38,6 +40,15 @@ TEST(ActionText, CommandsShowTheirFields) {
     EXPECT_EQ(
         describe_action(command::SetOverlay{.overlay = editor::Overlay::names, .visible = true}),
         "command::SetOverlay overlay=names visible=true");
+    EXPECT_EQ(describe_action(command::ReloadScripts{}), "command::ReloadScripts");
+    EXPECT_EQ(describe_action(command::CreatePrefab{.name = "crate"}),
+              "command::CreatePrefab name=crate");
+    EXPECT_EQ(describe_action(command::OpenNameDialog{.item = editor::NewItem::scene}),
+              "command::OpenNameDialog item=scene");
+    EXPECT_EQ(describe_action(command::SetNameDialogText{.name = "boss"}),
+              "command::SetNameDialogText name=boss");
+    EXPECT_EQ(describe_action(command::CloseNameDialog{}), "command::CloseNameDialog");
+    EXPECT_EQ(describe_action(command::RevealGameFolder{}), "command::RevealGameFolder");
     EXPECT_EQ(describe_action(command::DuplicateScene{.from = "a", .to = "b"}),
               "command::DuplicateScene from=a to=b");
 }

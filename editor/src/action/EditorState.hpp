@@ -33,6 +33,8 @@ struct ConsoleLine {
     std::string text;
     /** @brief When the line was written, as "HH:MM:SS"; empty when no clock is attached. */
     std::string time{};
+    /** @brief The script the line names (`player.lua:12:`) when it exists; clicking opens it. */
+    std::filesystem::path script{};
 
     bool operator==(const ConsoleLine&) const = default;
 };
@@ -43,6 +45,14 @@ struct ExportDialog {
     ExportPlan plan;
 
     bool operator==(const ExportDialog&) const = default;
+};
+
+/** @brief The open name dialog: what it creates and the name typed so far. */
+struct NameDialog {
+    NewItem item = NewItem::prefab;
+    std::string name;
+
+    bool operator==(const NameDialog&) const = default;
 };
 
 /**
@@ -63,6 +73,7 @@ struct EditorState {
     std::string prefab_filter;
     std::optional<InspectorModel> inspector;
     std::optional<ExportDialog> export_dialog;
+    std::optional<NameDialog> name_dialog;
     /** The user's settings file; empty when no config folder was found. */
     std::filesystem::path settings_file;
     /** `ui.scale` of the settings: multiplies the screen's DPI scale. */

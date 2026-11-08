@@ -11,8 +11,10 @@ in `build/release/bin/`.
 
 ## 1. The game folder
 
-A game is a folder. Create one anywhere, outside the engine's repository if
-you like:
+A game is a folder. `build/release/bin/editor --new coin-chase` creates one
+with a `game.json`, an empty `main` scene and a `scripts/main.lua`, then opens
+it. This tutorial writes each file itself so you see what they hold; create the
+folder anywhere, outside the engine's repository if you like:
 
 ```
 coin-chase/
@@ -160,7 +162,7 @@ empty; the editor fills it:
 }
 ```
 
-The editor cannot create scene files yet, so the first one is written by hand.
+In the editor, File > **New scene...** writes such a file for you.
 
 ## 4. Lay out the level
 

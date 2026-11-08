@@ -197,9 +197,9 @@ TEST_F(CommandPalette, ShortWindowsShowOnlyTheRowsThatFit) {
     const auto texts = frame({}, {}, short_window).texts;
     frame({}, {}, short_window);
 
-    EXPECT_NE(std::ranges::find(texts, "Open script"), texts.end());
+    EXPECT_NE(std::ranges::find(texts, "Save scene"), texts.end());
     EXPECT_EQ(std::ranges::find(texts, "Export game..."), texts.end());
-    const Clay_BoundingBox last = box_of(row("Open script"));
+    const Clay_BoundingBox last = box_of(row("Save scene"));
     EXPECT_LE(last.y + last.height, short_window.height);
 }
 

@@ -6,20 +6,32 @@ layout lives in scenes.
 
 ```sh
 editor examples/r-type                      # open a game folder and its start scene
+editor --new my-game                        # create a game in ./my-game, then open it
 editor examples/r-type --log-level debug    # also log every action on stderr
 editor --help
 ```
 
 | Argument | Meaning |
 |---|---|
-| `game` | Game folder to edit. Required; it must contain a `game.json` ([Game folders](game-folder.md)). |
+| `game` | Game folder to edit. Required without `--new`; it must contain a `game.json` ([Game folders](game-folder.md)). |
+| `--new` | Create a new game in `game` (the current folder when omitted), which must be empty or missing, then open it. |
 | `--runtime <program>` | Program Play starts. Defaults to `engine-runtime` next to the editor. |
 | `--log-level <level>` | `trace`, `debug`, `info` (default), `warn`, `error` or `off`. See [Developer logs](#developer-logs). |
 
 The editor opens the `start_scene` of `game.json`. Without one, it opens no
-scene: click one in the sidebar. Opening the editor without a folder, and
-creating a new game from the editor, are not there yet: create the folder by
-hand as in [Your first game](first-game.md).
+scene: click one in the sidebar.
+
+`--new` writes a game you can play at once:
+
+| File | Content |
+|---|---|
+| `game.json` | `name` (the folder's name) and `start_scene: "main"` |
+| `scenes/main.json` | An empty scene |
+| `scripts/main.lua` | Empty `on_start()` and `on_player_joined(player)` |
+| `assets/` | Empty |
+
+A folder that is not empty, or a file, is refused and nothing is written.
+Opening the editor without any folder is not there yet.
 
 ## Window
 
@@ -50,7 +62,7 @@ hand as in [Your first game](first-game.md).
 | Sidebar | **Prefabs** (every entity type the scripts declare, with a filter), **scenes** (the start scene is marked), **instances** of the open scene | Place a prefab, open a scene, select an instance |
 | Viewport | The scene drawn like the game, the grid, the camera frame, the selection | Select, move, scale, rotate, pan, zoom |
 | Inspector | The selected instance: name, prefab, script, fields by component | Rename, change type, edit and reset fields, open the script |
-| Bottom panel | **Console** (timestamped messages, game output during Play) and **Problems** | Switch tab |
+| Bottom panel | **Console** (timestamped messages, game output during Play) and **Problems** | Switch tab; click a console line that names a script (`player.lua:12: ...`) to open that script |
 | Status bar | Mode, instance count, selection, snap, unsaved changes, game folder, scene | |
 
 ## Words
@@ -142,10 +154,33 @@ it. A value that does not parse is refused with a message in the console.
 - Instances whose type no script declares (a typo, a deleted script) are
   reported when the scene opens and kept in the file exactly as they were.
 
-Creating, duplicating, renaming and deleting scenes, and changing the start
-scene, exist in the editor's model but have no buttons yet. Until they do,
-create scene files by hand (see [Your first game](first-game.md#3-an-empty-scene))
-and set `start_scene` in `game.json`.
+- `Ctrl+D` duplicates the selection: same prefab, name and overrides, one grid
+  cell down and right. The copy is selected, and one undo removes it.
+
+## New prefabs and scenes
+
+File > **New prefab...** and **New scene...** (also in the command palette) ask
+for a name: 1 to 63 letters, digits, `_` or `-`. `Enter` or **Create** makes
+it; `Esc`, **Cancel** or a click outside closes the dialog. A refused name
+keeps the dialog open, with the reason in the console.
+
+| Item | Writes | Then |
+|---|---|---|
+| Prefab | `scripts/<name>.lua`: `entity "<name>"`, a white `color` and a 64 × 64 `hitbox` | Reloads the scripts, so the prefab is listed, and opens the file |
+| Scene | `scenes/<name>.json`, empty | Opens it |
+
+A prefab name that is already declared, or a scene or file that exists, is
+refused.
+
+- File > **Reload scripts** reads `scripts/` and `game.json` again, so new,
+  changed and deleted prefabs show without restarting. The open scene, its
+  unsaved changes, its undo history and the selection are kept; instances of a
+  type that no longer exists become problems. It works while the game plays.
+- File > **Reveal game folder** opens the game folder in your file manager.
+
+Duplicating, renaming and deleting scenes, and changing the start scene, exist
+in the editor's model but have no buttons yet: set `start_scene` in
+`game.json`.
 
 ## Play
 
@@ -157,7 +192,8 @@ and set `start_scene` in `game.json`.
    a server and a client in one process, starting from that scene instead of
    the `start_scene`.
 3. Everything the game prints, Lua errors included, goes to the console. A
-   Lua error never closes the editor.
+   Lua error never closes the editor, and clicking its line opens the script
+   it names (your system's opener cannot jump to the line itself).
 
 | Command | Effect |
 |---|---|
@@ -179,8 +215,8 @@ dedicated server. See [Run and export](run-and-export.md#exporting-from-the-edit
 
 | Menu | Commands |
 |---|---|
-| File | Save scene, Discard changes, Open script, Open settings, Reload settings, Export game... |
-| Edit | Undo, Redo, Delete selection |
+| File | New prefab..., New scene..., Save scene, Discard changes, Open script, Reveal game folder, Open settings, Reload settings, Reload scripts, Export game... |
+| Edit | Undo, Redo, Duplicate selection, Delete selection |
 | View | Select tool, Move tool, Pan tool, Snap to grid, Show hitboxes, Show names |
 | Scene | Play, Pause, Stop |
 | Help | The viewport controls that have no menu entry |
@@ -189,6 +225,7 @@ dedicated server. See [Run and export](run-and-export.md#exporting-from-the-edit
 |---|---|
 | `Ctrl+S` | Save scene |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
+| `Ctrl+D` | Duplicate the selection |
 | `Delete` | Delete the selection |
 | `V` / `G` / `H` | Select / Move / Pan tool |
 | `Ctrl+Shift+P` | Command palette |

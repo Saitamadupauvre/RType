@@ -11,6 +11,7 @@ TEST(LetterKey, MapsTheLettersTheEditorUses) {
     EXPECT_EQ(letter_key("a"), Key::a);
     EXPECT_EQ(letter_key("z"), Key::z);
     EXPECT_EQ(letter_key("h"), Key::h);
+    EXPECT_EQ(letter_key("d"), Key::d);
 }
 
 TEST(LetterKey, IgnoresCase) { EXPECT_EQ(letter_key("A"), Key::a); }

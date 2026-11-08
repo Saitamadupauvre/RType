@@ -106,3 +106,13 @@ TEST_F(ApplyEdit, ChangeTypeToAnUnknownPrefabIsRefused) {
     EXPECT_FALSE(apply_edit(_session, editor::edit::ChangeType{.id = _rock, .type = "ghost"}).ok);
     EXPECT_EQ(instance(_session, _rock).type, "rock");
 }
+
+TEST_F(ApplyEdit, DuplicateAddsASelectedCopy) {
+    const auto before = _session.document().instances.size();
+
+    ASSERT_TRUE(apply_edit(_session, editor::edit::Duplicate{.id = _rock, .offset = {16, 16}}).ok);
+
+    EXPECT_EQ(_session.document().instances.size(), before + 1);
+    EXPECT_NE(_session.selection(), _rock);
+    EXPECT_TRUE(_session.can_undo());
+}

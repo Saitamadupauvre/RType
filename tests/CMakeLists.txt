@@ -264,9 +264,11 @@ editor_add_test(core
         editor/settings/SettingsTest.cpp
         editor/play/PlaySessionTest.cpp
         editor/play/ProcessLauncherTest.cpp
+        editor/project/ProjectFilesTest.cpp
         editor/text/CaretScrollTest.cpp
         editor/text/FitTextTest.cpp
         editor/text/FuzzyMatchTest.cpp
+        editor/text/ScriptLocationTest.cpp
         editor/text/TextEditTest.cpp
         editor/ui/ClickCounterTest.cpp
         editor/ui/CommandTableTest.cpp
@@ -281,6 +283,7 @@ editor_add_test(core
         editor/ui/sections/InspectorFieldsTest.cpp
         editor/ui/sections/InspectorTest.cpp
         editor/ui/sections/MenuBarTest.cpp
+        editor/ui/sections/NameDialogTest.cpp
         editor/ui/sections/ViewportTest.cpp
         editor/ui/widgets/CheckboxTest.cpp
         editor/ui/widgets/DropdownTest.cpp

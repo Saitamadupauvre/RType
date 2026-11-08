@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <optional>
 #include <string>
@@ -332,4 +334,91 @@ TEST_F(EditorSessionTest, ChangeTypeRefusesWhatIsNotADeclaredEntity) {
 
     EXPECT_EQ(instance(_hero).type, "ship");
     EXPECT_FALSE(session().can_undo());
+}
+
+TEST_F(EditorSessionTest, DuplicateCopiesTheInstanceRightAfterIt) {
+    ASSERT_TRUE(session().duplicate(_hero, Vec2{16, 0}).ok);
+
+    const auto& instances = session().document().instances;
+    ASSERT_EQ(instances.size(), 3U);
+    EXPECT_EQ(instances[0].id, _hero);
+    EXPECT_EQ(instances[2].id, _rock);
+    const engine::script::Instance& copy = instances[1].instance;
+    EXPECT_EQ(copy.type, "ship");
+    EXPECT_EQ(copy.name, "hero");
+    EXPECT_EQ(copy.position, (Vec2{17, 2}));
+    EXPECT_EQ(copy.overrides, instance(_hero).overrides);
+}
+
+TEST_F(EditorSessionTest, DuplicateSelectsTheCopy) {
+    ASSERT_TRUE(session().duplicate(_hero, Vec2{0, 16}).ok);
+
+    const InstanceId copy = session().document().instances[1].id;
+    EXPECT_NE(copy, _hero);
+    EXPECT_EQ(session().selection(), copy);
+    EXPECT_TRUE(session().entity_of(copy).has_value());
+}
+
+TEST_F(EditorSessionTest, DuplicateIsOneUndoableEdit) {
+    ASSERT_TRUE(session().duplicate(_hero, Vec2{16, 16}).ok);
+
+    ASSERT_TRUE(session().undo().ok);
+
+    EXPECT_EQ(session().document().instances.size(), 2U);
+    EXPECT_FALSE(session().selection().has_value());
+    EXPECT_FALSE(session().unsaved());
+}
+
+TEST_F(EditorSessionTest, DuplicateRefusesAnUnknownIdOrANonFiniteOffset) {
+    EXPECT_FALSE(session().duplicate(InstanceId{}, Vec2{16, 0}).ok);
+    EXPECT_FALSE(session().duplicate(_hero, Vec2{std::numeric_limits<float>::infinity(), 0}).ok);
+    EXPECT_FALSE(session().duplicate(_hero, Vec2{0, std::numeric_limits<float>::quiet_NaN()}).ok);
+
+    EXPECT_EQ(session().document().instances.size(), 2U);
+    EXPECT_FALSE(session().can_undo());
+}
+
+TEST_F(EditorSessionTest, ReloadScriptsSeesANewScript) {
+    std::ofstream(_game.path() / "scripts" / "crate.lua") << "entity \"crate\"\n";
+
+    const CommandResult result = session().reload_scripts();
+
+    ASSERT_TRUE(result.ok);
+    EXPECT_NE(result.message.find("3 prefabs"), std::string::npos) << result.message;
+    EXPECT_EQ(session().prefabs(), (std::vector<std::string>{"crate", "rock", "ship"}));
+    EXPECT_TRUE(session().place("crate", Vec2{0, 0}).ok);
+}
+
+TEST_F(EditorSessionTest, ReloadScriptsKeepsTheSceneHistoryAndSelection) {
+    ASSERT_TRUE(session().move(_rock, Vec2{40, 40}).ok);
+    ASSERT_TRUE(session().select(_hero).ok);
+
+    ASSERT_TRUE(session().reload_scripts().ok);
+
+    EXPECT_EQ(session().open_scene_name(), "level1");
+    EXPECT_EQ(instance(_rock).position, (Vec2{40, 40}));
+    EXPECT_TRUE(session().unsaved());
+    EXPECT_TRUE(session().can_undo());
+    EXPECT_EQ(session().selection(), _hero);
+    EXPECT_TRUE(session().entity_of(_hero).has_value());
+}
+
+TEST_F(EditorSessionTest, ReloadScriptsTurnsADeletedTypeIntoAProblem) {
+    std::filesystem::remove(_game.path() / "scripts" / "rock.lua");
+
+    ASSERT_TRUE(session().reload_scripts().ok);
+
+    EXPECT_EQ(session().prefabs(), (std::vector<std::string>{"ship"}));
+    EXPECT_FALSE(session().entity_of(_rock).has_value());
+    EXPECT_FALSE(session().problems().empty());
+}
+
+TEST_F(EditorSessionTest, ReloadScriptsSaysWhenAScriptFails) {
+    std::ofstream(_game.path() / "scripts" / "broken.lua") << "entity \"broken\" {\n";
+
+    const CommandResult result = session().reload_scripts();
+
+    ASSERT_TRUE(result.ok);
+    EXPECT_FALSE(session().scripts_loaded());
+    EXPECT_NE(result.message.find("failed"), std::string::npos) << result.message;
 }

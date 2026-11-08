@@ -24,6 +24,9 @@ CommandResult apply_edit(EditorSession& session, const Edit& edit) {
             [&](const edit::ChangeType& change) {
                 return session.change_type(change.id, change.type);
             },
+            [&](const edit::Duplicate& duplicate) {
+                return session.duplicate(duplicate.id, duplicate.offset);
+            },
         },
         edit);
 }

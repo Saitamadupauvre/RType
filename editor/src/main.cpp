@@ -10,6 +10,7 @@
 #include "cli/Cli.hpp"
 #include "engine/core/log/Log.hpp"
 #include "play/ProcessLauncher.hpp"
+#include "project/ProjectFiles.hpp"
 #include "raylib/EditorWindow.hpp"
 #include "settings/Settings.hpp"
 
@@ -20,6 +21,14 @@ int main(int argc, char** argv) {
         return result.exit_code;
     }
     engine::core::log::set_level(result.config->log_level);
+    if (result.config->create) {
+        const auto created = editor::create_project(result.config->game);
+        if (!created.ok) {
+            std::cerr << "editor: " << created.message << "\n";
+            return 84;
+        }
+        engine::core::log::info("editor: {}", created.message);
+    }
     auto editor = editor::open_editor(result.config->game);
     if (!editor) {
         std::cerr << "editor: cannot open " << result.config->game.string() << "\n";

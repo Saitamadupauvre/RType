@@ -11,6 +11,8 @@
 #include "action/ApplyEdit.hpp"
 #include "action/Overloaded.hpp"
 #include "engine/core/log/Log.hpp"
+#include "engine/script/GameFolder.hpp"
+#include "text/ScriptLocation.hpp"
 
 namespace editor {
 
@@ -52,6 +54,13 @@ void Editor::attach_clock(std::function<std::string()> clock) { _clock = std::mo
 void Editor::log(ConsoleLine line) {
     if (_clock) {
         line.time = _clock();
+    }
+    if (const auto location = script_location(line.text)) {
+        const auto file = engine::script::scripts_folder(_session.game()) / location->file;
+        std::error_code error;
+        if (std::filesystem::is_regular_file(file, error)) {
+            line.script = file;
+        }
     }
     _state.console.push_back(std::move(line));
 }

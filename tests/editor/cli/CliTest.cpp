@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <initializer_list>
 #include <string>
 #include <utility>
@@ -106,4 +107,59 @@ TEST_F(EditorCli, AcceptsEveryLogLevel) {
 TEST_F(EditorCli, RejectsAnUnknownLogLevel) {
     expect_rejected(args({_game.path().string(), "--log-level", "loud"}));
     expect_rejected(args({_game.path().string(), "--log-level"}));
+}
+
+TEST_F(EditorCli, NewCreatesInTheCurrentFolderByDefault) {
+    const auto empty = _game.path() / "empty";
+    std::filesystem::create_directories(empty);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(empty);
+    const auto result = parse_cli(args({"--new"}));
+    std::filesystem::current_path(previous);
+
+    ASSERT_TRUE(result.config.has_value()) << result.message;
+    EXPECT_TRUE(result.config->create);
+    EXPECT_EQ(result.config->game, std::filesystem::path("."));
+}
+
+TEST_F(EditorCli, NewAcceptsAMissingFolder) {
+    const auto folder = _game.path() / "new-game";
+
+    const auto result = parse_cli(args({"--new", folder.string()}));
+
+    ASSERT_TRUE(result.config.has_value()) << result.message;
+    EXPECT_TRUE(result.config->create);
+    EXPECT_EQ(result.config->game, folder);
+}
+
+TEST_F(EditorCli, NewAcceptsAnEmptyFolder) {
+    const auto folder = _game.path() / "empty";
+    std::filesystem::create_directories(folder);
+
+    EXPECT_TRUE(parse_cli(args({folder.string(), "--new"})).config.has_value());
+}
+
+TEST_F(EditorCli, NewRefusesAFolderThatIsNotEmpty) {
+    const auto result = parse_cli(args({"--new", _game.path().string()}));
+
+    EXPECT_FALSE(result.config.has_value());
+    EXPECT_EQ(result.exit_code, error_exit_code);
+    EXPECT_NE(result.message.find("not empty"), std::string::npos) << result.message;
+}
+
+TEST_F(EditorCli, NewRefusesAFile) {
+    expect_rejected(args({"--new", (_game.path() / "game.json").string()}));
+}
+
+TEST_F(EditorCli, AFolderWithoutGameJsonPointsAtNew) {
+    const auto result = parse_cli(args({(_game.path() / "scenes").string()}));
+
+    EXPECT_NE(result.message.find("--new"), std::string::npos) << result.message;
+}
+
+TEST_F(EditorCli, OpeningAGameDoesNotCreate) {
+    const auto result = parse_cli(args({_game.path().string()}));
+
+    ASSERT_TRUE(result.config.has_value());
+    EXPECT_FALSE(result.config->create);
 }

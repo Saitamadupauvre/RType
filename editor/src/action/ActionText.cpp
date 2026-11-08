@@ -77,6 +77,10 @@ std::string edit_text(const Edit& edit) {
                 return std::format("edit::ChangeType id={} type={}", id_text(change.id),
                                    change.type);
             },
+            [](const edit::Duplicate& duplicate) {
+                return std::format("edit::Duplicate id={} offset={}", id_text(duplicate.id),
+                                   point_text(duplicate.offset));
+            },
         },
         edit);
 }
@@ -89,6 +93,9 @@ std::string scene_text(const Command& command) {
             },
             [](const command::OpenScene& scene) {
                 return std::format("command::OpenScene name={}", scene.name);
+            },
+            [](const command::CreatePrefab& prefab) {
+                return std::format("command::CreatePrefab name={}", prefab.name);
             },
             [](const command::DuplicateScene& scene) {
                 return std::format("command::DuplicateScene from={} to={}", scene.from, scene.to);
@@ -146,8 +153,12 @@ std::string command_text(const Command& command) {
             [](const command::OpenScript& open) {
                 return std::format("command::OpenScript file={}", open.file.generic_string());
             },
+            [](const command::RevealGameFolder&) {
+                return std::string("command::RevealGameFolder");
+            },
             [](const command::OpenSettings&) { return std::string("command::OpenSettings"); },
             [](const command::ReloadSettings&) { return std::string("command::ReloadSettings"); },
+            [](const command::ReloadScripts&) { return std::string("command::ReloadScripts"); },
             [](const command::Play&) { return std::string("command::Play"); },
             [](const command::Pause&) { return std::string("command::Pause"); },
             [](const command::Stop&) { return std::string("command::Stop"); },
@@ -158,6 +169,14 @@ std::string command_text(const Command& command) {
                                    joined_modes(change.settings.modes));
             },
             [](const command::CloseExport&) { return std::string("command::CloseExport"); },
+            [](const command::OpenNameDialog& open) {
+                return std::format("command::OpenNameDialog item={}",
+                                   open.item == NewItem::prefab ? "prefab" : "scene");
+            },
+            [](const command::SetNameDialogText& text) {
+                return std::format("command::SetNameDialogText name={}", text.name);
+            },
+            [](const command::CloseNameDialog&) { return std::string("command::CloseNameDialog"); },
             [](const command::RunExport&) { return std::string("command::RunExport"); },
             [](const auto&) { return std::string{}; },
         },

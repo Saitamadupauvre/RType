@@ -30,6 +30,7 @@ add_library(editor-core STATIC
     src/cli/Cli.cpp
     src/exporter/GameExport.cpp
     src/play/PlaySession.cpp
+    src/project/ProjectFiles.cpp
     src/play/ProcessLauncher.cpp
     src/render/Geometry.cpp
     src/render/ScissorStack.cpp
@@ -37,6 +38,7 @@ add_library(editor-core STATIC
     src/text/CaretScroll.cpp
     src/text/FitText.cpp
     src/text/FuzzyMatch.cpp
+    src/text/ScriptLocation.cpp
     src/text/TextEdit.cpp
     src/text/Utf8.cpp
     src/ui/ClickCounter.cpp
@@ -57,6 +59,7 @@ add_library(editor-core STATIC
     src/ui/sections/Inspector.cpp
     src/ui/sections/InspectorFields.cpp
     src/ui/sections/MenuBar.cpp
+    src/ui/sections/NameDialog.cpp
     src/ui/sections/PanelHeader.cpp
     src/ui/sections/Sidebar.cpp
     src/ui/sections/StatusBar.cpp

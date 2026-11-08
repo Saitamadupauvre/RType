@@ -42,6 +42,15 @@ std::optional<Action> delete_selection(const Editor& editor) {
     return edit::Remove{.id = *selection};
 }
 
+std::optional<Action> duplicate_selection(const Editor& editor) {
+    const auto selection = editor.session().selection();
+    if (!editing(editor) || !selection) {
+        return std::nullopt;
+    }
+    const float step = editor.state().view.grid_size;
+    return edit::Duplicate{.id = *selection, .offset = {step, step}};
+}
+
 std::optional<Action> discard(const Editor& editor) {
     if (!editing(editor) || !editor.session().unsaved()) {
         return std::nullopt;
@@ -71,8 +80,23 @@ std::optional<Action> reload_settings(const Editor& editor) {
     return command::ReloadSettings{};
 }
 
+std::optional<Action> reload_scripts(const Editor&) { return command::ReloadScripts{}; }
+
+std::optional<Action> reveal_game_folder(const Editor&) { return command::RevealGameFolder{}; }
+
+bool dialog_open(const Editor& editor) {
+    return editor.state().export_dialog || editor.state().name_dialog;
+}
+
+template <NewItem item> std::optional<Action> open_name_dialog(const Editor& editor) {
+    if (!editing(editor) || dialog_open(editor)) {
+        return std::nullopt;
+    }
+    return command::OpenNameDialog{.item = item};
+}
+
 std::optional<Action> open_export(const Editor& editor) {
-    if (!editing(editor) || editor.state().export_dialog) {
+    if (!editing(editor) || dialog_open(editor)) {
         return std::nullopt;
     }
     return command::OpenExport{};
@@ -127,12 +151,24 @@ constexpr Shortcut primary(Key key) { return {.key = key, .primary_modifier = tr
 constexpr Shortcut plain(Key key) { return {.key = key}; }
 
 constexpr std::array table{
+    CommandEntry{.label = "New prefab...",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = open_name_dialog<NewItem::prefab>},
+    CommandEntry{.label = "New scene...",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = open_name_dialog<NewItem::scene>},
     CommandEntry{
         .label = "Save scene", .menu = Menu::file, .shortcut = primary(Key::s), .make = save},
     CommandEntry{
         .label = "Discard changes", .menu = Menu::file, .shortcut = std::nullopt, .make = discard},
     CommandEntry{
         .label = "Open script", .menu = Menu::file, .shortcut = std::nullopt, .make = open_script},
+    CommandEntry{.label = "Reveal game folder",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = reveal_game_folder},
     CommandEntry{.label = "Open settings",
                  .menu = Menu::file,
                  .shortcut = std::nullopt,
@@ -141,12 +177,20 @@ constexpr std::array table{
                  .menu = Menu::file,
                  .shortcut = std::nullopt,
                  .make = reload_settings},
+    CommandEntry{.label = "Reload scripts",
+                 .menu = Menu::file,
+                 .shortcut = std::nullopt,
+                 .make = reload_scripts},
     CommandEntry{.label = "Export game...",
                  .menu = Menu::file,
                  .shortcut = std::nullopt,
                  .make = open_export},
     CommandEntry{.label = "Undo", .menu = Menu::edit, .shortcut = primary(Key::z), .make = undo},
     CommandEntry{.label = "Redo", .menu = Menu::edit, .shortcut = primary(Key::y), .make = redo},
+    CommandEntry{.label = "Duplicate selection",
+                 .menu = Menu::edit,
+                 .shortcut = primary(Key::d),
+                 .make = duplicate_selection},
     CommandEntry{.label = "Delete selection",
                  .menu = Menu::edit,
                  .shortcut = plain(Key::del),
@@ -214,6 +258,8 @@ std::string_view key_name(Key key) {
         return "H";
     case Key::p:
         return "P";
+    case Key::d:
+        return "D";
     case Key::del:
         return "Del";
     case Key::backspace:
@@ -272,7 +318,7 @@ void trace_keys(const UiInput& input) {
 void emit_shortcuts(Ui& ui, const Editor& editor) {
     namespace logging = engine::core::log;
     trace_keys(ui.input());
-    if (ui.widgets().wants_keyboard() || editor.state().export_dialog) {
+    if (ui.widgets().wants_keyboard() || dialog_open(editor)) {
         if (!ui.input().keys_pressed.empty()) {
             logging::trace("editor: shortcuts ignored, a field or dialog has the keyboard");
         }
