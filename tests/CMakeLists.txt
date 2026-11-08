@@ -203,6 +203,7 @@ function(runtime_add_test name)
         TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
     workspace_set_warnings(${target})
+    set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "runtime.${name}.")
 endfunction()
 
