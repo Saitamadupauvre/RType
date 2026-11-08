@@ -264,6 +264,7 @@ editor_add_test(core
         editor/play/ProcessLauncherTest.cpp
         editor/text/CaretScrollTest.cpp
         editor/text/FitTextTest.cpp
+        editor/text/FuzzyMatchTest.cpp
         editor/text/TextEditTest.cpp
         editor/ui/ClickCounterTest.cpp
         editor/ui/CommandTableTest.cpp
@@ -273,6 +274,7 @@ editor_add_test(core
         editor/ui/LetterKeyTest.cpp
         editor/ui/SmoothScrollTest.cpp
         editor/ui/ThemeTest.cpp
+        editor/ui/sections/CommandPaletteTest.cpp
         editor/ui/sections/ExportDialogTest.cpp
         editor/ui/sections/InspectorFieldsTest.cpp
         editor/ui/sections/InspectorTest.cpp

@@ -33,6 +33,7 @@ add_library(editor-core STATIC
     src/render/ScissorStack.cpp
     src/text/CaretScroll.cpp
     src/text/FitText.cpp
+    src/text/FuzzyMatch.cpp
     src/text/TextEdit.cpp
     src/text/Utf8.cpp
     src/ui/ClickCounter.cpp
@@ -48,6 +49,7 @@ add_library(editor-core STATIC
     src/ui/SmoothScroll.cpp
     src/ui/WidgetState.cpp
     src/ui/sections/BottomPanel.cpp
+    src/ui/sections/CommandPalette.cpp
     src/ui/sections/ExportDialog.cpp
     src/ui/sections/Inspector.cpp
     src/ui/sections/InspectorFields.cpp

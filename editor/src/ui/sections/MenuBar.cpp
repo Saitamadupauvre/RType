@@ -27,7 +27,9 @@ constexpr float menu_width = 240.F;
 constexpr float check_width = 18.F;
 constexpr std::string_view check_mark = "\xE2\x9C\x93";
 
-constexpr std::array<std::string_view, 5> menu_titles{"File", "Edit", "View", "Scene", "Help"};
+constexpr std::array<std::string_view, 5> menu_titles{
+    menu_title(Menu::file), menu_title(Menu::edit), menu_title(Menu::view),
+    menu_title(Menu::scene), "Help"};
 constexpr std::array menus{Menu::file, Menu::edit, Menu::view, Menu::scene};
 
 struct HelpLine {
@@ -128,6 +130,12 @@ void entry_row(Ui& ui, const Editor& editor, std::size_t index, const CommandEnt
 
 void help_rows(Ui& ui) {
     const Theme& theme = ui.theme();
+    menu_row(theme, CLAY_ID("MenuHelpPalette"), false, [&] {
+        text(theme, CLAY_STRING("Command palette"), size::text, color::text);
+        spacer();
+        text(theme, ui.keep(shortcut_label(palette_shortcut)), size::small_text,
+             color::text_muted);
+    });
     for (std::size_t index = 0; index < help_lines.size(); ++index) {
         const HelpLine& line = help_lines[index];
         menu_row(theme, CLAY_IDI("MenuHelp", static_cast<std::uint32_t>(index)), false, [&] {

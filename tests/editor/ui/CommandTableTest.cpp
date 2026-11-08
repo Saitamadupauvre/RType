@@ -34,7 +34,7 @@ protected:
 } // namespace
 
 TEST(CommandTableEntries, ShortcutsAreUnique) {
-    std::vector<Shortcut> seen;
+    std::vector<Shortcut> seen{editor::palette_shortcut};
     for (const auto& entry : command_table()) {
         if (entry.shortcut) {
             EXPECT_EQ(std::ranges::count(seen, *entry.shortcut), 0) << entry.label;

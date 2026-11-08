@@ -24,6 +24,24 @@ struct Shortcut {
 /** @brief The menu bar menu a command is listed in. */
 enum class Menu : std::uint8_t { file, edit, view, scene };
 
+/** @brief The title of @p menu in the menu bar. */
+[[nodiscard]] constexpr std::string_view menu_title(Menu menu) {
+    switch (menu) {
+    case Menu::file:
+        return "File";
+    case Menu::edit:
+        return "Edit";
+    case Menu::view:
+        return "View";
+    case Menu::scene:
+        return "Scene";
+    }
+    return "";
+}
+
+/** @brief Opens the command palette; never used by an entry of the table. */
+inline constexpr Shortcut palette_shortcut{.key = Key::p, .primary_modifier = true, .shift = true};
+
 /**
  * @brief One user-facing command, shared by keyboard shortcuts, menus and the command palette.
  *
