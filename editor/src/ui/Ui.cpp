@@ -29,4 +29,8 @@ std::vector<Action> Ui::take_actions() { return std::exchange(_actions, {}); }
 
 Clay_String Ui::keep(std::string text) { return view_of(_texts.emplace_back(std::move(text))); }
 
+void Ui::request_cursor(Cursor cursor) noexcept { _cursor = cursor; }
+
+Cursor Ui::cursor() const noexcept { return _cursor; }
+
 } // namespace editor

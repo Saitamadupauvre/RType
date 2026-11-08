@@ -78,7 +78,10 @@ Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimension
             viewport(ui, editor);
             inspector(ui, editor);
         }
-        bottom_panel(ui, editor, bottom_panel_height(ui.theme(), window.height));
+        resize_bottom_panel(ui);
+        bottom_panel(
+            ui, editor,
+            bottom_panel_height(ui.theme(), window.height, ui.widgets().bottom_panel().height));
         status_bar(ui, editor);
         refusal_toast(ui, editor);
         drag_chip(ui);

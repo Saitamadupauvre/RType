@@ -20,6 +20,17 @@ namespace editor {
 namespace {
 
 constexpr float thumbnail_size = 24.F;
+constexpr float grip_height = 5.F;
+
+Clay_ElementId grip_id() { return CLAY_ID("BottomPanelGrip"); }
+
+void grip(Ui& ui) {
+    const bool active = ui.widgets().bottom_panel().grab || Ui::hovered(grip_id());
+    CLAY({.id = grip_id(),
+          .layout = {.sizing = {.width = CLAY_SIZING_GROW(),
+                                .height = CLAY_SIZING_FIXED(ui.theme().px(grip_height))}},
+          .backgroundColor = active ? color::focus : Clay_Color{}}) {}
+}
 
 void tab(Ui& ui, Clay_ElementId id, Clay_String label, BottomTab tab, BottomTab current) {
     const Theme& theme = ui.theme();
@@ -194,11 +205,32 @@ void assets(Ui& ui, const Editor& editor) {
 
 } // namespace
 
-float bottom_panel_height(const Theme& theme, float window_height) {
+float bottom_panel_height(const Theme& theme, float window_height, float chosen) {
     const float others =
         theme.px(size::menu_bar + size::toolbar + size::status_bar + size::workspace_min);
-    return std::clamp(window_height - others, theme.px(size::bottom_panel_min),
-                      theme.px(size::bottom_panel));
+    const float wanted = theme.px(std::clamp(chosen, bottom_panel_least, bottom_panel_most));
+    return std::max(theme.px(size::bottom_panel_min), std::min(wanted, window_height - others));
+}
+
+void resize_bottom_panel(Ui& ui) {
+    BottomPanelState& panel = ui.widgets().bottom_panel();
+    const UiInput& input = ui.input();
+    if (ui.clicked(grip_id())) {
+        if (input.click_count == 2) {
+            panel = BottomPanelState{};
+        } else {
+            panel.grab = PanelGrab{.pointer_y = input.pointer.y, .height = panel.height};
+        }
+    } else if (panel.grab && input.primary_down) {
+        const float moved = (input.pointer.y - panel.grab->pointer_y) / ui.theme().scale;
+        panel.height =
+            std::clamp(panel.grab->height - moved, bottom_panel_least, bottom_panel_most);
+    } else {
+        panel.grab.reset();
+    }
+    if (panel.grab || Ui::hovered(grip_id())) {
+        ui.request_cursor(Cursor::resize_vertical);
+    }
 }
 
 void bottom_panel(Ui& ui, const Editor& editor, float height) {
@@ -208,6 +240,7 @@ void bottom_panel(Ui& ui, const Editor& editor, float height) {
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::toolbar,
           .border = {.color = color::border, .width = {.top = theme.px16(1.F)}}}) {
+        grip(ui);
         tabs(ui, editor);
         CLAY({.id = CLAY_ID("BottomContent"),
               .layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
