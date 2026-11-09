@@ -40,7 +40,13 @@ runs:
     - name: Bootstrap vcpkg (Linux / macOS)
       if: runner.os != 'Windows'
       shell: bash
-      run: '"$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics'
+      run: |
+        for attempt in 1 2 3 4 5; do
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics && exit 0
+          echo "::warning::Bootstrapping vcpkg failed (attempt $attempt of 5), retrying"
+          sleep $((attempt * 15))
+        done
+        exit 1
 
     - name: Cache built packages
       uses: actions/cache@v6

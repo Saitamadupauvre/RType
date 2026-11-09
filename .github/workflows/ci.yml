@@ -54,7 +54,7 @@ jobs:
           restore-keys: ccache-${{ matrix.name }}-
 
       - name: Configure, build, test
-        run: cmake --workflow --preset ci
+        run: .github/scripts/run-workflow.sh ci
         env:
           CXX: ${{ matrix.cxx }}
           CMAKE_CXX_COMPILER_LAUNCHER: ${{ matrix.ccache && 'ccache' || '' }}
@@ -81,7 +81,7 @@ jobs:
         run: sudo sysctl vm.mmap_rnd_bits=28
 
       - name: Configure, build, test
-        run: cmake --workflow --preset ${{ matrix.preset }}
+        run: .github/scripts/run-workflow.sh ${{ matrix.preset }}
         env:
           CXX: clang++
 
@@ -98,7 +98,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang-tidy
 
       - name: Configure and build with clang-tidy
-        run: cmake --workflow --preset tidy
+        run: .github/scripts/run-workflow.sh tidy
         env:
           CXX: clang++
 
