@@ -43,4 +43,11 @@ double FixedStepLoop::alpha() const {
 
 Duration FixedStepLoop::step() const { return _config.step; }
 
+void FixedStepLoop::set_step(Duration step) {
+    if (step <= Duration::zero()) {
+        throw std::invalid_argument("FixedStepLoop step must be positive");
+    }
+    _config.step = step;
+}
+
 } // namespace engine::core::time

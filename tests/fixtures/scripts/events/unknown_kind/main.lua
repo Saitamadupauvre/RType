@@ -1,0 +1,1 @@
+event "explosion" { size = "double" }

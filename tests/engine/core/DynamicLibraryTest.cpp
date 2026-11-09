@@ -3,7 +3,7 @@
 #include <string>
 #include <utility>
 
-#include "engine/core/DynamicLibrary.hpp"
+#include "engine/core/util/DynamicLibrary.hpp"
 
 using engine::core::DynamicLibrary;
 

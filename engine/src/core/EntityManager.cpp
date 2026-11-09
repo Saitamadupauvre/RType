@@ -1,4 +1,4 @@
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 
 #include <string>
 
@@ -25,5 +25,7 @@ bool EntityManager::kill(Entity entity) {
 }
 
 bool EntityManager::alive(Entity entity) const noexcept { return _entities.alive(entity); }
+
+std::size_t EntityManager::size() const noexcept { return _entities.size(); }
 
 } // namespace engine::core

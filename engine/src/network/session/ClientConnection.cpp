@@ -7,12 +7,16 @@
 
 namespace engine::network {
 
-ClientConnection::ClientConnection(const core::time::IClock& clock, const Endpoint& server,
+ClientConnection::ClientConnection(const core::time::IClock& clock,
+                                   const core::FieldRegistry& fields, std::string server_label,
                                    std::uint32_t client_nonce, ClientConnectionConfig config)
-    : clock_(clock), server_(server), client_nonce_(client_nonce), config_(config),
-      traffic_(clock.now()) {}
+    : clock_(clock), _server_label(std::move(server_label)), client_nonce_(client_nonce),
+      config_(config), _strings(fields), traffic_(clock.now()) {}
 
 std::optional<Outbound> ClientConnection::update() {
+    if (_farewell) {
+        return std::exchange(_farewell, std::nullopt);
+    }
     const auto now = clock_.get().now();
     if (state_ == ConnectionState::connecting) {
         return retry_connect(now);
@@ -24,14 +28,13 @@ std::optional<Outbound> ClientConnection::update() {
 }
 
 bool ClientConnection::handle(const Inbound& inbound) {
-    if (inbound.from != server_) {
-        core::log::debug("network: ignored message from {}, not the server",
-                         inbound.from.to_string());
+    if (inbound.from != server_peer) {
+        core::log::debug("network: ignored message from a peer other than the server");
         return false;
     }
     if (!is_live()) {
         core::log::debug("network: ignored message from {} after the connection ended",
-                         server_.to_string());
+                         _server_label);
         return false;
     }
 
@@ -39,7 +42,7 @@ bool ClientConnection::handle(const Inbound& inbound) {
     last_received_ = now;
     traffic_.on_received(inbound.message, now);
     const auto& message = inbound.message.message;
-    if (!type_table_.admits(message)) {
+    if (!_strings.admits(message)) {
         return false;
     }
     if (std::holds_alternative<HeartbeatPayload>(message)) {
@@ -78,7 +81,7 @@ std::optional<Outbound> ClientConnection::retry_connect(core::time::Duration now
     }
     if (attempts_ >= config_.max_attempts) {
         end(ConnectionState::gave_up, DisconnectReason::timeout);
-        core::log::warn("network: no answer from {} after {} connect attempts", server_.to_string(),
+        core::log::warn("network: no answer from {} after {} connect attempts", _server_label,
                         attempts_);
         return std::nullopt;
     }
@@ -91,8 +94,7 @@ std::optional<Outbound> ClientConnection::retry_connect(core::time::Duration now
 std::optional<Outbound> ClientConnection::keep_alive(core::time::Duration now) {
     if (now - last_received_ > config_.server_timeout) {
         end(ConnectionState::disconnected, DisconnectReason::timeout);
-        core::log::warn("network: lost {}: no packet received before the timeout",
-                        server_.to_string());
+        core::log::warn("network: lost {}: no packet received before the timeout", _server_label);
         return std::nullopt;
     }
     if (now - last_heartbeat_ < config_.heartbeat_interval) {
@@ -114,22 +116,27 @@ void ClientConnection::on_accept(const ConnectAcceptPayload& accept) {
     if (state_ != ConnectionState::connecting || accept.client_nonce != client_nonce_) {
         return;
     }
+    if (!_strings.assign(accept)) {
+        end(ConnectionState::rejected, DisconnectReason::protocol_error);
+        _farewell = to_server(DisconnectPayload{.reason = DisconnectReason::protocol_error});
+        core::log::error("network: cannot use the fields replicated by {}", _server_label);
+        return;
+    }
     state_ = ConnectionState::connected;
     last_heartbeat_ = clock_.get().now();
     player_id_ = accept.player_entity_id;
-    type_table_.assign(accept);
-    core::log::info("network: connected to {} as player {}", server_.to_string(), player_id_);
+    core::log::info("network: connected to {} as player {}", _server_label, player_id_);
 }
 
 void ClientConnection::on_disconnect(const DisconnectPayload& disconnect) {
     if (state_ == ConnectionState::connecting &&
         disconnect.reason == DisconnectReason::server_full) {
         end(ConnectionState::rejected, disconnect.reason);
-        core::log::warn("network: {} rejected the connection: server full", server_.to_string());
+        core::log::warn("network: {} rejected the connection: server full", _server_label);
         return;
     }
     end(ConnectionState::disconnected, disconnect.reason);
-    core::log::info("network: disconnected by {} (reason {})", server_.to_string(),
+    core::log::info("network: disconnected by {} (reason {})", _server_label,
                     static_cast<int>(disconnect.reason));
 }
 
@@ -140,7 +147,7 @@ void ClientConnection::end(ConnectionState state, DisconnectReason reason) {
 
 Outbound ClientConnection::to_server(Message message) {
     traffic_.on_sent(message, clock_.get().now());
-    return Outbound{.to = server_, .message = std::move(message), .sequence = next_sequence_++};
+    return Outbound{.to = server_peer, .message = std::move(message), .sequence = next_sequence_++};
 }
 
 NetworkStats ClientConnection::stats() const { return traffic_.stats(clock_.get().now()); }

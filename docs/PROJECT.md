@@ -1,9 +1,9 @@
-# R-Type — Project Overview
+# Project overview
 
-> Networked multiplayer shoot'em up built on our own C++ game engine, with gameplay written in Lua.
+> A 2D multiplayer game engine in C++, with an editor to build games and a runtime to play and ship them. Games are written in Lua; R-Type is the example game.
 > Target track for Part 2: **Track 1 — Advanced Game Engine**.
 
-This page is the reference for the vision, the architecture decisions and the Lua API. It describes the **target design**; where the implementation is not there yet, the section says so. For the current state of the code, start with [Architecture](architecture.md).
+This page is the reference for the vision, the architecture decisions and the roadmap. It describes the **target design**; where the implementation is not there yet, the section says so. For the current state of the code, start with [Architecture](architecture.md). The Lua API has its own page: [Lua API reference](reference/lua-api.md).
 
 ---
 
@@ -30,13 +30,15 @@ This page is the reference for the vision, the architecture decisions and the Lu
 
 ## 1. Vision
 
-We are not only building a game; we are building a **reusable 2D multiplayer game engine** and using it to make R-Type.
+We are building a **reusable 2D multiplayer game engine** and the **editor** to make games with it. R-Type, the shoot'em up of the Epitech subject, is one example of what the editor makes.
 
-- The **engine** is written in C++. It knows nothing about R-Type: it provides an ECS, a game loop, networking, rendering, audio, input and a Lua runtime.
-- The **game** is written in **Lua**. A game developer describes entities and systems in script files; the engine loads and runs them.
+- The **engine** is written in C++. It knows nothing about any game: it provides an ECS, a game loop, networking, rendering, audio, input and a Lua runtime.
+- The **editor** opens a game folder, lays out its scenes, edits the fields of every placed entity, plays the game in one click and exports it.
+- The **runtime** (`engine-runtime`) runs any game folder: alone, hosted, joined over the network or as a dedicated server. An exported game is the runtime renamed after the game, next to the game's files.
+- A **game** is a folder of data: `game.json`, Lua scripts, JSON scenes and assets. Nothing in it is compiled.
 - The server is **authoritative**: all game logic runs on the server. Clients send inputs and display what the server replicates.
 
-The success criterion for the engine is simple: **a second, different game can be built by writing only Lua scripts and assets**.
+The success criterion is simple: **a different game can be built by writing only Lua scripts and assets, and laid out in the editor**.
 
 ---
 
@@ -46,7 +48,7 @@ The success criterion for the engine is simple: **a second, different game can b
 
 A playable, networked R-Type prototype:
 
-- Starfield scrolling background, timer-based (never tied to CPU speed).
+- Starfield scrolling background, timer-based (never tied to CPU speed): a Lua `space` entity drawn through `assets/shaders/space.fs` ([`shader`](reference/lua-api.md#entity-api-self)).
 - Up to 4 players, visually distinguishable (not only by colour).
 - Players move with the arrow keys and shoot.
 - Bydos (enemies) spawn randomly from the right side of the screen.
@@ -57,11 +59,13 @@ A playable, networked R-Type prototype:
 - Engine split into decoupled subsystems (rendering, networking, logic), built as shared libraries, with the graphics backend loaded as a runtime plugin.
 - Gameplay written in Lua on top of the engine.
 
+Part 1 is delivered by the R-Type example game, `examples/r-type/`.
+
 Progress is tracked in the [roadmap](#15-roadmap).
 
 ### Part 2 — Advanced Game Engine (week 6)
 
-See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as a standalone project, generic runtime, tooling (level editor, developer console, hot reload), and a second game.
+See [Roadmap](#15-roadmap). Main goals: the editor as the product, stronger modularity, engine extracted as a standalone project, generic runtime, tooling (developer console, hot reload), and a second game.
 
 ### Common requirements (evaluated at both defenses)
 
@@ -85,6 +89,7 @@ See [Roadmap](#15-roadmap). Main goals: stronger modularity, engine extracted as
 | Scripting | Lua 5.4 + sol2 | Lightweight, designed to be embedded, industry standard for game scripting; sol2 gives a modern C++ binding. |
 | Tests | GoogleTest | Decided. |
 | Command line | clap (our own library, vcpkg overlay port) | Typed arguments with ranges, generated help. |
+| Scene and project files | JSON through nlohmann-json | Header-only and standard; keeps key order, so saved scenes stay stable in diffs. Private to `engine-script`. |
 | Logging | Own logger in `engine-core` | Levels, `std::format` syntax, capturable in tests; no dependency. |
 | Documentation | MkDocs Material + Doxygen | Markdown in the repository, published online with search; API reference from the public headers. |
 | Formatting / CI | clang-format, clang-tidy, GitHub Actions | Linux GCC/Clang and macOS builds, sanitizers, static analysis. |
@@ -108,17 +113,17 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
             │  engine-network  UDP sockets, protocol, threads, replication   │
             │  engine-physics  bodies, colliders, collision resolution       │
             │  engine-graphics renderer/input interfaces, plugin loader      │
+            │  engine-editor   editing model: scenes, commands, undo/redo    │
             │                                                                │
             │  plugins/graphics-raylib   window, 2D rendering, input         │
             │                            (loaded at runtime, client only)    │
             └────────────────────────────────────────────────────────────────┘
-                        │                                      │
-             core + script + network            core + network + graphics
-                        │                       + graphics plugin
-                        ▼                                      ▼
-                 r-type_server                          r-type_client
-                        │                                      │
-                        └──────────── game/ (Lua + assets) ────┘
+                    │                                   │
+        engine-editor + Clay + raylib          engine-app (ServerApp, ClientApp)
+                    ▼                                   ▼
+                 editor ───── Play / Export ─────▶ engine-runtime
+                    │                                   │
+                    └────── game folder (game.json, scripts/, scenes/, assets/) ──┘
 ```
 
 ### 4.2 Principles
@@ -145,25 +150,21 @@ Linux system packages required by Raylib (X11, OpenGL, ALSA development headers)
 
 ## 5. Repository layout
 
-### Part 1
-
 ```
-r-type/
+<repository>/
 ├── engine/
 │   ├── cmake/              engine_add_module / engine_add_plugin
-│   ├── include/engine/     public headers (core, graphics, network, physics, script)
+│   ├── include/engine/     public headers (core, graphics, audio, network, physics, script, app, editor)
 │   └── src/                implementation
 ├── plugins/
-│   └── graphics-raylib/    the only code that includes raylib.h
-├── game/
-│   ├── server/             → r-type_server (Cli, ServerApp, main.cpp)
-│   ├── client/             → r-type_client (Cli, Controls, SnapshotView, Starfield, main.cpp)
-│   ├── common/             input encoding shared by both
-│   ├── sandbox/            → r-type_sandbox
-│   └── scripts/            Lua game code (free layout, see §10)
-├── assets/                 sprites
+│   ├── graphics-raylib/    the only engine code that includes raylib.h
+│   └── audio-raylib/
+├── editor/                 the editor app (Clay layout, raylib only in src/raylib/)
+├── runtime/                engine-runtime: runs any game folder in every mode
+├── examples/
+│   └── r-type/             example game: game.json, scripts/, scenes/, assets/
 ├── ports/                  vcpkg overlay ports (clap)
-├── tests/                  GoogleTest suites mirroring engine/, game/, plugins/
+├── tests/                  GoogleTest suites mirroring engine/, plugins/, editor/, runtime/
 ├── docs/                   MkDocs sources
 ├── mkdocs.yml
 ├── vcpkg.json
@@ -174,67 +175,74 @@ r-type/
 
 ```
 bin/
-├── r-type_server
-├── r-type_client
-├── libengine-core.so
-├── libengine-graphics.so
-├── libengine-network.so
-├── libengine-physics.so
-├── libengine-script.so
-├── plugins/
-│   └── graphics-raylib.so
-├── scripts/
-└── assets/
+├── editor
+├── editor-assets/fonts/
+├── engine-runtime
+├── libengine-{app,audio,core,editor,graphics,navigation,network,physics,script}.so
+└── plugins/
+    ├── audio-raylib.so
+    └── graphics-raylib.so
 ```
 
-Executables locate their libraries, plugins, scripts and assets **relative to their own location** (RPATH `$ORIGIN` on Linux, same folder on Windows), never relative to the current working directory, so the game still works once installed.
+Executables locate their libraries and plugins **relative to their own location** (RPATH `$ORIGIN` on Linux), never relative to the current working directory. Games are not copied into `bin/`: the editor and the runtime take the game folder as an argument. An exported game puts the runtime and the game folder side by side, and the runtime then uses its own folder as the game folder.
 
 ---
 
 ## 6. Executables
 
-In Part 1, each executable has a short, explicit `main` that assembles engine modules. Nothing is hidden: reading it shows the whole tick or frame. Simplified from the real code:
+There are two executables. `editor` edits a game folder (see [The editor](guide/editor-tour.md)). `engine-runtime` plays one: its `main` parses the command line and calls `engine::app::launch()` with a mode. `engine-app` holds a generic `ServerApp` and `ClientApp` that run any game folder (see [Game folders and scenes](guide/game-folder.md)) and know nothing about any game.
+
+| Mode | Server | Client | Network |
+|---|---|---|---|
+| `dedicated` | `ServerApp` on the main thread | none | UDP |
+| `client` | elsewhere | `ClientApp` | UDP |
+| `host` | `ServerApp` on a background thread | `ClientApp` on `127.0.0.1` | UDP, others can join |
+| `solo` | `ServerApp` and `ClientApp` in the same thread | | `LoopbackNetwork`, no socket |
+
+`engine-runtime` offers every mode, and so does an exported game, which is the same binary renamed. Simplified from the real code:
 
 ```cpp
-// game/server/ServerApp.cpp: one tick, run at 60 Hz by a FixedStepLoop
-void ServerApp::tick(Duration step)
+// engine/src/app/ServerApp.cpp: one tick, run at 60 Hz by a FixedStepLoop
+void ServerApp::Impl::tick(Duration step)
 {
-    network_.receive();                    // sessions, timeouts, latest input of each player
-    apply_inputs(network_.inputs());       // to the Lua entities each player owns
-    _runtime.update(dt);                   // every entity's update(self, dt)
-    _runtime.flush_destroyed();            // on_destroy, then removal
-    systems_.run(registry_, dt);           // native systems
+    network.receive();                     // sessions, timeouts, latest input of each player
+    apply_inputs();                        // to the Lua entities each player owns
+    runtime.update(dt);                    // every entity's update(self, dt), then main.lua update(dt)
+    collisions.step(dt);                   // engine-physics, then on_collide
+    runtime.flush_destroyed();             // on_destroy, then removal
+    runtime.flush_scene();                 // load_scene: swap non-persistent entities
+    systems.run(world, dt);                // native systems
     replicate();                           // mark scripted entities with a sprite or colour
-    network_.send_snapshot(registry_);     // queued for the send thread
+    publish_audio(); publish_events();     // play, music, emit
+    network.send_snapshot(world);          // queued for the send thread
 }
 ```
 
 ```cpp
-// game/client/main.cpp
-auto plugin = engine::graphics::load_graphics_plugin(executable_dir / "plugins" / GRAPHICS_PLUGIN_FILE);
-engine::network::NetworkClient network(clock, events);
-network.connect(host, port, ec);                       // exit 84 on failure
-renderer.open({.width = 1280, .height = 720, .title = "R-Type"});
-while (!renderer.should_close()) {
-    network.update();                                  // snapshots, retries, heartbeats, server timeout
-    loop.run_frame([&](Duration step) {                // fixed 60 Hz
-        starfield.update(step);
-        network.send_input(pack_input(read_controls(input)));
-    });
-    starfield.draw(renderer);
-    view.draw(network.entities(), network.types(), network.player_id());
+// engine/src/app/ClientApp.cpp: one frame
+void ClientApp::Impl::frame()
+{
+    network.update();                                  // snapshots, events, retries, heartbeats
+    audio.update();
+    const bool playing = assets_ready();               // preloads 4 assets per frame (§9.5)
+    if (playing) {
+        run_ticks();                                   // fixed 60 Hz: Lua `input`, update(dt), send input
+    }
+    sound.apply(client.audio_settings());              // Lua `audio`
+    draw(playing);                                     // the game, or the loading screen
 }
-network.disconnect();
 ```
-
-The client does not run Lua: it draws each entity with `assets/sprites/<type>.png`, using the type names sent by the server.
 
 Usage:
 
 ```
-./r-type_server <port> [--max-players <1-4>]
-./r-type_client <server-ip> <port>
+engine-runtime --game <folder> --server <port> [--max-players <1-4>]
+engine-runtime --game <folder> <server-ip> <port>
+engine-runtime --game <folder> --host <port>
+engine-runtime --game <folder> --solo
 ```
+
+Every option is in [Run and export](guide/run-and-export.md).
 
 ---
 
@@ -257,7 +265,7 @@ Usage:
 Waiting for players ──(start)──▶ Playing ──(all players dead)──▶ Game over ──▶ Waiting
 ```
 
-Implemented in `game/scripts/game.lua`: the first player to join starts the round, later players get a ship at once, and the round restarts 3 seconds after the last ship is destroyed. Threads, queues and failure handling are detailed in [Networking internals](networking.md).
+In the R-Type example, implemented in `examples/r-type/scripts/game.lua`: the first player to join starts the round, later players get a ship at once, and the round restarts 3 seconds after the last ship is destroyed. Threads, queues and failure handling are detailed in [Networking internals](networking.md).
 
 ---
 
@@ -272,7 +280,7 @@ The protocol is specified RFC-style in [protocol.md](protocol.md) and its implem
 - Entity types are sent as numeric IDs; the table *type name → ID* is sent at connection time.
 - Every incoming packet is validated (size, type, bounds) before use.
 
-The engine replicates position, velocity, type, owner and colour of every replicated entity. Replicating Lua fields marked `synced(...)` is planned (see §10.10).
+The engine replicates the type of every replicated entity and each component field flagged `replicated` in the field registry it owns: for example position, velocity, owner and colour. Snapshot entities are `entity_id, type_id, [field_id, value]*`, field names are sent once in `connect_accept`, so a new replicated field needs no protocol change. Replicating Lua fields marked `synced(...)` is planned (see the [Lua API](reference/lua-api.md#networking-from-the-scripts-point-of-view)).
 
 ---
 
@@ -280,7 +288,7 @@ The engine replicates position, velocity, type, owner and colour of every replic
 
 ### 9.1 Interfaces
 
-The engine only knows these interfaces (in `engine/include/engine/graphics/`). They use engine types (`Vec2`, `Rect`, `Color`, `TextureId`...) and never Raylib types.
+The engine only knows these interfaces (in `engine/include/engine/graphics/`). They use engine types (`Vec2`, `Rect`, `Color`, `TextureId`, `RenderTargetId`, `ShaderId`...) and never Raylib types.
 
 ```cpp
 class IRenderer {
@@ -294,10 +302,30 @@ class IRenderer {
     virtual TextureId load_texture(const std::string& path) = 0;
     virtual void unload_texture(TextureId) = 0;
     virtual Vec2 texture_size(TextureId) const = 0;
+    // render targets: off-screen surfaces, drawn back like any texture
+    virtual RenderTargetId create_render_target(Vec2 size) = 0;   // pixels
+    virtual void destroy_render_target(RenderTargetId) = 0;
+    virtual void begin_target(RenderTargetId, Color clear) = 0;
+    virtual void end_target() = 0;
+    virtual TextureId target_texture(RenderTargetId) const = 0;
+    // shaders (called through the engine's shader library, see 9.5)
+    virtual ShaderId load_shader(const std::string& vertex, const std::string& fragment) = 0;
+    virtual void unload_shader(ShaderId) = 0;
+    virtual void begin_shader(ShaderId) = 0;
+    virtual void end_shader() = 0;
+    virtual void set_uniform(ShaderId, const std::string& name, float) = 0;
+    virtual void set_uniform(ShaderId, const std::string& name, Vec2) = 0;
+    virtual void set_uniform(ShaderId, const std::string& name, Color) = 0;      // vec4 in [0, 1]
+    virtual void set_uniform(ShaderId, const std::string& name, TextureId) = 0;  // sampler2D
     // frame
     virtual void begin_frame(Color clear) = 0;
     virtual void end_frame() = 0;
-    // drawing, in virtual units
+    // world space: draw calls in between take world units, seen through a camera view
+    virtual void begin_world(const CameraView&) = 0;
+    virtual void end_world() = 0;
+    Vec2 world_to_screen(const CameraView&, Vec2 world) const;   // non-virtual helpers
+    Vec2 screen_to_world(const CameraView&, Vec2 screen) const;
+    // drawing, in virtual units (screen space outside begin_world / end_world)
     virtual void draw_sprite(const SpriteDraw&) = 0;
     virtual void draw_rect(const Rect&, Color, bool filled = true) = 0;
     virtual void draw_circle(Vec2 center, float radius, Color) = 0;
@@ -306,11 +334,21 @@ class IRenderer {
     virtual Vec2 measure_text(const std::string&, float size) const = 0;
 };
 
+struct SpriteDraw {
+    TextureId texture;
+    Rect source;          // texture pixels; a negative width or height mirrors the sprite
+    Rect dest;            // dest.x, dest.y is where origin lands
+    Vec2 origin;          // pivot, relative to the top-left of the drawn rectangle
+    float rotation = 0;   // degrees around origin, clockwise on screen
+    Color tint;
+};
+
 class IInput {   // raw keys; the engine's InputMap turns them into actions
     virtual bool is_key_down(Key) const = 0;
     virtual bool is_key_pressed(Key) const = 0;
     virtual bool is_key_released(Key) const = 0;
     virtual Key  last_key_pressed() = 0;   // for the key-remapping screen
+    virtual char32_t next_character() = 0;  // typed text, for the developer console
     virtual Vec2 mouse_position() const = 0;
     virtual bool is_mouse_down(MouseButton) const = 0;
     virtual bool is_mouse_pressed(MouseButton) const = 0;
@@ -340,6 +378,11 @@ The loader refuses a plugin built for another API version, and the backend is al
 - All graphics calls happen on the **main thread** (the OpenGL context lives there). Network threads push data into queues read by the main thread.
 - Timing comes from the engine clock, not from the backend.
 - The client draws in virtual units; the backend handles scaling and letterboxing.
+- **World space and screen space.** Between `begin_world(view)` and `end_world()`, draw calls take world units: a `CameraView` (`center`, the world point shown at the middle of the screen, and `zoom`) turns them into virtual units, `screen = (world - center) * zoom + virtual_size / 2`. Everything else, such as a HUD, is drawn in screen space and does not move with the camera. `end_frame()` ends world space if needed. The client draws the replicated entities in world space every frame.
+- **Render targets.** `create_render_target(size)` makes an off-screen surface of `size` pixels. Between `begin_target(target, clear)` and `end_target()`, draw calls go into it instead of the frame: screen space is the target's own pixels, and `begin_world(view)` centers the view on the target. `target_texture(target)` is a normal `TextureId`, drawn upright with `draw_sprite` (the backend handles the flip of the render texture); `unload_texture` ignores it, it lives as long as its target. `begin_target` and `end_target` end world space first, so the editor viewport is `begin_target` → `begin_world` → draw → `end_world` → `end_target` → `draw_sprite(target_texture)`. Calling `begin_target` again switches target; targets do not nest.
+- **Shaders.** `load_shader(vertex, fragment)` compiles GLSL files; an empty path uses the backend's default stage. Between `begin_shader(shader)` and `end_shader()`, draw calls go through it; calling `begin_shader` again replaces it. Uniforms keep their value across frames and only affect the draw calls made after them; unknown shaders and uniforms the program does not use are ignored. A missing file, a compile or link error gives the default `ShaderId`, is logged, and `begin_shader` on it draws with the default pipeline, so drawing always continues.
+- **Lifetime.** `destroy_render_target` / `unload_shader` end the target or shader first if it is current; `end_frame()` ends the current target, world space and shader; `close()` frees every texture, target and shader.
+- **Camera.** The view comes from, in this order: the local override of the client scripts (`camera.*`, see the [Lua API](reference/lua-api.md#networking-from-the-scripts-point-of-view)), the scene camera (the replicated entity with a `Camera` component and the lowest id, clamped to its bounds), or the default view (`center = virtual_size / 2`, `zoom = 1`), which draws exactly as without a camera. Camera entities are never drawn. The conversion math lives in `engine-core` (`engine/core/math/Camera.hpp`), so the script module uses it without depending on graphics.
 
 ### 9.4 Audio plugin
 
@@ -370,398 +413,59 @@ class IAudio {   // engine/include/engine/audio/IAudio.hpp
 - `NullAudio` (in `engine-audio`) plays nothing: the client uses it when the plugin cannot be loaded.
 - Main thread only, like graphics.
 
+### 9.5 Asset cache
+
+The game refers to assets by name; `engine::core::AssetCache<Id>` (`engine/core/util/AssetCache.hpp`) turns a name into a backend handle. It is built with a folder and a load / unload pair, e.g. `IRenderer::load_texture` / `unload_texture`.
+
+```cpp
+core::AssetCache<graphics::TextureId> textures(assets, load, unload);
+graphics::TextureId ship = textures.get("sprites/ship.png");   // loads assets/sprites/ship.png once
+```
+
+- `get(name)` loads a name the first time and returns the same handle afterwards.
+- A name is a relative path of `/`-separated segments; each segment is non-empty, does not start with `.`, and only holds letters, digits, `_`, `-` and `.`. At most 255 bytes (`is_valid_asset_name`). Absolute paths, `..`, backslashes and hidden files are rejected without touching the backend.
+- A rejected name or a failed load gives the placeholder (default id), is logged once and never retried.
+- `clear()` and the destructor unload every loaded handle; the backend must outlive the cache.
+- Main thread only, like the backends. The client uses one cache for textures (`assets/`), one for sounds (`assets/sounds/`) and one for musics (`assets/music/`).
+- Entity shaders (`shader` field, see the [Lua API](reference/lua-api.md#entity-api-self)) are drawn by `WorldDraw`, which sets the `time` and `resolution` uniforms, then `begin_shader` / draw / `end_shader` around the entity. Shader names never travel as text: the server lists them in the `shader` category of the string table, `Shader.path` is an asset field of type `AssetType::Shader`, and the client preloads them with the textures.
+- Shaders go through `engine::app::ShaderLibrary`, a cache of `ShaderId` over `IRenderer::load_shader` / `unload_shader`. A shader is named without extension: `shaders/wave` loads `assets/shaders/wave.fs` (required) and `assets/shaders/wave.vs` when it exists, the default vertex stage otherwise. A missing or invalid shader is reported once and gives the default `ShaderId`, which draws without a shader.
+
+```cpp
+app::ShaderLibrary shaders(renderer, assets);
+graphics::ShaderId wave = shaders.get("shaders/wave");   // wave.vs + wave.fs, loaded once
+renderer.set_uniform(wave, "time", seconds);
+renderer.begin_shader(wave);
+renderer.draw_sprite(sprite);
+renderer.end_shader();
+```
+- Texture names never travel as text: the scripts declare them (`textures { ... }`, see the [Lua API](reference/lua-api.md#global-functions)), the server lists them in the `texture` category of the string table and snapshots carry their 16-bit id. The client turns the id back into the name before asking its cache.
+
+#### Preloading and the loading screen
+
+The client does not show the game until every asset it may need is loaded, so the first explosion or the first enemy of a type never stalls a frame:
+
+- Until `connect_accept` arrives, and then until preloading ends, each frame draws the **loading screen** instead of the game: a bar filled with the progress and a `loaded / total` count above it, drawn with `draw_rect` and `draw_text` only (no asset needed).
+- Once connected, every name of the `texture`, `sound` and `music` categories of the string table is queued and loaded through the caches above, **4 assets per frame** on the main thread. The window stays responsive and the backends stay on their thread.
+- Each frame still runs `NetworkClient::update()`, so heartbeats keep the session alive whatever the total loading time; only a single asset taking longer than the 5 s timeout could end it. Events (sounds, music, script events) are handled as usual. Snapshots are received but not drawn, the scripts' `update(dt)` does not run and no input is sent.
+- A missing or rejected asset is logged once by its cache and counted; when the last asset is done the client logs `client: preloaded N assets, M missing` and the game starts, drawing placeholders for the missing ones. Sounds and musics are skipped while the audio device is closed.
+- Loading on first use stays as the fallback for anything not preloaded.
+- The first game frame comes right after the last asset is loaded, in the same frame.
+
 ---
 
 ## 10. Lua scripting API
 
-This section is the specification of the Lua API. Not everything is implemented yet:
-
-| Feature | Status |
-|---|---|
-| `entity "name"` declarations (short and table forms), `require` from `lib/`, sandbox | Implemented |
-| `system "name"` declarations | Parsed and validated; systems do not run yet |
-| `spawn(type, overrides)`, `players()`, `find_player(id)` | Implemented |
-| `main.lua`: `on_start`, `on_player_joined`, `on_player_left` | Implemented |
-| Entity fields `x`, `y`, `vx`, `vy`, `sprite`, `color`, `tags`, `hitbox`, `collides_with`, `id`, `type`, `age`, `input`, `owner`; free fields | Implemented |
-| Entity methods `destroy()`, `has_tag()`; callbacks `on_spawn`, `update`, `on_collide`, `on_destroy` | Implemented |
-| Native collisions: `engine-physics` detects `hitbox` overlaps in the server tick and calls `on_collide` (see §10.5) | Implemented |
-| Native movement from `vx` / `vy` in the server tick | Not yet: scripts move entities by writing `x` / `y` |
-| `sounds { ... }`, `musics { ... }`, `play(name, entity)`, `music(name)` | Implemented (see §10.6) |
-| `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `behavior`, `random`, `world`, `log`, `synced`, `add_tag`, `remove_tag`, `distance_to`, `move_to` | Planned (names already reserved) |
-
-[Writing the game](writing-the-game.md) shows how the current game works around what is missing.
-
-### 10.1 Principles
-
-- The whole game is written in Lua. The developer never touches C++.
-- **Files are free to live anywhere** in the game folder. The engine loads every `.lua` file recursively.
-- **Each file declares what it contains**: `entity "name"` or `system "name"`. A file usually declares one thing; small or related things can share a file using the table form.
-- A file uses **either** one short form (`entity "name"` alone, the whole file is the prefab) **or** any number of table forms (`entity "name" { ... }`). Two short forms in one file, or a short form mixed with table forms, is a load-time error and none of the file's declarations are registered.
-- A file outside `lib/` that declares nothing (other than `main.lua`) is loaded but logs a warning.
-- Names are **unique**. Two declarations with the same name are a load-time error that shows both file paths.
-- `main.lua` at the root is the entry point.
-- Utility code used with `require` lives in `lib/` and is **not** loaded automatically.
-- `require("name")` loads `lib/name.lua`; dots are folders (`require("enemies.wave")` loads `lib/enemies/wave.lua`). Each module runs once, in its own environment, and its return value is cached (`true` if it returns nothing). Names only contain letters, digits, `_` and `.`, so a script cannot leave `lib/`. Modules cannot declare entities or systems, circular requires are an error, and precompiled bytecode is rejected. The standard `package` library is not available.
-
-### 10.2 Loading order
-
-1. Load every declaration file (entities and systems are registered, nothing is spawned).
-2. Call `on_start()` from `main.lua`. `on_player_joined(player)` and `on_player_left(player)` are called later, whenever a player connects or leaves.
-
-Since `spawn` is only used once the game has started, file order never matters.
-
-### 10.3 Declaring an entity
-
-**One entity per file** (default style):
-
-```lua
--- stage1/bydo.lua
-entity "bydo"
-
--- native fields: handled by the C++ engine
-sprite        = "bydo.png"
-hitbox        = { w = 32, h = 32 }
-tags          = { "enemy" }
-collides_with = { "player_missile" }
-
--- free fields: invented by the developer
-health = 1
-speed  = 150
-points = 100
-
--- callbacks: called by the engine
-function on_spawn(self)
-    self.base_y = self.y
-end
-
-function update(self, dt)
-    self.x = self.x - self.speed * dt
-    self.y = self.base_y + math.sin(self.age * 3) * 40
-    if self.x < -50 then self:destroy() end
-end
-
-function on_collide(self, other)
-    self:damage(1)
-end
-
--- custom methods: as many as needed
-function damage(self, amount)
-    self.health = self.health - amount
-    if self.health <= 0 then self:explode() end
-end
-
-function explode(self)
-    spawn("explosion", { x = self.x, y = self.y })
-    play("explosion.wav", self)
-    self:destroy()
-end
-```
-
-**Several declarations in one file** (table form):
-
-```lua
--- player/player.lua
-entity "player" {
-    sprite = "ship.png",
-    speed  = 400,
-
-    update = function(self, dt)
-        -- ...
-    end,
-}
-
-entity "player_missile" {
-    sprite = "missile.png",
-    vx     = 900,
-    tags   = { "player_missile" },
-}
-
-system "respawn" {
-    on_destroy = function(e)
-        if e.type == "player" then
-            after(3, function() spawn("player") end)
-        end
-    end,
-}
-```
-
-Both forms produce the same internal representation.
-
-`entity "x" { ... }` is plain Lua sugar for `entity("x")({ ... })`: `entity "x"` returns a declarator, and calling it with a table gives the declaration its body. A declarator that is never called is a short form, and the file's environment becomes the prefab. This is why a file holds **at most one** short form and never mixes it with table forms: every name the file defines would otherwise belong to two declarations at once.
-
-### 10.4 What a file contains
-
-| Kind | Examples | Stored in | Used by |
-|---|---|---|---|
-| Native fields | `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags` | C++ component pools | Movement, collisions, rendering, replication |
-| Free fields | `health`, `speed`, `points` | Lua table of the entity | Scripts only |
-| Callbacks | `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior` | Prefab table | Called by the engine |
-| Custom methods | `damage`, `explode` | Prefab table (shared by all instances) | Called with `self:name()` |
-
-Methods are not copied into each instance: they stay in the prefab table, so reloading a file updates every live entity.
-
-### 10.5 Entity API (`self`)
-
-```lua
-self.x, self.y      -- position (native)
-self.vx, self.vy    -- velocity: moved by the C++ engine every tick
-self.age            -- seconds since spawn (read-only)
-self.id             -- unique id (read-only)
-self.type           -- declared name, e.g. "bydo" (read-only)
-self.owner          -- player controlling the entity, or nil
-
-self:destroy()                -- deferred to the end of the tick
-self:has_tag("enemy")
-self:add_tag("phase2")
-self:remove_tag("phase2")
-self:distance_to(other)
-self:move_to(x, y, duration)  -- inside a coroutine
-```
-
-`sprite` is a path relative to `assets/`. `tags` reads back as a new array: change tags by assigning a whole array (`self.tags = { "enemy" }`); entries must be strings and duplicates are dropped. `color` is a table `{ r, g, b, a }` of numbers in [0, 255] (`a` defaults to 255, the default color is white): it tints the sprite, and an entity with a color but no `sprite` is drawn as a square of that color (temporary, until the renderer API lands). It reads back as a new table.
-
-`hitbox = { w, h }` gives the entity a rectangular collider of positive size, anchored at its top-left `x`, `y` (the same corner the sprite is drawn from). `collides_with` is an array of tags: the entity's `on_collide(self, other)` is called on every tick its hitbox overlaps (strictly, touching edges do not count) the hitbox of an entity carrying one of those tags. Both read back as new tables, and both can change at any time, like `tags`. Collisions are one-sided: a missile with `collides_with = { "enemy" }` and an enemy with `collides_with = { "missile" }` each get their own call; an enemy without `collides_with` is never told. Both calls of a pair run even if the first destroys an entity, but an entity destroyed earlier in the tick gets no further collision. Detection runs in C++ (`engine-physics`) after every `update`, so it costs nothing in Lua.
-
-```lua
-entity "bydo_shot"
-
-tags          = { "enemy_shot" }
-hitbox        = { w = 24, h = 24 }
-collides_with = { "player" }
-
-function on_collide(self, other)
-    self:destroy()
-end
-```
-
-`self:destroy()` only marks the entity: it stays usable until the end of the tick, is skipped by later `update` calls, then `on_destroy(self)` runs and the entity is removed. Calling it twice has no extra effect. `on_spawn(self)` runs once the entity and its `spawn` overrides are in place.
-
-`owner` takes a player handle or `nil`, also as a `spawn` override (`spawn("ship", { owner = player })`). The entity then reads that player's input through `self.input`, and clients receive the owner so each one can highlight its own entities. Once the player leaves, `owner` reads `nil`.
-
-**Performance tip:** prefer setting `vx` / `vy` over moving the entity in `update`; native movement runs entirely in C++.
-
-### 10.6 Global functions
-
-```lua
--- entities
-spawn("bydo", { x = 1900, y = 300, speed = 200 })   -- optional field overrides
-find_all("enemy")          -- entities with a tag
-find_first("player")
-count("enemy")
-
--- players
-players()                  -- connected players, by ascending id
-find_player(1)             -- player handle, or nil
-
--- time
-after(2, function() ... end)     -- run once after 2 s
-every(0.5, function() ... end)   -- run every 0.5 s (returns a handle to cancel it)
-wait(1.5)                        -- only inside a coroutine
-
--- sound (replicated to clients)
-sounds { "shot.wav", "explosion.wav" }   -- declare, while the scripts load
-musics { "stage1.ogg" }
-play("shot.wav")                 -- play a declared sound
-play("explosion.wav", self)      -- with the entity that makes it
-music("stage1.ogg")              -- loop a declared music, replacing the current one
-music(nil)                       -- stop the music
-
--- utilities
-random(1, 10)
-world.width, world.height        -- 1920, 1080
-log("message")
-```
-
-**Sound rules.**
-
-- `sounds` and `musics` take a list of file names and can only be called while the scripts load (top level of any file, or `on_start`). A name is 1 to 63 letters, digits, `_`, `-` or `.`, not starting with `.`. A bad or already declared name raises an error and declares none of the names of that call. R-Type clients look for sounds in `assets/sounds/` and musics in `assets/music/`.
-- `play` and `music` with an undeclared name, or with arguments of the wrong type, raise an error. Nothing is played on the server: the requests are queued, and after each tick the server sends them to every client (`sound` and `music` events, see the [protocol](protocol.md)). At most 64 requests are kept per tick.
-- The current music is also sent to players who join later.
-
-### 10.7 Systems
-
-A system handles logic that spans several entity types.
-
-**Global system** (no query, runs once per tick):
-
-```lua
--- stage1/waves.lua
-system "waves"
-
-local timer = 0
-
-function update(dt)
-    timer = timer + dt
-    if timer > 2 then
-        timer = 0
-        spawn("bydo", { x = world.width + 50, y = random(100, 980) })
-    end
-end
-```
-
-**Query system** (runs for every entity that has the listed fields):
-
-```lua
--- common/gravity.lua
-system "gravity"
-
-query = { "gravity" }
-
-function update(e, dt)
-    e.vy = e.vy + e.gravity * dt
-end
-```
-
-Any entity that defines `gravity = 300` is affected, without declaring anything else.
-
-**Event system:**
-
-```lua
--- common/score.lua
-system "score"
-
-score = synced(0)
-
-function on_destroy(e)
-    if e.points then score = score + e.points end
-end
-```
-
-**Rule of thumb:** if the logic only concerns one entity type, put it in that entity; if it applies to several, write a system.
-
-### 10.8 Player input
-
-Clients send **actions**, not keys. The server exposes them on player entities:
-
-```lua
-function update(self, dt)
-    local input = self.input
-    self.vx = input:axis("move_x") * self.speed
-    self.vy = input:axis("move_y") * self.speed
-    if input:pressed("fire") then
-        spawn("player_missile", { x = self.x + 30, y = self.y, owner = self })
-    end
-end
-```
-
-`self.input` is available on every entity and is read-only. `input:axis(name)` returns a value in [-1, 1] (`move_x`: left/right, `move_y`: up/down), `input:pressed(name)` is true while the action is held. An entity reads the input of its `owner`; entities without one read a neutral input (axes 0, nothing pressed).
-
-Players are handled by two optional callbacks of `main.lua`. The engine calls them when a client connects or leaves; scripts never see the network:
-
-```lua
-function on_player_joined(player)
-    spawn("ship", { x = 100, y = 120 + player.slot * 140, owner = player })
-end
-
-function on_player_left(player)
-    for _, owned in ipairs(player:entities()) do
-        owned:destroy()
-    end
-end
-```
-
-A player handle has `id` (stable while connected), `slot` (lowest free index from 0, reused after a departure), `connected`, and `player:entities()` (live entities it owns). Without `on_player_left`, the engine destroys the player's entities itself. Errors in either callback are logged and the game continues.
-
-Button actions travel as bits in the order of the shared action list (`fire` is bit 0), axes as `-1`, `0` or `1` (the protocol rounds them); the server and the client use the same table, so the layout cannot drift.
-
-Key bindings are data, editable by the player (remapping, not implemented yet; the defaults below are built in):
-
-```lua
--- config/input.lua
-actions = {
-    move_up    = { "Up", "Z" },
-    move_down  = { "Down", "S" },
-    move_left  = { "Left", "Q" },
-    move_right = { "Right", "D" },
-    fire       = { "Space" },
-}
-```
-
-### 10.9 Coroutines
-
-The special callback `behavior` runs as a coroutine: `wait()` pauses only this entity, never the game.
-
-```lua
-entity "boss"
-
-sprite = "boss.png"
-health = synced(50)
-
-function behavior(self)
-    while true do
-        self:move_to(1500, 300, 2)
-        for i = 1, 5 do
-            self:shoot()
-            wait(0.2)
-        end
-        wait(1)
-    end
-end
-```
-
-### 10.10 Networking from the script's point of view
-
-- Scripts are written once; the developer does not write network code.
-- All logic (`update`, `on_collide`, `behavior`, systems) runs **on the server only**.
-- Clients load the same declarations only to know how each entity type looks (sprite).
-- `play` and `music` are sent to clients as events; clients receive the declared names in `connect_accept`.
-- Native fields are replicated automatically. A free field is replicated only when marked:
-
-```lua
-health = synced(3)   -- visible on clients (e.g. health bar)
-speed  = 150         -- server only
-```
-
-- Functions and scripts are never sent over the network, only data.
-
-### 10.11 Server tick order
-
-1. Apply received inputs.
-2. Run Lua systems.
-3. Run entity `update` callbacks and resume coroutines; fire `after` / `every` timers.
-4. Native movement (`vx`, `vy`).
-5. Collisions (`engine-physics`) → `on_collide` callbacks.
-6. Destroy entities marked for destruction → `on_destroy` callbacks.
-7. Send snapshot to clients.
-
-### 10.12 Reserved names
-
-Developers must not use these names for their own fields or methods; the engine warns at load time if they do.
-
-- Native fields: `x`, `y`, `vx`, `vy`, `sprite`, `color`, `hitbox`, `collides_with`, `tags`, `layer`, `age`, `id`, `type`, `input`, `owner`.
-- Callbacks: `on_spawn`, `update`, `on_collide`, `on_destroy`, `behavior`; in `main.lua`: `on_start`, `on_player_joined`, `on_player_left`.
-- Declarations and globals: `entity`, `system`, `query`, `spawn`, `find_all`, `find_first`, `count`, `after`, `every`, `wait`, `play`, `music`, `sounds`, `musics`, `random`, `world`, `log`, `synced`, `players`, `find_player`.
-
-### 10.13 Error handling and sandbox
-
-- Every call into Lua is protected. An error is logged with the file and line (`bydo.lua:14: attempt to index nil value 'target'`), the faulty entity or system is disabled, and the game continues.
-- Only safe Lua libraries are opened: `base`, `math`, `string`, `table`, `coroutine`. No `io`, no `os`: scripts cannot access the file system or run commands.
-- Common mistake to document: call methods with `self:method()`, not `self.method()`.
-
-### 10.14 How it maps to C++ (for engine developers)
-
-- **Declarations** — every declaration file runs in its own `sol::environment` whose `__index` is the globals table. `entity "name"` / `system "name"` record a pending declaration and return a declarator; calling the declarator with a table (`entity("name")({ ... })`, written `entity "name" { ... }`) stores that table as the prefab. Once the file has run, an uncalled declarator (short form) takes the file environment as its prefab. A file with one short form, or only table forms, is registered as a whole; two short forms, or a short form mixed with table forms, rejects the file. The registry maps each name to its prefab table, kind and source path.
-- **Global functions** are C++ lambdas exposed with sol2:
-
-  ```cpp
-  lua.set_function("spawn", [&](const std::string& type, sol::optional<sol::table> overrides) {
-      return world.spawn(type, overrides);
-  });
-  ```
-
-- **Field access** goes through the entity handle's metatable. `__index` looks up, in order: native components → the entity's Lua data → its prefab table (methods). `__newindex` writes native fields into C++ storage and everything else into the Lua data.
-- **Callbacks** are called by native systems through `sol::protected_function`.
-- **Coroutines** are `sol::thread` + `sol::coroutine`; `wait(t)` yields and the scheduler resumes the coroutine when `t` has elapsed.
+The Lua API has its own page: [Lua API reference](reference/lua-api.md).
 
 ---
 
 ## 11. Engine rules and conventions
 
-- Nothing in `engine/` knows about R-Type. Test for every addition: *would this make sense in a platformer?*
+- Nothing in `engine/` knows about any game. Test for every addition: *would this make sense in a platformer?*
 - Public engine symbols are marked with the export macro generated by CMake; default visibility is hidden on every platform.
 - No global state in headers (no `static` variables in templates): registries and singletons live in a `.cpp` of `engine-core`, behind exported functions. Component identity uses stable names, not per-module counters.
 - Third-party headers are never included in public engine headers.
-- Resources are referenced by name (`"bydo.png"`); the resource manager loads and caches them.
+- Resources are referenced by name (`"sprites/ship.png"`); the asset cache (§9.5) loads and caches them.
 - Every technical choice is written down with its justification in the [comparative study](comparative-study.md).
 
 ---
@@ -789,7 +493,7 @@ What is implemented and what is planned, measure by measure, is in [Accessibilit
   3. Lua loading: duplicate names, scripts with errors, reserved names;
   4. plugin loading: missing library, missing symbol, wrong API version.
 - **CI:** Linux (GCC, Clang) and macOS builds with cached dependencies, AddressSanitizer + UBSan, ThreadSanitizer, clang-tidy and a format check on every pull request.
-- **Packaging:** `cmake --install` produces a self-contained `bin/` folder with the executables, engine libraries, `plugins/`, scripts and assets. CPack archives on top of it are planned.
+- **Packaging:** `cmake --install` produces a self-contained `bin/` folder with the editor, the runtime, the engine libraries and `plugins/`, plus `examples/`. Games are packaged by the editor's export. CPack archives on top of it are planned.
 
 ---
 
@@ -799,11 +503,12 @@ All documentation is in English and published online.
 
 | Document | Where |
 |---|---|
-| README: description, dependencies, build, run, quick start | [README](https://github.com/Saitamadupauvre/RType#readme) |
-| Getting started and how to play | [getting-started.md](getting-started.md), [how-to-play.md](how-to-play.md) |
-| Architecture diagrams, modules, engine rules | [architecture.md](architecture.md), [engine.md](engine.md), [networking.md](networking.md), [plugins.md](plugins.md) |
-| How-to guides (add an enemy, tune the game) | [writing-the-game.md](writing-the-game.md) |
-| Lua API reference | §10 of this page |
+| README: description, dependencies, build, quick start | [README](https://github.com/Saitamadupauvre/RType#readme) |
+| Getting started | [getting-started.md](getting-started.md) |
+| Making games: editor, scripting, playing, exporting | [guide/](guide/index.md) |
+| Lua API reference | [reference/lua-api.md](reference/lua-api.md) |
+| Example game | [examples/r-type.md](examples/r-type.md) |
+| Architecture diagrams, modules, engine rules | [architecture.md](architecture.md), [engine.md](engine.md), [networking.md](networking.md), [plugins.md](plugins.md), [editor.md](editor.md), [editor-app.md](editor-app.md) |
 | Protocol specification (RFC-style) | [protocol.md](protocol.md) |
 | Comparative study (technologies, algorithms, storage, security) | [comparative-study.md](comparative-study.md) |
 | Accessibility report | [accessibility.md](accessibility.md) |
@@ -831,7 +536,7 @@ Part 1 status:
 |---|---|
 | ECS, fixed-timestep loop, event bus, scheduler | Done |
 | Graphics plugin: window, sprites, input, letterboxing | Done |
-| Starfield | Done |
+| Starfield | Removed with the generic `ClientApp`; to be redone as a shader |
 | Network: protocol, threads, sessions, timeouts, snapshots, statistics | Done |
 | Lua runtime: declarations, entities, players, sandbox | Done |
 | Player movement and shooting, Bydo spawning, game over | Done (in Lua) |
@@ -846,10 +551,11 @@ Part 1 status:
 ### Part 2 (weeks 4–6) — Advanced Game Engine
 
 1. **Modularity:** finer-grained libraries; more subsystems as runtime plugins.
-2. **Standalone engine:** `engine/` moves to its own repository; R-Type consumes it as a dependency.
-3. **Generic runtime:** the executables' `main` functions become generic `ServerApp` / `ClientApp` in the engine, with a launcher (`engine run <game-folder>`); `r-type_server` / `r-type_client` remain as thin entry points.
-4. **Tooling:** hot reload of scripts, developer console executing Lua, level editor.
-5. **Second game:** a different game (e.g. a platformer or networked Breakout) written only in Lua and assets, proving the engine is generic.
+2. **Standalone engine:** `engine/` moves to its own repository; the editor and the runtime consume it as a dependency.
+3. **Generic runtime:** done. `engine-runtime` runs any game folder in the dedicated, client, host and solo modes (§6); R-Type is a game folder in `examples/r-type/`, with no C++ of its own.
+4. **Editor:** done so far: scenes, viewport, inspector, undo/redo, Play, Export, command palette, settings. Next: a launcher to create and open games, scene management in the UI, asset browser.
+5. **Tooling:** hot reload of scripts, developer console executing Lua (done, see the [Lua API](reference/lua-api.md#developer-console-and-console-variables)).
+6. **Second game:** a different game (e.g. a platformer or networked Breakout) written only in Lua and assets, proving the engine is generic.
 
 ---
 

@@ -1,4 +1,4 @@
-#include "engine/core/ComponentTypeId.hpp"
+#include "engine/core/ecs/ComponentTypeId.hpp"
 
 #include <mutex>
 #include <string>

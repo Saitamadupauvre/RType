@@ -1,0 +1,12 @@
+{
+    "version": 1,
+    "instances": [
+        42,
+        { "position": [0, 0] },
+        { "type": "ship", "position": "here" },
+        { "type": "ship", "position": [0, 0], "name": 7 },
+        { "type": "ship", "position": [1, 2], "overrides": ["Sprite.color"] },
+        { "type": "plain" },
+        { "type": "plain", "position": [9, 9] }
+    ]
+}

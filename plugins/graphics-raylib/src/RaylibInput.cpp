@@ -51,6 +51,11 @@ Key RaylibInput::last_key_pressed() {
     return Key::Unknown;
 }
 
+char32_t RaylibInput::next_character() {
+    const int code = GetCharPressed();
+    return code > 0 ? static_cast<char32_t>(code) : U'\0';
+}
+
 Vec2 RaylibInput::mouse_position() const {
     const ::Vector2 mouse = GetMousePosition();
     const Vec2 window{static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())};

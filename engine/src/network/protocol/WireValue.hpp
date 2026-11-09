@@ -1,0 +1,25 @@
+#pragma once
+
+#include <optional>
+
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/network/Export.hpp"
+#include "engine/network/StringTable.hpp"
+
+#include "Messages.hpp"
+
+namespace engine::network {
+
+[[nodiscard]] ENGINE_NETWORK_EXPORT core::FieldKind kind_of(const WireValue& value) noexcept;
+
+[[nodiscard]] ENGINE_NETWORK_EXPORT StringCategory asset_category(core::AssetType type) noexcept;
+
+[[nodiscard]] ENGINE_NETWORK_EXPORT std::optional<WireValue>
+to_wire(const core::FieldValue& value, const StringTable& strings,
+        core::AssetType asset = core::AssetType::Texture);
+
+[[nodiscard]] ENGINE_NETWORK_EXPORT std::optional<core::FieldValue>
+from_wire(const WireValue& value, const StringTable& strings,
+          core::AssetType asset = core::AssetType::Texture);
+
+} // namespace engine::network

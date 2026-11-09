@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/core/NonCopyableNonMovable.hpp"
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
+#include "engine/core/util/NonCopyableNonMovable.hpp"
 #include "engine/graphics/Export.hpp"
 #include "engine/graphics/Types.hpp"
 
@@ -35,6 +35,17 @@ public:
      * @note Consumes the key: calling it again returns the next one.
      */
     [[nodiscard]] virtual Key last_key_pressed() = 0;
+
+    /**
+     * @brief Takes the next character typed this frame from the backend's queue.
+     *
+     * Characters follow the keyboard layout and modifiers, e.g. Shift+1 gives '!' on a QWERTY
+     * keyboard, unlike keys.
+     *
+     * @return A Unicode code point, or U'\0' when no character is left.
+     * @note Consumes the character: calling it again returns the next one.
+     */
+    [[nodiscard]] virtual char32_t next_character() = 0;
 
     /**
      * @return The mouse position in virtual units; outside [0, virtual_size()] when over the

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "engine/core/EntityPool.hpp"
+#include "engine/core/ecs/EntityPool.hpp"
 
 using engine::core::Entity;
 using engine::core::EntityPool;

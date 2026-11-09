@@ -1,23 +1,32 @@
 #include "engine/script/ScriptRuntime.hpp"
 
-#include <cstdint>
+#include <algorithm>
 #include <exception>
 #include <format>
-#include <map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
-#include "Audio.hpp"
-#include "Declarations.hpp"
-#include "Entities.hpp"
-#include "ModuleLoader.hpp"
-#include "Players.hpp"
-#include "ScriptFiles.hpp"
-#include "Sol.hpp"
+#include "RuntimeContext.hpp"
+#include "console/ConsoleLua.hpp"
 #include "engine/core/log/Log.hpp"
+#include "engine/physics/Fields.hpp"
+#include "engine/script/GameFolder.hpp"
+#include "entity/Instances.hpp"
+#include "entity/ScriptFields.hpp"
+#include "loading/Declarations.hpp"
+#include "loading/ModuleLoader.hpp"
+#include "loading/ScriptFiles.hpp"
+#include "loading/Sections.hpp"
+#include "lua/LuaErrors.hpp"
+#include "lua/Sol.hpp"
+#include "scene/SceneAssets.hpp"
+#include "scene/SceneFile.hpp"
+#include "scene/SceneSwitch.hpp"
 
 namespace engine::script {
 
@@ -26,39 +35,168 @@ namespace {
 namespace fs = std::filesystem;
 namespace log = engine::core::log;
 
-constexpr std::string_view on_player_joined = "on_player_joined";
-constexpr std::string_view on_player_left = "on_player_left";
+core::FieldRegistry engine_fields() {
+    core::FieldRegistry fields;
+    core::register_core_fields(fields);
+    physics::register_physics_fields(fields);
+    return fields;
+}
+
+std::string_view section_of(const std::vector<std::unique_ptr<ApiSet>>& sets) {
+    for (const auto& set : sets) {
+        if (!set->section().empty()) {
+            return set->section();
+        }
+    }
+    return {};
+}
 
 } // namespace
 
+RuntimeContext::RuntimeContext()
+    : fields(engine_fields()), types(lua.create_table()), entities(lua, fields, textures, shaders),
+      navigation(entities) {}
+
+const Declaration* RuntimeContext::find_declaration(std::string_view name) const {
+    const auto found = declarations.find(name);
+    return found == declarations.end() ? nullptr : &found->second;
+}
+
+sol::protected_function RuntimeContext::main_callback(std::string_view name) const {
+    if (!main) {
+        return sol::lua_nil;
+    }
+    const auto callback = main->raw_get<sol::object>(name);
+    if (callback.get_type() != sol::type::function) {
+        return sol::lua_nil;
+    }
+    return callback.as<sol::protected_function>();
+}
+
+sol::object RuntimeContext::spawn_declared(sol::this_state state, std::string_view type,
+                                           const sol::optional<sol::table>& overrides) {
+    const Declaration* declaration = find_declaration(type);
+    if (declaration == nullptr) {
+        log::error("lua: {}cannot spawn unknown entity '{}'", caller_location(state), type);
+        return sol::make_object(state, sol::lua_nil);
+    }
+    return entities.spawn_from_lua(state, *declaration, overrides);
+}
+
+struct GameStart {
+    std::optional<fs::path> scene;
+};
+
 struct ScriptRuntime::Impl {
-    sol::state lua;
-    Players players;
-    Entities entities{lua, players};
-    std::optional<sol::environment> main;
-    std::map<std::string, Declaration, std::less<>> declarations;
+    RuntimeContext context;
     std::shared_ptr<PendingFile> current_file;
     std::optional<ModuleLoader> modules;
-    Audio audio;
+    std::vector<std::unique_ptr<ApiSet>> sets;
+    std::string_view section;
 
+    explicit Impl(std::vector<std::unique_ptr<ApiSet>> installed);
+
+    void open_sandbox();
+    void bind_core();
     sol::object declare(sol::this_state state, DeclarationKind kind, const std::string& name);
     sol::object require(sol::this_state state, const std::string& name);
-    sol::object spawn(sol::this_state state, const std::string& type,
-                      const sol::optional<sol::table>& overrides);
-    bool load_scripts(const fs::path& root);
-    bool load_all(const fs::path& root, const std::vector<fs::path>& files);
+    bool load_game(const fs::path& game, const fs::path& start_scene_file);
+    bool load_scripts(const fs::path& root, const std::optional<GameStart>& game_start);
+    bool load_all(const fs::path& root, const std::vector<fs::path>& files,
+                  const std::optional<GameStart>& game_start);
+    bool spawn_scene(const fs::path& file);
     bool load_declaration_file(const fs::path& root, const fs::path& relative,
                                const sol::environment& environment);
+    void describe_script_fields(std::vector<Declaration>& batch) const;
+    bool apply_sections(const std::vector<Declaration>& batch) const;
     bool register_declarations(std::vector<Declaration> batch);
+    static bool declare_asset(const Declaration& declaration, std::string_view field,
+                              DeclaredAssets& declared);
     bool start(const sol::environment& main);
-    [[nodiscard]] sol::protected_function main_callback(std::string_view name) const;
-    sol::table player_entities(sol::this_state state, const PlayerHandle& player) const;
-    sol::object player_field(sol::this_state state, const PlayerHandle& player,
-                             const std::string& key) const;
-    sol::table all_players(sol::this_state state) const;
-    bool player_joined(std::uint32_t player_id);
-    bool player_left(std::uint32_t player_id);
+    void declare_scene_assets(const fs::path& game, const std::optional<fs::path>& start);
 };
+
+void ScriptRuntime::Impl::declare_scene_assets(const fs::path& game,
+                                               const std::optional<fs::path>& start) {
+    std::vector<fs::path> files;
+    for (const std::string& name : list_scenes(game)) {
+        files.push_back(scene_file(game, name));
+    }
+    if (start) {
+        files.push_back(*start);
+    }
+    for (const fs::path& file : files) {
+        const SceneAssets assets = scene_assets(file);
+        for (const std::string& texture : assets.textures) {
+            if (!context.textures.add(texture)) {
+                log::warn("scene: {}: texture '{}' cannot be declared", file.generic_string(),
+                          texture);
+            }
+        }
+        for (const std::string& shader : assets.shaders) {
+            if (!context.shaders.add(shader)) {
+                log::warn("scene: {}: shader '{}' cannot be declared", file.generic_string(),
+                          shader);
+            }
+        }
+    }
+}
+
+ScriptRuntime::Impl::Impl(std::vector<std::unique_ptr<ApiSet>> installed)
+    : sets(std::move(installed)), section(section_of(sets)) {
+    open_sandbox();
+    bind_core();
+}
+
+void ScriptRuntime::Impl::open_sandbox() {
+    sol::state& lua = context.lua;
+    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::string, sol::lib::table,
+                       sol::lib::coroutine);
+    lua["dofile"] = sol::lua_nil;
+    lua["loadfile"] = sol::lua_nil;
+    lua.safe_script(R"(
+        local raw_load = load
+        load = function(chunk, name, _, env)
+            return raw_load(chunk, name, "t", env)
+        end
+    )",
+                    "=sandbox", sol::load_mode::text);
+}
+
+void ScriptRuntime::Impl::bind_core() {
+    sol::state& lua = context.lua;
+    lua.set_function("entity", [this](sol::this_state state, const std::string& name) {
+        return declare(state, DeclarationKind::Entity, name);
+    });
+    lua.set_function("system", [this](sol::this_state state, const std::string& name) {
+        return declare(state, DeclarationKind::System, name);
+    });
+    lua.set_function("require", [this](sol::this_state state, const std::string& name) {
+        return require(state, name);
+    });
+    lua.set_function("sounds", [this](sol::this_state state, const sol::object& names) {
+        context.audio.declare_sounds(state, names);
+    });
+    lua.set_function("musics", [this](sol::this_state state, const sol::object& names) {
+        context.audio.declare_musics(state, names);
+    });
+    lua.set_function("textures", [this](sol::this_state state, const sol::object& names) {
+        context.textures.declare(state, names);
+    });
+    lua.set_function("shaders", [this](sol::this_state state, const sol::object& names) {
+        context.shaders.declare(state, names);
+    });
+    lua.set_function("event", [this](sol::this_state state, const sol::object& name) {
+        return context.events.declare(state, name);
+    });
+    lua.set_function("navgrid", [this](sol::this_state state, const sol::object& options) {
+        context.navigation.configure(state, options);
+    });
+    lua.set_function("find_path", [this](sol::this_state state, const sol::object& from,
+                                         const sol::object& to, const sol::object& options) {
+        return context.navigation.find_path(state, from, to, options);
+    });
+}
 
 sol::object ScriptRuntime::Impl::declare(sol::this_state state, DeclarationKind kind,
                                          const std::string& name) {
@@ -89,17 +227,22 @@ sol::object ScriptRuntime::Impl::require(sol::this_state state, const std::strin
     }
 }
 
-sol::object ScriptRuntime::Impl::spawn(sol::this_state state, const std::string& type,
-                                       const sol::optional<sol::table>& overrides) {
-    const auto found = declarations.find(type);
-    if (found == declarations.end()) {
-        log::error("lua: {}cannot spawn unknown entity '{}'", caller_location(state), type);
-        return sol::make_object(state, sol::lua_nil);
+bool ScriptRuntime::Impl::load_game(const fs::path& game, const fs::path& start_scene_file) {
+    const std::optional<GameProject> project = read_project(game);
+    GameStart game_start;
+    if (!start_scene_file.empty()) {
+        game_start.scene = start_scene_file;
+    } else if (project && project->start_scene) {
+        game_start.scene = scene_file(game, *project->start_scene);
     }
-    return entities.spawn_from_lua(state, found->second, overrides);
+    context.game = game;
+    declare_scene_assets(game, game_start.scene);
+    const bool loaded = load_scripts(scripts_folder(game), game_start);
+    return loaded && project.has_value();
 }
 
-bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
+bool ScriptRuntime::Impl::load_scripts(const fs::path& root,
+                                       const std::optional<GameStart>& game_start) {
     if (modules) {
         log::error("lua: scripts are already loaded");
         return false;
@@ -115,30 +258,58 @@ bool ScriptRuntime::Impl::load_scripts(const fs::path& root) {
         return false;
     }
     modules.emplace(root);
-    audio.allow_declarations(true);
-    const bool loaded = load_all(root, files);
-    audio.allow_declarations(false);
+    context.audio.allow_declarations(true);
+    context.textures.allow_declarations(true);
+    context.shaders.allow_declarations(true);
+    context.events.allow_declarations(true);
+    const bool loaded = load_all(root, files, game_start);
+    context.events.allow_declarations(false);
+    context.shaders.allow_declarations(false);
+    context.textures.allow_declarations(false);
+    context.audio.allow_declarations(false);
     return loaded;
 }
 
-bool ScriptRuntime::Impl::load_all(const fs::path& root, const std::vector<fs::path>& files) {
+bool ScriptRuntime::Impl::load_all(const fs::path& root, const std::vector<fs::path>& files,
+                                   const std::optional<GameStart>& game_start) {
     bool success = true;
     bool found_entry_point = false;
     std::optional<sol::environment> entry;
     for (const fs::path& relative : files) {
-        const sol::environment environment(lua, sol::create, lua.globals());
+        const sol::environment environment(context.lua, sol::create, context.lua.globals());
         const bool loaded = load_declaration_file(root, relative, environment);
         success = loaded && success;
         if (relative == fs::path(entry_point)) {
             found_entry_point = true;
-            entry = loaded ? std::optional(environment) : std::nullopt;
+            const bool sectioned =
+                loaded && apply_section(environment, std::string(entry_point), section);
+            entry = sectioned ? std::optional(environment) : std::nullopt;
         }
     }
     if (!found_entry_point) {
         log::error("lua: {} has no {}", root.string(), entry_point);
         return false;
     }
-    return entry && start(*entry) && success;
+    if (!entry) {
+        return false;
+    }
+    if (!game_start) {
+        context.main = *entry;
+        return success;
+    }
+    const bool spawned = !game_start->scene || spawn_scene(*game_start->scene);
+    return start(*entry) && spawned && success;
+}
+
+bool ScriptRuntime::Impl::spawn_scene(const fs::path& file) {
+    if (context.entities.world() == nullptr) {
+        return true;
+    }
+    const SceneLoad load = script::read_scene(context, file);
+    if (load.ok()) {
+        std::ignore = script::spawn_instances(context, load.scene.instances);
+    }
+    return load.ok();
 }
 
 bool ScriptRuntime::Impl::load_declaration_file(const fs::path& root, const fs::path& relative,
@@ -152,8 +323,8 @@ bool ScriptRuntime::Impl::load_declaration_file(const fs::path& root, const fs::
     auto file = std::make_shared<PendingFile>(PendingFile{.source = relative, .declarations = {}});
     {
         const DeclarationScope scope(current_file, file);
-        if (!report(lua.safe_script(*code, environment, &sol::script_pass_on_error, "@" + source,
-                                    sol::load_mode::text))) {
+        if (!report(context.lua.safe_script(*code, environment, &sol::script_pass_on_error,
+                                            "@" + source, sol::load_mode::text))) {
             file->declarations.clear();
             return false;
         }
@@ -166,7 +337,30 @@ bool ScriptRuntime::Impl::load_declaration_file(const fs::path& root, const fs::
     }
     auto resolved = resolve_declarations(*file, environment);
     file->declarations.clear();
-    return resolved && register_declarations(std::move(*resolved));
+    if (!resolved) {
+        return false;
+    }
+    if (!std::ranges::all_of(*resolved, read_persistence)) {
+        return false;
+    }
+    describe_script_fields(*resolved);
+    return apply_sections(*resolved) && register_declarations(std::move(*resolved));
+}
+
+void ScriptRuntime::Impl::describe_script_fields(std::vector<Declaration>& batch) const {
+    const sol::this_state state{context.lua.lua_state()};
+    for (Declaration& declaration : batch) {
+        if (declaration.kind == DeclarationKind::Entity) {
+            declaration.script_fields =
+                infer_script_fields(state, declaration.prefab, context.entities);
+        }
+    }
+}
+
+bool ScriptRuntime::Impl::apply_sections(const std::vector<Declaration>& batch) const {
+    return std::ranges::all_of(batch, [this](const Declaration& declaration) {
+        return apply_section(declaration, section);
+    });
 }
 
 bool ScriptRuntime::Impl::register_declarations(std::vector<Declaration> batch) {
@@ -175,8 +369,8 @@ bool ScriptRuntime::Impl::register_declarations(std::vector<Declaration> batch) 
             return other.name == current->name;
         };
         const auto earlier = std::find_if(batch.begin(), current, same_name);
-        const auto registered = declarations.find(current->name);
-        if (earlier == current && registered == declarations.end()) {
+        const auto registered = context.declarations.find(current->name);
+        if (earlier == current && registered == context.declarations.end()) {
             continue;
         }
         const fs::path& first = earlier != current ? earlier->source : registered->second.source;
@@ -184,16 +378,36 @@ bool ScriptRuntime::Impl::register_declarations(std::vector<Declaration> batch) 
                    current->source.generic_string(), first.generic_string());
         return false;
     }
+    if (!std::ranges::all_of(batch, [this](const Declaration& declaration) {
+            return declare_asset(declaration, "sprite", context.textures) &&
+                   declare_asset(declaration, "shader", context.shaders);
+        })) {
+        return false;
+    }
     for (Declaration& declaration : batch) {
         warn_reserved_names(declaration);
         std::string name = declaration.name;
-        declarations.emplace(std::move(name), std::move(declaration));
+        context.declarations.emplace(std::move(name), std::move(declaration));
     }
     return true;
 }
 
+bool ScriptRuntime::Impl::declare_asset(const Declaration& declaration, std::string_view field,
+                                        DeclaredAssets& declared) {
+    if (declaration.kind != DeclarationKind::Entity) {
+        return true;
+    }
+    const auto value = declaration.prefab.raw_get<sol::object>(field);
+    if (value.get_type() != sol::type::string || declared.add(value.as<std::string_view>())) {
+        return true;
+    }
+    log::error("lua: {}: entity '{}' has an invalid {} '{}'", declaration.source.generic_string(),
+               declaration.name, field, value.as<std::string_view>());
+    return false;
+}
+
 bool ScriptRuntime::Impl::start(const sol::environment& environment) {
-    main = environment;
+    context.main = environment;
     const auto on_start = environment.raw_get<sol::object>("on_start");
     if (on_start.get_type() != sol::type::function) {
         log::warn("lua: {} does not define on_start()", entry_point);
@@ -202,145 +416,35 @@ bool ScriptRuntime::Impl::start(const sol::environment& environment) {
     return report(on_start.as<sol::protected_function>()());
 }
 
-sol::protected_function ScriptRuntime::Impl::main_callback(std::string_view name) const {
-    if (!main) {
-        return sol::lua_nil;
-    }
-    const auto callback = main->raw_get<sol::object>(name);
-    if (callback.get_type() != sol::type::function) {
-        return sol::lua_nil;
-    }
-    return callback.as<sol::protected_function>();
-}
+ScriptRuntimeBuilder ScriptRuntime::builder() { return {}; }
 
-sol::table ScriptRuntime::Impl::player_entities(sol::this_state state,
-                                                const PlayerHandle& player) const {
-    sol::table owned = sol::state_view(state).create_table();
-    for (const core::Entity entity : entities.owned_by(player.id)) {
-        owned.add(entities.handle_of(entity));
+ScriptRuntime::ScriptRuntime(std::vector<std::unique_ptr<ApiSet>> sets)
+    : _impl(std::make_unique<Impl>(std::move(sets))) {
+    for (const auto& set : _impl->sets) {
+        set->install(_impl->context);
     }
-    return owned;
-}
-
-sol::object ScriptRuntime::Impl::player_field(sol::this_state state, const PlayerHandle& player,
-                                              const std::string& key) const {
-    if (key == "id") {
-        return sol::make_object(state, static_cast<lua_Integer>(player.id));
-    }
-    if (key == "slot") {
-        const auto slot = players.slot(player.id);
-        return slot ? sol::make_object(state, static_cast<lua_Integer>(*slot))
-                    : sol::make_object(state, sol::lua_nil);
-    }
-    if (key == "connected") {
-        return sol::make_object(state, players.contains(player.id));
-    }
-    if (key == "entities") {
-        return sol::make_object(state, [this](sol::this_state inner, const PlayerHandle& self) {
-            return player_entities(inner, self);
-        });
-    }
-    return sol::make_object(state, sol::lua_nil);
-}
-
-sol::table ScriptRuntime::Impl::all_players(sol::this_state state) const {
-    sol::table result = sol::state_view(state).create_table();
-    for (const std::uint32_t id : players.ids()) {
-        result.add(PlayerHandle{id});
-    }
-    return result;
-}
-
-bool ScriptRuntime::Impl::player_joined(std::uint32_t player_id) {
-    if (!players.join(player_id)) {
-        log::warn("lua: player {} is already connected", player_id);
-        return false;
-    }
-    const auto callback = main_callback(on_player_joined);
-    if (!callback.valid()) {
-        return true;
-    }
-    return report(callback(PlayerHandle{player_id}));
-}
-
-bool ScriptRuntime::Impl::player_left(std::uint32_t player_id) {
-    if (!players.contains(player_id)) {
-        log::warn("lua: unknown player {} left", player_id);
-        return false;
-    }
-    const auto callback = main_callback(on_player_left);
-    bool success = true;
-    if (callback.valid()) {
-        success = report(callback(PlayerHandle{player_id}));
-    } else {
-        for (const core::Entity entity : entities.owned_by(player_id)) {
-            entities.doom(entity);
-        }
-    }
-    players.leave(player_id);
-    return success;
-}
-
-ScriptRuntime::ScriptRuntime() : _impl(std::make_unique<Impl>()) {
-    _impl->lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::string, sol::lib::table,
-                              sol::lib::coroutine);
-    _impl->lua["dofile"] = sol::lua_nil;
-    _impl->lua["loadfile"] = sol::lua_nil;
-    _impl->lua.safe_script(R"(
-        local raw_load = load
-        load = function(chunk, name, _, env)
-            return raw_load(chunk, name, "t", env)
-        end
-    )",
-                           "=sandbox", sol::load_mode::text);
-    Impl* impl = _impl.get();
-    _impl->lua.set_function("entity", [impl](sol::this_state state, const std::string& name) {
-        return impl->declare(state, DeclarationKind::Entity, name);
-    });
-    _impl->lua.set_function("system", [impl](sol::this_state state, const std::string& name) {
-        return impl->declare(state, DeclarationKind::System, name);
-    });
-    _impl->lua.set_function("spawn", [impl](sol::this_state state, const std::string& type,
-                                            const sol::optional<sol::table>& overrides) {
-        return impl->spawn(state, type, overrides);
-    });
-    sol::table types = _impl->lua.create_table();
-    types.new_usertype<PlayerHandle>(
-        "PlayerHandle", sol::no_constructor, sol::meta_function::index,
-        [impl](sol::this_state state, const PlayerHandle& player, const std::string& key) {
-            return impl->player_field(state, player, key);
-        },
-        sol::meta_function::equal_to,
-        [](const PlayerHandle& left, const PlayerHandle& right) { return left.id == right.id; });
-    _impl->lua.set_function("players",
-                            [impl](sol::this_state state) { return impl->all_players(state); });
-    _impl->lua.set_function("find_player", [impl](sol::this_state state, lua_Integer id) {
-        return impl->entities.player_object(state, static_cast<std::uint32_t>(id));
-    });
-    _impl->lua.set_function("require", [impl](sol::this_state state, const std::string& name) {
-        return impl->require(state, name);
-    });
-    _impl->lua.set_function("sounds", [impl](sol::this_state state, const sol::object& names) {
-        impl->audio.declare_sounds(state, names);
-    });
-    _impl->lua.set_function("musics", [impl](sol::this_state state, const sol::object& names) {
-        impl->audio.declare_musics(state, names);
-    });
-    _impl->lua.set_function(
-        "play", [impl](sol::this_state state, const sol::object& name, const sol::object& source) {
-            impl->audio.play(state, name, source);
-        });
-    _impl->lua.set_function("music", [impl](sol::this_state state, const sol::object& name) {
-        impl->audio.music(state, name);
-    });
 }
 
 ScriptRuntime::~ScriptRuntime() = default;
 
+ScriptRuntime::ScriptRuntime(ScriptRuntime&&) noexcept = default;
+
+ScriptRuntime& ScriptRuntime::operator=(ScriptRuntime&&) noexcept = default;
+
+ApiSet& ScriptRuntime::find_api(const std::type_info& type) const {
+    for (const auto& set : _impl->sets) {
+        ApiSet& api = *set;
+        if (typeid(api) == type) {
+            return api;
+        }
+    }
+    throw std::out_of_range(std::format("script API set {} is not installed", type.name()));
+}
+
 bool ScriptRuntime::run_file(const std::filesystem::path& path) noexcept {
     try {
-        return report(_impl->lua.safe_script_file(path.string(), &sol::script_pass_on_error,
-                                                  sol::load_mode::text));
+        return report(_impl->context.lua.safe_script_file(path.string(), &sol::script_pass_on_error,
+                                                          sol::load_mode::text));
     } catch (const std::exception& exception) {
         log::error("lua: {}: {}", path.string(), exception.what());
     } catch (...) {
@@ -351,8 +455,8 @@ bool ScriptRuntime::run_file(const std::filesystem::path& path) noexcept {
 
 bool ScriptRuntime::run_string(std::string_view code, std::string_view chunk_name) noexcept {
     try {
-        return report(_impl->lua.safe_script(code, &sol::script_pass_on_error,
-                                             "=" + std::string(chunk_name), sol::load_mode::text));
+        return report(_impl->context.lua.safe_script(
+            code, &sol::script_pass_on_error, "=" + std::string(chunk_name), sol::load_mode::text));
     } catch (const std::exception& exception) {
         log::error("lua: {}: {}", chunk_name, exception.what());
     } catch (...) {
@@ -363,7 +467,7 @@ bool ScriptRuntime::run_string(std::string_view code, std::string_view chunk_nam
 
 bool ScriptRuntime::load_scripts(const std::filesystem::path& root) noexcept {
     try {
-        return _impl->load_scripts(root);
+        return _impl->load_scripts(root, GameStart{});
     } catch (const std::exception& exception) {
         log::error("lua: {}: {}", root.string(), exception.what());
     } catch (...) {
@@ -372,27 +476,84 @@ bool ScriptRuntime::load_scripts(const std::filesystem::path& root) noexcept {
     return false;
 }
 
-std::optional<DeclarationInfo> ScriptRuntime::find_declaration(std::string_view name) const {
-    const auto found = _impl->declarations.find(name);
-    if (found == _impl->declarations.end()) {
-        return std::nullopt;
+bool ScriptRuntime::load_game(const std::filesystem::path& game,
+                              const std::filesystem::path& start_scene_file) noexcept {
+    try {
+        return _impl->load_game(game, start_scene_file);
+    } catch (const std::exception& exception) {
+        log::error("lua: {}: {}", game.string(), exception.what());
+    } catch (...) {
+        log::error("lua: {}: unknown error", game.string());
     }
-    return DeclarationInfo{.kind = found->second.kind, .source = found->second.source};
+    return false;
 }
 
-void ScriptRuntime::attach_world(core::EntityManager& world) { _impl->entities.attach(world); }
+bool ScriptRuntime::load_declarations(const std::filesystem::path& root) noexcept {
+    try {
+        return _impl->load_scripts(root, std::nullopt);
+    } catch (const std::exception& exception) {
+        log::error("lua: {}: {}", root.string(), exception.what());
+    } catch (...) {
+        log::error("lua: {}: unknown error", root.string());
+    }
+    return false;
+}
+
+SceneLoad ScriptRuntime::read_scene(const std::filesystem::path& file) const noexcept {
+    try {
+        return script::read_scene(_impl->context, file);
+    } catch (const std::exception& exception) {
+        log::error("scene: {}: {}", file.string(), exception.what());
+        return {.scene = {}, .issues = {}, .error = exception.what()};
+    } catch (...) {
+        log::error("scene: {}: unknown error", file.string());
+    }
+    return {.scene = {}, .issues = {}, .error = "unknown error"};
+}
+
+std::optional<DeclarationInfo> ScriptRuntime::find_declaration(std::string_view name) const {
+    const Declaration* found = _impl->context.find_declaration(name);
+    if (found == nullptr) {
+        return std::nullopt;
+    }
+    return DeclarationInfo{.kind = found->kind, .source = found->source};
+}
+
+void ScriptRuntime::attach_world(core::EntityManager& world) {
+    _impl->context.entities.attach(world);
+}
+
+void ScriptRuntime::attach_cvars(core::console::CVars& cvars) {
+    bind_cvars(_impl->context.lua, cvars);
+}
+
+core::console::ExecutionResult ScriptRuntime::evaluate(std::string_view code) noexcept {
+    try {
+        RuntimeContext& context = _impl->context;
+        if (context.main) {
+            return script::evaluate(context.lua, *context.main, code);
+        }
+        return script::evaluate(context.lua, context.lua.globals(), code);
+    } catch (const std::exception& exception) {
+        return {.ok = false, .output = exception.what()};
+    } catch (...) {
+        return {.ok = false, .output = "unknown error"};
+    }
+}
+
+const core::FieldRegistry& ScriptRuntime::fields() const noexcept { return _impl->context.fields; }
 
 std::optional<core::Entity> ScriptRuntime::spawn(std::string_view type,
                                                  std::optional<core::Vec2> position) noexcept {
     try {
-        const auto found = _impl->declarations.find(type);
-        if (found == _impl->declarations.end()) {
+        const Declaration* found = _impl->context.find_declaration(type);
+        if (found == nullptr) {
             log::error("lua: cannot spawn unknown entity '{}'", type);
             return std::nullopt;
         }
-        const auto entity = _impl->entities.spawn(found->second, position);
+        const auto entity = _impl->context.entities.spawn(*found, position);
         if (entity) {
-            _impl->entities.finish_spawn(*entity);
+            _impl->context.entities.finish_spawn(*entity);
         }
         return entity;
     } catch (const std::exception& exception) {
@@ -403,11 +564,19 @@ std::optional<core::Entity> ScriptRuntime::spawn(std::string_view type,
     return std::nullopt;
 }
 
-void ScriptRuntime::release(core::Entity entity) noexcept { _impl->entities.release(entity); }
+void ScriptRuntime::release(core::Entity entity) noexcept {
+    try {
+        _impl->context.entities.release(entity);
+    } catch (const std::exception& exception) {
+        log::error("lua: release: {}", exception.what());
+    } catch (...) {
+        log::error("lua: release: unknown error");
+    }
+}
 
 bool ScriptRuntime::call(core::Entity entity, std::string_view method) noexcept {
     try {
-        return _impl->entities.call(entity, method);
+        return _impl->context.entities.call(entity, method);
     } catch (const std::exception& exception) {
         log::error("lua: {}: {}", method, exception.what());
     } catch (...) {
@@ -416,39 +585,9 @@ bool ScriptRuntime::call(core::Entity entity, std::string_view method) noexcept 
     return false;
 }
 
-void ScriptRuntime::set_input(core::Entity entity, InputState input) noexcept {
-    _impl->entities.set_input(entity, std::move(input));
-}
-
-bool ScriptRuntime::player_joined(std::uint32_t player_id) noexcept {
-    try {
-        return _impl->player_joined(player_id);
-    } catch (const std::exception& exception) {
-        log::error("lua: {}: {}", on_player_joined, exception.what());
-    } catch (...) {
-        log::error("lua: {}: unknown error", on_player_joined);
-    }
-    return false;
-}
-
-bool ScriptRuntime::player_left(std::uint32_t player_id) noexcept {
-    try {
-        return _impl->player_left(player_id);
-    } catch (const std::exception& exception) {
-        log::error("lua: {}: {}", on_player_left, exception.what());
-    } catch (...) {
-        log::error("lua: {}: unknown error", on_player_left);
-    }
-    return false;
-}
-
-void ScriptRuntime::set_player_input(std::uint32_t player_id, InputState input) noexcept {
-    _impl->players.set_input(player_id, std::move(input));
-}
-
 std::vector<std::string> ScriptRuntime::entity_types() const {
     std::vector<std::string> types;
-    for (const auto& [name, declaration] : _impl->declarations) {
+    for (const auto& [name, declaration] : _impl->context.declarations) {
         if (declaration.kind == DeclarationKind::Entity) {
             types.push_back(name);
         }
@@ -456,25 +595,95 @@ std::vector<std::string> ScriptRuntime::entity_types() const {
     return types;
 }
 
-std::vector<std::string> ScriptRuntime::sound_names() const { return _impl->audio.sound_names(); }
-
-std::vector<std::string> ScriptRuntime::music_names() const { return _impl->audio.music_names(); }
-
-std::vector<AudioCommand> ScriptRuntime::take_audio_commands() noexcept {
-    return _impl->audio.take_commands();
+std::vector<ScriptField> ScriptRuntime::script_fields(std::string_view type) const {
+    const Declaration* declaration = _impl->context.find_declaration(type);
+    if (declaration == nullptr || declaration->kind != DeclarationKind::Entity) {
+        return {};
+    }
+    return declaration->script_fields;
 }
+
+std::vector<std::string> ScriptRuntime::sound_names() const {
+    return _impl->context.audio.sound_names();
+}
+
+std::vector<std::string> ScriptRuntime::music_names() const {
+    return _impl->context.audio.music_names();
+}
+
+std::vector<std::string> ScriptRuntime::texture_names() const {
+    return _impl->context.textures.names();
+}
+
+std::vector<std::string> ScriptRuntime::shader_names() const {
+    return _impl->context.shaders.names();
+}
+
+std::vector<std::string> ScriptRuntime::event_names() const {
+    return _impl->context.events.names();
+}
+
+std::vector<std::string> ScriptRuntime::event_keys() const { return _impl->context.events.keys(); }
 
 std::optional<std::string> ScriptRuntime::entity_type(core::Entity entity) const {
-    return _impl->entities.type_of(entity);
+    return _impl->context.entities.type_of(entity);
 }
 
-std::optional<std::uint32_t> ScriptRuntime::entity_owner(core::Entity entity) const {
-    return _impl->entities.owner_of(entity);
+std::optional<std::string> ScriptRuntime::entity_name(core::Entity entity) const {
+    return _impl->context.entities.name_of(entity);
+}
+
+bool ScriptRuntime::set_entity_name(core::Entity entity, std::string name) {
+    return _impl->context.entities.rename(entity, std::move(name));
+}
+
+std::vector<Instance> ScriptRuntime::capture_instances() {
+    return script::capture_instances(_impl->context);
+}
+
+std::vector<InstanceIssue>
+ScriptRuntime::spawn_instances(std::span<const Instance> instances) noexcept {
+    try {
+        return script::spawn_instances(_impl->context, instances);
+    } catch (const std::exception& exception) {
+        log::error("lua: spawn_instances: {}", exception.what());
+    } catch (...) {
+        log::error("lua: spawn_instances: unknown error");
+    }
+    return {};
+}
+
+Preview ScriptRuntime::preview_instances(core::EntityManager& world,
+                                         std::span<const Instance> instances) noexcept {
+    try {
+        return script::preview_instances(_impl->context, world, instances);
+    } catch (const std::exception& exception) {
+        log::error("lua: preview_instances: {}", exception.what());
+    } catch (...) {
+        log::error("lua: preview_instances: unknown error");
+    }
+    return {};
+}
+
+std::optional<core::FieldValue> ScriptRuntime::default_value(std::string_view type,
+                                                             std::string_view key) {
+    return script::default_value(_impl->context, type, key);
 }
 
 void ScriptRuntime::update(float dt) noexcept {
     try {
-        _impl->entities.update(dt);
+        RuntimeContext& context = _impl->context;
+        context.navigation.new_tick();
+        context.entities.update(dt);
+        const auto main_update = context.main_callback("update");
+        if (main_update.valid()) {
+            report(main_update(dt));
+        }
+        for (const core::Entity arrived : context.navigation.step(dt)) {
+            if (context.entities.is_active(arrived)) {
+                context.entities.call(arrived, "on_arrive");
+            }
+        }
     } catch (const std::exception& exception) {
         log::error("lua: update: {}", exception.what());
     } catch (...) {
@@ -484,7 +693,7 @@ void ScriptRuntime::update(float dt) noexcept {
 
 void ScriptRuntime::collide(core::Entity first, core::Entity second) noexcept {
     try {
-        _impl->entities.collide(first, second);
+        _impl->context.entities.collide(first, second);
     } catch (const std::exception& exception) {
         log::error("lua: on_collide: {}", exception.what());
     } catch (...) {
@@ -494,13 +703,24 @@ void ScriptRuntime::collide(core::Entity first, core::Entity second) noexcept {
 
 std::size_t ScriptRuntime::flush_destroyed() noexcept {
     try {
-        return _impl->entities.flush_destroyed();
+        return _impl->context.entities.flush_destroyed();
     } catch (const std::exception& exception) {
         log::error("lua: flush_destroyed: {}", exception.what());
     } catch (...) {
         log::error("lua: flush_destroyed: unknown error");
     }
     return 0;
+}
+
+std::optional<std::string> ScriptRuntime::flush_scene() noexcept {
+    try {
+        return switch_to_pending_scene(_impl->context);
+    } catch (const std::exception& exception) {
+        log::error("lua: flush_scene: {}", exception.what());
+    } catch (...) {
+        log::error("lua: flush_scene: unknown error");
+    }
+    return std::nullopt;
 }
 
 } // namespace engine::script

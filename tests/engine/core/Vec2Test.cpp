@@ -3,7 +3,7 @@
 #include <cmath>
 #include <sstream>
 
-#include "engine/core/Vec2.hpp"
+#include "engine/core/math/Vec2.hpp"
 
 using engine::core::Vec2;
 

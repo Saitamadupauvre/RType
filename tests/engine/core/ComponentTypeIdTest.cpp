@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "engine/core/ComponentTypeId.hpp"
+#include "engine/core/ecs/ComponentTypeId.hpp"
 
 using engine::core::component_type_id;
 

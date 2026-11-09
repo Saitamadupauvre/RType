@@ -13,8 +13,10 @@ using engine::network::EntityState;
 using engine::network::SnapshotPayload;
 using engine::network::SnapshotReceiver;
 
-EntityState entity(std::uint32_t id, std::int16_t x = 0) {
-    return EntityState{.entity_id = id, .type_id = 1, .x = x, .y = 0, .vx = 0, .vy = 0};
+EntityState entity(std::uint32_t id, float x = 0) {
+    return EntityState{.entity_id = id,
+                       .type_id = 1,
+                       .fields = {{.field_id = 1, .value = engine::core::Vec2{x, 0}}}};
 }
 
 SnapshotPayload snapshot(std::uint32_t tick, std::vector<EntityState> entities) {

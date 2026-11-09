@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <limits>
 
-#include "engine/core/Entity.hpp"
+#include "engine/core/ecs/Entity.hpp"
 
 using engine::core::Entity;
 

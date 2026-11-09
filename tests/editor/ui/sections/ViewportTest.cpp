@@ -1,0 +1,295 @@
+#include <gtest/gtest.h>
+
+#include <variant>
+#include <vector>
+
+#include "../FrameFixture.hpp"
+#include "action/Action.hpp"
+#include "engine/core/math/Vec2.hpp"
+
+using editor::Tool;
+using editor::UiInput;
+using engine::core::Vec2;
+
+namespace command = editor::command;
+namespace edit = editor::edit;
+
+namespace {
+
+class Viewport : public FrameFixture {
+protected:
+    void SetUp() override {
+        frame();
+        frame();
+    }
+
+    [[nodiscard]] static Clay_Vector2 screen(Vec2 world) {
+        const Clay_BoundingBox box = box_of(CLAY_ID("Viewport"));
+        return {.x = box.x + world.x, .y = box.y + world.y};
+    }
+
+    void use(Tool tool) { _editor.handle(command::SetTool{.tool = tool}); }
+
+    void select_ship() { _editor.handle(command::Select{.id = id_of(_editor.session(), "ship")}); }
+
+    std::vector<editor::Action> drag(Vec2 from, Vec2 to, bool alt = false) {
+        std::vector<editor::Action> actions;
+        const auto collect = [&](const UiInput& input) {
+            for (auto& action : frame(input).actions) {
+                actions.push_back(std::move(action));
+            }
+        };
+        collect({.pointer = screen(from), .primary_down = true, .primary_pressed = true});
+        collect({.pointer = screen(to), .primary_down = true, .alt = alt});
+        collect({.pointer = screen(to), .primary_down = true, .alt = alt});
+        collect({.pointer = screen(to), .alt = alt});
+        return actions;
+    }
+
+    template <typename Wanted>
+    static const Wanted* only_edit(const std::vector<editor::Action>& actions) {
+        if (actions.size() != 1) {
+            return nullptr;
+        }
+        const auto* change = std::get_if<editor::Edit>(&actions.front());
+        return change ? std::get_if<Wanted>(change) : nullptr;
+    }
+
+    editor::ViewportState& state() { return _widgets.viewport(); }
+
+    editor::ViewCamera camera() { return state().camera.value_or(editor::ViewCamera{}); }
+};
+
+} // namespace
+
+TEST_F(Viewport, ClickOnAnInstanceSelectsIt) {
+    const auto actions =
+        frame({.pointer = screen({2.F, 3.F}), .primary_down = true, .primary_pressed = true})
+            .actions;
+
+    const auto* select = only<command::Select>(actions);
+    ASSERT_NE(select, nullptr);
+    EXPECT_EQ(select->id, id_of(_editor.session(), "ship"));
+}
+
+TEST_F(Viewport, ClickOnTheTopmostOfOverlappingInstancesSelectsIt) {
+    const auto actions =
+        frame({.pointer = screen({30.F, 10.F}), .primary_down = true, .primary_pressed = true})
+            .actions;
+
+    const auto* select = only<command::Select>(actions);
+    ASSERT_NE(select, nullptr);
+    EXPECT_EQ(select->id, id_of(_editor.session(), "rock"));
+}
+
+TEST_F(Viewport, ClickOnEmptySpaceClearsTheSelection) {
+    select_ship();
+    const auto actions =
+        frame({.pointer = screen({300.F, 300.F}), .primary_down = true, .primary_pressed = true})
+            .actions;
+
+    const auto* select = only<command::Select>(actions);
+    ASSERT_NE(select, nullptr);
+    EXPECT_FALSE(select->id.has_value());
+}
+
+TEST_F(Viewport, ClickOnTheSelectionEmitsNothing) {
+    select_ship();
+    EXPECT_TRUE(
+        frame({.pointer = screen({2.F, 3.F}), .primary_down = true, .primary_pressed = true})
+            .actions.empty());
+}
+
+TEST_F(Viewport, MoveToolDragEmitsOneSnappedMove) {
+    use(Tool::move);
+    select_ship();
+    const auto actions = drag({2.F, 3.F}, {40.F, 30.F});
+
+    const auto* move = only_edit<edit::Move>(actions);
+    ASSERT_NE(move, nullptr);
+    EXPECT_EQ(move->id, id_of(_editor.session(), "ship"));
+    EXPECT_EQ(move->position, Vec2(32.F, 32.F));
+}
+
+TEST_F(Viewport, AltDropsWithoutSnapping) {
+    use(Tool::move);
+    select_ship();
+    const auto actions = drag({2.F, 3.F}, {40.F, 30.F}, true);
+
+    const auto* move = only_edit<edit::Move>(actions);
+    ASSERT_NE(move, nullptr);
+    EXPECT_EQ(move->position, Vec2(39.F, 29.F));
+}
+
+TEST_F(Viewport, DragShowsThePreviewBeforeTheRelease) {
+    use(Tool::move);
+    select_ship();
+    frame({.pointer = screen({2.F, 3.F}), .primary_down = true, .primary_pressed = true});
+    frame({.pointer = screen({40.F, 30.F}), .primary_down = true});
+    const auto actions = frame({.pointer = screen({40.F, 30.F}), .primary_down = true}).actions;
+
+    EXPECT_TRUE(actions.empty());
+    const auto& items = state().frame.items;
+    const auto ship =
+        std::ranges::find(items, id_of(_editor.session(), "ship"), &editor::SceneItem::id);
+    ASSERT_NE(ship, items.end());
+    EXPECT_EQ(ship->top_left, Vec2(32.F, 32.F));
+}
+
+TEST_F(Viewport, ReleasingWhereItStartedEmitsNothing) {
+    use(Tool::move);
+    select_ship();
+    EXPECT_TRUE(drag({2.F, 3.F}, {2.F, 3.F}).empty());
+}
+
+TEST_F(Viewport, SelectToolDoesNotMove) {
+    select_ship();
+    EXPECT_TRUE(drag({2.F, 3.F}, {40.F, 30.F}).empty());
+}
+
+TEST_F(Viewport, WheelZoomsWithoutEmitting) {
+    const auto actions =
+        frame({.pointer = screen({100.F, 100.F}), .wheel = {.x = 0.F, .y = 2.F}}).actions;
+
+    EXPECT_TRUE(actions.empty());
+    ASSERT_TRUE(state().camera.has_value());
+    EXPECT_GT(camera().zoom, 1.F);
+}
+
+TEST_F(Viewport, MiddleDragPans) {
+    const Vec2 before = camera().center;
+    frame({.pointer = screen({100.F, 100.F}), .middle_down = true});
+    frame({.pointer = screen({130.F, 90.F}), .middle_down = true});
+
+    EXPECT_EQ(camera().center, before - Vec2(30.F, -10.F));
+}
+
+TEST_F(Viewport, PanToolDragPansWithoutSelecting) {
+    use(Tool::pan);
+    const Vec2 before = camera().center;
+    std::vector<editor::Action> actions = drag({2.F, 3.F}, {22.F, 3.F});
+
+    EXPECT_TRUE(actions.empty());
+    EXPECT_EQ(camera().center, before - Vec2(20.F, 0.F));
+}
+
+TEST_F(Viewport, FrameHoldsTheSceneAndTheSelection) {
+    select_ship();
+    frame();
+
+    EXPECT_EQ(state().frame.items.size(), 2U);
+    EXPECT_EQ(state().frame.selection, id_of(_editor.session(), "ship"));
+    EXPECT_FALSE(state().frame.grid.xs.empty());
+}
+
+TEST_F(Viewport, DraggingAPrefabIntoTheViewportPlacesIt) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame({.pointer = screen({100.F, 100.F}), .primary_down = true});
+    frame({.pointer = screen({100.F, 100.F}), .primary_down = true});
+    ASSERT_TRUE(state().frame.ghost.has_value());
+    const auto actions = frame({.pointer = screen({100.F, 100.F})}).actions;
+
+    const auto* place = only_edit<edit::Place>(actions);
+    ASSERT_NE(place, nullptr);
+    EXPECT_EQ(place->type, "rock");
+    EXPECT_EQ(place->position, Vec2(64.F, 64.F));
+}
+
+TEST_F(Viewport, ClickingAPrefabArmsIt) {
+    const auto row = CLAY_IDI("PrefabRow", 0);
+    click(row);
+    const Clay_BoundingBox box = box_of(row);
+    const auto actions = frame({.pointer = {.x = box.x + 2.F, .y = box.y + 2.F}}).actions;
+
+    EXPECT_TRUE(actions.empty());
+    ASSERT_TRUE(state().placing.has_value());
+    EXPECT_TRUE(state().placing.value_or(editor::Placing{}).armed);
+}
+
+TEST_F(Viewport, ArmedPrefabIsPlacedByAClickInTheViewport) {
+    const auto row = CLAY_IDI("PrefabRow", 1);
+    click(row);
+    frame();
+    frame({.pointer = screen({100.F, 100.F})});
+    ASSERT_TRUE(state().frame.ghost.has_value());
+    const auto actions =
+        frame({.pointer = screen({100.F, 100.F}), .primary_down = true, .primary_pressed = true})
+            .actions;
+
+    const auto* place = only_edit<edit::Place>(actions);
+    ASSERT_NE(place, nullptr);
+    EXPECT_EQ(place->type, "ship");
+    EXPECT_EQ(place->position, Vec2(64.F, 64.F));
+    EXPECT_FALSE(state().placing.has_value());
+}
+
+TEST_F(Viewport, EscapeDisarmsThePrefab) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame();
+    frame({.keys_pressed = {editor::Key::escape}});
+
+    EXPECT_FALSE(state().placing.has_value());
+}
+
+TEST_F(Viewport, ClickingElsewhereDisarmsThePrefab) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame();
+    const auto actions = click(CLAY_ID("PlayButton"));
+
+    EXPECT_FALSE(state().placing.has_value());
+    for (const auto& action : actions) {
+        EXPECT_EQ(std::get_if<editor::Edit>(&action), nullptr);
+    }
+}
+
+TEST_F(Viewport, ArmedPrefabIsTheClickedOne) {
+    click(CLAY_IDI("PrefabRow", 0));
+    frame();
+
+    EXPECT_EQ(state().placing.value_or(editor::Placing{}).type, "rock");
+}
+
+TEST_F(Viewport, RotateHandleEmitsTheRotation) {
+    const auto rock = id_of(_editor.session(), "rock");
+    _editor.handle(edit::Move{.id = rock, .position = Vec2(100.F, 100.F)});
+    _editor.handle(command::Select{.id = rock});
+    frame();
+    const auto actions = drag({132.F, 76.F}, {300.F, 132.F});
+
+    const auto* set = only_edit<edit::SetField>(actions);
+    ASSERT_NE(set, nullptr);
+    EXPECT_EQ(set->key, "Rotation.degrees");
+    EXPECT_EQ(set->value, engine::core::FieldValue{90.F});
+}
+
+TEST_F(Viewport, FrameCarriesTheOverlaysAndTheGameFrame) {
+    _editor.handle(command::SetOverlay{.overlay = editor::Overlay::hitboxes, .visible = true});
+    _editor.handle(command::SetOverlay{.overlay = editor::Overlay::names, .visible = false});
+    frame();
+
+    EXPECT_TRUE(state().frame.show_hitboxes);
+    EXPECT_FALSE(state().frame.show_names);
+    EXPECT_EQ(state().frame.game_frame.size, editor::game_screen);
+}
+
+TEST_F(Viewport, FrameKnowsTheWorldPointUnderTheCursor) {
+    frame({.pointer = screen({100.F, 50.F})});
+    frame({.pointer = screen({100.F, 50.F})});
+
+    ASSERT_TRUE(state().frame.cursor.has_value());
+    EXPECT_EQ(state().frame.cursor.value_or(Vec2{}), Vec2(100.F, 50.F));
+
+    frame({.pointer = {.x = 1.F, .y = 1.F}});
+    EXPECT_FALSE(state().frame.cursor.has_value());
+}
+
+TEST_F(Viewport, ItemsCarryTheirTypeForTheSelectionTag) {
+    frame();
+    const auto& items = state().frame.items;
+    const auto ship =
+        std::ranges::find(items, id_of(_editor.session(), "ship"), &editor::SceneItem::id);
+
+    ASSERT_NE(ship, items.end());
+    EXPECT_EQ(ship->type, "ship");
+    EXPECT_EQ(ship->label, "hero");
+}

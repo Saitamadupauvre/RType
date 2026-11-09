@@ -1,0 +1,337 @@
+# The editor
+
+The editor opens one game folder, shows its scenes, and turns clicks into
+changes to the open scene. It never edits scripts: behaviour lives in Lua,
+layout lives in scenes.
+
+```sh
+editor examples/r-type                      # open a game folder and its start scene
+editor --new my-game                        # create a game in ./my-game, then open it
+editor examples/r-type --log-level debug    # also log every action on stderr
+editor --help
+```
+
+| Argument | Meaning |
+|---|---|
+| `game` | Game folder to edit. Required without `--new`; it must contain a `game.json` ([Game folders](game-folder.md)). |
+| `--new` | Create a new game in `game` (the current folder when omitted), which must be empty or missing, then open it. |
+| `--runtime <program>` | Program Play starts. Defaults to `engine-runtime` next to the editor. |
+| `--log-level <level>` | `trace`, `debug`, `info` (default), `warn`, `error` or `off`. See [Developer logs](#developer-logs). |
+
+The editor opens the `start_scene` of `game.json`. Without one, it opens no
+scene: click one in the sidebar.
+
+`--new` writes a game you can play at once:
+
+| File | Content |
+|---|---|
+| `game.json` | `name` (the folder's name) and `start_scene: "main"` |
+| `scenes/main.json` | An empty scene |
+| `scripts/main.lua` | Empty `on_start()` and `on_player_joined(player)` |
+| `assets/` | Empty |
+
+A folder that is not empty, or a file, is refused and nothing is written.
+Opening the editor without any folder is not there yet.
+
+## Window
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ File  Edit  View  Scene  Help            stage1 •          Play Export│  menu bar
+│ [Select][Move][Pan]  Snap  Grid 16  Hitboxes  Names     Undo  Redo    │  toolbar
+├────────────┬───────────────────────────────────────────┬──────────────┤
+│ PREFABS    │                                           │ INSPECTOR    │
+│  ship      │                                           │  name        │
+│  enemy     │               viewport                    │  type ▾      │
+│ SCENES     │                                           │  position    │
+│  stage1 ★  │                                           │  components  │
+│ INSTANCES  │                                           │  script      │
+│  space     │                                           │              │
+├────────────┴───────────────────────────────────────────┴──────────────┤
+│ CONSOLE | PROBLEMS | ASSETS                                            │  bottom panel
+├───────────────────────────────────────────────────────────────────────┤
+│ EDIT · 12 instances · enemy_1 · snap 16 · unsaved · game · stage1      │  status bar
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+| Area | Shows | Does |
+|---|---|---|
+| Menu bar | File, Edit, View, Scene and Help menus; the open scene, with `•` when it has unsaved changes | Every command, Play, Stop, Export |
+| Toolbar | Tools, snap, grid size, overlays | Switch tool, toggle snap and overlays, Undo, Redo |
+| Play band | While the game runs or is paused: the mode and what is blocked | |
+| Sidebar | **Prefabs** (every entity type the scripts declare, with a filter), **scenes** (the start scene is marked), **instances** of the open scene | Place a prefab, open a scene, select an instance |
+| Viewport | The scene drawn like the game, the grid, the camera frame, the selection | Select, move, scale, rotate, pan, zoom |
+| Inspector | The selected instance: name, prefab, script, fields by component | Rename, change type, edit and reset fields, open the script |
+| Bottom panel | **Console** (timestamped messages, game output during Play, its last 500 lines), **Problems** and **Assets** | Switch tab; click a console line that names a script (`player.lua:12: ...`) to open that script; drag an asset onto an instance; drag the panel's top edge to resize it |
+| Status bar | Mode, instance count, selection, snap, unsaved changes, game folder, scene | |
+
+The window cannot be made smaller than 1000 × 600. Drag the top edge of the
+bottom panel (the cursor turns into a vertical arrow) to make it from half to
+twice its usual 150 px; a double-click on that edge resets it. The panel never
+grows so tall that the viewport disappears, and its height is not kept between
+runs.
+
+A refused action, such as opening a scene while the open one has unsaved
+changes, also shows in red at the bottom of the viewport for 3 seconds, so you
+see it even when the console is hidden.
+
+## Words
+
+| Word | Meaning |
+|---|---|
+| **Prefab** | An entity type declared in Lua with `entity "name"`. Its fields give the default of every instance. |
+| **Instance** | One entity placed in a scene: a prefab, a position, an optional name, and the fields it overrides. |
+| **Override** | A field whose value differs from the prefab, stored in the scene. Changing the prefab in Lua changes every instance that does not override that field. |
+| **Scene** | A JSON file of instances in `scenes/`. The runtime spawns it when the game starts or when a script calls `load_scene`. |
+
+## Viewport
+
+Instances are drawn like the game draws them: the position is the top-left
+corner, a sprite takes its texture size times its scale, an entity with a
+color and no sprite is a 64 px square of that color, and `z_index` orders the
+drawing. Entities the game does not draw (no sprite, no color) show as a crossed
+outline so they can still be selected. Textures load from the game's
+`assets/`; a missing one is drawn as the tinted square.
+
+| Input | Effect |
+|---|---|
+| Click an instance | Select it (the topmost one when they overlap) |
+| Click empty space | Clear the selection |
+| Drag with the Move tool (`G`) | Move the instance; one undoable step when you release |
+| `Alt` while dragging | Drop without snapping |
+| Middle drag, or drag with the Pan tool (`H`) | Pan |
+| Wheel | Zoom around the cursor, 0.1× to 10× |
+| Drag a prefab from PREFABS into the viewport | Place an instance under the cursor, snapped |
+| Click a prefab, then click in the viewport | Same; `Esc` or a click elsewhere cancels |
+| Drag the square handle of the selection | Scale it (only if the prefab has a `scale`) |
+| Drag the round handle of the selection | Rotate it, by 15° steps with snap on (only if the prefab has a `rotation`) |
+| `Delete` | Delete the selection |
+
+| Overlay | Shows |
+|---|---|
+| Camera frame (always) | What the game shows at start: the view of the first instance with a camera (`zoom`, `follow` or `bounds`), or the 1920 × 1080 screen from the origin |
+| Names (toolbar) | Each instance's name, or its type |
+| Hitboxes (toolbar) | Rectangle and circle colliders, where the physics puts them |
+
+With snap on, a dragged instance's top-left corner lands on the grid. The
+world is 1920 × 1080 virtual units with the origin at the top-left and Y
+pointing down, the same units scripts use.
+
+## Assets
+
+The **Assets** tab of the bottom panel lists every file of the game's
+`assets/` folder, with its kind and, for images, a thumbnail.
+
+| Kind | Files | Dropped on an instance |
+|---|---|---|
+| sprite | `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tga`, `.gif`, `.qoi` | Sets its sprite |
+| shader | `.fs`, `.vs`, `.glsl`, `.frag`, `.vert` | Sets its shader, by name without the extension (`shaders/space`) |
+| music | Audio under `assets/music/` | Nothing |
+| sound | Other audio (`.wav`, `.ogg`, `.mp3`, `.flac`, `.qoa`) | Nothing |
+| file | Anything else | Nothing |
+
+- Drag a sprite or a shader from the list onto an instance in the viewport. A
+  chip with its name follows the pointer, and the instance under it is
+  outlined. Releasing there sets the field, undoable like any edit; releasing
+  elsewhere, or `Esc`, cancels.
+- Double-click a file to open it with your system's program.
+- Files starting with `.` are skipped. New files show after the next action.
+- A sprite or shader set this way needs no `textures { ... }` or
+  `shaders { ... }` in the scripts: loading the game declares what the scenes
+  use ([Game folders](game-folder.md#loading)).
+
+## Inspector
+
+The inspector shows the selected instance: a header with its name and
+`instance of <prefab> · <script>`, then its fields.
+
+- **Name** is a label for you; scripts never see it, and it need not be unique.
+- **Position** moves the instance.
+- **Type** switches the instance to another prefab. The name, the position and
+  the overrides the new prefab accepts are kept; the console lists the ones
+  dropped. Undo brings everything back.
+- **Script** names the file declaring the prefab; **Open** opens it in your
+  system's program for `.lua` files.
+- **Components** lists the engine fields of the prefab (sprite, color, hitbox,
+  physics body...), one band per component.
+- **Script** lists the [script fields](game-folder.md#script-fields) the prefab
+  declares, such as `health = 3`.
+
+Each field shows its override, or the prefab value when there is none. An
+overridden field has an accent label and a **Reset** button; **Reset all to
+prefab** clears every override of the instance.
+
+| Field kind | Edited with |
+|---|---|
+| float, int | Number field |
+| bool | Checkbox |
+| string | Text field |
+| vec2 | Two number fields, x and y |
+| color | Swatch and a hex field: `#RRGGBB` or `#RRGGBBAA` |
+| asset | Path relative to `assets/` |
+| list | One row per item, `x` to remove it, `+ Add` to append |
+
+A value is committed with `Enter`, `Tab` or a click elsewhere; `Esc` restores
+it. A value that does not parse is refused with a message in the console.
+
+## Scenes and saving
+
+- Click a scene in SCENES to open it. A scene with unsaved changes must be
+  saved (`Ctrl+S`) or discarded (File > Discard changes) first.
+- Every edit can be undone (`Ctrl+Z`) and redone (`Ctrl+Y`), up to 100 steps.
+  Undoing back to the saved state clears the unsaved mark.
+- Saving writes only the open scene file. Overrides are sorted by key, so two
+  saves of the same scene give the same file and diffs stay small.
+- **Problems** lists the warnings and errors of the last script load first
+  (a broken file, a name outside a table form, a misspelled callback), then
+  what the editor could not build for an instance of the open scene: an
+  override of the wrong kind, a value the component refuses. File > Reload
+  scripts refreshes the script part.
+- Instances whose type no script declares (a typo, a deleted script) are
+  reported when the scene opens and kept in the file exactly as they were.
+
+- `Ctrl+D` duplicates the selection: same prefab, name and overrides, one grid
+  cell down and right. The copy is selected, and one undo removes it.
+
+## New prefabs and scenes
+
+File > **New prefab...** and **New scene...** (also in the command palette) ask
+for a name: 1 to 63 letters, digits, `_` or `-`. `Enter` or **Create** makes
+it; `Esc`, **Cancel** or a click outside closes the dialog. A refused name
+keeps the dialog open, with the reason in the console.
+
+| Item | Writes | Then |
+|---|---|---|
+| Prefab | `scripts/<name>.lua`: `entity "<name>"`, a white `color` and a 64 × 64 `hitbox` | Reloads the scripts, so the prefab is listed, and opens the file |
+| Scene | `scenes/<name>.json`, empty | Opens it |
+
+A prefab name that is already declared, or a scene or file that exists, is
+refused.
+
+- File > **Reload scripts** reads `scripts/` and `game.json` again, so new,
+  changed and deleted prefabs show without restarting. The open scene, its
+  unsaved changes, its undo history and the selection are kept; instances of a
+  type that no longer exists become problems. It works while the game plays.
+- File > **Reveal game folder** opens the game folder in your file manager.
+
+Opening a file (Open script, a console line, an asset, New prefab, Open
+settings, Reveal game folder) starts `xdg-open`, or `open` on macOS, and never
+waits for it: the editor keeps running while the program you opened is open,
+and a terminal program such as `nvim` cannot take over the editor's terminal.
+When the opener fails, for example because no program is set for that kind of
+file, the console and the red message over the viewport say so. On Linux, set
+one with `xdg-mime default <program>.desktop <type>`; `xdg-mime query filetype
+<file>` gives the type.
+
+Duplicating, renaming and deleting scenes, and changing the start scene, exist
+in the editor's model but have no buttons yet: set `start_scene` in
+`game.json`.
+
+## Play
+
+**Play** runs the open scene in the real game, in its own window:
+
+1. The scene, unsaved changes included, is written to a temporary file. Your
+   scene files are never touched by playing.
+2. The runtime starts as `engine-runtime --solo --game <folder> --scene-file <temp file>`:
+   a server and a client in one process, starting from that scene instead of
+   the `start_scene`.
+3. Everything the game prints, Lua errors included, goes to the console. A
+   Lua error never closes the editor, and clicking its line opens the script
+   it names (your system's opener cannot jump to the line itself).
+
+| Command | Effect |
+|---|---|
+| Play | Start the open scene; on a paused game, continue it |
+| Pause | Freeze the game process |
+| Stop | Ask the game to quit, kill it after one second |
+
+While the game runs, edits and scene changes are refused ("Stop the game to
+change the project."). Closing the game window ends Play too. More in
+[Play and debug](play-and-debug.md).
+
+## Export
+
+**Export** (or File > Export game...) writes a folder that runs the game
+without the editor, offering the modes you choose: solo, host, join and
+dedicated server. See [Run and export](run-and-export.md#exporting-from-the-editor).
+
+## Menus, shortcuts and command palette
+
+| Menu | Commands |
+|---|---|
+| File | New prefab..., New scene..., Save scene, Discard changes, Open script, Reveal game folder, Open settings, Reload settings, Reload scripts, Export game... |
+| Edit | Undo, Redo, Duplicate selection, Delete selection |
+| View | Select tool, Move tool, Pan tool, Snap to grid, Show hitboxes, Show names, Zoom in, Zoom out |
+| Scene | Play, Pause, Stop |
+| Help | The viewport controls that have no menu entry |
+
+| Shortcut | Command |
+|---|---|
+| `Ctrl+S` | Save scene |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
+| `Ctrl+D` | Duplicate the selection |
+| `Delete` | Delete the selection |
+| `V` / `G` / `H` | Select / Move / Pan tool |
+| `Ctrl+Shift+P` | Command palette |
+| `Ctrl+=` / `Ctrl+-` | Zoom the whole editor in / out |
+| `F11` | Layout debug view |
+
+On macOS, `Cmd` replaces `Ctrl`. Shortcuts follow the keyboard layout:
+`Ctrl+Z` is the key printed Z, and `Ctrl+-` the key printed `-` (the `6` key on
+AZERTY). Zoom also takes `Ctrl++`, with or without `Shift`, and the keypad. Shortcuts are ignored
+while a text field has the keyboard.
+
+The **command palette** (`Ctrl+Shift+P`) lists every command with a filter.
+The filter is fuzzy: `sv` finds "Save scene" and `stg` finds "Snap to grid".
+`Up` and `Down` move, `Enter` runs, `Esc` closes. Disabled commands are greyed
+out.
+
+## Settings
+
+Personal preferences live in a `settings.json` read at startup. File > Open
+settings opens it (creating it with `{}` if needed); File > Reload settings
+applies it at once.
+
+| System | File |
+|---|---|
+| Linux | `$XDG_CONFIG_HOME/engine-editor/settings.json`, or `~/.config/engine-editor/settings.json` |
+| macOS | `~/Library/Application Support/engine-editor/settings.json` |
+
+```json
+{
+    "ui.scale": 1.25,
+    "ui.scroll_speed": 1,
+    "view.snap": true,
+    "view.grid_size": 16,
+    "view.show_hitboxes": false,
+    "view.show_names": true
+}
+```
+
+| Key | Type | Range | Default | Effect |
+|---|---|---|---|---|
+| `ui.scale` | number | 0.5 to 3 | 1 | Multiplies the screen's DPI scale: every panel, font and row. Zoom in / out change it by 0.1 for the session; Reload settings goes back to the file |
+| `ui.scroll_speed` | number | 0.25 to 4 | 1 | Multiplies the 40 px one wheel notch scrolls |
+| `view.snap` | bool | | true | Snap to the grid when the editor starts |
+| `view.grid_size` | number | 1 to 512 | 16 | Grid size, in pixels, when the editor starts |
+| `view.show_hitboxes` | bool | | false | Show hitboxes when the editor starts |
+| `view.show_names` | bool | | true | Show names when the editor starts |
+
+A bad file never stops the editor: invalid JSON gives one error in the console
+and the defaults; an unknown key, a wrong type or a value out of range gives a
+warning and that key keeps its default. Settings belong to you, not to the
+game: a game's window, scenes and controls live in its folder.
+
+## Developer logs
+
+The console is for you as a game maker. What the editor itself does goes to
+stderr, at the level of `--log-level`:
+
+| Level | Logged |
+|---|---|
+| `info` | The game folder and start scene at startup; every refused action with its reason |
+| `debug` | Every action with its fields, each font loaded, raylib's own messages |
+| `trace` | Every key pressed and the shortcut it ran or why it was skipped |
+
+How the editor is built is described in [Editor internals](../editor-app.md).

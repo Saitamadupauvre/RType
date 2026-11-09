@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <system_error>
 #include <type_traits>
 
@@ -7,7 +8,7 @@
 
 namespace engine::network {
 
-enum class SocketError {
+enum class SocketError : std::uint8_t {
     closed = 1,
     canceled,
     timed_out,

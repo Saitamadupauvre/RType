@@ -1,4 +1,4 @@
-#include "engine/core/SystemScheduler.hpp"
+#include "engine/core/ecs/SystemScheduler.hpp"
 
 #include <algorithm>
 #include <exception>

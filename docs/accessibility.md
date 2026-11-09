@@ -1,8 +1,11 @@
 # Accessibility
 
-The game and its documentation must be usable by people with disabilities.
-This page lists, for each category, what the game provides **today** and what
-is **planned**, with the existing games that inspired each measure.
+The editor, the games made with it and the documentation must be usable by
+people with disabilities. This page lists, for each category, what is
+provided **today** and what is **planned**, with the existing tools and games
+that inspired each measure. Game measures are those of the
+[R-Type example](examples/r-type.md); the engine features they rely on
+(raw input, separate volumes, scaling) are available to every game.
 
 Status: ✅ available, 🔜 planned for the next releases.
 
@@ -14,7 +17,7 @@ Status: ✅ available, 🔜 planned for the next releases.
 | Two key sets at once | ✅ | Arrow keys and `ZQSD` both move the ship, so the game can be played with the right or the left hand only. |
 | No precision timing on menus | ✅ | There are no menus to navigate: launching the client joins the game, and a new round starts automatically. |
 | Generous pace | ✅ | Enemies are spawned at a fixed, moderate rate; the game never speeds up. |
-| Remappable controls | 🔜 | Bindings are already data (an action → keys table in `game/client/Controls.cpp`) and the input interface exposes `last_key_pressed()` for a remapping screen. Next: load the table from a user file and add the screen. Inspired by *Celeste* and *The Last of Us Part II*. |
+| Remappable controls | 🔜 | Bindings are already data (an action → keys table in `examples/r-type/scripts/lib/controls.lua`, read by the server from the raw keys clients send) and the input interface exposes `last_key_pressed()` for a remapping screen. Next: per-player bindings from a user file and the screen. Inspired by *Celeste* and *The Last of Us Part II*. |
 | Gamepad support | 🔜 | Through the same action table. |
 | Adjustable game speed | 🔜 | A server option scaling the fixed step, like *Celeste*'s assist mode. |
 
@@ -22,10 +25,10 @@ Status: ✅ available, 🔜 planned for the next releases.
 
 | Measure | Status | Details |
 |---|---|---|
-| Not colour alone | ✅ | Your own ship is marked with a white dot, so you can find yourself without telling colours apart. |
+| Not colour alone | 🔜 | The white dot marking your own ship was drawn by the C++ client; it left with the generic `ClientApp` and comes back from the game's scripts once the client can draw from Lua. |
 | Distinct colours | ✅ | The four players are blue, red, green and yellow. |
 | Scalable display | ✅ | The window is resizable and the full play area is scaled to it with letterboxing, so a large screen gives larger sprites. |
-| High-contrast background | ✅ | A plain black background with small grey stars; entities are drawn on top in full colour. |
+| High-contrast background | ✅ | A plain black background; entities are drawn on top in full colour. |
 | Colour-blind palette | 🔜 | Replace red/green with a palette distinguishable under protanopia and deuteranopia (e.g. blue, orange, white, magenta), selectable in `lib/config.lua`. |
 | Shape or number per player | 🔜 | A player number drawn next to each ship, as in *Overcooked*. |
 | Fullscreen | 🔜 | The renderer already supports `set_fullscreen()`; add a key and a command-line flag. |
@@ -52,6 +55,18 @@ Status: ✅ available, 🔜 planned for the next releases.
 | Pause | 🔜 | A pause available at any time (needs a server-side pause in multiplayer). |
 | Difficulty setting | 🔜 | Spawn rate and enemy speed are already tunables in `lib/config.lua`; next is a server option exposing presets. |
 | On-screen feedback | 🔜 | A HUD showing the game state ("Game over", "Waiting for players") and the players present. |
+
+## Editor
+
+| Measure | Status | Details |
+|---|---|---|
+| Scalable interface | ✅ | `ui.scale` in `settings.json` multiplies every panel, font and row on top of the screen's DPI scale, from 0.5 to 3. |
+| Keyboard access to every command | ✅ | The command palette (`Ctrl+Shift+P`) runs any command by typing a few letters; fuzzy matching tolerates typos of order and case. |
+| Layout-aware shortcuts | ✅ | Letter shortcuts follow the printed key, so `Ctrl+Z` is the same key on AZERTY and QWERTY. |
+| Adjustable scrolling | ✅ | `ui.scroll_speed` multiplies the wheel step. |
+| Readable font | ✅ | JetBrains Mono, designed for legibility, with distinct `0`/`O` and `1`/`l`. |
+| High-contrast theme | 🔜 | A theme setting next to `ui.scale`. |
+| Full keyboard navigation of panels | 🔜 | `Tab` moves through the fields drawn in a frame today; panels and lists come next. |
 
 ## Documentation
 

@@ -1,19 +1,23 @@
 # AGENTS.md
 
 Instructions for anyone (human or AI agent) writing code in this repository.
-Read [docs/PROJECT.md](docs/PROJECT.md) first: it is the reference for the
-architecture, the Lua API and the roadmap.
+The product is the **editor** and the **runtime**: games are folders of Lua,
+scenes and assets made with them, and R-Type in `examples/r-type/` is one
+example. Read [docs/PROJECT.md](docs/PROJECT.md) first for the architecture and
+the roadmap, and [docs/reference/lua-api.md](docs/reference/lua-api.md) for the
+Lua API.
 
 ## Golden rules
 
 1. **Every feature and every bug fix comes with GoogleTest tests.** No pull
    request without tests. A bug fix starts with a test that reproduces it.
-2. **The engine never knows about the game.** Nothing under `engine/` includes,
-   links or names anything from `game/`. Before adding something to the engine,
-   ask: *would this make sense in a platformer?* If not, it belongs in Lua.
+2. **The engine never knows about a game.** Nothing under `engine/`, `editor/`
+   or `runtime/` includes, links or names anything from `examples/`. Games
+   have no C++. Before adding something to the engine, ask: *would this make
+   sense in a platformer?* If not, it belongs in a game's Lua.
 3. **The engine stays extractable.** `engine/` only uses its own CMake helpers
-   (`engine/cmake/`) and variables, never root ones. The game only links
-   `engine::*` targets. In Part 2 `engine/` moves to its own repository and is
+   (`engine/cmake/`) and variables, never root ones. The editor and the
+   runtime only link `engine::*` targets. In Part 2 `engine/` moves to its own repository and is
    consumed through vcpkg with `find_package(engine)`.
 4. **Dependencies only through vcpkg.** Add a port to `vcpkg.json` in the same
    pull request as the module that uses it. Never copy library sources, never
@@ -29,14 +33,14 @@ engine/                     C++ engine, shared libraries engine-<module>
   include/engine/<module>/  public headers
   src/<module>/             implementation and private headers
 plugins/<name>/             runtime plugins (bin/plugins/), e.g. graphics-raylib
-game/server, game/client    r-type_server / r-type_client entry points
-game/sandbox/               r-type_sandbox: scratch executable to try the engine out
-game/scripts/               Lua game code (main.lua is the entry point)
-assets/                     sprites, sounds, music
+editor/                     editor app: Clay layout, raylib only in editor/src/raylib/
+runtime/                    engine-runtime: runs any game folder (solo, host, client, dedicated)
+examples/r-type/            example game folder: game.json, scripts/, scenes/, assets/
 tests/engine/<module>/      tests of one engine module
-tests/game/<target>/        tests of one game target (server, client)
 tests/plugins/<name>/       tests of one plugin's backend-free code
-tests/fixtures/             test data: packets, Lua scripts...
+tests/editor/               tests of the editor's raylib-free code
+tests/runtime/              tests of the runtime's command line and options
+tests/fixtures/             test data: packets, small Lua games, scenes...
 docs/                       documentation (English, MkDocs sources; mkdocs.yml at the root)
 ```
 
@@ -48,20 +52,25 @@ docs/                       documentation (English, MkDocs sources; mkdocs.yml a
 - One test executable per module (`engine_<module>_tests`), linked **only**
   against that module. Needing another module in a test means the modules are
   coupled: fix the design, not the test.
-- Game code under test lives in a static library linked by its executable
-  (e.g. `r-type_server_cli`), tested in `tests/game/<target>/` and registered
-  with `game_add_test(<target> SOURCES ... LINKS <library>)`.
+- Runtime code under test lives in `engine-runtime-core`, linked by
+  `engine-runtime`, tested in `tests/runtime/` and registered with
+  `runtime_add_test(<name> SOURCES ... LINKS engine-runtime-core)`.
+- Tests never load an example game: each test uses its own small game in
+  `tests/fixtures/`, so examples can change freely.
 - Plugin code under test must not need the backend library: it lives in a
   static library linked by the plugin (e.g. `graphics-raylib-letterbox`),
   tested in `tests/plugins/<name>/` and registered with
   `plugin_add_test(<name> SOURCES ... LINKS <library>)`.
+- Editor code under test must not need raylib: it lives in `editor-core`, built
+  from everything outside `editor/src/raylib/`, tested in `tests/editor/` and
+  registered with `editor_add_test(<name> SOURCES ... LINKS editor-core)`.
 - Test names: `TEST(Feature, ExpectedBehaviour)`, e.g.
   `TEST(PacketParser, RejectsTruncatedHeader)`.
 - Test the failure paths, not only the happy path: truncated or random packets,
   Lua scripts with errors, duplicate or reserved names, missing plugin, missing
   symbol, wrong plugin API version.
 - Test data goes in `tests/fixtures/` and is reached through the
-  `RTYPE_FIXTURES_DIR` macro, never through the working directory.
+  `TEST_FIXTURES_DIR` macro, never through the working directory.
 - Tests must be deterministic: no real network, no sleeps, no display. Inject
   the clock and random seeds.
 
@@ -71,7 +80,8 @@ docs/                       documentation (English, MkDocs sources; mkdocs.yml a
   Symbols are hidden by default: mark public API with the generated
   `ENGINE_<MODULE>_EXPORT` macro from `<engine/<module>/Export.hpp>`.
 - Third-party headers never appear in public headers (`engine/include/`).
-  `raylib.h` is included only in `plugins/graphics-raylib/`; POSIX socket
+  `raylib.h` is included only in `plugins/graphics-raylib/` and
+  `editor/src/raylib/`; `clay.h` only in `editor/`; POSIX socket
   headers only in `engine/src/network/`. Link third-party libraries with
   `PRIVATE_DEPENDS`.
 - No global state in headers (no `static` variables in templates): registries
@@ -92,7 +102,8 @@ docs/                       documentation (English, MkDocs sources; mkdocs.yml a
   explaining code, no commented-out code, no TODOs in the source (open an
   issue instead). Code must explain itself through names and small functions.
 - **The only exception is professional Doxygen**, and only where it is
-  important: public API in `engine/include/` and plugin interfaces. Use
+  important: public API in `engine/include/`, plugin interfaces and the
+  editor's contract headers (actions, `Editor`, `Ui`, widgets). Use
   `/** ... */` blocks with `@brief`, `@param`, `@return`, `@throws` and
   `@note` as needed. Document the contract (what, preconditions, errors,
   thread safety), never the implementation.
@@ -105,7 +116,7 @@ docs/                       documentation (English, MkDocs sources; mkdocs.yml a
 - C++20. Formatting follows `.clang-format`, checks follow `.clang-tidy`.
 - `snake_case` for functions and variables, `PascalCase` for types and files,
   namespaces `engine::<module>`.
-- Changes to the Lua API update docs/PROJECT.md §10 in the same pull request.
+- Changes to the Lua API update docs/reference/lua-api.md in the same pull request.
 
 ## Commands
 

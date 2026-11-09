@@ -1,0 +1,19 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "name": "boss_1",
+            "type": "ship",
+            "position": [840, 300],
+            "overrides": {
+                "Tags.labels": ["boss", "enemy"],
+                "Sprite.color": [255, 0, 0, 255],
+                "PhysicsBody.mass": 2.5
+            }
+        },
+        {
+            "type": "plain",
+            "position": [-12.5, 0.25]
+        }
+    ]
+}

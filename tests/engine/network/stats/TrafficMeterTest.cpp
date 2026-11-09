@@ -37,7 +37,7 @@ void receive_sequences(TrafficMeter& meter, std::initializer_list<std::uint32_t>
 
 TEST(TrafficMeter, DatagramSizeIsHeaderPlusPayload) {
     EXPECT_EQ(datagram_size(HeartbeatPayload{}), 13U);
-    EXPECT_EQ(datagram_size(InputPayload{}), 16U);
+    EXPECT_EQ(datagram_size(InputPayload{}), 31U);
     EXPECT_EQ(datagram_size(DisconnectPayload{}), 14U);
 }
 
@@ -51,7 +51,7 @@ TEST(TrafficMeter, RatesCountTheLastCompleteSecond) {
     const auto stats = meter.stats(1s);
 
     EXPECT_EQ(stats.packets_sent_per_second, 2U);
-    EXPECT_EQ(stats.bytes_sent_per_second, 32U);
+    EXPECT_EQ(stats.bytes_sent_per_second, 62U);
     EXPECT_EQ(stats.packets_received_per_second, 1U);
     EXPECT_EQ(stats.bytes_received_per_second, 16U);
 }

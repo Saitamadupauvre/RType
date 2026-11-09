@@ -58,6 +58,16 @@ public:
 
     [[nodiscard]] Duration step() const;
 
+    /**
+     * @brief Changes the duration of the next steps.
+     *
+     * Time already accumulated is kept, so the change takes effect at the next run_frame().
+     *
+     * @param step Duration of one step.
+     * @throws std::invalid_argument If @p step is not positive.
+     */
+    void set_step(Duration step);
+
 private:
     std::reference_wrapper<const IClock> _clock;
     FixedStepConfig _config;

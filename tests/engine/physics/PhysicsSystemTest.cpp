@@ -2,8 +2,8 @@
 
 #include <vector>
 
-#include "engine/core/ComponentPhysics.hpp"
-#include "engine/core/EntityManager.hpp"
+#include "engine/core/ecs/ComponentPhysics.hpp"
+#include "engine/core/ecs/EntityManager.hpp"
 #include "engine/core/event/EventBus.hpp"
 #include "engine/physics/Components.hpp"
 #include "engine/physics/Events.hpp"

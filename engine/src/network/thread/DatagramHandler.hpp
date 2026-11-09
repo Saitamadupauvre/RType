@@ -13,11 +13,12 @@
 
 namespace engine::network {
 
-[[nodiscard]] ENGINE_NETWORK_EXPORT std::optional<Inbound>
+[[nodiscard]] ENGINE_NETWORK_EXPORT std::optional<AddressedInbound>
 handle_datagram(const ProtocolHandler& handler, std::span<const std::uint8_t> datagram,
                 const Endpoint& from);
 
 [[nodiscard]] ENGINE_NETWORK_EXPORT std::optional<Bytes>
-encode_outbound(const ProtocolHandler& handler, const Outbound& outbound, std::uint32_t sequence);
+encode_outbound(const ProtocolHandler& handler, const AddressedOutbound& outbound,
+                std::uint32_t sequence);
 
 } // namespace engine::network

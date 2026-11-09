@@ -39,6 +39,8 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-name: ${{ matrix.name }}
 
       - name: Install ccache
         if: matrix.ccache
@@ -52,7 +54,7 @@ jobs:
           restore-keys: ccache-${{ matrix.name }}-
 
       - name: Configure, build, test
-        run: cmake --workflow --preset ci
+        run: .github/scripts/run-workflow.sh ci
         env:
           CXX: ${{ matrix.cxx }}
           CMAKE_CXX_COMPILER_LAUNCHER: ${{ matrix.ccache && 'ccache' || '' }}
@@ -70,6 +72,8 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-name: ${{ matrix.preset }}
 
       # TSan cannot map its shadow memory with the runner's default ASLR entropy.
       - name: Lower ASLR entropy
@@ -77,14 +81,14 @@ jobs:
         run: sudo sysctl vm.mmap_rnd_bits=28
 
       - name: Configure, build, test
-        run: cmake --workflow --preset ${{ matrix.preset }}
+        run: .github/scripts/run-workflow.sh ${{ matrix.preset }}
         env:
           CXX: clang++
 
   tidy:
     name: clang-tidy
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -94,7 +98,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang-tidy
 
       - name: Configure and build with clang-tidy
-        run: cmake --workflow --preset tidy
+        run: .github/scripts/run-workflow.sh tidy
         env:
           CXX: clang++
 
@@ -112,7 +116,7 @@ jobs:
       # Same files as the `format-check` target.
       - name: clang-format
         run: >
-          git ls-files -- {engine,plugins,game,tests}/'*'.{cpp,hpp}
+          git ls-files -- {engine,plugins,editor,runtime,tests}/'*'.{cpp,hpp}
           | xargs -r clang-format --dry-run --Werror
 
   # Every job above passed on a push to main: the tested commit goes to the mirror.

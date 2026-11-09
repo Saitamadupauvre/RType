@@ -24,9 +24,9 @@ set_target_properties(graphics-raylib-keymap PROPERTIES
 )
 engine_set_warnings(graphics-raylib-keymap)
 
-add_library(graphics-raylib-textures INTERFACE)
-target_include_directories(graphics-raylib-textures INTERFACE src)
-target_link_libraries(graphics-raylib-textures INTERFACE engine::graphics)
+add_library(graphics-raylib-handles INTERFACE)
+target_include_directories(graphics-raylib-handles INTERFACE src)
+target_link_libraries(graphics-raylib-handles INTERFACE engine::graphics)
 
 engine_add_plugin(graphics-raylib
     SOURCES
@@ -34,5 +34,5 @@ engine_add_plugin(graphics-raylib
         src/RaylibInput.cpp
         src/RaylibRenderer.cpp
     PRIVATE_DEPENDS engine::graphics graphics-raylib-letterbox graphics-raylib-keymap
-        graphics-raylib-textures raylib glfw
+        graphics-raylib-handles raylib glfw
 )

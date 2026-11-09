@@ -132,7 +132,7 @@ Part 1. Acknowledgement of events is planned (issue #86).
 **Decision:** Lua 5.4 through sol2. Lua is designed to be embedded, can be
 sandboxed (we open only `base`, `math`, `string`, `table`, `coroutine` and
 reject bytecode), and lets a designer add an enemy without touching C++. The
-whole R-Type game is Lua; the engine has no game rule. LuaJIT is faster but
+whole R-Type example is Lua; the engine has no game rule. LuaJIT is faster but
 stuck on Lua 5.1 semantics and less maintained; our scripts are far from
 being a bottleneck.
 
@@ -242,7 +242,6 @@ snapshots are rejected correctly even after a wrap.
 | Validate-then-allocate decoding (`ByteReader`) | A packet announcing 65 535 entities in 13 bytes must be rejected before any allocation |
 | Snapshot splitting | A world larger than 62 entities is split into several packets with the same tick, each below the 1200-byte MTU-safe limit; the client merges them by entity id |
 | Lowest-free player id / slot | Ids and colours are reused when a player leaves, so four simultaneous players always get four distinct slots |
-| Parallax starfield | Three layers at different speeds and brightness, seeded so it looks identical on every client |
 | AABB overlap in `engine-physics` | Every pair of hitboxes is tested in C++ each tick (O(n²), fine for a few hundred entities; a broad phase is the next step), then filtered by `collides_with` tags before reaching Lua |
 
 ## Storage
@@ -252,6 +251,7 @@ What the project stores, and where:
 | Data | Storage | Persistence |
 |---|---|---|
 | Game rules and tunables | Lua files in `scripts/` | Files, versioned in git |
+| Levels (scenes) and start scene | JSON files in `scenes/` and `game.json` | Files, versioned in git, written by the editor |
 | Sprites | PNG files in `assets/` | Files, versioned in git |
 | World state | In memory, server only | Lost when the server stops (by design: a round lasts minutes) |
 | Sessions | In memory | Expire after 5 s of silence |

@@ -5,23 +5,30 @@ function(engine_add_test module)
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE engine::${module} GTest::gtest_main)
     target_compile_definitions(${target} PRIVATE
-        RTYPE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+        TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
-    rtype_set_warnings(${target})
+    workspace_set_warnings(${target})
     set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "${module}.")
 endfunction()
 
 engine_add_test(core SOURCES
+    engine/core/AssetCacheTest.cpp
     engine/core/EntityTest.cpp
+    engine/core/KeysTest.cpp
     engine/core/EntityPoolTest.cpp
     engine/core/ComponentPoolTest.cpp
     engine/core/ComponentTypeIdTest.cpp
     engine/core/EntityManagerTest.cpp
     engine/core/SystemSchedulerTest.cpp
+    engine/core/console/ConsoleTest.cpp
+    engine/core/console/CVarsTest.cpp
+    engine/core/console/LogCaptureTest.cpp
     engine/core/event/EventBusTest.cpp
     engine/core/log/LogTest.cpp
     engine/core/log/MemorySinkTest.cpp
+    engine/core/metrics/MetricsTest.cpp
+    engine/core/metrics/ProcessUsageTest.cpp
     engine/core/NonCopyableNonMovableTest.cpp
     engine/core/time/ManualClockTest.cpp
     engine/core/time/FixedStepLoopTest.cpp
@@ -29,32 +36,66 @@ engine_add_test(core SOURCES
     engine/core/ComponentPhysicsTest.cpp
     engine/core/ComponentsTest.cpp
     engine/core/DynamicLibraryTest.cpp
+    engine/core/FieldRegistryTest.cpp
+    engine/core/CameraTest.cpp
+    engine/core/TransformTest.cpp
 )
 engine_add_test(script SOURCES
+    engine/script/ApiSetsTest.cpp
+    engine/script/CameraApiTest.cpp
+    engine/script/ClientApiTest.cpp
     engine/script/ScriptRuntimeTest.cpp
-    engine/script/ScriptDeclarationsTest.cpp
-    engine/script/ScriptRequireTest.cpp
-    engine/script/EntityHandleTest.cpp
-    engine/script/TickTest.cpp
-    engine/script/PlayersTest.cpp
-    engine/script/AudioTest.cpp
-    engine/script/CollisionsTest.cpp
+    engine/script/assets/ShadersTest.cpp
+    engine/script/assets/TexturesTest.cpp
+    engine/script/audio/AudioTest.cpp
+    engine/script/client/HudTest.cpp
+    engine/script/console/ConsoleTest.cpp
+    engine/script/client/LocalEntitiesTest.cpp
+    engine/script/entity/CameraFieldsTest.cpp
+    engine/script/entity/TransformFieldsTest.cpp
+    engine/script/entity/CollisionsTest.cpp
+    engine/script/entity/EntityFieldsTest.cpp
+    engine/script/entity/EntityHandleTest.cpp
+    engine/script/entity/InstancesTest.cpp
+    engine/script/entity/LayerFieldsTest.cpp
+    engine/script/entity/ScriptFieldsTest.cpp
+    engine/script/entity/TickTest.cpp
+    engine/script/event/EventsTest.cpp
+    engine/script/loading/ScriptDeclarationsTest.cpp
+    engine/script/loading/ScriptRequireTest.cpp
+    engine/script/loading/SectionsTest.cpp
+    engine/script/navigation/NavigationTest.cpp
+    engine/script/player/PlayersTest.cpp
+    engine/script/scene/GameFolderTest.cpp
+    engine/script/scene/SceneFileTest.cpp
+    engine/script/scene/SceneSwitchTest.cpp
+)
+engine_add_test(editor SOURCES
+    engine/editor/EditorSessionTest.cpp
+    engine/editor/SceneCommandsTest.cpp
 )
 engine_add_test(network SOURCES
     engine/network/ClientTest.cpp
+    engine/network/FieldsTest.cpp
     engine/network/ModuleTest.cpp
     engine/network/ServerTest.cpp
+    engine/network/StringTableTest.cpp
+    engine/network/TransportTest.cpp
     engine/network/bytes/ByteReaderTest.cpp
     engine/network/bytes/ByteWriterTest.cpp
     engine/network/decoder/PayloadDecoderTest.cpp
     engine/network/encoder/PayloadEncoderTest.cpp
     engine/network/event/GameEventsTest.cpp
+    engine/network/input/InputCodecTest.cpp
+    engine/network/protocol/FieldWireTest.cpp
     engine/network/protocol/ProtocolHandlerTest.cpp
+    engine/network/protocol/ReceivedStringsTest.cpp
     engine/network/protocol/SequenceTest.cpp
-    engine/network/protocol/TypeTableTest.cpp
+    engine/network/protocol/WireValueTest.cpp
     engine/network/server/ServerNetworkTest.cpp
     engine/network/session/ClientConnectionTest.cpp
     engine/network/session/ServerSessionsTest.cpp
+    engine/network/snapshot/ReplicatedFieldsTest.cpp
     engine/network/snapshot/SnapshotBuilderTest.cpp
     engine/network/snapshot/SnapshotReceiverTest.cpp
     engine/network/socket/SocketErrorTest.cpp
@@ -63,17 +104,27 @@ engine_add_test(network SOURCES
     engine/network/thread/DatagramHandlerTest.cpp
     engine/network/thread/MessageQueueTest.cpp
     engine/network/thread/NetworkIoTest.cpp
+    engine/network/transport/LoopbackLinksTest.cpp
+    engine/network/transport/UdpLinksTest.cpp
 )
 target_include_directories(engine_network_tests PRIVATE
     "${PROJECT_SOURCE_DIR}/engine/src/network"
     "${CMAKE_CURRENT_SOURCE_DIR}/engine/network"
 )
+engine_add_test(navigation SOURCES
+    engine/navigation/GridFixture.cpp
+    engine/navigation/NavGridTest.cpp
+    engine/navigation/PathfindingTest.cpp
+    engine/navigation/SmoothingTest.cpp
+)
 engine_add_test(physics SOURCES
     engine/physics/PhysicsSystemTest.cpp
     engine/physics/CollisionsTest.cpp
+    engine/physics/FieldsTest.cpp
 )
 engine_add_test(graphics SOURCES
     engine/graphics/BackendTest.cpp
+    engine/graphics/InputCaptureTest.cpp
     engine/graphics/TypesTest.cpp
     engine/graphics/PluginLoaderTest.cpp
 )
@@ -81,13 +132,31 @@ engine_add_test(audio SOURCES
     engine/audio/NullAudioTest.cpp
     engine/audio/PluginLoaderTest.cpp
 )
+engine_add_test(app SOURCES
+    engine/app/assets/AssetPreloaderTest.cpp
+    engine/app/assets/AudioPlayerTest.cpp
+    engine/app/simulation/CameraFollowTest.cpp
+    engine/app/render/CameraRigTest.cpp
+    engine/app/render/ConsoleOverlayTest.cpp
+    engine/app/ClientAppTest.cpp
+    engine/app/render/HitboxDrawTest.cpp
+    engine/app/render/HudDrawTest.cpp
+    engine/app/render/LoadingScreenTest.cpp
+    engine/app/render/MetricsOverlayTest.cpp
+    engine/app/ServerAppTest.cpp
+    engine/app/assets/ShaderLibraryTest.cpp
+    engine/app/render/SnapshotViewTest.cpp
+    engine/app/assets/TextureLibraryTest.cpp
+    engine/app/render/WorldDrawTest.cpp
+)
+target_include_directories(engine_app_tests PRIVATE "${PROJECT_SOURCE_DIR}/engine/src/app")
 
 function(engine_add_test_library name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
     add_library(${name} MODULE ${arg_SOURCES})
     target_link_libraries(${name} PRIVATE ${arg_LINKS})
     set_target_properties(${name} PROPERTIES PREFIX "")
-    rtype_set_warnings(${name})
+    workspace_set_warnings(${name})
 endfunction()
 
 function(engine_test_use_library test_target macro library)
@@ -124,18 +193,18 @@ engine_test_use_library(engine_audio_tests MISSING_CREATE_PLUGIN_PATH test-audio
 engine_test_use_library(engine_audio_tests NULL_BACKEND_PLUGIN_PATH test-audio-plugin-nullbackend)
 engine_test_use_library(engine_audio_tests RAYLIB_PLUGIN_PATH audio-raylib)
 
-function(game_add_test name)
+function(runtime_add_test name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
-    set(target game_${name}_tests)
+    set(target runtime_${name}_tests)
 
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
     target_compile_definitions(${target} PRIVATE
-        RTYPE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+        TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
-    rtype_set_warnings(${target})
+    workspace_set_warnings(${target})
     set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
-    gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "game.${name}.")
+    gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "runtime.${name}.")
 endfunction()
 
 function(plugin_add_test name)
@@ -144,7 +213,7 @@ function(plugin_add_test name)
 
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
-    rtype_set_warnings(${target})
+    workspace_set_warnings(${target})
     gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "plugin.${name}.")
 endfunction()
 
@@ -152,8 +221,10 @@ plugin_add_test(graphics-raylib
     SOURCES
         plugins/graphics-raylib/LetterboxTest.cpp
         plugins/graphics-raylib/KeyMapTest.cpp
-        plugins/graphics-raylib/TextureTableTest.cpp
-    LINKS graphics-raylib-letterbox graphics-raylib-keymap graphics-raylib-textures
+        plugins/graphics-raylib/HandleTableTest.cpp
+        plugins/graphics-raylib/TargetSourceTest.cpp
+        plugins/graphics-raylib/UniformLocationsTest.cpp
+    LINKS graphics-raylib-letterbox graphics-raylib-keymap graphics-raylib-handles
 )
 
 plugin_add_test(audio-raylib
@@ -163,25 +234,72 @@ plugin_add_test(audio-raylib
     LINKS audio-raylib-mixer
 )
 
-game_add_test(server SOURCES game/server/CliTest.cpp game/server/ServerAppTest.cpp
-    game/server/ShipTest.cpp game/server/MissileTest.cpp game/server/BydoTest.cpp
-    game/server/BydoShotTest.cpp game/server/SpawnerTest.cpp game/server/CollisionTest.cpp
-    game/server/GameFlowTest.cpp
-    LINKS r-type_server_cli r-type_server_app)
-game_add_test(client SOURCES game/client/CliTest.cpp game/client/ControlsTest.cpp
-    game/client/StarfieldTest.cpp game/client/WorldDrawTest.cpp
-    game/client/SnapshotViewTest.cpp game/client/AudioPlayerTest.cpp
-    LINKS r-type_client_cli r-type_client_controls r-type_client_draw r-type_client_audio)
-game_add_test(common SOURCES game/common/ActionCodecTest.cpp LINKS r-type_common)
+function(editor_add_test name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINKS")
+    set(target editor_${name}_tests)
 
-function(game_add_runtime_data_test folder source)
-    add_test(NAME game.runtime_data.${folder}
-        COMMAND ${CMAKE_COMMAND}
-            -DSOURCE=${source}
-            -DCOPY=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${folder}
-            -P ${CMAKE_CURRENT_SOURCE_DIR}/game/RuntimeDataTest.cmake
+    add_executable(${target} ${arg_SOURCES})
+    target_link_libraries(${target} PRIVATE ${arg_LINKS} GTest::gtest_main)
+    target_compile_definitions(${target} PRIVATE
+        TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
+    editor_set_warnings(${target})
+    set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "")
+    gtest_discover_tests(${target} DISCOVERY_MODE PRE_TEST TEST_PREFIX "editor.${name}.")
 endfunction()
 
-game_add_runtime_data_test(scripts ${PROJECT_SOURCE_DIR}/game/scripts)
-game_add_runtime_data_test(assets ${PROJECT_SOURCE_DIR}/assets)
+editor_add_test(core
+    SOURCES
+        editor/action/ActionTextTest.cpp
+        editor/assets/AssetListTest.cpp
+        editor/action/ApplyCommandTest.cpp
+        editor/action/ApplyEditTest.cpp
+        editor/action/EditorTest.cpp
+        editor/action/InspectorModelTest.cpp
+        editor/action/OpenEditorTest.cpp
+        editor/clay/ClayContextTest.cpp
+        editor/cli/CliTest.cpp
+        editor/exporter/GameExportTest.cpp
+        editor/render/GeometryTest.cpp
+        editor/render/ScissorStackTest.cpp
+        editor/settings/SettingsTest.cpp
+        editor/open/SystemOpenerTest.cpp
+        editor/play/PlaySessionTest.cpp
+        editor/play/ProcessLauncherTest.cpp
+        editor/project/ProjectFilesTest.cpp
+        editor/text/CaretScrollTest.cpp
+        editor/text/FitTextTest.cpp
+        editor/text/FuzzyMatchTest.cpp
+        editor/text/ScriptLocationTest.cpp
+        editor/text/TextEditTest.cpp
+        editor/ui/ClickCounterTest.cpp
+        editor/ui/CommandTableTest.cpp
+        editor/ui/FieldTextTest.cpp
+        editor/ui/FrameTest.cpp
+        editor/ui/LayoutTest.cpp
+        editor/ui/LetterKeyTest.cpp
+        editor/ui/SmoothScrollTest.cpp
+        editor/ui/ThemeTest.cpp
+        editor/ui/sections/AssetsTabTest.cpp
+        editor/ui/sections/BottomPanelResizeTest.cpp
+        editor/ui/sections/CommandPaletteTest.cpp
+        editor/ui/sections/ExportDialogTest.cpp
+        editor/ui/sections/InspectorFieldsTest.cpp
+        editor/ui/sections/InspectorTest.cpp
+        editor/ui/sections/MenuBarTest.cpp
+        editor/ui/sections/NameDialogTest.cpp
+        editor/ui/sections/OverlaysTest.cpp
+        editor/ui/sections/ViewportTest.cpp
+        editor/ui/widgets/CheckboxTest.cpp
+        editor/ui/widgets/DropdownTest.cpp
+        editor/ui/widgets/NumberFieldTest.cpp
+        editor/ui/widgets/TextFieldTest.cpp
+        editor/viewport/HandlesTest.cpp
+        editor/viewport/SceneItemsTest.cpp
+        editor/viewport/SnapTest.cpp
+        editor/viewport/ViewCameraTest.cpp
+    LINKS editor-core
+)
+
+runtime_add_test(cli SOURCES runtime/CliTest.cpp runtime/OptionsTest.cpp
+    LINKS engine-runtime-core)

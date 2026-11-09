@@ -20,8 +20,9 @@ void append(std::vector<Outbound>& outbound, std::vector<Outbound> more) {
 } // namespace
 
 ServerNetwork::ServerNetwork(const core::time::IClock& clock, core::event::EventBus& events,
-                             ServerSessionsConfig config)
-    : clock_(clock), last_report_(clock.now()), sessions_(clock, events, std::move(config)) {}
+                             const core::FieldRegistry& fields, ServerSessionsConfig config)
+    : clock_(clock), last_report_(clock.now()), _replicated(fields, config.strings),
+      sessions_(clock, events, std::move(config)) {}
 
 std::vector<Outbound> ServerNetwork::receive(const std::vector<Inbound>& inbound) {
     std::vector<Outbound> outbound;
@@ -44,18 +45,21 @@ void ServerNetwork::report_stats() {
     }
 }
 
-void ServerNetwork::queue_event(const EventPayload& event) {
-    append(queued_events_, sessions_.broadcast(event));
+void ServerNetwork::queue_event(EventPayload event) {
+    append(queued_events_, sessions_.broadcast(Message{std::move(event)}));
 }
 
-std::vector<Outbound> ServerNetwork::snapshot(core::EntityManager& registry) {
+std::vector<Outbound> ServerNetwork::snapshot(core::EntityManager& world) {
     ++server_tick_;
+    last_snapshot_bytes_ = 0;
     auto outbound = std::exchange(queued_events_, {});
     if (sessions_.sessions().empty()) {
         return outbound;
     }
-    for (auto& snapshot : build_snapshots(registry, server_tick_)) {
-        append(outbound, sessions_.broadcast(std::move(snapshot)));
+    for (auto& snapshot : build_snapshots(world, _replicated, sessions_.strings(), server_tick_)) {
+        const Message message = std::move(snapshot);
+        last_snapshot_bytes_ += datagram_size(message);
+        append(outbound, sessions_.broadcast(message));
     }
     return outbound;
 }

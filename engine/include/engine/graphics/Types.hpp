@@ -3,6 +3,9 @@
 #include <cstdint>
 #include <string>
 
+#include "engine/core/input/Keys.hpp"
+#include "engine/core/math/Vec2.hpp"
+
 namespace engine::graphics {
 
 /** @brief Axis-aligned rectangle in virtual units; origin at the top-left, Y pointing down. */
@@ -36,14 +39,48 @@ struct TextureId {
     bool operator==(const TextureId&) const = default;
 };
 
+/**
+ * @brief Handle to an off-screen render target owned by a renderer.
+ *
+ * @note The default value refers to no target.
+ */
+struct RenderTargetId {
+    std::uint32_t value{0};
+
+    bool operator==(const RenderTargetId&) const = default;
+};
+
+/**
+ * @brief Handle to a shader program owned by a renderer.
+ *
+ * @note The default value refers to no shader: drawing with it uses the backend's default
+ * pipeline.
+ */
+struct ShaderId {
+    std::uint32_t value{0};
+
+    bool operator==(const ShaderId&) const = default;
+};
+
 /** @brief Part of a texture drawn into a rectangle of the virtual space. */
 struct SpriteDraw {
     /** @brief Texture to draw; the default value draws the placeholder texture. */
     TextureId texture;
-    /** @brief Region of the texture to draw, in texture pixels. */
+    /** @brief Region of the texture to draw, in texture pixels; a negative size mirrors it. */
     Rect source;
-    /** @brief Where the region is drawn, in virtual units; it is stretched to fit. */
+    /**
+     * @brief Where the region is drawn, in virtual units; it is stretched to fit.
+     *
+     * @note dest.x and dest.y give where @ref origin lands, not the top-left corner.
+     */
     Rect dest;
+    /**
+     * @brief Point of the drawn rectangle, relative to its top-left corner, placed at dest.x and
+     * dest.y and used as the pivot of @ref rotation.
+     */
+    core::Vec2 origin{};
+    /** @brief Rotation around @ref origin, in degrees, clockwise on screen. */
+    float rotation{0.F};
     /** @brief Color multiplied with the texture; white keeps it unchanged. */
     Color tint{.r = 255, .g = 255, .b = 255, .a = 255};
 };
@@ -57,120 +94,9 @@ struct WindowConfig {
 };
 
 /** @brief Mouse buttons, independent of any backend. */
-enum class MouseButton : std::uint8_t {
-    Left,
-    Right,
-    Middle,
-};
+using core::MouseButton;
 
 /** @brief Physical keyboard keys, independent of any backend. */
-enum class Key : std::uint8_t {
-    Unknown,
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-    H,
-    I,
-    J,
-    K,
-    L,
-    M,
-    N,
-    O,
-    P,
-    Q,
-    R,
-    S,
-    T,
-    U,
-    V,
-    W,
-    X,
-    Y,
-    Z,
-    Num0,
-    Num1,
-    Num2,
-    Num3,
-    Num4,
-    Num5,
-    Num6,
-    Num7,
-    Num8,
-    Num9,
-    Numpad0,
-    Numpad1,
-    Numpad2,
-    Numpad3,
-    Numpad4,
-    Numpad5,
-    Numpad6,
-    Numpad7,
-    Numpad8,
-    Numpad9,
-    NumpadDecimal,
-    NumpadDivide,
-    NumpadMultiply,
-    NumpadSubtract,
-    NumpadAdd,
-    NumpadEnter,
-    NumpadEqual,
-    Up,
-    Down,
-    Left,
-    Right,
-    Space,
-    Enter,
-    Escape,
-    Tab,
-    Backspace,
-    LeftShift,
-    RightShift,
-    LeftControl,
-    RightControl,
-    LeftAlt,
-    RightAlt,
-    LeftSuper,
-    RightSuper,
-    Menu,
-    Insert,
-    Delete,
-    Home,
-    End,
-    PageUp,
-    PageDown,
-    CapsLock,
-    ScrollLock,
-    NumLock,
-    PrintScreen,
-    Pause,
-    F1,
-    F2,
-    F3,
-    F4,
-    F5,
-    F6,
-    F7,
-    F8,
-    F9,
-    F10,
-    F11,
-    F12,
-    Apostrophe,
-    Comma,
-    Minus,
-    Period,
-    Slash,
-    Semicolon,
-    Equal,
-    LeftBracket,
-    RightBracket,
-    Backslash,
-    GraveAccent,
-};
+using core::Key;
 
 } // namespace engine::graphics

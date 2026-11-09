@@ -1,0 +1,41 @@
+#pragma once
+
+#include <optional>
+#include <string_view>
+
+#include "engine/core/ecs/FieldRegistry.hpp"
+#include "engine/core/math/Vec2.hpp"
+#include "lua/Sol.hpp"
+
+namespace engine::script {
+
+sol::object to_lua(sol::this_state state, const core::FieldValue& value);
+
+core::FieldValue from_lua(sol::this_state state, const sol::object& value,
+                          const core::FieldDescriptor& field, std::string_view name);
+
+core::FieldValue from_lua(sol::this_state state, const sol::object& value, core::FieldKind kind,
+                          std::string_view label, std::string_view name);
+
+core::FieldValue from_lua(sol::this_state state, const sol::object& value, core::FieldKind kind,
+                          std::optional<core::FieldKind> element, std::string_view label,
+                          std::string_view name);
+
+float number_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
+
+core::Vec2 factor_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
+
+sol::object size_to_lua(sol::this_state state, core::Vec2 size);
+
+core::Vec2 size_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
+
+struct Area {
+    core::Vec2 origin;
+    core::Vec2 size;
+};
+
+sol::object area_to_lua(sol::this_state state, const Area& area);
+
+Area area_from_lua(sol::this_state state, const sol::object& value, std::string_view name);
+
+} // namespace engine::script

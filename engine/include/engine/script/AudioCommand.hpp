@@ -4,7 +4,7 @@
 #include <optional>
 #include <string>
 
-#include "engine/core/Entity.hpp"
+#include "engine/core/ecs/Entity.hpp"
 
 namespace engine::script {
 

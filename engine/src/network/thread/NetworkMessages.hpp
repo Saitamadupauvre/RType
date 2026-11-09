@@ -8,12 +8,27 @@
 
 namespace engine::network {
 
+enum class PeerId : std::uint32_t {};
+
+inline constexpr PeerId server_peer{0};
+
 struct Inbound {
-    Endpoint from;
+    PeerId from{};
     ReceivedMessage message;
 };
 
 struct Outbound {
+    PeerId to{};
+    Message message;
+    std::uint32_t sequence{};
+};
+
+struct AddressedInbound {
+    Endpoint from;
+    ReceivedMessage message;
+};
+
+struct AddressedOutbound {
     Endpoint to;
     Message message;
     std::uint32_t sequence{};
