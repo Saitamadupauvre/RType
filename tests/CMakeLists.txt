@@ -263,6 +263,7 @@ editor_add_test(core
         editor/render/GeometryTest.cpp
         editor/render/ScissorStackTest.cpp
         editor/settings/SettingsTest.cpp
+        editor/open/SystemOpenerTest.cpp
         editor/play/PlaySessionTest.cpp
         editor/play/ProcessLauncherTest.cpp
         editor/project/ProjectFilesTest.cpp
