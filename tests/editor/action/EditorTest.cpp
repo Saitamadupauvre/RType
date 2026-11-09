@@ -1,12 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "../GameFixture.hpp"
+#include "../open/FakeOpener.hpp"
 #include "../play/FakeLauncher.hpp"
 #include "action/Editor.hpp"
 #include "action/EditorState.hpp"
@@ -276,4 +278,31 @@ TEST_F(EditorTest, RefusalsAreCounted) {
 
     EXPECT_EQ(_editor.state().refusal.count, 2U);
     EXPECT_EQ(_editor.state().refusal.text, "nothing to undo");
+}
+
+TEST_F(EditorTest, OpensThatFailLaterAreRefusals) {
+    auto openings = std::make_shared<FakeOpenings>();
+    _editor.attach_file_opener(std::make_unique<FakeOpener>(openings));
+    const std::string failure = "xdg-open could not open /game/scripts/rock.lua (exit code 3)";
+    _editor.handle(command::OpenScript{.file = "/game/scripts/rock.lua"});
+    openings->failures = {failure};
+
+    _editor.update();
+
+    EXPECT_EQ(_editor.state().refusal.count, 1U);
+    EXPECT_EQ(_editor.state().refusal.text, failure);
+    ASSERT_FALSE(_editor.state().console.empty());
+    EXPECT_EQ(_editor.state().console.back().severity, Severity::error);
+    EXPECT_EQ(_editor.state().console.back().text, failure);
+}
+
+TEST_F(EditorTest, AnOpenThatStartsIsNotARefusal) {
+    auto openings = std::make_shared<FakeOpenings>();
+    _editor.attach_file_opener(std::make_unique<FakeOpener>(openings));
+
+    _editor.handle(command::OpenScript{.file = "/game/scripts/rock.lua"});
+    _editor.update();
+
+    EXPECT_EQ(openings->opened, (std::vector<std::filesystem::path>{"/game/scripts/rock.lua"}));
+    EXPECT_EQ(_editor.state().refusal.count, 0U);
 }

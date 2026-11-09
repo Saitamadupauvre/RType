@@ -214,6 +214,15 @@ refused.
   type that no longer exists become problems. It works while the game plays.
 - File > **Reveal game folder** opens the game folder in your file manager.
 
+Opening a file (Open script, a console line, an asset, New prefab, Open
+settings, Reveal game folder) starts `xdg-open`, or `open` on macOS, and never
+waits for it: the editor keeps running while the program you opened is open,
+and a terminal program such as `nvim` cannot take over the editor's terminal.
+When the opener fails, for example because no program is set for that kind of
+file, the console and the red message over the viewport say so. On Linux, set
+one with `xdg-mime default <program>.desktop <type>`; `xdg-mime query filetype
+<file>` gives the type.
+
 Duplicating, renaming and deleting scenes, and changing the start scene, exist
 in the editor's model but have no buttons yet: set `start_scene` in
 `game.json`.

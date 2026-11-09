@@ -48,17 +48,17 @@ CommandResult set_ui_scale(EditorState& state, float scale) {
     return CommandResult::done();
 }
 
-CommandResult open_script(const FileOpener& open_file, const std::filesystem::path& file) {
-    if (!open_file) {
+CommandResult open_script(FileOpener* open_file, const std::filesystem::path& file) {
+    if (open_file == nullptr) {
         return CommandResult::refused("Opening files is not available here.");
     }
-    if (!open_file(file)) {
+    if (!open_file->open(file)) {
         return CommandResult::refused(std::format("Cannot open {}.", file.string()));
     }
     return CommandResult::done();
 }
 
-CommandResult open_settings(const FileOpener& open_file, const std::filesystem::path& file) {
+CommandResult open_settings(FileOpener* open_file, const std::filesystem::path& file) {
     if (file.empty()) {
         return CommandResult::refused(
             "No settings folder: neither XDG_CONFIG_HOME nor HOME is set.");
@@ -69,7 +69,7 @@ CommandResult open_settings(const FileOpener& open_file, const std::filesystem::
     return open_script(open_file, file);
 }
 
-CommandResult new_prefab(EditorSession& session, EditorState& state, const FileOpener& open_file,
+CommandResult new_prefab(EditorSession& session, EditorState& state, FileOpener* open_file,
                          const std::string& name) {
     const std::vector<std::string> prefabs = session.prefabs();
     if (std::ranges::find(prefabs, name) != prefabs.end()) {
@@ -83,7 +83,7 @@ CommandResult new_prefab(EditorSession& session, EditorState& state, const FileO
     if (const CommandResult reloaded = session.reload_scripts(); !session.scripts_loaded()) {
         return CommandResult::done(std::format("{}; {}", created.message, reloaded.message));
     }
-    if (open_file && !open_file(prefab_file(session.game(), name))) {
+    if (open_file != nullptr && !open_file->open(prefab_file(session.game(), name))) {
         return CommandResult::done(std::format("{}; cannot open it", created.message));
     }
     return created;

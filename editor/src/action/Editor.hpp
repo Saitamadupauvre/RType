@@ -40,8 +40,11 @@ public:
     /** @brief Stamps console lines, e.g. with the local time; without it lines have no time. */
     void attach_clock(std::function<std::string()> clock);
 
-    /** @brief Lets OpenScript open files; without it OpenScript is refused. */
-    void attach_file_opener(FileOpener opener);
+    /**
+     * @brief Lets OpenScript open files; without it OpenScript is refused. Opens that fail later
+     * are reported by update() like refused actions.
+     */
+    void attach_file_opener(std::unique_ptr<FileOpener> opener);
     /**
      * @brief Starts the view with the settings' defaults and writes each settings problem to the
      * console and the log.
@@ -52,7 +55,8 @@ public:
 
     /**
      * @brief Follows the played game: its output goes to the console, and its end brings the
-     * editor back to Mode::editing. Called once per frame by the loop.
+     * editor back to Mode::editing. Also reports the file opens that failed. Called once per
+     * frame by the loop.
      */
     void update();
 
@@ -78,7 +82,7 @@ private:
     engine::editor::EditorSession _session;
     EditorState _state;
     PlaySession _play;
-    FileOpener _open_file;
+    std::unique_ptr<FileOpener> _open_file;
     std::filesystem::path _runtime;
     std::function<std::string()> _clock;
 
