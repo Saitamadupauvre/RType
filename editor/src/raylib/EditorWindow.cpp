@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <format>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -17,6 +18,7 @@
 #include <vector>
 
 #include "clay/ClayContext.hpp"
+#include "open/SystemOpener.hpp"
 #include "raylib/ClayRenderer.hpp"
 #include "raylib/RaylibLog.hpp"
 #include "raylib/ViewportPainter.hpp"
@@ -213,10 +215,7 @@ void run_frames(Editor& editor) {
 
 bool run_editor_window(Editor& editor) {
     editor.attach_clock(local_time);
-    editor.attach_file_opener([](const std::filesystem::path& file) {
-        OpenURL(file.string().c_str());
-        return true;
-    });
+    editor.attach_file_opener(std::make_unique<SystemOpener>());
     route_raylib_log();
     SetConfigFlags(window_flags);
     InitWindow(initial_width, initial_height, "Editor");

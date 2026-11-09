@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <filesystem>
 #include <format>
+#include <memory>
+#include <string>
 #include <system_error>
 #include <utility>
 #include <variant>
@@ -48,7 +50,9 @@ void Editor::attach_launcher(std::unique_ptr<GameLauncher> launcher) {
     _play.attach(std::move(launcher));
 }
 
-void Editor::attach_file_opener(FileOpener opener) { _open_file = std::move(opener); }
+void Editor::attach_file_opener(std::unique_ptr<FileOpener> opener) {
+    _open_file = std::move(opener);
+}
 
 void Editor::attach_clock(std::function<std::string()> clock) { _clock = std::move(clock); }
 
@@ -92,6 +96,12 @@ void Editor::update() {
     for (ConsoleLine& line : _play.update(_state.mode)) {
         log(std::move(line));
     }
+    if (_open_file) {
+        for (std::string& failure : _open_file->take_failures()) {
+            engine::core::log::info("editor: {}", failure);
+            report(CommandResult::refused(std::move(failure)));
+        }
+    }
 }
 
 void Editor::handle(const Action& action) {
@@ -128,8 +138,9 @@ CommandResult Editor::apply(const Command& command) {
     if (std::holds_alternative<command::ReloadSettings>(command)) {
         return reload_settings();
     }
-    CommandResult result = apply_command(
-        _session, _state, {.play = _play, .open_file = _open_file, .runtime = _runtime}, command);
+    CommandResult result =
+        apply_command(_session, _state,
+                      {.play = _play, .open_file = _open_file.get(), .runtime = _runtime}, command);
     refresh_lists();
     return result;
 }
