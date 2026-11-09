@@ -1,5 +1,7 @@
 #include "raylib/ViewportPainter.hpp"
 
+#include "assets/AssetList.hpp"
+
 #include <cmath>
 #include <format>
 #include <string>
@@ -279,6 +281,24 @@ void ViewportPainter::paint(const Clay_RenderCommand& command) {
     draw_selection_tag(frame, box, font);
     draw_cursor(frame, box, font);
     EndScissorMode();
+}
+
+void ViewportPainter::paint_thumbnail(const Clay_RenderCommand& command) {
+    const auto* entry = static_cast<const AssetEntry*>(command.renderData.image.imageData);
+    const Texture2D* loaded = entry != nullptr ? texture(entry->path) : nullptr;
+    if (loaded == nullptr || loaded->width <= 0 || loaded->height <= 0) {
+        return;
+    }
+    const Clay_BoundingBox box = command.boundingBox;
+    const auto width = static_cast<float>(loaded->width);
+    const auto height = static_cast<float>(loaded->height);
+    const float fit = std::min(box.width / width, box.height / height);
+    const Rectangle dest{.x = box.x + ((box.width - (width * fit)) / 2.F),
+                         .y = box.y + ((box.height - (height * fit)) / 2.F),
+                         .width = width * fit,
+                         .height = height * fit};
+    DrawTexturePro(*loaded, {.x = 0.F, .y = 0.F, .width = width, .height = height}, dest,
+                   {.x = 0.F, .y = 0.F}, 0.F, WHITE);
 }
 
 } // namespace editor

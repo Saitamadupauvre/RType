@@ -24,6 +24,7 @@
 #include "loading/Sections.hpp"
 #include "lua/LuaErrors.hpp"
 #include "lua/Sol.hpp"
+#include "scene/SceneAssets.hpp"
 #include "scene/SceneFile.hpp"
 #include "scene/SceneSwitch.hpp"
 
@@ -112,7 +113,34 @@ struct ScriptRuntime::Impl {
     static bool declare_asset(const Declaration& declaration, std::string_view field,
                               DeclaredAssets& declared);
     bool start(const sol::environment& main);
+    void declare_scene_assets(const fs::path& game, const std::optional<fs::path>& start);
 };
+
+void ScriptRuntime::Impl::declare_scene_assets(const fs::path& game,
+                                               const std::optional<fs::path>& start) {
+    std::vector<fs::path> files;
+    for (const std::string& name : list_scenes(game)) {
+        files.push_back(scene_file(game, name));
+    }
+    if (start) {
+        files.push_back(*start);
+    }
+    for (const fs::path& file : files) {
+        const SceneAssets assets = scene_assets(file);
+        for (const std::string& texture : assets.textures) {
+            if (!context.textures.add(texture)) {
+                log::warn("scene: {}: texture '{}' cannot be declared", file.generic_string(),
+                          texture);
+            }
+        }
+        for (const std::string& shader : assets.shaders) {
+            if (!context.shaders.add(shader)) {
+                log::warn("scene: {}: shader '{}' cannot be declared", file.generic_string(),
+                          shader);
+            }
+        }
+    }
+}
 
 ScriptRuntime::Impl::Impl(std::vector<std::unique_ptr<ApiSet>> installed)
     : sets(std::move(installed)), section(section_of(sets)) {
@@ -208,6 +236,7 @@ bool ScriptRuntime::Impl::load_game(const fs::path& game, const fs::path& start_
         game_start.scene = scene_file(game, *project->start_scene);
     }
     context.game = game;
+    declare_scene_assets(game, game_start.scene);
     const bool loaded = load_scripts(scripts_folder(game), game_start);
     return loaded && project.has_value();
 }

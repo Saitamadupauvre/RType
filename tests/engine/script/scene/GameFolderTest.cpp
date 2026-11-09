@@ -332,3 +332,40 @@ TEST_F(GameFolderTest, MissingStartSceneFileIsReportedAndSpawnsNoScene) {
     EXPECT_FALSE(_runtime.load_game(_game.path(), _game.path() / "missing.json"));
     EXPECT_EQ(std::ranges::count(spawned_types(), "early"), 0);
 }
+
+TEST_F(GameFolderTest, AssetsOverriddenByScenesAreDeclared) {
+    _game.write("game.json", R"({ "name": "assets" })");
+    _game.write("scenes/one.json", R"({ "version": 1, "instances": [
+        { "type": "late", "position": [0, 0],
+          "overrides": { "Sprite.path": "sprites/ship.png", "Shader.path": "shaders/glow" } } ] })");
+    _game.write("scenes/two.json", R"({ "version": 1, "instances": [
+        { "type": "late", "position": [0, 0], "overrides": { "Sprite.path": "sprites/rock.png" } },
+        { "type": "late", "position": [0, 0], "overrides": { "Sprite.path": "" } } ] })");
+
+    EXPECT_TRUE(_runtime.load_game(_game.path()));
+
+    const auto textures = _runtime.texture_names();
+    EXPECT_NE(std::ranges::find(textures, "sprites/ship.png"), textures.end());
+    EXPECT_NE(std::ranges::find(textures, "sprites/rock.png"), textures.end());
+    EXPECT_EQ(std::ranges::find(textures, ""), textures.end());
+    const auto shaders = _runtime.shader_names();
+    EXPECT_NE(std::ranges::find(shaders, "shaders/glow"), shaders.end());
+}
+
+TEST_F(GameFolderTest, AssetsOfAPlayedSceneFileAreDeclared) {
+    _game.write("played.json", R"({ "version": 1, "instances": [
+        { "type": "late", "position": [0, 0], "overrides": { "Sprite.path": "sprites/boss.png" } } ] })");
+
+    EXPECT_TRUE(_runtime.load_game(_game.path(), _game.path() / "played.json"));
+
+    const auto textures = _runtime.texture_names();
+    EXPECT_NE(std::ranges::find(textures, "sprites/boss.png"), textures.end());
+}
+
+TEST_F(GameFolderTest, BrokenScenesDeclareNothing) {
+    _game.write("game.json", R"({ "name": "broken" })");
+    _game.write("scenes/bad.json", "{ not json");
+    _game.write("scenes/odd.json", R"({ "version": 1, "instances": [ 3, { "overrides": 4 } ] })");
+
+    EXPECT_TRUE(_runtime.load_game(_game.path()));
+}

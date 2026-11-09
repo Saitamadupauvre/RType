@@ -257,3 +257,23 @@ TEST_F(EditorTest, ConsoleLinesNamingAScriptPointAtIt) {
     EXPECT_TRUE(console[1].script.empty());
     EXPECT_TRUE(console[2].script.empty());
 }
+
+TEST_F(EditorTest, TheConsoleKeepsOnlyTheLastLines) {
+    for (std::size_t index = 0; index < editor::max_console_lines + 20; ++index) {
+        _editor.handle(command::ReportInvalidInput{.message = std::to_string(index)});
+    }
+
+    const auto& console = _editor.state().console;
+    ASSERT_EQ(console.size(), editor::max_console_lines);
+    EXPECT_EQ(console.front().text, "20");
+    EXPECT_EQ(console.back().text, std::to_string(editor::max_console_lines + 19));
+}
+
+TEST_F(EditorTest, RefusalsAreCounted) {
+    _editor.handle(command::Undo{});
+    _editor.handle(command::Undo{});
+    _editor.handle(command::SetSnap{.enabled = false});
+
+    EXPECT_EQ(_editor.state().refusal.count, 2U);
+    EXPECT_EQ(_editor.state().refusal.text, "nothing to undo");
+}

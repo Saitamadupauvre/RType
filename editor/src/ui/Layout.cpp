@@ -9,6 +9,7 @@
 #include "ui/sections/Inspector.hpp"
 #include "ui/sections/MenuBar.hpp"
 #include "ui/sections/NameDialog.hpp"
+#include "ui/sections/Overlays.hpp"
 #include "ui/sections/Sidebar.hpp"
 #include "ui/sections/StatusBar.hpp"
 #include "ui/sections/Toolbar.hpp"
@@ -77,8 +78,13 @@ Clay_RenderCommandArray build_frame(Ui& ui, const Editor& editor, Clay_Dimension
             viewport(ui, editor);
             inspector(ui, editor);
         }
-        bottom_panel(ui, editor, bottom_panel_height(ui.theme(), window.height));
+        resize_bottom_panel(ui);
+        bottom_panel(
+            ui, editor,
+            bottom_panel_height(ui.theme(), window.height, ui.widgets().bottom_panel().height));
         status_bar(ui, editor);
+        refusal_toast(ui, editor);
+        drag_chip(ui);
         export_dialog(ui, editor, window);
         name_dialog(ui, editor, window);
         command_palette(ui, editor, window);

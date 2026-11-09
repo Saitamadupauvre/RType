@@ -21,6 +21,8 @@ enum class Key : std::uint8_t {
     h,
     p,
     d,
+    plus,
+    minus,
     del,
     backspace,
     enter,

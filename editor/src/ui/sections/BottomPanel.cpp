@@ -13,10 +13,24 @@
 #include "ui/SmoothScroll.hpp"
 #include "ui/Text.hpp"
 #include "ui/widgets/ListRow.hpp"
+#include "viewport/ViewportState.hpp"
 
 namespace editor {
 
 namespace {
+
+constexpr float thumbnail_size = 24.F;
+constexpr float grip_height = 5.F;
+
+Clay_ElementId grip_id() { return CLAY_ID("BottomPanelGrip"); }
+
+void grip(Ui& ui) {
+    const bool active = ui.widgets().bottom_panel().grab || Ui::hovered(grip_id());
+    CLAY({.id = grip_id(),
+          .layout = {.sizing = {.width = CLAY_SIZING_GROW(),
+                                .height = CLAY_SIZING_FIXED(ui.theme().px(grip_height))}},
+          .backgroundColor = active ? color::focus : Clay_Color{}}) {}
+}
 
 void tab(Ui& ui, Clay_ElementId id, Clay_String label, BottomTab tab, BottomTab current) {
     const Theme& theme = ui.theme();
@@ -48,6 +62,9 @@ void tabs(Ui& ui, const Editor& editor) {
         tab(ui, CLAY_ID("ProblemsTab"),
             problems == 0 ? CLAY_STRING("Problems") : ui.keep(std::format("Problems {}", problems)),
             BottomTab::problems, current);
+        tab(ui, CLAY_ID("AssetsTab"),
+            ui.keep(std::format("Assets {}", editor.state().assets.size())), BottomTab::assets,
+            current);
     }
 }
 
@@ -121,13 +138,99 @@ void problems(Ui& ui, const engine::editor::EditorSession& session) {
     }
 }
 
+void thumbnail(const Theme& theme, const AssetEntry& entry) {
+    const float side = theme.px(thumbnail_size);
+    CLAY(
+        {.layout = {.sizing = {.width = CLAY_SIZING_FIXED(side), .height = CLAY_SIZING_FIXED(side)},
+                    .childAlignment = {.x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER}},
+         .backgroundColor = color::field,
+         .cornerRadius = CLAY_CORNER_RADIUS(theme.px(size::radius))}) {
+        if (entry.kind == AssetKind::sprite) {
+            CLAY({.layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()}},
+                  .image = {.imageData = const_cast<AssetEntry*>(&entry)}}) {}
+        } else {
+            text(theme, view_of(kind_label(entry.kind).substr(0, 3)), size::small_text,
+                 color::text_dim);
+        }
+    }
+}
+
+void react_to_asset(Ui& ui, const Editor& editor, Clay_ElementId id, const AssetEntry& entry) {
+    if (!ui.clicked(id)) {
+        return;
+    }
+    if (ui.input().click_count == 2) {
+        ui.emit(command::OpenScript{.file = editor.session().game() / "assets" / entry.path});
+        return;
+    }
+    if (const auto key = asset_field(entry.kind)) {
+        ui.widgets().viewport().asset_drag =
+            AssetDrag{.path = entry.path, .value = asset_value(entry), .key = std::string(*key)};
+    }
+}
+
+void asset_row(Ui& ui, const Editor& editor, Clay_ElementId id, const AssetEntry& entry) {
+    const Theme& theme = ui.theme();
+    const auto& dragged = ui.widgets().viewport().asset_drag;
+    const bool picked = dragged && dragged->path == entry.path;
+    CLAY({.id = id,
+          .layout = {.sizing = {.width = CLAY_SIZING_GROW()},
+                     .padding = {.left = theme.px16(size::gutter),
+                                 .right = theme.px16(size::gutter),
+                                 .top = theme.px16(2.F),
+                                 .bottom = theme.px16(2.F)},
+                     .childGap = theme.px16(10.F),
+                     .childAlignment = {.y = CLAY_ALIGN_Y_CENTER}},
+          .backgroundColor = picked            ? color::selected
+                             : Ui::hovered(id) ? color::hover
+                                               : Clay_Color{}}) {
+        thumbnail(theme, entry);
+        text(theme, view_of(entry.path), size::small_text, color::text);
+        spacer();
+        text(theme, view_of(kind_label(entry.kind)), size::small_text, color::text_dim);
+    }
+    react_to_asset(ui, editor, id, entry);
+}
+
+void assets(Ui& ui, const Editor& editor) {
+    const auto& entries = editor.state().assets;
+    if (entries.empty()) {
+        empty_hint(ui.theme(), CLAY_STRING("No files in assets/"));
+    }
+    for (std::size_t index = 0; index < entries.size(); ++index) {
+        asset_row(ui, editor, CLAY_IDI("AssetRow", static_cast<std::uint32_t>(index)),
+                  entries[index]);
+    }
+}
+
 } // namespace
 
-float bottom_panel_height(const Theme& theme, float window_height) {
+float bottom_panel_height(const Theme& theme, float window_height, float chosen) {
     const float others =
         theme.px(size::menu_bar + size::toolbar + size::status_bar + size::workspace_min);
-    return std::clamp(window_height - others, theme.px(size::bottom_panel_min),
-                      theme.px(size::bottom_panel));
+    const float wanted = theme.px(std::clamp(chosen, bottom_panel_least, bottom_panel_most));
+    return std::max(theme.px(size::bottom_panel_min), std::min(wanted, window_height - others));
+}
+
+void resize_bottom_panel(Ui& ui) {
+    BottomPanelState& panel = ui.widgets().bottom_panel();
+    const UiInput& input = ui.input();
+    if (ui.clicked(grip_id())) {
+        if (input.click_count == 2) {
+            panel = BottomPanelState{};
+        } else {
+            panel.grab = PanelGrab{.pointer_y = input.pointer.y, .height = panel.height};
+        }
+    } else if (panel.grab && input.primary_down) {
+        const float moved = (input.pointer.y - panel.grab->pointer_y) / ui.theme().scale;
+        panel.height =
+            std::clamp(panel.grab->height - moved, bottom_panel_least, bottom_panel_most);
+    } else {
+        panel.grab.reset();
+    }
+    if (panel.grab || Ui::hovered(grip_id())) {
+        ui.request_cursor(Cursor::resize_vertical);
+    }
 }
 
 void bottom_panel(Ui& ui, const Editor& editor, float height) {
@@ -137,6 +240,7 @@ void bottom_panel(Ui& ui, const Editor& editor, float height) {
                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
           .backgroundColor = color::toolbar,
           .border = {.color = color::border, .width = {.top = theme.px16(1.F)}}}) {
+        grip(ui);
         tabs(ui, editor);
         CLAY({.id = CLAY_ID("BottomContent"),
               .layout = {.sizing = {.width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW()},
@@ -144,10 +248,16 @@ void bottom_panel(Ui& ui, const Editor& editor, float height) {
                          .childGap = theme.px16(2.F),
                          .layoutDirection = CLAY_TOP_TO_BOTTOM},
               .clip = scroll_clip(ui.widgets().scroll(), CLAY_ID("BottomContent"))}) {
-            if (editor.state().bottom_tab == BottomTab::console) {
+            switch (editor.state().bottom_tab) {
+            case BottomTab::console:
                 console(ui, editor.state().console);
-            } else {
+                break;
+            case BottomTab::problems:
                 problems(ui, editor.session());
+                break;
+            case BottomTab::assets:
+                assets(ui, editor);
+                break;
             }
         }
     }

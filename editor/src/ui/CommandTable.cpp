@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <string>
 #include <utility>
 
 #include "engine/core/log/Log.hpp"
+#include "settings/Settings.hpp"
 
 namespace editor {
 
@@ -81,6 +83,18 @@ std::optional<Action> reload_settings(const Editor& editor) {
 }
 
 std::optional<Action> reload_scripts(const Editor&) { return command::ReloadScripts{}; }
+
+constexpr float zoom_step = 0.1F;
+constexpr float zoom_steps_per_unit = 10.F;
+
+template <int direction> std::optional<Action> zoom(const Editor& editor) {
+    const float steps = std::round(editor.state().ui_scale * zoom_steps_per_unit) + direction;
+    const float scale = steps * zoom_step;
+    if (scale < min_ui_scale - (zoom_step / 2.F) || scale > max_ui_scale + (zoom_step / 2.F)) {
+        return std::nullopt;
+    }
+    return command::SetUiScale{.scale = std::clamp(scale, min_ui_scale, max_ui_scale)};
+}
 
 std::optional<Action> reveal_game_folder(const Editor&) { return command::RevealGameFolder{}; }
 
@@ -225,6 +239,16 @@ constexpr std::array table{
                  .shortcut = std::nullopt,
                  .make = toggle_overlay<Overlay::names>,
                  .checked = showing<Overlay::names>},
+    CommandEntry{.label = "Zoom in",
+                 .menu = Menu::view,
+                 .shortcut =
+                     Shortcut{.key = Key::plus, .primary_modifier = true, .any_shift = true},
+                 .make = zoom<1>},
+    CommandEntry{.label = "Zoom out",
+                 .menu = Menu::view,
+                 .shortcut =
+                     Shortcut{.key = Key::minus, .primary_modifier = true, .any_shift = true},
+                 .make = zoom<-1>},
     CommandEntry{.label = "Play", .menu = Menu::scene, .shortcut = std::nullopt, .make = play},
     CommandEntry{.label = "Pause", .menu = Menu::scene, .shortcut = std::nullopt, .make = pause},
     CommandEntry{.label = "Stop", .menu = Menu::scene, .shortcut = std::nullopt, .make = stop},
@@ -260,6 +284,10 @@ std::string_view key_name(Key key) {
         return "P";
     case Key::d:
         return "D";
+    case Key::plus:
+        return "=";
+    case Key::minus:
+        return "-";
     case Key::del:
         return "Del";
     case Key::backspace:
@@ -287,7 +315,8 @@ std::string_view key_name(Key key) {
 }
 
 bool pressed(const UiInput& input, const Shortcut& shortcut) {
-    return input.primary_modifier == shortcut.primary_modifier && input.shift == shortcut.shift &&
+    return input.primary_modifier == shortcut.primary_modifier &&
+           (shortcut.any_shift || input.shift == shortcut.shift) &&
            std::ranges::find(input.keys_pressed, shortcut.key) != input.keys_pressed.end();
 }
 

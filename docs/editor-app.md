@@ -21,6 +21,11 @@ changes. What the editor does for its users is described in
 | New game, new prefab | `project/ProjectFiles` | `create_project()` (for `--new`) and `create_prefab()` write files without a display; `main` creates the game before opening it |
 | Name dialog | `ui/sections/NameDialog` | `EditorState::name_dialog` holds what it creates and the name typed; `CreatePrefab` and `CreateScene` close it only when they succeed |
 | Clickable console lines | `text/ScriptLocation` | `Editor::log()` stores in `ConsoleLine::script` the existing script a line names (`player.lua:12:`), so drawing never touches the disk |
+| Assets tab | `assets/AssetList`, `ui/sections/BottomPanel`, `raylib/ViewportPainter::paint_thumbnail` | `EditorState::assets` caches `list_assets()` with the prefabs and scenes; a drag lives in `ViewportState::asset_drag` and ends in the viewport as one `SetField`; thumbnails are Clay image elements pointing at the row's `AssetEntry`, drawn from the viewport's texture cache |
+| Refusals, drag chip | `ui/sections/Overlays` | `Editor` counts refusals in `EditorState::refusal`; the toast shows a new count for 3 s (`WidgetState::toast()`); the chip follows the pointer during an asset or prefab drag |
+| Console cap | `action/Editor` | `Editor::log()` keeps the last `max_console_lines` (500) lines: a flood of game output once overflowed Clay's element count |
+| Bottom panel size | `ui/sections/BottomPanel` | The chosen height, unscaled, lives in `WidgetState::bottom_panel()`; `bottom_panel_height()` keeps it between half and twice the design height and leaves the workspace its minimum; the grip asks for the resize cursor with `Ui::request_cursor()`, which `EditorWindow` applies |
+| UI zoom | `ui/CommandTable`, `command::SetUiScale` | Steps `EditorState::ui_scale` by 0.1 within `min_ui_scale` and `max_ui_scale`; `Shortcut::any_shift` lets `Ctrl+=` and `Ctrl++` share an entry, and `=`, `+`, `-` are read from the layout like letters |
 
 ## One-way flow
 
@@ -227,6 +232,7 @@ editor/
   src/exporter/   Export: plan and copy the runtime and the game folder
   src/settings/   settings.json: path, parsing, validation
   src/project/    new game folders and prefab scripts
+  src/assets/     the asset list of the Assets tab
   src/render/     geometry and scissor helpers for the renderer
   src/raylib/     window, input, Clay renderer, font cache: the only raylib code
 ```

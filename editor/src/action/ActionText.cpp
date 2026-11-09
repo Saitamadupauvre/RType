@@ -31,7 +31,15 @@ std::string_view tool_name(Tool tool) {
 }
 
 std::string_view tab_name(BottomTab tab) {
-    return tab == BottomTab::console ? "console" : "problems";
+    switch (tab) {
+    case BottomTab::console:
+        return "console";
+    case BottomTab::problems:
+        return "problems";
+    case BottomTab::assets:
+        return "assets";
+    }
+    return "";
 }
 
 std::string_view overlay_name(Overlay overlay) {
@@ -159,6 +167,9 @@ std::string command_text(const Command& command) {
             [](const command::OpenSettings&) { return std::string("command::OpenSettings"); },
             [](const command::ReloadSettings&) { return std::string("command::ReloadSettings"); },
             [](const command::ReloadScripts&) { return std::string("command::ReloadScripts"); },
+            [](const command::SetUiScale& zoom) {
+                return std::format("command::SetUiScale scale={:g}", zoom.scale);
+            },
             [](const command::Play&) { return std::string("command::Play"); },
             [](const command::Pause&) { return std::string("command::Pause"); },
             [](const command::Stop&) { return std::string("command::Stop"); },

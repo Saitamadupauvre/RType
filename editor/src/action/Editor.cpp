@@ -1,5 +1,6 @@
 #include "action/Editor.hpp"
 
+#include <cstddef>
 #include <filesystem>
 #include <format>
 #include <system_error>
@@ -63,6 +64,10 @@ void Editor::log(ConsoleLine line) {
         }
     }
     _state.console.push_back(std::move(line));
+    if (_state.console.size() > max_console_lines) {
+        _state.console.erase(_state.console.begin(),
+                             _state.console.end() - static_cast<std::ptrdiff_t>(max_console_lines));
+    }
 }
 
 void Editor::attach_runtime(std::filesystem::path folder) { _runtime = std::move(folder); }
@@ -144,10 +149,12 @@ void Editor::refresh_inspector() { _state.inspector = inspect_selection(_session
 void Editor::refresh_lists() {
     _state.prefabs = _session.prefabs();
     _state.scenes = _session.scenes();
+    _state.assets = list_assets(_session.game());
 }
 
 void Editor::report(const CommandResult& result) {
     if (!result.ok) {
+        _state.refusal = {.count = _state.refusal.count + 1, .text = result.message};
         log({.severity = Severity::error, .text = result.message});
         return;
     }

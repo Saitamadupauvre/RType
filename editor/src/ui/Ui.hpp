@@ -2,6 +2,7 @@
 
 #include <clay.h>
 
+#include <cstdint>
 #include <deque>
 #include <string>
 #include <vector>
@@ -13,6 +14,9 @@
 #include "ui/WidgetState.hpp"
 
 namespace editor {
+
+/** @brief The mouse cursor a frame asks for. */
+enum class Cursor : std::uint8_t { standard, resize_vertical };
 
 /**
  * @brief Context of one UI frame: theme, input, emitted actions and the text they show.
@@ -38,6 +42,11 @@ public:
     void emit(Action action);
     [[nodiscard]] std::vector<Action> take_actions();
 
+    /** @brief Asks the platform to show @p cursor this frame; the last request wins. */
+    void request_cursor(Cursor cursor) noexcept;
+    /** @return The cursor requested this frame, Cursor::standard by default. */
+    [[nodiscard]] Cursor cursor() const noexcept;
+
     /** @brief Stores a formatted string until the Ui is destroyed and returns a view of it. */
     [[nodiscard]] Clay_String keep(std::string text);
 
@@ -48,6 +57,7 @@ private:
     const Platform* _platform;
     std::vector<Action> _actions;
     std::deque<std::string> _texts;
+    Cursor _cursor = Cursor::standard;
 };
 
 } // namespace editor

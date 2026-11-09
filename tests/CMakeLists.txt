@@ -251,6 +251,7 @@ endfunction()
 editor_add_test(core
     SOURCES
         editor/action/ActionTextTest.cpp
+        editor/assets/AssetListTest.cpp
         editor/action/ApplyCommandTest.cpp
         editor/action/ApplyEditTest.cpp
         editor/action/EditorTest.cpp
@@ -278,12 +279,15 @@ editor_add_test(core
         editor/ui/LetterKeyTest.cpp
         editor/ui/SmoothScrollTest.cpp
         editor/ui/ThemeTest.cpp
+        editor/ui/sections/AssetsTabTest.cpp
+        editor/ui/sections/BottomPanelResizeTest.cpp
         editor/ui/sections/CommandPaletteTest.cpp
         editor/ui/sections/ExportDialogTest.cpp
         editor/ui/sections/InspectorFieldsTest.cpp
         editor/ui/sections/InspectorTest.cpp
         editor/ui/sections/MenuBarTest.cpp
         editor/ui/sections/NameDialogTest.cpp
+        editor/ui/sections/OverlaysTest.cpp
         editor/ui/sections/ViewportTest.cpp
         editor/ui/widgets/CheckboxTest.cpp
         editor/ui/widgets/DropdownTest.cpp

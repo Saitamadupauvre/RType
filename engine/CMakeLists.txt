@@ -86,6 +86,7 @@ engine_add_module(script
         src/script/scene/GameFolder.cpp
         src/script/scene/JsonFieldValue.cpp
         src/script/scene/JsonFile.cpp
+        src/script/scene/SceneAssets.cpp
         src/script/scene/SceneFile.cpp
         src/script/scene/SceneSwitch.cpp
     DEPENDS engine::core

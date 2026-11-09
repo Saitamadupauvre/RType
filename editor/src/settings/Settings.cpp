@@ -32,7 +32,8 @@ struct FlagKey {
 };
 
 constexpr std::array number_keys{
-    NumberKey{.name = "ui.scale", .min = 0.5F, .max = 3.F, .field = &Settings::ui_scale},
+    NumberKey{
+        .name = "ui.scale", .min = min_ui_scale, .max = max_ui_scale, .field = &Settings::ui_scale},
     NumberKey{
         .name = "ui.scroll_speed", .min = 0.25F, .max = 4.F, .field = &Settings::scroll_speed},
 };

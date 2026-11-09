@@ -81,7 +81,7 @@ using Edit = std::variant<edit::Place, edit::Move, edit::Remove, edit::Rename, e
 
 enum class Overlay : std::uint8_t { hitboxes, names };
 enum class Tool : std::uint8_t { select, move, pan };
-enum class BottomTab : std::uint8_t { console, problems };
+enum class BottomTab : std::uint8_t { console, problems, assets };
 /** @brief What the name dialog creates. */
 enum class NewItem : std::uint8_t { prefab, scene };
 
@@ -257,6 +257,15 @@ struct ReloadScripts {
     static constexpr bool while_running = true;
 };
 
+/**
+ * @brief Sets the UI scale for this session, like `ui.scale` of the settings; refused outside
+ * min_ui_scale to max_ui_scale. The settings file is not changed.
+ */
+struct SetUiScale {
+    static constexpr bool while_running = true;
+    float scale = 1.F;
+};
+
 /** @brief Pauses a playing game; refused otherwise. */
 struct Pause {
     static constexpr bool while_running = true;
@@ -290,17 +299,16 @@ struct RunExport {
 
 } // namespace command
 
-using Command =
-    std::variant<command::Select, command::Undo, command::Redo, command::Save,
-                 command::DiscardChanges, command::CreateScene, command::OpenScene,
-                 command::CreatePrefab, command::OpenNameDialog, command::SetNameDialogText,
-                 command::CloseNameDialog, command::DuplicateScene, command::RenameScene,
-                 command::DeleteScene, command::SetStartScene, command::SetSnap,
-                 command::SetGridSize, command::SetOverlay, command::SetTool, command::ShowTab,
-                 command::ReportInvalidInput, command::SetPrefabFilter, command::OpenScript,
-                 command::RevealGameFolder, command::OpenSettings, command::ReloadSettings,
-                 command::ReloadScripts, command::Play, command::Pause, command::Stop,
-                 command::OpenExport, command::SetExport, command::CloseExport, command::RunExport>;
+using Command = std::variant<
+    command::Select, command::Undo, command::Redo, command::Save, command::DiscardChanges,
+    command::CreateScene, command::OpenScene, command::CreatePrefab, command::OpenNameDialog,
+    command::SetNameDialogText, command::CloseNameDialog, command::DuplicateScene,
+    command::RenameScene, command::DeleteScene, command::SetStartScene, command::SetSnap,
+    command::SetGridSize, command::SetOverlay, command::SetTool, command::ShowTab,
+    command::ReportInvalidInput, command::SetPrefabFilter, command::OpenScript,
+    command::RevealGameFolder, command::OpenSettings, command::ReloadSettings,
+    command::ReloadScripts, command::SetUiScale, command::Play, command::Pause, command::Stop,
+    command::OpenExport, command::SetExport, command::CloseExport, command::RunExport>;
 
 /** @brief What the UI emits; applied after the frame by Editor::handle(). */
 using Action = std::variant<Edit, Command>;

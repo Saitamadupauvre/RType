@@ -36,6 +36,8 @@ namespace {
 constexpr int initial_width = 1440;
 constexpr std::size_t time_length = 9;
 constexpr int initial_height = 900;
+constexpr int min_width = 1000;
+constexpr int min_height = 600;
 constexpr unsigned int window_flags = static_cast<unsigned int>(FLAG_WINDOW_RESIZABLE) |
                                       static_cast<unsigned int>(FLAG_VSYNC_HINT) |
                                       static_cast<unsigned int>(FLAG_MSAA_4X_HINT);
@@ -61,6 +63,7 @@ constexpr std::array named_keys{
     std::pair{KEY_LEFT, Key::left},     std::pair{KEY_RIGHT, Key::right},
     std::pair{KEY_UP, Key::up},         std::pair{KEY_DOWN, Key::down},
     std::pair{KEY_HOME, Key::home},     std::pair{KEY_END, Key::end},
+    std::pair{KEY_KP_ADD, Key::plus},   std::pair{KEY_KP_SUBTRACT, Key::minus},
 };
 
 #ifdef __APPLE__
@@ -84,6 +87,9 @@ std::vector<std::pair<int, Key>> layout_letters() {
         add_if_letter(letters, code);
     }
     for (const int code : punctuation_keys) {
+        add_if_letter(letters, code);
+    }
+    for (int code = KEY_ZERO; code <= KEY_NINE; ++code) {
         add_if_letter(letters, code);
     }
     return letters;
@@ -152,6 +158,15 @@ std::string local_time() {
 
 void toggle_debug_view() { Clay_SetDebugModeEnabled(!Clay_IsDebugModeEnabled()); }
 
+void show_cursor(Cursor wanted, Cursor& shown) {
+    if (wanted == shown) {
+        return;
+    }
+    SetMouseCursor(wanted == Cursor::resize_vertical ? MOUSE_CURSOR_RESIZE_NS
+                                                     : MOUSE_CURSOR_DEFAULT);
+    shown = wanted;
+}
+
 void run_frames(Editor& editor) {
     ClayRenderer renderer(font_directory());
     const MeasureText measure = [&renderer](auto text, const auto& config) {
@@ -164,6 +179,8 @@ void run_frames(Editor& editor) {
                             });
     renderer.set_custom_painter(
         [&painter](const Clay_RenderCommand& command) { painter.paint(command); });
+    renderer.set_image_painter(
+        [&painter](const Clay_RenderCommand& command) { painter.paint_thumbnail(command); });
     const Platform platform{
         .measure = measure,
         .read_clipboard = read_clipboard,
@@ -171,6 +188,7 @@ void run_frames(Editor& editor) {
         .texture_size = [&painter](std::string_view path) { return painter.texture_size(path); }};
     WidgetState widgets;
     ClickCounter clicks;
+    Cursor shown_cursor = Cursor::standard;
 
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_F11)) {
@@ -179,6 +197,7 @@ void run_frames(Editor& editor) {
         const Theme theme = theme_for(editor.state(), GetWindowScaleDPI().x);
         Ui ui(theme, read_input(clicks), widgets, platform);
         const Clay_RenderCommandArray commands = build_frame(ui, editor, window_size());
+        show_cursor(ui.cursor(), shown_cursor);
         BeginDrawing();
         ClearBackground(BLACK);
         renderer.render(commands);
@@ -204,6 +223,7 @@ bool run_editor_window(Editor& editor) {
     if (!IsWindowReady()) {
         return false;
     }
+    SetWindowMinSize(min_width, min_height);
     SetExitKey(KEY_NULL);
     run_frames(editor);
     CloseWindow();

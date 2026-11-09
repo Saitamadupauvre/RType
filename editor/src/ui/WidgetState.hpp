@@ -11,6 +11,7 @@
 
 #include "text/TextEdit.hpp"
 #include "ui/SmoothScroll.hpp"
+#include "ui/Theme.hpp"
 #include "viewport/ViewportState.hpp"
 
 namespace editor {
@@ -35,6 +36,24 @@ struct PaletteState {
  * Owned by the frame loop and lent to each frame's Ui. Focus changes requested during a frame
  * apply on the next one, so the field losing focus always gets to commit first.
  */
+/** @brief Where the bottom panel's grip was grabbed: the pointer's y and the height then. */
+struct PanelGrab {
+    float pointer_y = 0.F;
+    float height = 0.F;
+};
+
+/** @brief The height chosen for the bottom panel, unscaled, and a drag of its grip. */
+struct BottomPanelState {
+    float height = size::bottom_panel;
+    std::optional<PanelGrab> grab;
+};
+
+/** @brief The refusal shown over the viewport and how long it stays. */
+struct ToastState {
+    std::uint64_t shown = 0;
+    float remaining = 0.F;
+};
+
 class WidgetState {
 public:
     /** @brief Whether a field is focused; the viewport and the shortcuts ignore keys then. */
@@ -79,6 +98,8 @@ public:
     [[nodiscard]] PaletteState& palette() noexcept;
     [[nodiscard]] SmoothScroll& scroll() noexcept;
     [[nodiscard]] ViewportState& viewport() noexcept;
+    [[nodiscard]] ToastState& toast() noexcept;
+    [[nodiscard]] BottomPanelState& bottom_panel() noexcept;
 
     /** @brief Applies Tab moves, drops focus from fields not drawn and starts the next frame. */
     void end_frame();
@@ -101,6 +122,8 @@ private:
     PaletteState _palette;
     SmoothScroll _scroll;
     ViewportState _viewport;
+    ToastState _toast;
+    BottomPanelState _bottom_panel;
 };
 
 } // namespace editor

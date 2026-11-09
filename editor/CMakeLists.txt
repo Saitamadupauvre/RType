@@ -21,6 +21,7 @@ set_target_properties(editor-clay PROPERTIES CXX_CLANG_TIDY "")
 
 add_library(editor-core STATIC
     src/action/ActionText.cpp
+    src/assets/AssetList.cpp
     src/action/ApplyCommand.cpp
     src/action/ApplyEdit.cpp
     src/action/Editor.cpp
@@ -60,6 +61,7 @@ add_library(editor-core STATIC
     src/ui/sections/InspectorFields.cpp
     src/ui/sections/MenuBar.cpp
     src/ui/sections/NameDialog.cpp
+    src/ui/sections/Overlays.cpp
     src/ui/sections/PanelHeader.cpp
     src/ui/sections/Sidebar.cpp
     src/ui/sections/StatusBar.cpp

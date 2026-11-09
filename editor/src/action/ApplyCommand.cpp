@@ -39,6 +39,15 @@ CommandResult set_grid_size(ViewSettings& view, float size) {
     return CommandResult::done();
 }
 
+CommandResult set_ui_scale(EditorState& state, float scale) {
+    if (!std::isfinite(scale) || scale < min_ui_scale || scale > max_ui_scale) {
+        return CommandResult::refused(
+            std::format("The UI scale goes from {:g} to {:g}.", min_ui_scale, max_ui_scale));
+    }
+    state.ui_scale = scale;
+    return CommandResult::done();
+}
+
 CommandResult open_script(const FileOpener& open_file, const std::filesystem::path& file) {
     if (!open_file) {
         return CommandResult::refused("Opening files is not available here.");
@@ -181,6 +190,7 @@ CommandResult apply_command(EditorSession& session, EditorState& state, EditorSe
                 return CommandResult::refused("Reloading settings needs the editor.");
             },
             [&](const command::ReloadScripts&) { return session.reload_scripts(); },
+            [&](const command::SetUiScale& zoom) { return set_ui_scale(state, zoom.scale); },
             [&](const command::Play&) { return play.play(session, state.mode); },
             [&](const command::Pause&) { return play.pause(state.mode); },
             [&](const command::Stop&) { return play.stop(state.mode); },
