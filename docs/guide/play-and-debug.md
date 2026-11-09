@@ -35,6 +35,8 @@ Every Lua call is protected. An error never closes the game or the editor:
 | Undeclared sound, texture or event | Lua error at the call |
 | Bad scene file or instance | The file or the instance is skipped and logged; the rest loads |
 | Missing asset | Drawn as a placeholder, logged once |
+| A name written after a table-form `entity "x" { ... }`, or a misspelled callback (`on_collision`) | Warning at load, also in the editor's Problems tab: the engine would ignore it otherwise |
+| A call to a planned function such as `after` | The nil-call error says it is planned but not implemented yet |
 
 Common mistakes:
 

@@ -149,8 +149,11 @@ it. A value that does not parse is refused with a message in the console.
   Undoing back to the saved state clears the unsaved mark.
 - Saving writes only the open scene file. Overrides are sorted by key, so two
   saves of the same scene give the same file and diffs stay small.
-- **Problems** lists what the editor could not build for an instance of the
-  open scene: an override of the wrong kind, a value the component refuses.
+- **Problems** lists the warnings and errors of the last script load first
+  (a broken file, a name outside a table form, a misspelled callback), then
+  what the editor could not build for an instance of the open scene: an
+  override of the wrong kind, a value the component refuses. File > Reload
+  scripts refreshes the script part.
 - Instances whose type no script declares (a typo, a deleted script) are
   reported when the scene opens and kept in the file exactly as they were.
 

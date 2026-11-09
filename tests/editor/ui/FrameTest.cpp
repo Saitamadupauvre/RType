@@ -178,6 +178,18 @@ TEST_F(FrameTest, ProblemsTabListsProblems) {
     EXPECT_TRUE(contains(texts, "PhysicsBody.type"));
 }
 
+TEST_F(FrameTest, ProblemsTabListsScriptWarnings) {
+    _game.write("scripts/crate.lua", "entity \"crate\" {}\nfunction update(self, dt) end\n");
+    _editor.handle(command::ReloadScripts{});
+    _editor.handle(command::ShowTab{.tab = BottomTab::problems});
+    const auto texts = frame().texts;
+
+    EXPECT_TRUE(contains(texts, "Problems 1"));
+    EXPECT_TRUE(std::ranges::any_of(texts, [](const std::string& text) {
+        return text.starts_with("crate.lua: 'update' is defined outside");
+    }));
+}
+
 TEST_F(FrameTest, TypingInThePrefabFilterEmitsSetPrefabFilter) {
     click(CLAY_ID("PrefabFilter"));
     frame();

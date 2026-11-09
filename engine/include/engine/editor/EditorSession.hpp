@@ -29,6 +29,15 @@ struct Problem {
     bool operator==(const Problem&) const = default;
 };
 
+/** @brief A warning or an error logged while the scripts were loading. */
+struct ScriptMessage {
+    bool error = false;
+    /** The logged text without its `lua: ` prefix, e.g. `player.lua: 'update' is defined...`. */
+    std::string text;
+
+    bool operator==(const ScriptMessage&) const = default;
+};
+
 /**
  * @brief Editing model of one game folder: its prefabs, its scenes and the open scene.
  *
@@ -83,6 +92,11 @@ public:
     [[nodiscard]] const std::filesystem::path& game() const noexcept;
     /** @return false when a script failed to load; what did load is still usable. */
     [[nodiscard]] bool scripts_loaded() const noexcept;
+    /**
+     * @return What the last load of the scripts (open() or reload_scripts()) logged as a
+     * warning or an error, in order. Messages below the log level are not seen.
+     */
+    [[nodiscard]] const std::vector<ScriptMessage>& script_messages() const noexcept;
     /** @return The declared entity types that can be placed, in ascending order. */
     [[nodiscard]] std::vector<std::string> prefabs() const;
     /** @return The scenes of the game folder, see script::list_scenes(). */

@@ -638,6 +638,10 @@ Developers must not use these names for their own fields or methods; the engine 
 - Every call into Lua is protected. An error is logged with the file and line (`enemy.lua:14: attempt to index nil value 'target'`), the faulty entity or system is disabled, and the game continues.
 - Only safe Lua libraries are opened: `base`, `math`, `string`, `table`, `coroutine`. No `io`, no `os`: scripts cannot access the file system or run commands.
 - Common mistake to document: call methods with `self:method()`, not `self.method()`.
+- Mistakes the engine would otherwise ignore silently are logged as warnings while the scripts load, and the editor lists them in its Problems tab:
+  - a name defined beside a table-form declaration (`entity "player" { ... }` then `function update(self, dt)` below it): it belongs to neither, so it is ignored. Move it into the table, or use the short form;
+  - a function close to a callback name, which the engine never calls (`on_collision`, "did you mean 'on_collide'?"; `updte`, "did you mean 'update'?"). Custom methods with other names, such as `on_hit` or `fire`, are not reported.
+- Calling a planned but unimplemented function (`after`, `every`, `wait` and the others of the status table above) fails like any nil call, and the first line of the error adds `('after' is planned but not implemented yet, see docs/reference/lua-api.md)`.
 
 ## How it maps to C++ (for engine developers)
 

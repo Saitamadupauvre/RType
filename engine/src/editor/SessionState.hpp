@@ -23,6 +23,7 @@ struct EditorSession::Impl {
     std::filesystem::path game;
     script::ScriptRuntime runtime;
     bool scripts_loaded = false;
+    std::vector<ScriptMessage> script_messages;
     std::optional<std::string> start_scene;
     std::optional<std::string> open_scene;
     SceneDocument document;

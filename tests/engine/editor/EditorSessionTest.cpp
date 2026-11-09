@@ -422,3 +422,36 @@ TEST_F(EditorSessionTest, ReloadScriptsSaysWhenAScriptFails) {
     EXPECT_FALSE(session().scripts_loaded());
     EXPECT_NE(result.message.find("failed"), std::string::npos) << result.message;
 }
+
+TEST_F(EditorSessionTest, ScriptMessagesListWhatLoadingWarnedAbout) {
+    EXPECT_TRUE(session().script_messages().empty());
+    std::ofstream(_game.path() / "scripts" / "crate.lua")
+        << "entity \"crate\" {}\nfunction update(self, dt) end\n";
+
+    ASSERT_TRUE(session().reload_scripts().ok);
+
+    ASSERT_EQ(session().script_messages().size(), 1U);
+    const auto& message = session().script_messages().front();
+    EXPECT_FALSE(message.error);
+    EXPECT_TRUE(message.text.starts_with("crate.lua: 'update' is defined outside")) << message.text;
+    EXPECT_TRUE(logged("'update' is defined outside"));
+}
+
+TEST_F(EditorSessionTest, ScriptMessagesListLoadErrors) {
+    std::ofstream(_game.path() / "scripts" / "broken.lua") << "entity \"broken\" {\n";
+
+    ASSERT_TRUE(session().reload_scripts().ok);
+
+    ASSERT_FALSE(session().script_messages().empty());
+    EXPECT_TRUE(session().script_messages().front().error);
+}
+
+TEST_F(EditorSessionTest, ReloadingClearsOldScriptMessages) {
+    std::ofstream(_game.path() / "scripts" / "broken.lua") << "entity \"broken\" {\n";
+    ASSERT_TRUE(session().reload_scripts().ok);
+    std::filesystem::remove(_game.path() / "scripts" / "broken.lua");
+
+    ASSERT_TRUE(session().reload_scripts().ok);
+
+    EXPECT_TRUE(session().script_messages().empty());
+}
