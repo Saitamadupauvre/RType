@@ -39,6 +39,8 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-name: ${{ matrix.name }}
 
       - name: Install ccache
         if: matrix.ccache
@@ -70,6 +72,8 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-name: ${{ matrix.preset }}
 
       # TSan cannot map its shadow memory with the runner's default ASLR entropy.
       - name: Lower ASLR entropy
