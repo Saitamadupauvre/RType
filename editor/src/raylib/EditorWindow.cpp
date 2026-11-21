@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <ctime>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -153,7 +154,11 @@ UiInput read_input(ClickCounter& clicks) {
 std::string local_time() {
     const std::time_t now = std::time(nullptr);
     std::tm local{};
+#if defined(_WIN32)
+    localtime_s(&local, &now);
+#else
     localtime_r(&now, &local);
+#endif
     std::array<char, time_length> stamp{};
     return {stamp.data(), std::strftime(stamp.data(), stamp.size(), "%H:%M:%S", &local)};
 }

@@ -40,8 +40,19 @@ int main(int argc, char** argv) {
             : result.config->runtime;
     const auto settings_file = editor::settings_path([](std::string_view name) {
         const std::string key(name);
+#if defined(_WIN32)
+        char* value = nullptr;
+        std::size_t length = 0;
+        if (_dupenv_s(&value, &length, key.c_str()) != 0 || value == nullptr) {
+            return std::optional<std::string>();
+        }
+        std::optional<std::string> result(value);
+        std::free(value);
+        return result;
+#else
         const char* value = std::getenv(key.c_str());
         return value ? std::optional<std::string>(value) : std::nullopt;
+#endif
     });
     const editor::LoadedSettings settings =
         settings_file ? editor::load_settings(*settings_file) : editor::LoadedSettings{};
