@@ -91,8 +91,6 @@ void ensure_winsock_initialized() noexcept {}
 
 int last_socket_errno() noexcept { return errno; }
 
-int to_fd(int fd) noexcept { return fd; }
-
 int to_native(int fd) noexcept { return fd; }
 
 int poll_fds(poll_fd_t* fds, nfds_t count, int timeout) noexcept {
