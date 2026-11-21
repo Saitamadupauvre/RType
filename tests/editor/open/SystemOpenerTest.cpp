@@ -95,7 +95,9 @@ TEST(SystemOpener, AMissingProgramCannotOpen) {
 }
 
 TEST(SystemOpener, UsesTheSystemOpener) {
-#ifdef __APPLE__
+#if defined(_WIN32)
+    EXPECT_TRUE(SystemOpener::default_program().empty());
+#elif defined(__APPLE__)
     EXPECT_EQ(SystemOpener::default_program(), "open");
 #else
     EXPECT_EQ(SystemOpener::default_program(), "xdg-open");

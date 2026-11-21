@@ -11,7 +11,17 @@
 #include <tuple>
 #include <utility>
 
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#else
 #include <fcntl.h>
+#endif
 
 #include <gtest/gtest.h>
 
@@ -35,7 +45,16 @@ Endpoint endpoint_of(std::string_view ip, std::uint16_t port) {
     return endpoint.value_or(Endpoint{});
 }
 
-bool is_open_descriptor(int fd) { return ::fcntl(fd, F_GETFD) != -1; }
+bool is_open_descriptor(int fd) {
+#if defined(_WIN32)
+    int type = 0;
+    int length = sizeof(type);
+    return ::getsockopt(static_cast<SOCKET>(static_cast<UINT_PTR>(fd)), SOL_SOCKET, SO_TYPE,
+                        reinterpret_cast<char*>(&type), &length) == 0;
+#else
+    return ::fcntl(fd, F_GETFD) != -1;
+#endif
+}
 
 UdpSocket bound_loopback_socket() {
     UdpSocket socket(AF_INET);

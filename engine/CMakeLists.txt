@@ -128,6 +128,7 @@ engine_add_module(network
         src/network/transport/LoopbackLinks.cpp
         src/network/transport/UdpLinks.cpp
     DEPENDS engine::core
+    PRIVATE_DEPENDS $<$<PLATFORM_ID:Windows>:ws2_32>
 )
 target_include_directories(engine-network PRIVATE src/network)
 
