@@ -117,6 +117,8 @@ int socket_errno_of(int wsa_error) noexcept {
         return ECONNREFUSED;
     case WSAEMSGSIZE:
         return EMSGSIZE;
+    case WSAEAFNOSUPPORT:
+        return EAFNOSUPPORT;
     default:
         return wsa_error;
     }
@@ -420,6 +422,12 @@ std::size_t UdpSocket::receive_from(std::span<std::uint8_t> buffer, Endpoint& fr
                 from.set_size(length);
                 return static_cast<std::size_t>(received);
             }
+#if defined(_WIN32)
+            if (last_socket_errno() == WSAEMSGSIZE) {
+                from.set_size(length);
+                return buffer.size();
+            }
+#endif
             if (!is_retryable_receive_error(last_socket_errno())) {
                 ec = last_error();
                 return 0;

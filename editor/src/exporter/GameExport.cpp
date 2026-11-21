@@ -132,7 +132,7 @@ ExportModes modes_of(const std::optional<std::vector<std::string>>& names) {
 }
 
 void write_launcher(const ExportLauncher& launcher) {
-    std::ofstream out(launcher.to);
+    std::ofstream out(launcher.to, std::ios::binary);
     out << launcher.text;
     out.close();
     if (!out) {
@@ -223,7 +223,7 @@ engine::editor::CommandResult run_export(const ExportPlan& plan) {
         if (plan.server_launcher) {
             write_launcher(*plan.server_launcher);
         }
-        std::ofstream readme_out(plan.output / readme_file);
+        std::ofstream readme_out(plan.output / readme_file, std::ios::binary);
         readme_out << plan.readme;
         if (!readme_out) {
             return engine::editor::CommandResult::refused(

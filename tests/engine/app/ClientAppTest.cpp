@@ -148,13 +148,13 @@ public:
     [[nodiscard]] bool is_open() const override { return true; }
     void update() override {}
     [[nodiscard]] SoundId load_sound(const std::filesystem::path& path) override {
-        loaded.push_back(path.string());
+        loaded.push_back(path.generic_string());
         return {.value = 1};
     }
     void unload_sound(SoundId) override {}
     void play_sound(SoundId, float, float) override {}
     [[nodiscard]] MusicId load_music(const std::filesystem::path& path) override {
-        loaded.push_back(path.string());
+        loaded.push_back(path.generic_string());
         return {.value = 1};
     }
     void unload_music(MusicId) override {}
@@ -168,7 +168,7 @@ public:
     std::vector<std::string> loaded;
 };
 
-std::string asset(const std::string& name) { return (game / "assets" / name).string(); }
+std::string asset(const std::string& name) { return (game / "assets" / name).generic_string(); }
 
 std::vector<std::string> sorted(std::vector<std::string> names) {
     std::ranges::sort(names);
