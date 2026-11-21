@@ -121,11 +121,11 @@ constexpr std::array key_map{
 } // namespace
 
 int to_raylib(Key key) {
-    const auto* entry = std::ranges::find(key_map, key, &std::pair<Key, KeyboardKey>::first);
+    const auto entry = std::ranges::find(key_map, key, &std::pair<Key, KeyboardKey>::first);
     return entry == key_map.end() ? KEY_NULL : entry->second;
 }
 
 Key from_raylib(int code) {
-    const auto* entry = std::ranges::find(key_map, code, &std::pair<Key, KeyboardKey>::second);
+    const auto entry = std::ranges::find(key_map, code, &std::pair<Key, KeyboardKey>::second);
     return entry == key_map.end() ? Key::Unknown : entry->first;
 }
