@@ -54,7 +54,7 @@ public:
     void close() override { is_open = false; }
     [[nodiscard]] bool should_close() const override { return frames >= close_after; }
     [[nodiscard]] TextureId load_texture(const std::string& path) override {
-        loaded.push_back(path);
+        loaded.push_back(std::filesystem::path(path).generic_string());
         if (on_load) {
             on_load();
         }
