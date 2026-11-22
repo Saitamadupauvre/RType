@@ -86,7 +86,8 @@ TEST(ProtocolHandler, SerializesPacketInBigEndianOrder) {
     const engine::network::ProtocolHandler handler;
     const std::array<std::uint8_t, 3> payload{1, 0, 1};
 
-    const auto packet = handler.serialize(input_header(0x0102'0304, payload.size()), payload);
+    const auto packet = handler.serialize(
+        input_header(0x0102'0304, static_cast<std::uint16_t>(payload.size())), payload);
 
     const std::vector<std::uint8_t> expected{0x52, 0x54, 0x59, 0x50, 0x00, 0x08, 0x03, 0x01,
                                              0x02, 0x03, 0x04, 0x00, 0x03, 0x01, 0x00, 0x01};
@@ -97,7 +98,8 @@ TEST(ProtocolHandler, SerializesPacketInBigEndianOrder) {
 TEST(ProtocolHandler, DeserializesValidPacket) {
     const engine::network::ProtocolHandler handler;
     const std::array<std::uint8_t, 3> payload{1, 0, 1};
-    const auto encoded = value_of(handler.serialize(input_header(42, payload.size()), payload));
+    const auto encoded = value_of(
+        handler.serialize(input_header(42, static_cast<std::uint16_t>(payload.size())), payload));
 
     const auto packet = value_of(handler.deserialize(encoded));
 

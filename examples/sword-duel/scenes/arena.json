@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "instances": [
+        {
+            "name": "sky",
+            "type": "sky",
+            "position": [0, 0]
+        },
+        {
+            "name": "water",
+            "type": "water",
+            "position": [0, 760]
+        },
+        {
+            "name": "match",
+            "type": "match",
+            "position": [0, 0]
+        }
+    ]
+}

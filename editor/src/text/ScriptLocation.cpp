@@ -19,7 +19,7 @@ bool path_char(char c) {
 }
 
 bool safe(const std::filesystem::path& path) {
-    return !path.empty() && path.is_relative() &&
+    return !path.empty() && path.is_relative() && !path.has_root_directory() &&
            std::ranges::none_of(path,
                                 [](const std::filesystem::path& part) { return part == ".."; });
 }

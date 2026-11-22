@@ -111,6 +111,9 @@ target_include_directories(engine_network_tests PRIVATE
     "${PROJECT_SOURCE_DIR}/engine/src/network"
     "${CMAKE_CURRENT_SOURCE_DIR}/engine/network"
 )
+if(WIN32)
+    target_link_libraries(engine_network_tests PRIVATE ws2_32)
+endif()
 engine_add_test(navigation SOURCES
     engine/navigation/GridFixture.cpp
     engine/navigation/NavGridTest.cpp
@@ -264,6 +267,7 @@ editor_add_test(core
         editor/render/ScissorStackTest.cpp
         editor/settings/SettingsTest.cpp
         editor/open/SystemOpenerTest.cpp
+        editor/platform/ExecutableTest.cpp
         editor/play/PlaySessionTest.cpp
         editor/play/ProcessLauncherTest.cpp
         editor/project/ProjectFilesTest.cpp

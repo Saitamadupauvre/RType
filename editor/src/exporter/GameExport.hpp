@@ -84,8 +84,8 @@ struct ExportPlan {
 /**
  * @brief Lists what exporting @p game with @p settings copies, and why it cannot run.
  *
- * @param runtime Folder holding `engine-runtime`, the `libengine-*` libraries and `plugins/`;
- * usually the editor's own folder.
+ * @param runtime Folder holding `engine-runtime`, its engine libraries (`libengine-*.so`,
+ * `engine-*.dll`...) and `plugins/`; usually the editor's own folder.
  * @note Reads the disk but never writes to it.
  */
 [[nodiscard]] ExportPlan plan_export(const std::filesystem::path& game,

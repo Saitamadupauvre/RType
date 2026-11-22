@@ -31,6 +31,7 @@ add_library(editor-core STATIC
     src/cli/Cli.cpp
     src/exporter/GameExport.cpp
     src/open/SystemOpener.cpp
+    src/platform/Executable.cpp
     src/play/PlaySession.cpp
     src/project/ProjectFiles.cpp
     src/play/ProcessLauncher.cpp
@@ -82,7 +83,8 @@ add_library(editor-core STATIC
     src/ui/widgets/Toggle.cpp
 )
 target_include_directories(editor-core PUBLIC src)
-target_link_libraries(editor-core PUBLIC editor-clay engine::editor PRIVATE clap::clap nlohmann_json::nlohmann_json)
+target_link_libraries(editor-core PUBLIC editor-clay engine::editor PRIVATE clap::clap
+    nlohmann_json::nlohmann_json $<$<PLATFORM_ID:Windows>:Shell32>)
 editor_set_warnings(editor-core)
 
 set(EDITOR_ASSETS_DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/editor-assets)
