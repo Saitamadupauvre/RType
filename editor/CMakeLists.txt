@@ -31,6 +31,7 @@ add_library(editor-core STATIC
     src/cli/Cli.cpp
     src/exporter/GameExport.cpp
     src/open/SystemOpener.cpp
+    src/platform/Executable.cpp
     src/play/PlaySession.cpp
     src/project/ProjectFiles.cpp
     src/play/ProcessLauncher.cpp

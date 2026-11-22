@@ -1,15 +1,18 @@
 #include "exporter/GameExport.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <format>
 #include <fstream>
 #include <optional>
 #include <stdexcept>
+#include <string_view>
 #include <system_error>
 #include <utility>
 
 #include "engine/script/GameFolder.hpp"
+#include "platform/Executable.hpp"
 
 namespace editor {
 
@@ -18,7 +21,15 @@ namespace {
 namespace fs = std::filesystem;
 
 constexpr std::string_view runtime_binary = "engine-runtime";
-constexpr std::string_view library_prefix = "libengine-";
+constexpr std::string_view unix_library_prefix = "libengine-";
+constexpr std::string_view bare_library_prefix = "engine-";
+// Libraries a plugin depends on but that are not themselves named "engine-*": the engine's own
+// plugins are loaded with the process directory as the only default search path (plugins/ is
+// not searched for a plugin's own dependencies on Windows), so these must also sit next to the
+// main executable, not only inside plugins/.
+constexpr std::array<std::string_view, 5> optional_runtime_libraries = {
+    "lua.dll", "liblua.so", "liblua.dylib", "raylib.dll", "glfw3.dll"};
+constexpr std::array<std::string_view, 3> library_extensions = {".dll", ".so", ".dylib"};
 constexpr std::string_view fallback_name = "game";
 constexpr std::string_view readme_file = "README.txt";
 
@@ -44,21 +55,35 @@ bool empty_folder(const fs::path& path) {
 
 void add_binary(ExportPlan& plan, const fs::path& runtime, std::string_view binary,
                 const std::string& name) {
-    const fs::path from = runtime / binary;
+    const fs::path from = runtime / executable_name(binary);
     if (!present(from)) {
         plan.problems.push_back(std::format("runtime not found: {}", from.generic_string()));
         return;
     }
-    plan.steps.push_back({.from = from, .to = plan.output / name});
+    plan.steps.push_back({.from = from, .to = plan.output / executable_name(name)});
+}
+
+bool is_runtime_library(const fs::path& path, std::string_view binary_name) {
+    const std::string file = path.filename().string();
+    if (file == binary_name) {
+        return false;
+    }
+    if (file.starts_with(unix_library_prefix) || file.starts_with(bare_library_prefix)) {
+        return true;
+    }
+    return std::ranges::find(optional_runtime_libraries, file) != optional_runtime_libraries.end();
 }
 
 void add_libraries(ExportPlan& plan, const fs::path& runtime) {
+    const std::string binary_name = executable_name(runtime_binary);
     std::error_code error;
     std::vector<fs::path> libraries;
     for (const fs::directory_entry& entry : fs::directory_iterator(runtime, error)) {
-        const std::string file = entry.path().filename().string();
-        if (file.starts_with(library_prefix) && entry.is_regular_file(error)) {
-            libraries.push_back(entry.path());
+        const fs::path& path = entry.path();
+        if (std::ranges::find(library_extensions, path.extension().string()) !=
+                library_extensions.end() &&
+            entry.is_regular_file(error) && is_runtime_library(path, binary_name)) {
+            libraries.push_back(path);
         }
     }
     std::ranges::sort(libraries);
@@ -92,15 +117,16 @@ void check_output(ExportPlan& plan, const fs::path& game, const ExportSettings& 
 
 std::string readme(const ExportSettings& settings) {
     const ExportModes& modes = settings.modes;
+    const std::string binary = executable_name(settings.name);
     std::string text = std::format("{}\n\n", settings.name);
     if (modes.solo) {
-        text += std::format("Play alone:             ./{} --solo\n", settings.name);
+        text += std::format("Play alone:             ./{} --solo\n", binary);
     }
     if (modes.host) {
-        text += std::format("Host and play:          ./{} --host 4242\n", settings.name);
+        text += std::format("Host and play:          ./{} --host 4242\n", binary);
     }
     if (modes.client) {
-        text += std::format("Join a game:            ./{} <server-ip> 4242\n", settings.name);
+        text += std::format("Join a game:            ./{} <server-ip> 4242\n", binary);
     }
     if (modes.dedicated) {
         text += std::format("Dedicated server:       ./{}-server 4242\n", settings.name);
@@ -115,7 +141,7 @@ std::optional<ExportLauncher> server_launcher(const ExportSettings& settings) {
     return ExportLauncher{
         .to = settings.output / (settings.name + "-server"),
         .text = std::format("#!/bin/sh\nexec \"$(dirname \"$0\")/{}\" --server \"$@\"\n",
-                            settings.name)};
+                            executable_name(settings.name))};
 }
 
 ExportModes modes_of(const std::optional<std::vector<std::string>>& names) {

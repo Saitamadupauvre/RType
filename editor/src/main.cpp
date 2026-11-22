@@ -9,6 +9,7 @@
 #include "action/OpenEditor.hpp"
 #include "cli/Cli.hpp"
 #include "engine/core/log/Log.hpp"
+#include "platform/Executable.hpp"
 #include "play/ProcessLauncher.hpp"
 #include "project/ProjectFiles.hpp"
 #include "raylib/EditorWindow.hpp"
@@ -36,7 +37,7 @@ int main(int argc, char** argv) {
     }
     const std::filesystem::path runtime =
         result.config->runtime.empty()
-            ? std::filesystem::path(argv[0]).parent_path() / "engine-runtime"
+            ? std::filesystem::path(argv[0]).parent_path() / editor::executable_name("engine-runtime")
             : result.config->runtime;
     const auto settings_file = editor::settings_path([](std::string_view name) {
         const std::string key(name);
