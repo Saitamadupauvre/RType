@@ -8,6 +8,7 @@
 #include "../../engine/script/scene/TempFolder.hpp"
 #include "engine/script/GameFolder.hpp"
 #include "exporter/GameExport.hpp"
+#include "platform/Executable.hpp"
 
 using editor::ExportModes;
 using editor::ExportPlan;
@@ -30,13 +31,14 @@ protected:
         _root.write("game/scripts/main.lua", "");
         _root.write("game/assets/ship.png", "png");
         _root.write("game/scenes/level1.json", "{}");
-        _root.write("runtime/engine-runtime", "runtime");
+        _root.write("runtime/" + editor::executable_name("engine-runtime"), "runtime");
         _root.write("runtime/libengine-core.so", "core");
         _root.write("runtime/libengine-app.so", "app");
         _root.write("runtime/libother.so", "other");
         _root.write("runtime/editor", "editor");
         _root.write("runtime/plugins/graphics-raylib.so", "graphics");
-        fs::permissions(_runtime / "engine-runtime", fs::perms::owner_exec, fs::perm_options::add);
+        fs::permissions(_runtime / editor::executable_name("engine-runtime"), fs::perms::owner_exec,
+                        fs::perm_options::add);
     }
 
     [[nodiscard]] ExportSettings settings() const { return {.name = "space", .output = _output}; }
@@ -93,17 +95,21 @@ TEST_F(GameExport, PlanCopiesTheRuntimeAndTheGame) {
 
     EXPECT_TRUE(planned.problems.empty());
     EXPECT_EQ(targets(planned),
-              (std::vector<std::string>{"space", "libengine-app.so", "libengine-core.so", "plugins",
-                                        "game.json", "scripts", "assets", "scenes"}));
+              (std::vector<std::string>{editor::executable_name("space"), "libengine-app.so",
+                                        "libengine-core.so", "plugins", "game.json", "scripts",
+                                        "assets", "scenes"}));
     EXPECT_EQ(planned.steps.front(),
-              (ExportStep{.from = _runtime / "engine-runtime", .to = _output / "space"}));
+              (ExportStep{.from = _runtime / editor::executable_name("engine-runtime"),
+                          .to = _output / editor::executable_name("space")}));
 }
 
 TEST_F(GameExport, ReadmeTellsHowToRunEveryMode) {
     const std::string readme = plan(settings()).readme;
+    const std::string binary = editor::executable_name("space");
 
-    for (const std::string_view mode :
-         {"./space --solo", "./space --host", "./space <server-ip>", "./space-server 4242"}) {
+    for (const std::string& mode :
+         {"./" + binary + " --solo", "./" + binary + " --host", "./" + binary + " <server-ip>",
+          std::string("./space-server 4242")}) {
         EXPECT_NE(readme.find(mode), std::string::npos) << mode;
     }
 }
@@ -114,7 +120,9 @@ TEST_F(GameExport, EveryModeIsOfferedByDefault) {
     EXPECT_EQ(planned.modes, (std::vector<std::string>{"solo", "host", "client", "dedicated"}));
     ASSERT_TRUE(planned.server_launcher.has_value());
     EXPECT_EQ(planned.server_launcher->to, _output / "space-server");
-    EXPECT_NE(planned.server_launcher->text.find("/space\" --server \"$@\""), std::string::npos);
+    EXPECT_NE(planned.server_launcher->text.find("/" + editor::executable_name("space") +
+                                                 "\" --server \"$@\""),
+              std::string::npos);
 }
 
 TEST_F(GameExport, DefaultsOfferTheModesTheProjectLists) {
@@ -142,7 +150,7 @@ TEST_F(GameExport, ReadmeOnlyListsTheOfferedModes) {
 
     const std::string readme = plan(chosen).readme;
 
-    EXPECT_NE(readme.find("./space --solo"), std::string::npos);
+    EXPECT_NE(readme.find("./" + editor::executable_name("space") + " --solo"), std::string::npos);
     EXPECT_EQ(readme.find("--host"), std::string::npos);
     EXPECT_EQ(readme.find("<server-ip>"), std::string::npos);
 }
@@ -207,8 +215,40 @@ TEST_F(GameExport, EmptyOutputIsFine) {
     EXPECT_TRUE(plan(settings()).problems.empty());
 }
 
+TEST_F(GameExport, LibrariesWithoutTheUnixLibPrefixAreCopiedToo) {
+    _root.write("runtime/engine-extra.dll", "extra");
+    _root.write("runtime/lua.dll", "lua");
+    _root.write("runtime/other.dll", "other");
+
+    const ExportPlan planned = plan(settings());
+
+    EXPECT_TRUE(planned.problems.empty());
+    const auto copied = targets(planned);
+    EXPECT_NE(std::ranges::find(copied, "engine-extra.dll"), copied.end());
+    EXPECT_NE(std::ranges::find(copied, "lua.dll"), copied.end());
+    EXPECT_EQ(std::ranges::find(copied, "other.dll"), copied.end());
+}
+
+TEST_F(GameExport, PluginBackendLibrariesNextToTheRuntimeAreCopiedToo) {
+    _root.write("runtime/raylib.dll", "raylib");
+    _root.write("runtime/glfw3.dll", "glfw");
+
+    const ExportPlan planned = plan(settings());
+
+    EXPECT_TRUE(planned.problems.empty());
+    const auto copied = targets(planned);
+    EXPECT_NE(std::ranges::find(copied, "raylib.dll"), copied.end());
+    EXPECT_NE(std::ranges::find(copied, "glfw3.dll"), copied.end());
+}
+
+TEST_F(GameExport, TheRuntimeBinaryIsNeverCopiedAsALibraryToo) {
+    const ExportPlan planned = plan(settings());
+
+    EXPECT_EQ(std::ranges::count(targets(planned), editor::executable_name("engine-runtime")), 0);
+}
+
 TEST_F(GameExport, MissingRuntimePiecesAreProblems) {
-    fs::remove(_runtime / "engine-runtime");
+    fs::remove(_runtime / editor::executable_name("engine-runtime"));
     fs::remove_all(_runtime / "plugins");
 
     const ExportPlan planned = plan(settings());
@@ -230,7 +270,7 @@ TEST_F(GameExport, RunWritesEveryFileAndTheReadme) {
     const auto result = editor::run_export(planned);
 
     ASSERT_TRUE(result.ok) << result.message;
-    EXPECT_EQ(_root.read("out/space"), "runtime");
+    EXPECT_EQ(_root.read("out/" + editor::executable_name("space")), "runtime");
     EXPECT_EQ(_root.read("out/libengine-core.so"), "core");
     EXPECT_EQ(_root.read("out/plugins/graphics-raylib.so"), "graphics");
     EXPECT_EQ(_root.read("out/scripts/main.lua"), "");
@@ -238,7 +278,9 @@ TEST_F(GameExport, RunWritesEveryFileAndTheReadme) {
     EXPECT_EQ(_root.read("out/README.txt"), planned.readme);
     EXPECT_FALSE(fs::exists(_output / "libother.so"));
     EXPECT_FALSE(fs::exists(_output / "editor"));
-    EXPECT_NE(fs::status(_output / "space").permissions() & fs::perms::owner_exec, fs::perms::none);
+    EXPECT_NE(fs::status(_output / editor::executable_name("space")).permissions() &
+                 fs::perms::owner_exec,
+             fs::perms::none);
 }
 
 TEST_F(GameExport, RunWritesTheModesAndTheServerLauncher) {

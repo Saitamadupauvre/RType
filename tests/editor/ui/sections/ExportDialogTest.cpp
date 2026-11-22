@@ -8,6 +8,7 @@
 
 #include "../FrameFixture.hpp"
 #include "action/Action.hpp"
+#include "platform/Executable.hpp"
 #include "ui/UiInput.hpp"
 
 namespace command = editor::command;
@@ -22,7 +23,7 @@ protected:
     }
 
     void attach_runtime() {
-        _game.write(".runtime/engine-runtime", "runtime");
+        _game.write(".runtime/" + editor::executable_name("engine-runtime"), "runtime");
         _game.write(".runtime/plugins/graphics-raylib.so", "graphics");
         _editor.attach_runtime(_game.path() / ".runtime");
     }
