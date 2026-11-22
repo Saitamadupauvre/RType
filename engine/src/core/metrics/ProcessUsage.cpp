@@ -9,8 +9,9 @@
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-#include <psapi.h>
 #include <windows.h>
+
+#include <psapi.h>
 #elif defined(__APPLE__)
 #include <mach/mach.h>
 #include <sys/resource.h>

@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <string>
 #include <utility>
@@ -76,7 +77,8 @@ TEST(InputPayload, EncodesPointerAfterFlag) {
     input.pointer = engine::network::PointerPosition{.x = -2, .y = 300};
 
     std::vector<std::uint8_t> expected(17, 0x00);
-    for (const std::uint8_t byte : {0x01, 0xFF, 0xFE, 0x01, 0x2C}) {
+    for (const std::uint8_t byte :
+         std::initializer_list<std::uint8_t>{0x01, 0xFF, 0xFE, 0x01, 0x2C}) {
         expected.push_back(byte);
     }
     EXPECT_EQ(encode_payload(input), expected);

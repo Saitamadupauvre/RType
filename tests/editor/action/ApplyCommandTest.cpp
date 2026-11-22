@@ -17,6 +17,7 @@
 #include "action/EditorState.hpp"
 #include "engine/core/math/Vec2.hpp"
 #include "engine/editor/EditorSession.hpp"
+#include "platform/Executable.hpp"
 
 using editor::apply_command;
 using editor::apply_edit;
@@ -218,7 +219,7 @@ protected:
 
     ApplyExport() {
         _runtime = _game.path() / ".runtime";
-        _game.write(".runtime/engine-runtime", "runtime");
+        _game.write(".runtime/" + editor::executable_name("engine-runtime"), "runtime");
         _game.write(".runtime/plugins/graphics-raylib.so", "graphics");
     }
 
@@ -293,7 +294,7 @@ TEST_F(ApplyExport, ExportWritesTheGameAndClosesTheDialog) {
     ASSERT_TRUE(run(command::RunExport{}));
 
     EXPECT_FALSE(_state.export_dialog.has_value());
-    EXPECT_TRUE(std::filesystem::exists(_output / "editor-test"));
+    EXPECT_TRUE(std::filesystem::exists(_output / editor::executable_name("editor-test")));
     EXPECT_TRUE(std::filesystem::exists(_output / "editor-test-server"));
     EXPECT_TRUE(std::filesystem::exists(_output / "scenes" / "level1.json"));
     EXPECT_TRUE(std::filesystem::exists(_output / "README.txt"));

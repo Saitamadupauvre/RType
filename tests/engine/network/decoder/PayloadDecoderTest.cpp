@@ -1,6 +1,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <span>
 #include <string>
 #include <vector>
@@ -103,7 +104,7 @@ std::vector<std::uint8_t> raw_input(std::uint8_t first_key_byte, std::uint8_t la
 
 TEST(InputPayload, DecodesValidPayload) {
     auto payload = raw_input(0x06, 0x00, 0x03, 0x01);
-    for (const std::uint8_t byte : {0x00, 0x0A, 0xFF, 0xF6}) {
+    for (const std::uint8_t byte : std::initializer_list<std::uint8_t>{0x00, 0x0A, 0xFF, 0xF6}) {
         payload.push_back(byte);
     }
 

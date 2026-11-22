@@ -34,6 +34,9 @@ jobs:
           - name: macOS Clang
             os: macos-latest
             ccache: true
+          - name: Windows MSVC
+            os: windows-latest
+            ccache: false
 
     steps:
       - uses: actions/checkout@v7
@@ -54,6 +57,7 @@ jobs:
           restore-keys: ccache-${{ matrix.name }}-
 
       - name: Configure, build, test
+        shell: bash
         run: .github/scripts/run-workflow.sh ci
         env:
           CXX: ${{ matrix.cxx }}

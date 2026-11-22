@@ -7,7 +7,7 @@ option(WORKSPACE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 # Apply the project's warning flags to one of its own targets.
 function(workspace_set_warnings target)
     if(MSVC)
-        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8 /wd4251 /wd4275)
         if(WORKSPACE_WARNINGS_AS_ERRORS)
             target_compile_options(${target} PRIVATE /WX)
         endif()

@@ -49,6 +49,12 @@ public:
  */
 class EntityManager {
 public:
+    EntityManager() = default;
+    EntityManager(const EntityManager&) = delete;
+    EntityManager& operator=(const EntityManager&) = delete;
+    EntityManager(EntityManager&&) = default;
+    EntityManager& operator=(EntityManager&&) = default;
+
     /**
      * @brief Creates a new entity.
      * @return A handle that stays alive until kill() is called with it.

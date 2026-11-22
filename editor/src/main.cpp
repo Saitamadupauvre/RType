@@ -9,6 +9,7 @@
 #include "action/OpenEditor.hpp"
 #include "cli/Cli.hpp"
 #include "engine/core/log/Log.hpp"
+#include "platform/Executable.hpp"
 #include "play/ProcessLauncher.hpp"
 #include "project/ProjectFiles.hpp"
 #include "raylib/EditorWindow.hpp"
@@ -34,14 +35,25 @@ int main(int argc, char** argv) {
         std::cerr << "editor: cannot open " << result.config->game.string() << "\n";
         return 84;
     }
-    const std::filesystem::path runtime =
-        result.config->runtime.empty()
-            ? std::filesystem::path(argv[0]).parent_path() / "engine-runtime"
-            : result.config->runtime;
+    const std::filesystem::path runtime = result.config->runtime.empty()
+                                              ? std::filesystem::path(argv[0]).parent_path() /
+                                                    editor::executable_name("engine-runtime")
+                                              : result.config->runtime;
     const auto settings_file = editor::settings_path([](std::string_view name) {
         const std::string key(name);
+#if defined(_WIN32)
+        char* value = nullptr;
+        std::size_t length = 0;
+        if (_dupenv_s(&value, &length, key.c_str()) != 0 || value == nullptr) {
+            return std::optional<std::string>();
+        }
+        std::optional<std::string> result(value);
+        std::free(value);
+        return result;
+#else
         const char* value = std::getenv(key.c_str());
         return value ? std::optional<std::string>(value) : std::nullopt;
+#endif
     });
     const editor::LoadedSettings settings =
         settings_file ? editor::load_settings(*settings_file) : editor::LoadedSettings{};

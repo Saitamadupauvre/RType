@@ -3,10 +3,21 @@
 #include "OpGuard.hpp"
 #include "SocketError.hpp"
 
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <array>
@@ -21,18 +32,112 @@ using namespace std::chrono_literals;
 
 constexpr auto close_check_interval = 100ms;
 
+#if defined(_WIN32)
+using io_result_t = int;
+using poll_fd_t = WSAPOLLFD;
+constexpr int shutdown_both = SD_BOTH;
+constexpr int send_flags = 0;
+constexpr int recv_flags = 0;
+
+void ensure_winsock_initialized() noexcept {
+    static const struct WinsockInit {
+        WinsockInit() noexcept {
+            WSADATA data{};
+            WSAStartup(MAKEWORD(2, 2), &data);
+        }
+        ~WinsockInit() { WSACleanup(); }
+        WinsockInit(const WinsockInit&) = delete;
+        WinsockInit& operator=(const WinsockInit&) = delete;
+        WinsockInit(WinsockInit&&) = delete;
+        WinsockInit& operator=(WinsockInit&&) = delete;
+    } winsock_init;
+    (void)winsock_init;
+}
+
+int last_socket_errno() noexcept { return WSAGetLastError(); }
+
+int to_fd(SOCKET socket) noexcept {
+    return socket == INVALID_SOCKET ? -1 : static_cast<int>(socket);
+}
+
+SOCKET to_native(int fd) noexcept {
+    return fd < 0 ? INVALID_SOCKET : static_cast<SOCKET>(static_cast<UINT_PTR>(fd));
+}
+
+int poll_fds(poll_fd_t* fds, unsigned long count, int timeout) noexcept {
+    return WSAPoll(fds, count, timeout);
+}
+
+void close_native(int fd) noexcept { ::closesocket(to_native(fd)); }
+
+#else
+using io_result_t = ssize_t;
+using poll_fd_t = pollfd;
+constexpr int shutdown_both = SHUT_RDWR;
+
 #ifdef MSG_NOSIGNAL
 constexpr int send_flags = MSG_NOSIGNAL;
 #else
 constexpr int send_flags = 0;
 #endif
 
-std::error_code last_error() noexcept { return socket_error_from_errno(errno); }
+#ifdef MSG_DONTWAIT
+constexpr int recv_flags = MSG_DONTWAIT;
+#else
+constexpr int recv_flags = 0;
+#endif
+
+void ensure_winsock_initialized() noexcept {}
+
+int last_socket_errno() noexcept { return errno; }
+
+int to_native(int fd) noexcept { return fd; }
+
+int poll_fds(poll_fd_t* fds, nfds_t count, int timeout) noexcept {
+    return ::poll(fds, count, timeout);
+}
+
+void close_native(int fd) noexcept { ::close(fd); }
+
+#endif
+
+#if defined(_WIN32)
+int socket_errno_of(int wsa_error) noexcept {
+    switch (wsa_error) {
+    case WSAEBADF:
+    case WSAENOTSOCK:
+        return EBADF;
+    case WSAEADDRINUSE:
+        return EADDRINUSE;
+    case WSAEADDRNOTAVAIL:
+        return EADDRNOTAVAIL;
+    case WSAEACCES:
+        return EACCES;
+    case WSAECONNREFUSED:
+        return ECONNREFUSED;
+    case WSAEMSGSIZE:
+        return EMSGSIZE;
+    case WSAEAFNOSUPPORT:
+        return EAFNOSUPPORT;
+    default:
+        return wsa_error;
+    }
+}
+#else
+int socket_errno_of(int error) noexcept { return error; }
+#endif
+
+std::error_code last_error() noexcept {
+    return socket_error_from_errno(socket_errno_of(last_socket_errno()));
+}
 
 std::error_code closed_socket_error() noexcept { return make_error_code(SocketError::closed); }
 
 int open_datagram_socket(int domain) noexcept {
-#ifdef SOCK_CLOEXEC
+    ensure_winsock_initialized();
+#if defined(_WIN32)
+    return to_fd(::socket(domain, SOCK_DGRAM, 0));
+#elif defined(SOCK_CLOEXEC)
     return ::socket(domain, SOCK_DGRAM | SOCK_CLOEXEC, 0);
 #else
     const int fd = ::socket(domain, SOCK_DGRAM, 0);
@@ -47,7 +152,11 @@ int open_datagram_socket(int domain) noexcept {
 }
 
 bool is_retryable_receive_error(int error) noexcept {
+#if defined(_WIN32)
+    return error == WSAEINTR || error == WSAEWOULDBLOCK;
+#else
     return error == EINTR || error == EAGAIN || error == EWOULDBLOCK;
+#endif
 }
 
 } // namespace
@@ -182,14 +291,14 @@ void UdpSocket::close() noexcept {
         return;
     }
 
-    ::shutdown(fd, SHUT_RDWR);
+    ::shutdown(to_native(fd), shutdown_both);
 
     for (unsigned int pending = active_ops_.load(std::memory_order_seq_cst); pending != 0;
          pending = active_ops_.load(std::memory_order_seq_cst)) {
         active_ops_.wait(pending, std::memory_order_seq_cst);
     }
 
-    ::close(fd);
+    close_native(fd);
 }
 
 void UdpSocket::bind(const Endpoint& local, std::error_code& ec) noexcept {
@@ -200,7 +309,7 @@ void UdpSocket::bind(const Endpoint& local, std::error_code& ec) noexcept {
         return;
     }
 
-    if (::bind(guard.fd, local.addr(), local.size()) < 0) {
+    if (::bind(to_native(guard.fd), local.addr(), local.size()) < 0) {
         ec = last_error();
     }
 }
@@ -214,7 +323,8 @@ void UdpSocket::set_reuse_address(bool enable, std::error_code& ec) noexcept {
     }
 
     const int value = enable ? 1 : 0;
-    if (::setsockopt(guard.fd, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value)) < 0) {
+    if (::setsockopt(to_native(guard.fd), SOL_SOCKET, SO_REUSEADDR,
+                     reinterpret_cast<const char*>(&value), sizeof(value)) < 0) {
         ec = last_error();
     }
 }
@@ -230,7 +340,7 @@ Endpoint UdpSocket::local_endpoint(std::error_code& ec) const noexcept {
 
     local.prepare_for_receive();
     socklen_t length = local.size();
-    if (::getsockname(guard.fd, local.addr(), &length) < 0) {
+    if (::getsockname(to_native(guard.fd), local.addr(), &length) < 0) {
         ec = last_error();
         return {};
     }
@@ -248,12 +358,17 @@ std::size_t UdpSocket::send_to(std::span<const std::uint8_t> data, const Endpoin
     }
 
     for (;;) {
-        const ssize_t sent =
-            ::sendto(guard.fd, data.data(), data.size(), send_flags, to.addr(), to.size());
+        const io_result_t sent =
+            ::sendto(to_native(guard.fd), reinterpret_cast<const char*>(data.data()),
+                     static_cast<int>(data.size()), send_flags, to.addr(), to.size());
         if (sent >= 0) {
             return static_cast<std::size_t>(sent);
         }
+#if defined(_WIN32)
+        if (last_socket_errno() != WSAEINTR) {
+#else
         if (errno != EINTR) {
+#endif
             ec = last_error();
             return 0;
         }
@@ -281,9 +396,13 @@ std::size_t UdpSocket::receive_from(std::span<std::uint8_t> buffer, Endpoint& fr
         const auto wait =
             waits_forever ? close_check_interval : std::clamp(remaining, 0ms, close_check_interval);
 
-        pollfd request{.fd = guard.fd, .events = POLLIN, .revents = 0};
-        const int ready = ::poll(&request, 1, static_cast<int>(wait.count()));
+        poll_fd_t request{.fd = to_native(guard.fd), .events = POLLIN, .revents = 0};
+        const int ready = poll_fds(&request, 1, static_cast<int>(wait.count()));
+#if defined(_WIN32)
+        if (ready < 0 && last_socket_errno() != WSAEINTR) {
+#else
         if (ready < 0 && errno != EINTR) {
+#endif
             ec = last_error();
             return 0;
         }
@@ -296,13 +415,20 @@ std::size_t UdpSocket::receive_from(std::span<std::uint8_t> buffer, Endpoint& fr
         if (ready > 0) {
             from.prepare_for_receive();
             socklen_t length = from.size();
-            const ssize_t received = ::recvfrom(guard.fd, buffer.data(), buffer.size(),
-                                                MSG_DONTWAIT, from.addr(), &length);
+            const io_result_t received =
+                ::recvfrom(to_native(guard.fd), reinterpret_cast<char*>(buffer.data()),
+                           static_cast<int>(buffer.size()), recv_flags, from.addr(), &length);
             if (received >= 0) {
                 from.set_size(length);
                 return static_cast<std::size_t>(received);
             }
-            if (!is_retryable_receive_error(errno)) {
+#if defined(_WIN32)
+            if (last_socket_errno() == WSAEMSGSIZE) {
+                from.set_size(length);
+                return buffer.size();
+            }
+#endif
+            if (!is_retryable_receive_error(last_socket_errno())) {
                 ec = last_error();
                 return 0;
             }
