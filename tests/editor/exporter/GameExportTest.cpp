@@ -279,8 +279,8 @@ TEST_F(GameExport, RunWritesEveryFileAndTheReadme) {
     EXPECT_FALSE(fs::exists(_output / "libother.so"));
     EXPECT_FALSE(fs::exists(_output / "editor"));
     EXPECT_NE(fs::status(_output / editor::executable_name("space")).permissions() &
-                 fs::perms::owner_exec,
-             fs::perms::none);
+                  fs::perms::owner_exec,
+              fs::perms::none);
 }
 
 TEST_F(GameExport, RunWritesTheModesAndTheServerLauncher) {

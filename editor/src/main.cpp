@@ -35,10 +35,10 @@ int main(int argc, char** argv) {
         std::cerr << "editor: cannot open " << result.config->game.string() << "\n";
         return 84;
     }
-    const std::filesystem::path runtime =
-        result.config->runtime.empty()
-            ? std::filesystem::path(argv[0]).parent_path() / editor::executable_name("engine-runtime")
-            : result.config->runtime;
+    const std::filesystem::path runtime = result.config->runtime.empty()
+                                              ? std::filesystem::path(argv[0]).parent_path() /
+                                                    editor::executable_name("engine-runtime")
+                                              : result.config->runtime;
     const auto settings_file = editor::settings_path([](std::string_view name) {
         const std::string key(name);
 #if defined(_WIN32)
